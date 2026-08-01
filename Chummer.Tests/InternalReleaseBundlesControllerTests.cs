@@ -744,6 +744,32 @@ public sealed class InternalReleaseBundlesControllerTests
         Assert.Contains("sessionId must be a valid GUID", problem.Detail ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("avalonia-linux-x64-installer")]
+    [InlineData("avalonia-win-x64-installer")]
+    [InlineData("avalonia-win-x64-installer-payload")]
+    public async Task UploadSessionFileAcceptsArtifactSpecificGovernedSbomPath(string artifactId)
+    {
+        using ControllerFixture fixture = new();
+        AuthenticateController(fixture);
+
+        OkObjectResult sessionResponse = Assert.IsType<OkObjectResult>(fixture.Controller.CreateUploadSession().Result);
+        var created = Assert.IsType<InternalReleaseBundlesController.ReleaseUploadSessionCreatedResponse>(sessionResponse.Value);
+        FormFile formFile = BuildTextFormFile($"{artifactId}.cdx.json", "application/json", "{}");
+
+        ActionResult<InternalReleaseBundlesController.ReleaseUploadFileStoredResponse> response =
+            await fixture.Controller.UploadSessionFile(
+                created.SessionId,
+                formFile,
+                $"proof/build-provenance/v1/sbom/{artifactId}.cdx.json",
+                CancellationToken.None);
+
+        OkObjectResult stored = Assert.IsType<OkObjectResult>(response.Result);
+        var result = Assert.IsType<InternalReleaseBundlesController.ReleaseUploadFileStoredResponse>(stored.Value);
+        Assert.Equal($"proof/build-provenance/v1/sbom/{artifactId}.cdx.json", result.RelativePath);
+        Assert.Equal(2, result.BytesStored);
+    }
+
     [Fact]
     public async Task UploadSessionChunkRejectsInvalidSessionId()
     {

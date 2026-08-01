@@ -23,8 +23,24 @@ internal static partial class ReleaseBuildProvenanceValidator
     private static readonly IReadOnlyDictionary<string, BuildIdentity> BuildIdentityByPlatform =
         new Dictionary<string, BuildIdentity>(StringComparer.Ordinal)
         {
-            ["macos"] = new("chummer-mac-hosted-bootstrap", "macos-desktop-release", "hosted-bootstrap"),
-            ["windows"] = new("chummer-windows-release-bootstrap", "windows-desktop-release", "windows-bootstrap-recipe")
+            ["linux"] = new(
+                "chummer-linux-desktop-exit-gate",
+                "chummer6.desktop.linux-self-contained-installer",
+                new HashSet<string>(StringComparer.Ordinal) { "source_snapshot_manifest" }),
+            ["macos"] = new(
+                "chummer-mac-hosted-bootstrap",
+                "macos-desktop-release",
+                new HashSet<string>(StringComparer.Ordinal)
+                {
+                    "hosted-bootstrap", "desktop-project", "desktop-installer-recipe", "dotnet-sdk-selection"
+                }),
+            ["windows"] = new(
+                "chummer-windows-release-bootstrap",
+                "windows-desktop-release",
+                new HashSet<string>(StringComparer.Ordinal)
+                {
+                    "windows-bootstrap-recipe", "desktop-project", "desktop-installer-recipe", "dotnet-sdk-selection"
+                })
         };
     private static readonly HashSet<string> RequiredSourceMaterials =
     [
@@ -59,10 +75,12 @@ internal static partial class ReleaseBuildProvenanceValidator
         ValidateGovernedPaths(governedRoot, invocationRoot, sbomRoot);
 
         Dictionary<string, SbomBinding> sboms = LoadSboms(sbomRoot);
-        HashSet<string> expectedTargets = expected.Values.Select(static item => item.TargetId).ToHashSet(StringComparer.Ordinal);
-        if (!sboms.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(expectedTargets))
+        HashSet<string> expectedSbomPaths = expected.Keys
+            .Select(static artifactId => $"proof/build-provenance/v1/sbom/{artifactId}.cdx.json")
+            .ToHashSet(StringComparer.Ordinal);
+        if (!sboms.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(expectedSbomPaths))
         {
-            throw new InvalidDataException("governed build provenance SBOM target set does not match desktop artifact targets.");
+            throw new InvalidDataException("governed build provenance SBOM set does not match desktop artifacts.");
         }
 
         Dictionary<string, JsonObject> subjects = new(StringComparer.Ordinal);
@@ -117,7 +135,7 @@ internal static partial class ReleaseBuildProvenanceValidator
             string fileName = normalized[sbomPrefix.Length..];
             if (!fileName.Contains('/')
                 && fileName.EndsWith(".cdx.json", StringComparison.Ordinal)
-                && TargetByHead.Values.Contains(fileName[..^".cdx.json".Length], StringComparer.Ordinal))
+                && SafeId().IsMatch(fileName[..^".cdx.json".Length]))
             {
                 maximumBytes = MaximumSbomBytes;
                 return true;
@@ -170,15 +188,58 @@ internal static partial class ReleaseBuildProvenanceValidator
                 artifactId,
                 new ExpectedArtifact(
                     artifactId,
+                    "desktop_download",
                     fileName,
                     digest,
                     sizeBytes.Value,
                     targetId,
                     buildIdentity.BuilderId,
                     buildIdentity.BuildType,
-                    buildIdentity.BootstrapInputLabel)))
+                    buildIdentity.RequiredBuildInputs)))
             {
                 throw new InvalidDataException($"desktop artifact id is duplicated: {artifactId}.");
+            }
+
+            string payloadFileName = JsonString(artifact["payloadFileName"]);
+            string payloadDigest = NormalizeDigest(JsonString(artifact["payloadSha256"]));
+            long? payloadSizeBytes = JsonInt64(artifact["payloadSizeBytes"]);
+            if (!string.IsNullOrWhiteSpace(payloadFileName)
+                || !string.IsNullOrWhiteSpace(payloadDigest)
+                || payloadSizeBytes is not null)
+            {
+                string payloadArtifactId = $"{artifactId}-payload";
+                if (!SafeId().IsMatch(payloadArtifactId)
+                    || string.IsNullOrWhiteSpace(payloadFileName)
+                    || !string.Equals(payloadFileName, Path.GetFileName(payloadFileName), StringComparison.Ordinal)
+                    || !Sha256().IsMatch(payloadDigest)
+                    || payloadSizeBytes is null or <= 0)
+                {
+                    throw new InvalidDataException($"desktop payload row is incomplete for governed provenance: {artifactId}.");
+                }
+
+                string payloadPath = Path.Combine(filesRoot, payloadFileName);
+                RequireRegularFile(payloadPath, $"payload bytes for {artifactId}");
+                if (new FileInfo(payloadPath).Length != payloadSizeBytes.Value
+                    || !string.Equals(Sha256For(payloadPath), payloadDigest, StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException($"desktop payload identity does not match its manifest row: {artifactId}.");
+                }
+
+                if (!expected.TryAdd(
+                    payloadArtifactId,
+                    new ExpectedArtifact(
+                        payloadArtifactId,
+                        "desktop_payload",
+                        payloadFileName,
+                        payloadDigest,
+                        payloadSizeBytes.Value,
+                        targetId,
+                        buildIdentity.BuilderId,
+                        buildIdentity.BuildType,
+                        buildIdentity.RequiredBuildInputs)))
+                {
+                    throw new InvalidDataException($"desktop payload id is duplicated: {payloadArtifactId}.");
+                }
             }
         }
 
@@ -235,26 +296,28 @@ internal static partial class ReleaseBuildProvenanceValidator
             }
 
             string fileName = Path.GetFileName(path);
-            string targetId = fileName[..^".cdx.json".Length];
-            if (!TargetByHead.Values.Contains(targetId, StringComparer.Ordinal))
+            string artifactId = fileName[..^".cdx.json".Length];
+            if (!SafeId().IsMatch(artifactId))
             {
-                throw new InvalidDataException($"governed build provenance has an unexpected SBOM target: {targetId}.");
+                throw new InvalidDataException($"governed build provenance has an unsafe SBOM artifact id: {artifactId}.");
             }
 
             JsonObject payload = ParseObject(path, "SBOM");
             JsonObject component = payload["metadata"]?["component"] as JsonObject
                 ?? throw new InvalidDataException($"SBOM metadata component is missing: {fileName}.");
+            string targetId = JsonString(component["name"]);
             if (!string.Equals(JsonString(payload["bomFormat"]), "CycloneDX", StringComparison.Ordinal)
                 || !string.Equals(JsonString(payload["specVersion"]), "1.5", StringComparison.Ordinal)
-                || !string.Equals(JsonString(component["name"]), targetId, StringComparison.Ordinal)
+                || !TargetByHead.Values.Contains(targetId, StringComparer.Ordinal)
                 || !string.Equals(JsonString(component["bom-ref"]), $"urn:chummer:project:{targetId}", StringComparison.Ordinal))
             {
                 throw new InvalidDataException($"SBOM contract or target binding is invalid: {fileName}.");
             }
 
-            if (!result.TryAdd(targetId, new SbomBinding(targetId, path, Sha256For(path))))
+            string relativePath = $"proof/build-provenance/v1/sbom/{fileName}";
+            if (!result.TryAdd(relativePath, new SbomBinding(targetId, path, Sha256For(path))))
             {
-                throw new InvalidDataException($"governed build provenance has duplicate SBOM target: {targetId}.");
+                throw new InvalidDataException($"governed build provenance has duplicate SBOM path: {relativePath}.");
             }
         }
 
@@ -340,7 +403,7 @@ internal static partial class ReleaseBuildProvenanceValidator
             throw new InvalidDataException(
                 $"build provenance invocation authority does not match the artifact platform: {artifactId}.");
         }
-        ValidateBuildInputs(state, invocationId, artifact.BootstrapInputLabel);
+        ValidateBuildInputs(state, invocationId, artifact.RequiredBuildInputs);
         if (subjects.ContainsKey(artifactId))
         {
             throw new InvalidDataException($"build provenance contains duplicate subject: {artifactId}.");
@@ -355,14 +418,17 @@ internal static partial class ReleaseBuildProvenanceValidator
         JsonObject source = state["source"] as JsonObject ?? new JsonObject();
         JsonObject sbom = state["sbom"] as JsonObject ?? new JsonObject();
         long? startedEpochNs = JsonInt64(state["started_epoch_ns"]);
-        if (!sboms.TryGetValue(artifact.TargetId, out SbomBinding? sbomBinding))
+        string expectedSbomPath = $"proof/build-provenance/v1/sbom/{artifact.ArtifactId}.cdx.json";
+        if (!string.Equals(JsonString(sbom["path"]), expectedSbomPath, StringComparison.Ordinal)
+            || !sboms.TryGetValue(expectedSbomPath, out SbomBinding? sbomBinding)
+            || !string.Equals(sbomBinding.TargetId, artifact.TargetId, StringComparison.Ordinal))
         {
-            throw new InvalidDataException($"build provenance SBOM is missing for target: {artifact.TargetId}.");
+            throw new InvalidDataException($"build provenance SBOM path or target is invalid for artifact: {artifact.ArtifactId}.");
         }
 
         bool identityMatches =
             string.Equals(JsonString(subject["artifact_id"]), artifact.ArtifactId, StringComparison.Ordinal)
-            && string.Equals(JsonString(subject["artifact_kind"]), "desktop_download", StringComparison.Ordinal)
+            && string.Equals(JsonString(subject["artifact_kind"]), artifact.ArtifactKind, StringComparison.Ordinal)
             && string.Equals(JsonString(subject["artifact_name"]), artifact.FileName, StringComparison.Ordinal)
             && string.Equals(NormalizeDigest(JsonString(subject["artifact_sha256"])), artifact.Sha256, StringComparison.Ordinal)
             && JsonInt64(subject["artifact_size_bytes"]) == artifact.SizeBytes
@@ -380,7 +446,7 @@ internal static partial class ReleaseBuildProvenanceValidator
             && string.Equals(JsonString(sbom["sha256"]), sbomBinding.Sha256, StringComparison.Ordinal)
             && string.Equals(JsonString(sbom["generator"]), "deterministic_project.assets.json_inventory.v1", StringComparison.Ordinal)
             && string.Equals(JsonString(declaration["artifact_id"]), artifact.ArtifactId, StringComparison.Ordinal)
-            && string.Equals(JsonString(declaration["artifact_kind"]), "desktop_download", StringComparison.Ordinal)
+            && string.Equals(JsonString(declaration["artifact_kind"]), artifact.ArtifactKind, StringComparison.Ordinal)
             && string.Equals(JsonString(declaration["artifact_name"]), artifact.FileName, StringComparison.Ordinal)
             && string.Equals(JsonString(declaration["artifact_binding_type"]), "file", StringComparison.Ordinal)
             && string.Equals(Path.GetFileName(JsonString(declaration["artifact_path"])), artifact.FileName, StringComparison.Ordinal)
@@ -428,15 +494,11 @@ internal static partial class ReleaseBuildProvenanceValidator
         }
     }
 
-    private static void ValidateBuildInputs(JsonObject state, string invocationId, string bootstrapInputLabel)
+    private static void ValidateBuildInputs(
+        JsonObject state,
+        string invocationId,
+        IReadOnlySet<string> required)
     {
-        HashSet<string> required =
-        [
-            bootstrapInputLabel,
-            "desktop-project",
-            "desktop-installer-recipe",
-            "dotnet-sdk-selection"
-        ];
         if (state["build_inputs"] is not JsonArray inputs)
         {
             throw new InvalidDataException($"build provenance inputs are missing: {invocationId}.");
@@ -575,15 +637,19 @@ internal static partial class ReleaseBuildProvenanceValidator
 
     private sealed record ExpectedArtifact(
         string ArtifactId,
+        string ArtifactKind,
         string FileName,
         string Sha256,
         long SizeBytes,
         string TargetId,
         string BuilderId,
         string BuildType,
-        string BootstrapInputLabel);
+        IReadOnlySet<string> RequiredBuildInputs);
 
     private sealed record SbomBinding(string TargetId, string Path, string Sha256);
 
-    private sealed record BuildIdentity(string BuilderId, string BuildType, string BootstrapInputLabel);
+    private sealed record BuildIdentity(
+        string BuilderId,
+        string BuildType,
+        IReadOnlySet<string> RequiredBuildInputs);
 }

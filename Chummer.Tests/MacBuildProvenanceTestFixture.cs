@@ -10,7 +10,8 @@ internal sealed record MacBuildProvenanceSubject(
     string Head,
     string FileName,
     byte[] Bytes,
-    string Platform = "macos");
+    string Platform = "macos",
+    string ArtifactKind = "desktop_download");
 
 internal static class MacBuildProvenanceTestFixture
 {
@@ -21,17 +22,18 @@ internal static class MacBuildProvenanceTestFixture
 
     public static bool IsGovernedDesktopPlatform(string platform)
         => IsMacPlatform(platform)
-           || platform.Trim().ToLowerInvariant() is "win" or "windows";
+           || platform.Trim().ToLowerInvariant() is "linux" or "win" or "windows";
 
     public static IReadOnlyDictionary<string, byte[]> CreateFiles(
         IEnumerable<MacBuildProvenanceSubject> subjects)
     {
         MacBuildProvenanceSubject[] subjectRows = subjects.ToArray();
         Dictionary<string, byte[]> files = new(StringComparer.Ordinal);
-        Dictionary<string, (byte[] Bytes, string Sha256)> sboms = new(StringComparer.Ordinal);
+        Dictionary<string, (byte[] Bytes, string Sha256, string TargetId)> sboms = new(StringComparer.Ordinal);
 
-        foreach (string targetId in subjectRows.Select(ResolveTargetId).Distinct(StringComparer.Ordinal))
+        foreach (MacBuildProvenanceSubject subject in subjectRows)
         {
+            string targetId = ResolveTargetId(subject);
             JsonObject sbom = new()
             {
                 ["bomFormat"] = "CycloneDX",
@@ -51,9 +53,9 @@ internal static class MacBuildProvenanceTestFixture
                 ["dependencies"] = new JsonArray()
             };
             byte[] bytes = Encoding.UTF8.GetBytes(sbom.ToJsonString(JsonOptions));
-            string relativePath = $"proof/build-provenance/v1/sbom/{targetId}.cdx.json";
+            string relativePath = $"proof/build-provenance/v1/sbom/{subject.ArtifactId}.cdx.json";
             files.Add(relativePath, bytes);
-            sboms.Add(targetId, (bytes, Sha256For(bytes)));
+            sboms.Add(subject.ArtifactId, (bytes, Sha256For(bytes), targetId));
         }
 
         foreach (MacBuildProvenanceSubject subject in subjectRows)
@@ -65,7 +67,7 @@ internal static class MacBuildProvenanceTestFixture
             string sourceCommit = new('d', 40);
             string sourceTree = new('e', 40);
             string artifactSha = Sha256For(subject.Bytes);
-            string sbomSha = sboms[targetId].Sha256;
+            string sbomSha = sboms[subject.ArtifactId].Sha256;
 
             JsonArray sourceMaterials = new();
             foreach (string repository in new[]
@@ -89,13 +91,7 @@ internal static class MacBuildProvenanceTestFixture
             }
 
             JsonArray buildInputs = new();
-            foreach (string label in new[]
-                     {
-                         buildIdentity.BootstrapInputLabel,
-                         "desktop-project",
-                         "desktop-installer-recipe",
-                         "dotnet-sdk-selection"
-                     })
+            foreach (string label in buildIdentity.RequiredBuildInputs)
             {
                 buildInputs.Add(new JsonObject
                 {
@@ -127,7 +123,7 @@ internal static class MacBuildProvenanceTestFixture
                 ["subject_declaration"] = new JsonObject
                 {
                     ["artifact_id"] = subject.ArtifactId,
-                    ["artifact_kind"] = "desktop_download",
+                    ["artifact_kind"] = subject.ArtifactKind,
                     ["artifact_name"] = subject.FileName,
                     ["artifact_binding_type"] = "file",
                     ["artifact_path"] = $"/dist/files/{subject.FileName}",
@@ -136,7 +132,7 @@ internal static class MacBuildProvenanceTestFixture
                 },
                 ["sbom"] = new JsonObject
                 {
-                    ["path"] = $"/proof/sbom/{targetId}.cdx.json",
+                    ["path"] = $"proof/build-provenance/v1/sbom/{subject.ArtifactId}.cdx.json",
                     ["sha256"] = sbomSha,
                     ["source_assets_path"] = "/source/App/obj/project.assets.json",
                     ["source_assets_sha256"] = new string('f', 64),
@@ -175,7 +171,7 @@ internal static class MacBuildProvenanceTestFixture
                     new JsonObject
                     {
                         ["artifact_id"] = subject.ArtifactId,
-                        ["artifact_kind"] = "desktop_download",
+                        ["artifact_kind"] = subject.ArtifactKind,
                         ["artifact_name"] = subject.FileName,
                         ["artifact_sha256"] = artifactSha,
                         ["artifact_size_bytes"] = subject.Bytes.LongLength,
@@ -222,9 +218,26 @@ internal static class MacBuildProvenanceTestFixture
         => platform.Trim().ToLowerInvariant() switch
         {
             "mac" or "macos" or "osx" or "darwin" =>
-                new BuildIdentity("chummer-mac-hosted-bootstrap", "macos-desktop-release", "hosted-bootstrap"),
+                new BuildIdentity(
+                    "chummer-mac-hosted-bootstrap",
+                    "macos-desktop-release",
+                    new HashSet<string>(StringComparer.Ordinal)
+                    {
+                        "hosted-bootstrap", "desktop-project", "desktop-installer-recipe", "dotnet-sdk-selection"
+                    }),
+            "linux" =>
+                new BuildIdentity(
+                    "chummer-linux-desktop-exit-gate",
+                    "chummer6.desktop.linux-self-contained-installer",
+                    new HashSet<string>(StringComparer.Ordinal) { "source_snapshot_manifest" }),
             "win" or "windows" =>
-                new BuildIdentity("chummer-windows-release-bootstrap", "windows-desktop-release", "windows-bootstrap-recipe"),
+                new BuildIdentity(
+                    "chummer-windows-release-bootstrap",
+                    "windows-desktop-release",
+                    new HashSet<string>(StringComparer.Ordinal)
+                    {
+                        "windows-bootstrap-recipe", "desktop-project", "desktop-installer-recipe", "dotnet-sdk-selection"
+                    }),
             _ => throw new InvalidDataException($"Unsupported desktop provenance fixture platform: {platform}.")
         };
 
@@ -271,5 +284,8 @@ internal static class MacBuildProvenanceTestFixture
     private static string Sha256For(byte[] bytes)
         => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
-    private sealed record BuildIdentity(string BuilderId, string BuildType, string BootstrapInputLabel);
+    private sealed record BuildIdentity(
+        string BuilderId,
+        string BuildType,
+        IReadOnlySet<string> RequiredBuildInputs);
 }
