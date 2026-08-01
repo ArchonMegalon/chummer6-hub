@@ -222,6 +222,9 @@ ISOLATED_BUILD_IGNORED_NAMES = frozenset(
 REQUIRED_COMPOSE_MOUNTPOINTS = (
     Path("wwwroot") / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
 )
+RUNTIME_COMPOSE_MOUNT_EXCLUSIONS = (
+    Path("state") / "origin-provider-accounts.json",
+)
 REQUIRED_LANDING_MARKERS = {
     "playDirectTarget": 'href="/mobile/player"',
     "playInstallHandoff": 'data-mobile-app-handoff="mobile-app-handoff"',
@@ -1315,7 +1318,7 @@ def staged_payload_rows(root: Path) -> list[dict[str, Any]]:
 def staged_payload_runtime_mount_exclusions() -> list[str]:
     return sorted(
         str(relative_path).replace(os.sep, "/")
-        for relative_path in REQUIRED_COMPOSE_MOUNTPOINTS
+        for relative_path in (*REQUIRED_COMPOSE_MOUNTPOINTS, *RUNTIME_COMPOSE_MOUNT_EXCLUSIONS)
     )
 
 
@@ -1333,7 +1336,9 @@ def staged_payload_fingerprint(root: Path) -> dict[str, Any]:
     }
     missing_or_invalid_mountpoints = [
         relative_path
-        for relative_path in staged_payload_runtime_mount_exclusions()
+        for relative_path in (
+            str(path).replace(os.sep, "/") for path in REQUIRED_COMPOSE_MOUNTPOINTS
+        )
         if (entry := entry_by_path.get(relative_path)) is None
         or entry.get("kind") != "file"
         or entry.get("modeActual") != "0644"
