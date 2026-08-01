@@ -550,7 +550,7 @@
         },
         {
           "name": "chummer:dependencyInventorySha256",
-          "value": "903c811cac6437c82454b3c7fe916e2a66a4b13ac215fa51ce40e2a188ab4535"
+          "value": "e6751ab260c183b185053589213b61852281a35c917dc512a8cd3f90139dd9ba"
         },
         {
           "name": "chummer:evidenceKind",
@@ -558,11 +558,11 @@
         },
         {
           "name": "chummer:releaseVersion",
-          "value": "run-20260731-095000"
+          "value": "run-20260801-013900"
         }
       ],
       "type": "application",
-      "version": "run-20260731-095000"
+      "version": "run-20260801-013900"
     },
     "tools": {
       "components": [
@@ -574,7 +574,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:f944686f-e320-56e8-a0ef-3bfc2efb386e",
+  "serialNumber": "urn:uuid:f2426b11-8578-54b9-ae8a-c59ef350aa69",
   "specVersion": "1.5",
   "version": 1
 }
