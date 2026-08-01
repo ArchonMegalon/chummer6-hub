@@ -99,7 +99,11 @@ def test_windows_visual_capture_requires_fresh_trace_before_generic_completion_w
     assert "function Test-InstallerTraceReportsCompletion" in script
     assert "$traceFile.LastWriteTimeUtc -lt $freshnessFloor" in script
     assert '([string]$_).Trim() -eq "Install complete"' in script
-    assert '$title.IndexOf(": Installing"' in script
+    assert (
+        '$title.IndexOf(": Installing", '
+        "[System.StringComparison]::OrdinalIgnoreCase) -ge 0"
+    ) in script
+    assert "Matched detailed installer window only after the fresh installer trace" in script
     assert "if ($AllowCompletionInstallerFallback -and (Test-InstallerTraceReportsCompletion))" in script
     assert (
         "Wait-ForInstallerSurface $captureSurface $effectiveAutoCaptureTimeoutSeconds "
