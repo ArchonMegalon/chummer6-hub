@@ -3008,8 +3008,14 @@ def configured_materializers(
     public_edge_full_deployment_digest_sha256: str = "",
     public_edge_pwa_asset_inventory_sha256: str = "",
     public_edge_release_channel_receipt: str = "",
+    authorize_external_release_writes: bool = False,
 ) -> list[list[str]]:
     commands = [list(command) for command in MATERIALIZERS]
+    if authorize_external_release_writes:
+        release_controller = next(
+            item for item in commands if item and item[0] == str(RELEASE_READY_CONTROLLER)
+        )
+        release_controller.append("--authorize-external-release-writes")
     if not public_edge_skip_preflight:
         if public_edge_full_deployment_digest_sha256 or public_edge_pwa_asset_inventory_sha256:
             raise ValueError("public-edge deployment digests require --public-edge-skip-preflight")
@@ -3043,7 +3049,11 @@ def configured_materializers(
     return commands
 
 
-def run_materializers(materializers: list[list[str]] | None = None) -> list[dict[str, Any]]:
+def run_materializers(
+    materializers: list[list[str]] | None = None,
+    *,
+    environment: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for command in materializers or MATERIALIZERS:
         timeout_seconds = materializer_timeout_seconds(command)
@@ -3053,6 +3063,7 @@ def run_materializers(materializers: list[list[str]] | None = None) -> list[dict
         process = subprocess.Popen(
             command,
             cwd=RUN_SERVICES_ROOT,
+            env=environment,
             stdout=stdout_file,
             stderr=stderr_file,
             start_new_session=True,
@@ -5077,6 +5088,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--public-edge-full-deployment-digest-sha256", default="")
     parser.add_argument("--public-edge-pwa-asset-inventory-sha256", default="")
     parser.add_argument("--public-edge-release-channel-receipt", default="")
+    parser.add_argument(
+        "--authorize-external-release-writes",
+        action="store_true",
+        help="Authorize controller-classified release metadata writes for this invocation.",
+    )
     return parser.parse_args()
 
 
@@ -5088,10 +5104,23 @@ def main() -> int:
             public_edge_full_deployment_digest_sha256=args.public_edge_full_deployment_digest_sha256,
             public_edge_pwa_asset_inventory_sha256=args.public_edge_pwa_asset_inventory_sha256,
             public_edge_release_channel_receipt=args.public_edge_release_channel_receipt,
+            authorize_external_release_writes=args.authorize_external_release_writes,
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
-    command_results = [] if args.skip_materializers else run_materializers(materializers)
+    materializer_environment = os.environ.copy()
+    if args.public_edge_skip_preflight:
+        materializer_environment.update(
+            {
+                "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256": args.public_edge_full_deployment_digest_sha256,
+                "CHUMMER_PUBLIC_EDGE_PWA_ASSET_INVENTORY_SHA256": args.public_edge_pwa_asset_inventory_sha256,
+            }
+        )
+    command_results = (
+        []
+        if args.skip_materializers
+        else run_materializers(materializers, environment=materializer_environment)
+    )
     payload = build_payload(
         command_results,
         refresh_windows_runtime_receipts=not (

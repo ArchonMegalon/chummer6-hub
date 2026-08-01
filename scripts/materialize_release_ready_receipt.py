@@ -256,6 +256,8 @@ RELEASE_EXECUTION_ENV_KEYS = (
     "CHUMMER_RELEASE_READY_GATE_KILL_AFTER_SECONDS",
     "CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS",
     "CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS",
+    "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256",
+    "CHUMMER_PUBLIC_EDGE_PWA_ASSET_INVENTORY_SHA256",
     "PATH",
     "PYTHONDONTWRITEBYTECODE",
     "PYTHONNOUSERSITE",
@@ -565,6 +567,12 @@ def canonical_release_gate_specs(
     guide_timeout = int(environment["CHUMMER_RELEASE_READY_GUIDE_GATE_TIMEOUT_SECONDS"])
     public_edge_timeout = int(environment["CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS"])
     public_edge_reuse = int(environment["CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS"])
+    public_edge_full_deployment_digest = shlex.quote(
+        environment["CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256"]
+    )
+    public_edge_pwa_asset_inventory = shlex.quote(
+        environment["CHUMMER_PUBLIC_EDGE_PWA_ASSET_INVENTORY_SHA256"]
+    )
     skip_google = environment["CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH"] == "1"
     skip_windows = environment["CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH"] == "1"
     require_blazor_local_e2e = environment["CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E"] == "1"
@@ -668,7 +676,13 @@ def canonical_release_gate_specs(
         f"{python} {services}/scripts/materialize_ea_operator_readiness.py && "
         f"{python} {services}/scripts/verify_ea_operator_readiness.py"
     )
-    public_edge_preflight = " --skip-preflight" if environment["CHUMMER_PUBLIC_BASE_URL"].rstrip("/") == "https://chummer.run" else ""
+    public_edge_preflight = (
+        " --skip-preflight"
+        f" --expected-full-deployment-digest-sha256 {public_edge_full_deployment_digest}"
+        f" --expected-pwa-asset-inventory-sha256 {public_edge_pwa_asset_inventory}"
+        if environment["CHUMMER_PUBLIC_BASE_URL"].rstrip("/") == "https://chummer.run"
+        else ""
+    )
     desktop_gold_entrypoints = (
         f"{root}/scripts/release/verify_desktop_gold_policy.sh",
         f"{root}/scripts/release/verify_package_boundaries.sh",
@@ -3821,6 +3835,8 @@ def authoritative_controller_environment(
         "CHUMMER_RELEASE_READY_GATE_KILL_AFTER_SECONDS": "30",
         "CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS": "24",
         "CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS": "60",
+        "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256": "",
+        "CHUMMER_PUBLIC_EDGE_PWA_ASSET_INVENTORY_SHA256": "",
         "PATH": TRUSTED_PATH,
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
@@ -3914,6 +3930,17 @@ def validate_release_execution_environment(environment: dict[str, object]) -> di
             raise ValueError(f"release execution environment {key} is not an integer") from exc
         if parsed <= 0 or parsed > 86400:
             raise ValueError(f"release execution environment {key} is out of range")
+    for key in (
+        "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256",
+        "CHUMMER_PUBLIC_EDGE_PWA_ASSET_INVENTORY_SHA256",
+    ):
+        value = normalized[key]
+        if value and re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise ValueError(f"release execution environment {key} is not a lowercase SHA-256")
+        if normalized["CHUMMER_PUBLIC_BASE_URL"].rstrip("/") == "https://chummer.run" and not value:
+            raise ValueError(
+                f"release execution environment {key} is required for production postdeploy verification"
+            )
     for key in (
         "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E",
         "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E",

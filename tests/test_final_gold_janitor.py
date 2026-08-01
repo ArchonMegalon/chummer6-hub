@@ -1480,6 +1480,23 @@ class FinalGoldJanitorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "full deployment digest"):
             module.configured_materializers(public_edge_skip_preflight=True)
 
+    def test_external_release_write_authority_is_explicitly_forwarded(self) -> None:
+        module = load_module()
+
+        materializers = module.configured_materializers(
+            authorize_external_release_writes=True
+        )
+        controller = next(
+            item
+            for item in materializers
+            if item and item[0] == str(module.RELEASE_READY_CONTROLLER)
+        )
+
+        self.assertEqual(
+            [str(module.RELEASE_READY_CONTROLLER), "--authorize-external-release-writes"],
+            controller,
+        )
+
     def test_teable_important_work_sync_is_required_and_materialized(self) -> None:
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]

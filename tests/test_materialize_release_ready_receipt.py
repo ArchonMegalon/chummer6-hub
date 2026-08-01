@@ -47,6 +47,8 @@ def load_module():
         "CHUMMER_RELEASE_READY_GATE_KILL_AFTER_SECONDS": "30",
         "CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS": "24",
         "CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS": "60",
+        "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256": "a" * 64,
+        "CHUMMER_PUBLIC_EDGE_PWA_ASSET_INVENTORY_SHA256": "b" * 64,
         "PATH": module.TRUSTED_PATH,
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
@@ -650,6 +652,8 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         base = {
             "PATH": module.TRUSTED_PATH,
             "PYTHONDONTWRITEBYTECODE": "1",
+            "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256": "a" * 64,
+            "CHUMMER_PUBLIC_EDGE_PWA_ASSET_INVENTORY_SHA256": "b" * 64,
             "TEABLE_API_TOKEN": "test-secret-value",
             "UNLISTED_SECRET": "must-not-be-inherited",
         }
@@ -1471,6 +1475,8 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                     "PATH": module.TRUSTED_PATH,
                     "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "1",
                     "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "1",
+                    "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256": "a" * 64,
+                    "CHUMMER_PUBLIC_EDGE_PWA_ASSET_INVENTORY_SHA256": "b" * 64,
                 }
             )
         )
@@ -2618,6 +2624,37 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             by_name["verify_flagship_product_readiness"]["command"],
         )
         self.assertTrue(by_name["verify_teable_important_work_sync"]["external_write"])
+
+    def test_production_public_edge_gate_binds_sealed_deployment_digests(self) -> None:
+        module = load_module()
+        specs = {
+            str(item["name"]): item
+            for item in module.canonical_release_gate_specs(
+                module._test_release_execution_environment
+            )
+        }
+        command = str(specs["verify_public_edge_postdeploy_gate"]["command"])
+
+        self.assertIn("--skip-preflight", command)
+        self.assertIn(
+            "--expected-full-deployment-digest-sha256 " + "a" * 64,
+            command,
+        )
+        self.assertIn(
+            "--expected-pwa-asset-inventory-sha256 " + "b" * 64,
+            command,
+        )
+
+    def test_production_controller_rejects_missing_public_edge_digests(self) -> None:
+        module = load_module()
+        environment = dict(module._test_release_execution_environment)
+        environment["CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256"] = ""
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256 is required",
+        ):
+            module.validate_release_execution_environment(environment)
 
     def test_flagship_gate_with_non_wrapper_release_truth_blockers_is_not_recoverable(self) -> None:
         module = load_module()
