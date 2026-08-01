@@ -268,6 +268,30 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
             )
             self.assertEqual(completed.returncode, 0, completed.stdout)
             payload = json.loads(proof_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                [
+                    "install_claim_restore_continue",
+                    "build_explain_publish",
+                    "campaign_session_recover_recap",
+                    "recover_from_sync_conflict",
+                    "report_cluster_release_notify",
+                    "organize_community_and_close_loop",
+                ],
+                payload.get("journeys_passed"),
+            )
+            conflict_receipt = next(
+                receipt
+                for receipt in payload.get("proof_receipts") or []
+                if receipt.get("receipt_id") == "entitlement_sync:conflict_receipts"
+            )
+            self.assertEqual(
+                {"/home/work", "/account/roster", "/account/access", "/downloads"},
+                set(conflict_receipt.get("routes") or []),
+            )
+            self.assertIn(
+                "entitlement_sync:recoverable_actions",
+                conflict_receipt.get("surfaces") or [],
+            )
             release_channel = payload.get("release_channel") or {}
             self.assertEqual("available", release_channel.get("status"))
             self.assertEqual(str(release_channel_path), release_channel.get("path"))
