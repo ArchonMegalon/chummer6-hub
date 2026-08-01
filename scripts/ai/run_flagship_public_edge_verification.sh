@@ -104,8 +104,14 @@ POSTDEPLOY_ARTIFACT_DIR="$OUTPUT_DIR/public-edge-browser-proofs"
 DOWNLOADS_BROWSER_DIR="$POSTDEPLOY_ARTIFACT_DIR/downloads-status"
 MOBILE_VIEWPORT_DIR="$POSTDEPLOY_ARTIFACT_DIR/mobile-viewport"
 OFFLINE_CACHE_DIR="$POSTDEPLOY_ARTIFACT_DIR/offline-cache"
+BLAZOR_NEW_RUNNER_DIR="$POSTDEPLOY_ARTIFACT_DIR/blazor-new-runner-menu"
 FRONTDOOR_DIR="$POSTDEPLOY_ARTIFACT_DIR/frontdoor-navigation"
-mkdir -p "$DOWNLOADS_BROWSER_DIR" "$MOBILE_VIEWPORT_DIR" "$OFFLINE_CACHE_DIR" "$FRONTDOOR_DIR"
+mkdir -p \
+  "$DOWNLOADS_BROWSER_DIR" \
+  "$MOBILE_VIEWPORT_DIR" \
+  "$OFFLINE_CACHE_DIR" \
+  "$BLAZOR_NEW_RUNNER_DIR" \
+  "$FRONTDOOR_DIR"
 
 SKIP_PREFLIGHT="$(default_skip_preflight "$BASE_URL")"
 if [[ "$SKIP_PREFLIGHT_OVERRIDE" != "auto" ]]; then
@@ -186,6 +192,8 @@ postdeploy_args=(
   --mobile-pwa-viewport-artifact-dir "$MOBILE_VIEWPORT_DIR"
   --require-pwa-offline-cache-playwright
   --pwa-offline-cache-artifact-dir "$OFFLINE_CACHE_DIR"
+  --require-blazor-new-runner-menu-playwright
+  --blazor-new-runner-menu-artifact-dir "$BLAZOR_NEW_RUNNER_DIR"
   --require-frontdoor-navigation-playwright
   --frontdoor-navigation-artifact-dir "$FRONTDOOR_DIR"
   --output "$OUTPUT_DIR/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"

@@ -20,6 +20,9 @@ def test_flagship_public_edge_helper_runs_the_live_proof_pack() -> None:
     assert "--require-downloads-status-playwright" in text
     assert "--require-mobile-pwa-viewport-playwright" in text
     assert "--require-pwa-offline-cache-playwright" in text
+    assert "--require-blazor-new-runner-menu-playwright" in text
+    assert "--blazor-new-runner-menu-artifact-dir" in text
+    assert 'BLAZOR_NEW_RUNNER_DIR="$POSTDEPLOY_ARTIFACT_DIR/blazor-new-runner-menu"' in text
     assert "--require-frontdoor-navigation-playwright" in text
     assert "public-edge-browser-proofs" in text
     assert "flagship public-edge verification receipts:" in text
