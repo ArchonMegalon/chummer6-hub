@@ -194,8 +194,15 @@ function Find-InstallerSurfaceWindow([string]$SurfaceValue, [bool]$AllowCompleti
         if ($AllowCompletionInstallerFallback -and (Test-InstallerTraceReportsCompletion)) {
             foreach ($window in $windows) {
                 $title = [string]$window.Title
-                if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
-                    $title.IndexOf(": Installing", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                if ($title.IndexOf(": Installing", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                    Write-Host "Matched detailed installer window only after the fresh installer trace reported Install complete."
+                    return (New-InstallerSurfaceWindow $window)
+                }
+            }
+
+            foreach ($window in $windows) {
+                $title = [string]$window.Title
+                if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
                     Write-Host "Matched generic completion window only after the fresh installer trace reported Install complete."
                     return (New-InstallerSurfaceWindow $window)
                 }
