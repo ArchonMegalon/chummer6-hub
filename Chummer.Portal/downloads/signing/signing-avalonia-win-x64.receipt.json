@@ -1,0 +1,28 @@
+{
+  "contractName": "chummer6-ui.desktop_artifact_signing",
+  "generatedAt": "2026-08-01T03:32:01Z",
+  "platform": "windows",
+  "app": "avalonia",
+  "rid": "win-x64",
+  "releaseChannel": "preview",
+  "releaseVersion": "run-20260801-031406",
+  "signingStatus": "skipped_preview",
+  "notarizationStatus": null,
+  "reason": "Preview channel does not require Authenticode signing.",
+  "artifacts": [
+    {
+      "fileName": "chummer-avalonia-win-x64.exe",
+      "sha256": "efbdb50ab34ef152c27b3c53b1a835cae5aff76ce528c5ac1a5335c04dd62ab2",
+      "kind": "portable",
+      "signingStatus": "skipped_preview",
+      "notarizationStatus": null
+    },
+    {
+      "fileName": "chummer-avalonia-win-x64-installer.exe",
+      "sha256": "13477e00b148b41b84f59ed3d5e25bb38267f530193aa80b7eb7649ed9416d74",
+      "kind": "installer",
+      "signingStatus": "skipped_preview",
+      "notarizationStatus": null
+    }
+  ]
+}
