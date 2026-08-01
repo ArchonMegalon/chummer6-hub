@@ -620,6 +620,19 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('FLAGSHIP_READINESS_GATE_PATH="${CHUMMER_FLAGSHIP_READINESS_GATE_PATH:-$REPO_ROOT/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json}"', script_text)
         self.assertIn('materialize_args+=(--flagship-readiness "$FLAGSHIP_READINESS_GATE_PATH")', script_text)
 
+    def test_run_services_manifest_generator_binds_registry_authority_commit(self):
+        script_path = REPO_ROOT / "scripts" / "generate-releases-manifest.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn('EXPECTED_REGISTRY_COMMIT="${CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT:-}"', script_text)
+        self.assertIn("resolve_registry_commit() {", script_text)
+        self.assertIn("git -C \"$REGISTRY_ROOT\" rev-parse --verify 'HEAD^{commit}'", script_text)
+        self.assertIn('git -C "$REGISTRY_ROOT" diff --quiet HEAD --', script_text)
+        self.assertIn('if [[ "$registry_commit" != "$EXPECTED_REGISTRY_COMMIT" ]]; then', script_text)
+        self.assertIn('--registry-commit "$REGISTRY_COMMIT"', script_text)
+        self.assertIn("Stale or incomplete proof receipts still require review", script_text)
+        self.assertEqual(script_text.count('materializer.proof_freshness_status(payload)'), 2)
+
     def test_run_services_public_bundle_materializer_recanonicalizes_verifier_owned_release_channel_surfaces(self):
         script_path = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
         script_text = script_path.read_text(encoding="utf-8")
