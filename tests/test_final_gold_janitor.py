@@ -1664,15 +1664,28 @@ class FinalGoldJanitorTests(unittest.TestCase):
         command = ["python3", "scripts/materialize_release_ready_receipt.py"]
         process = mock.Mock(pid=1234, returncode=0)
         process.wait.return_value = 0
+        inherited_environment = {
+            "PATH": "/unsafe/user/bin:/usr/bin",
+            "PYTHONPATH": "/tmp/injected-python",
+            "BASH_FUNC_injected%%": "() { :; }",
+            "CHUMMER_PUBLIC_EDGE_FULL_DEPLOYMENT_DIGEST_SHA256": "a" * 64,
+            "UNCHANGED_ALLOWED_VALUE": "kept",
+        }
 
-        with mock.patch.object(module, "MATERIALIZERS", [command]), mock.patch.object(module.subprocess, "Popen", return_value=process):
-            results = module.run_materializers()
+        with mock.patch.object(module, "MATERIALIZERS", [command]), mock.patch.object(module.subprocess, "Popen", return_value=process) as popen:
+            results = module.run_materializers(environment=inherited_environment)
 
         timeout = module.materializer_timeout_seconds(command)
         self.assertGreaterEqual(timeout, module.RELEASE_READY_MATERIALIZER_TIMEOUT_SECONDS)
         self.assertGreater(timeout, module.MATERIALIZER_TIMEOUT_SECONDS)
         process.wait.assert_called_once_with(timeout=timeout)
         self.assertEqual(timeout, results[0]["timeout_seconds"])
+        child_environment = popen.call_args.kwargs["env"]
+        self.assertEqual(module.RELEASE_READY_TRUSTED_PATH, child_environment["PATH"])
+        self.assertNotIn("PYTHONPATH", child_environment)
+        self.assertNotIn("BASH_FUNC_injected%%", child_environment)
+        self.assertEqual("kept", child_environment["UNCHANGED_ALLOWED_VALUE"])
+        self.assertEqual("/unsafe/user/bin:/usr/bin", inherited_environment["PATH"])
 
     def test_black_ledger_live_media_materializer_uses_extended_timeout(self) -> None:
         module = load_module()

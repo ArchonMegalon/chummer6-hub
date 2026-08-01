@@ -36,6 +36,22 @@ RELEASE_READY_MATERIALIZER_COMMAND = [
     "scripts/materialize_release_ready_receipt.py",
     "--force-global-verifier",
 ]
+RELEASE_READY_TRUSTED_PATH = "/usr/bin:/bin"
+RELEASE_READY_FORBIDDEN_ENV_KEYS = frozenset(
+    {
+        "BASH_ENV",
+        "ENV",
+        "CDPATH",
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "NODE_PATH",
+        "NODE_OPTIONS",
+        "PYTHONSTARTUP",
+        "PYTHONINSPECT",
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+    }
+)
 DEFAULT_PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 PUBLISHED_ROOT = DEFAULT_PUBLISHED_ROOT
 DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH = PUBLISHED_ROOT / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
@@ -3073,10 +3089,19 @@ def run_materializers(
         started_at_utc = now_iso()
         stdout_file = tempfile.TemporaryFile()
         stderr_file = tempfile.TemporaryFile()
+        process_environment = environment
+        if "scripts/materialize_release_ready_receipt.py" in command:
+            process_environment = dict(os.environ if environment is None else environment)
+            process_environment["PATH"] = RELEASE_READY_TRUSTED_PATH
+            for key in RELEASE_READY_FORBIDDEN_ENV_KEYS:
+                process_environment.pop(key, None)
+            for key in list(process_environment):
+                if key.startswith("BASH_FUNC_"):
+                    process_environment.pop(key, None)
         process = subprocess.Popen(
             command,
             cwd=RUN_SERVICES_ROOT,
-            env=environment,
+            env=process_environment,
             stdout=stdout_file,
             stderr=stderr_file,
             start_new_session=True,
