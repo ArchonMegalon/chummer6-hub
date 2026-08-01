@@ -695,6 +695,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                         "platform": "windows",
                         "hostClass": "native-windows-11",
                         "artifactSha256": stale_sha,
+                        "scaleEvidenceContract": "chummer.windows_installer_native_layout_scale.v1",
                         "sourceUpdatedAtUtc": "2026-06-21T17:44:15Z",
                         "screenshots": [
                             {
@@ -703,6 +704,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "install-progress",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 96,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 10, "top": 10, "width": 400, "height": 240},
                             },
                             {
                                 "path": "progress-scaled.png",
@@ -710,6 +717,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "install-progress",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 144,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 10, "top": 10, "width": 600, "height": 360},
                             },
                             {
                                 "path": "completion-default.png",
@@ -717,6 +730,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "completion",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 96,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 20, "top": 20, "width": 400, "height": 240},
                             },
                             {
                                 "path": "completion-scaled.png",
@@ -724,6 +743,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "completion",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 144,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 20, "top": 20, "width": 600, "height": 360},
                             },
                         ],
                     }
@@ -779,6 +804,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                         "platform": "windows",
                         "hostClass": "native-windows-11",
                         "artifactSha256": sha,
+                        "scaleEvidenceContract": "chummer.windows_installer_native_layout_scale.v1",
                         "screenshots": [
                             {
                                 "path": "progress-default.png",
@@ -786,6 +812,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "install-progress",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 96,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 10, "top": 10, "width": 400, "height": 240},
                             },
                             {
                                 "path": "progress-scaled.png",
@@ -793,6 +825,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "install-progress",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 144,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 10, "top": 10, "width": 600, "height": 360},
                             },
                             {
                                 "path": "completion-default.png",
@@ -800,6 +838,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "completion",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 96,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 20, "top": 20, "width": 400, "height": 240},
                             },
                             {
                                 "path": "completion-scaled.png",
@@ -807,6 +851,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "completion",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 144,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 20, "top": 20, "width": 600, "height": 360},
                             },
                         ],
                     }
@@ -1131,6 +1181,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                         "platform": "windows",
                         "hostClass": "native-windows-11",
                         "artifactSha256": sha,
+                        "scaleEvidenceContract": "chummer.windows_installer_native_layout_scale.v1",
                         "screenshots": [
                             {
                                 "path": "progress-default.png",
@@ -1138,6 +1189,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "install-progress",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 96,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 10, "top": 10, "width": 400, "height": 240},
                             },
                             {
                                 "path": "progress-scaled.png",
@@ -1145,6 +1202,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "install-progress",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 144,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 10, "top": 10, "width": 600, "height": 360},
                             },
                             {
                                 "path": "completion-default.png",
@@ -1152,6 +1215,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "completion",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 96,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 20, "top": 20, "width": 400, "height": 240},
                             },
                             {
                                 "path": "completion-scaled.png",
@@ -1159,6 +1228,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                                 "surface": "completion",
                                 "clippingStatus": "pass",
                                 "readabilityStatus": "pass",
+                                "captureMode": "window-bounds",
+                                "scaleMode": "installer-native-layout",
+                                "systemDpi": 96,
+                                "effectiveDpi": 144,
+                                "traceScaleVerified": True,
+                                "captureBounds": {"left": 20, "top": 20, "width": 600, "height": 360},
                             },
                         ],
                     }
@@ -1388,10 +1463,18 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn('"install-progress", "completion"', text)
         self.assertIn("[switch]$CaptureRequiredSet", text)
         self.assertIn("$ScaledDpiScale", text)
-        self.assertLess(
-            text.index('[ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale }'),
-            text.index('[ordered]@{ Surface = "completion"; DpiScale = "1.0" }'),
+        native_scale_order = (
+            '[ordered]@{ Surface = "install-progress"; DpiScale = "1.0" },\n'
+            '            [ordered]@{ Surface = "completion"; DpiScale = "1.0" },\n'
+            '            [ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale },\n'
+            '            [ordered]@{ Surface = "completion"; DpiScale = $ScaledDpiScale }'
         )
+        self.assertIn(native_scale_order, text)
+        self.assertIn("function Start-InstallerForNativeLayoutScale", text)
+        self.assertIn("function Test-InstallerTraceReportsScale", text)
+        self.assertIn("public static extern uint GetDpiForWindow", text)
+        self.assertIn("traceScaleVerified = $traceScaleVerified", text)
+        self.assertIn("$surfacesByHash.Keys.Count -ne $requiredScreenshotRows.Count", text)
         self.assertIn("foreach ($request in $captureRequests)", text)
         self.assertIn("function Wait-ForInstallerSurface", text)
         self.assertIn("function New-InstallerSurfaceWindow", text)

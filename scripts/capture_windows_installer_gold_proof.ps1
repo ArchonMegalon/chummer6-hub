@@ -9,6 +9,7 @@ param(
     [switch]$LaunchInstaller,
     [switch]$CaptureVisualAudit,
     [string]$ScaledDpiScale = "1.5",
+    [switch]$UseInstallerNativeLayoutScale,
     [switch]$AutoCaptureVisualAudit,
     [int]$AutoCaptureDelaySeconds = 3,
     [int]$AutoCaptureTimeoutSeconds = 45,
@@ -148,6 +149,9 @@ if ($CaptureVisualAudit) {
         ScaledDpiScale = $ScaledDpiScale
         ClippingStatus = $VisualClippingStatus
         ReadabilityStatus = $VisualReadabilityStatus
+    }
+    if ($UseInstallerNativeLayoutScale) {
+        $captureArgs["UseInstallerNativeLayoutScale"] = $true
     }
     if ($AutoCaptureVisualAudit) {
         $captureArgs["AutoCapture"] = $true

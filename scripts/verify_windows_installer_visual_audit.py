@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import shlex
 import subprocess
@@ -114,6 +115,7 @@ DEFAULT_WINDOWS_WATCHER_STATE = ROOT / ".state" / "windows_installer_gold_proof_
 AUTO_IMPORT_SIDE_EFFECTS_PAUSE_FLAG = ROOT / ".state" / "windows_installer_visual_audit_paused.flag"
 DEFAULT_TELEGRAM_TEXT_DELIVERY_ROOT = WORKSPACE_ROOT / "_completion" / "telegram_text_delivery"
 REQUIRED_SURFACES = ("install-progress", "completion")
+NATIVE_LAYOUT_SCALE_CONTRACT = "chummer.windows_installer_native_layout_scale.v1"
 CAPTURE_SCRIPT = "scripts/capture_windows_installer_visual_audit.ps1"
 GOLD_PROOF_SCRIPT = "scripts/capture_windows_installer_gold_proof.ps1"
 CONTRACT_NAME = "chummer.windows_installer_visual_audit"
@@ -581,6 +583,10 @@ def screenshot_rows(source_path: Path, source: dict[str, Any]) -> list[dict[str,
                 "readabilityStatus": normalized(row.get("readabilityStatus")),
                 "hostClass": str(row.get("hostClass") or "").strip(),
                 "captureMode": normalized(row.get("captureMode")),
+                "scaleMode": normalized(row.get("scaleMode")),
+                "systemDpi": row.get("systemDpi"),
+                "effectiveDpi": row.get("effectiveDpi"),
+                "traceScaleVerified": row.get("traceScaleVerified") is True,
                 "captureBounds": row.get("captureBounds") if isinstance(row.get("captureBounds"), dict) else {},
                 "reusedFrom": str(row.get("reusedFrom") or "").strip(),
                 "windowTitle": str(row.get("windowTitle") or "").strip(),
@@ -610,6 +616,28 @@ def capture_bounds_look_like_desktop_fallback(row: dict[str, Any]) -> bool:
     # A real Chummer installer window is compact even at scaled DPI. 1024x768 from
     # (0,0) is the Windows runner's virtual desktop fallback, not a dialog.
     return left == 0 and top == 0 and width >= 1000 and height >= 700
+
+
+def dpi_scale_value(value: Any) -> float | None:
+    try:
+        scale = float(str(value).strip().removesuffix("%"))
+    except (TypeError, ValueError):
+        return None
+    if str(value).strip().endswith("%") or scale >= 10:
+        scale /= 100.0
+    return scale if math.isfinite(scale) and scale > 0 else None
+
+
+def capture_bounds_size(row: dict[str, Any]) -> tuple[int, int] | None:
+    bounds = row.get("captureBounds")
+    if not isinstance(bounds, dict):
+        return None
+    try:
+        width = int(bounds.get("width", 0))
+        height = int(bounds.get("height", 0))
+    except (TypeError, ValueError):
+        return None
+    return (width, height) if width > 0 and height > 0 else None
 
 
 def build_payload(
@@ -751,6 +779,10 @@ def build_payload(
         failures.append("Windows installer visual audit source platform is not windows")
     if source and "windows" not in source_host_class and source_host_class != "native":
         failures.append("Windows installer visual audit source is not marked as a native Windows host")
+    if source and normalized(source.get("scaleEvidenceContract")) != NATIVE_LAYOUT_SCALE_CONTRACT:
+        failures.append(
+            "Windows installer visual audit source is missing the native layout scale evidence contract"
+        )
     if source and not is_sha256(source_artifact_sha):
         failures.append("Windows installer visual audit source artifact digest is missing or invalid")
     if effective_artifact_sha and is_sha256(source_artifact_sha) and source_artifact_sha != effective_artifact_sha:
@@ -788,6 +820,30 @@ def build_payload(
                 "Windows installer screenshot used full-desktop fallback bounds instead of the installer window: "
                 f"{row['path']}"
             )
+        if row.get("canonicalSurface") in REQUIRED_SURFACES:
+            scale = dpi_scale_value(row.get("dpiScale"))
+            try:
+                system_dpi = int(row.get("systemDpi"))
+                effective_dpi = int(row.get("effectiveDpi"))
+            except (TypeError, ValueError):
+                system_dpi = 0
+                effective_dpi = 0
+            expected_effective_dpi = (
+                int(round(system_dpi * scale)) if scale is not None else 0
+            )
+            if (
+                row.get("captureMode") != "window-bounds"
+                or row.get("scaleMode") != "installer-native-layout"
+                or row.get("traceScaleVerified") is not True
+                or system_dpi < 96
+                or system_dpi > 480
+                or effective_dpi != expected_effective_dpi
+                or capture_bounds_size(row) is None
+            ):
+                failures.append(
+                    "Windows installer screenshot lacks trace-verified native layout scale evidence: "
+                    f"{row['path']}"
+                )
     rows_by_hash: dict[str, set[str]] = {}
     for row in screenshots:
         screenshot_sha = str(row.get("sha256") or "")
@@ -799,6 +855,40 @@ def build_payload(
             failures.append(
                 "Windows installer screenshots for distinct required surfaces are byte-identical: "
                 f"{screenshot_sha} covers {', '.join(sorted(surfaces))}"
+            )
+    required_screenshots = [
+        row for row in screenshots if row.get("canonicalSurface") in REQUIRED_SURFACES
+    ]
+    required_hashes = [str(row.get("sha256") or "") for row in required_screenshots]
+    if required_screenshots and (
+        not all(required_hashes) or len(set(required_hashes)) != len(required_hashes)
+    ):
+        failures.append(
+            "Windows installer required screenshots must have four distinct image hashes"
+        )
+    for surface in REQUIRED_SURFACES:
+        default_rows = [
+            row
+            for row in required_screenshots
+            if row.get("canonicalSurface") == surface and is_default_dpi(row.get("dpiScale"))
+        ]
+        scaled_rows = [
+            row
+            for row in required_screenshots
+            if row.get("canonicalSurface") == surface
+            and dpi_scale_value(row.get("dpiScale")) == 1.5
+        ]
+        if len(default_rows) != 1 or len(scaled_rows) != 1:
+            continue
+        default_size = capture_bounds_size(default_rows[0])
+        scaled_size = capture_bounds_size(scaled_rows[0])
+        if default_size is None or scaled_size is None:
+            continue
+        width_ratio = scaled_size[0] / default_size[0]
+        height_ratio = scaled_size[1] / default_size[1]
+        if abs(width_ratio - 1.5) > 0.15 or abs(height_ratio - 1.5) > 0.15:
+            failures.append(
+                f"Windows installer {surface} bounds do not demonstrate native 1.5 layout scaling"
             )
 
     startup_needs_native_proof = (
