@@ -53,6 +53,14 @@ STABLE_READ_CHUNK_BYTES = 1024 * 1024
 MAX_AUTHORITY_INPUT_BYTES = 16 * 1024 * 1024
 MAX_RELEASE_INPUT_AGE_SECONDS = 86400
 MAX_RELEASE_INPUT_FUTURE_SKEW_SECONDS = 300
+CANONICAL_BASELINE_GOLDEN_JOURNEYS = (
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "recover_from_sync_conflict",
+    "report_cluster_release_notify",
+    "organize_community_and_close_loop",
+)
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 PORTABLE_KNOWN_ROOTS = (
@@ -1773,13 +1781,7 @@ def _materialize_under_shared_mutation_lock(
         "compose_file": CANONICAL_COMPOSE_FILE,
         "playwright_timeout_seconds": CANONICAL_PLAYWRIGHT_TIMEOUT_SECONDS,
         "edge_rebuild_skipped": skip_rebuild.lower() in {"1", "true"},
-        "journeys_passed": [
-            "install_claim_restore_continue",
-            "build_explain_publish",
-            "campaign_session_recover_recap",
-            "report_cluster_release_notify",
-            "organize_community_and_close_loop",
-        ],
+        "journeys_passed": list(CANONICAL_BASELINE_GOLDEN_JOURNEYS),
         "proof_routes": _sorted_unique_strings([
             "/downloads/install/avalonia-linux-x64-installer",
             "/home/access",
