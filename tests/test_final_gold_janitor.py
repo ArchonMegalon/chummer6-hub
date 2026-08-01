@@ -1362,7 +1362,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]
 
-        release_ready_index = commands.index(str(module.RELEASE_READY_CONTROLLER))
+        release_ready_index = commands.index(" ".join(module.RELEASE_READY_MATERIALIZER_COMMAND))
         operator_dashboard_index = commands.index("python3 scripts/materialize_operator_release_dashboard.py")
 
         self.assertLess(release_ready_index, operator_dashboard_index)
@@ -1371,7 +1371,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]
 
-        release_ready_index = commands.index(str(module.RELEASE_READY_CONTROLLER))
+        release_ready_index = commands.index(" ".join(module.RELEASE_READY_MATERIALIZER_COMMAND))
         hub_local_release_proof_index = commands.index(
             "python3 scripts/materialize_hub_local_release_proof.py "
             f"{module.PUBLISHED_ROOT / 'HUB_LOCAL_RELEASE_PROOF.generated.json'} "
@@ -1409,7 +1409,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
             f"{module.PUBLISHED_ROOT / 'WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json'} "
             "--wait-seconds 0"
         )
-        release_ready_index = commands.index(str(module.RELEASE_READY_CONTROLLER))
+        release_ready_index = commands.index(" ".join(module.RELEASE_READY_MATERIALIZER_COMMAND))
 
         self.assertLess(verify_windows_index, intake_index)
         self.assertLess(intake_index, auto_import_index)
@@ -1489,13 +1489,32 @@ class FinalGoldJanitorTests(unittest.TestCase):
         controller = next(
             item
             for item in materializers
-            if item and item[0] == str(module.RELEASE_READY_CONTROLLER)
+            if "scripts/materialize_release_ready_receipt.py" in item
         )
 
         self.assertEqual(
-            [str(module.RELEASE_READY_CONTROLLER), "--authorize-external-release-writes"],
+            [
+                *module.RELEASE_READY_MATERIALIZER_COMMAND,
+                "--authorize-external-release-writes",
+            ],
             controller,
         )
+
+    def test_release_ready_runtime_refresh_pauses_are_forwarded(self) -> None:
+        module = load_module()
+
+        materializers = module.configured_materializers(
+            skip_windows_runtime_refresh=True,
+            skip_google_oauth_runtime_refresh=True,
+        )
+        command = next(
+            item
+            for item in materializers
+            if "scripts/materialize_release_ready_receipt.py" in item
+        )
+
+        self.assertIn("--skip-windows-runtime-refresh", command)
+        self.assertIn("--skip-google-oauth-runtime-refresh", command)
 
     def test_teable_important_work_sync_is_required_and_materialized(self) -> None:
         module = load_module()
@@ -1556,7 +1575,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         ea_verify_index = commands.index(ea_verify_command)
         mymedia_materialize_index = commands.index(mymedia_materialize_command)
         mymedia_verify_index = commands.index(mymedia_verify_command)
-        release_ready_index = commands.index(str(module.RELEASE_READY_CONTROLLER))
+        release_ready_index = commands.index(" ".join(module.RELEASE_READY_MATERIALIZER_COMMAND))
         dashboard_index = commands.index("python3 scripts/materialize_operator_release_dashboard.py")
 
         self.assertIn("google_oauth_linking_proof", module.REQUIRED_RECEIPTS)

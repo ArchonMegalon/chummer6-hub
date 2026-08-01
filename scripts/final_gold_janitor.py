@@ -31,6 +31,11 @@ from public_edge_postdeploy_contract import (
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = RUN_SERVICES_ROOT.parent
 RELEASE_READY_CONTROLLER = WORKSPACE_ROOT / "scripts" / "release" / "verify_chummer6_release_ready.sh"
+RELEASE_READY_MATERIALIZER_COMMAND = [
+    "python3",
+    "scripts/materialize_release_ready_receipt.py",
+    "--force-global-verifier",
+]
 DEFAULT_PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 PUBLISHED_ROOT = DEFAULT_PUBLISHED_ROOT
 DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH = PUBLISHED_ROOT / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
@@ -808,7 +813,7 @@ MATERIALIZERS = [
     ["python3", "scripts/verify_ea_operator_readiness.py"],
     ["python3", "scripts/materialize_mymedia_public_surface.py"],
     ["python3", "scripts/verify_mymedia_public_surface.py"],
-    [str(RELEASE_READY_CONTROLLER)],
+    list(RELEASE_READY_MATERIALIZER_COMMAND),
     [
         "python3",
         "scripts/materialize_hub_local_release_proof.py",
@@ -3009,13 +3014,21 @@ def configured_materializers(
     public_edge_pwa_asset_inventory_sha256: str = "",
     public_edge_release_channel_receipt: str = "",
     authorize_external_release_writes: bool = False,
+    skip_windows_runtime_refresh: bool = False,
+    skip_google_oauth_runtime_refresh: bool = False,
 ) -> list[list[str]]:
     commands = [list(command) for command in MATERIALIZERS]
+    release_materializer = next(
+        item
+        for item in commands
+        if "scripts/materialize_release_ready_receipt.py" in item
+    )
     if authorize_external_release_writes:
-        release_controller = next(
-            item for item in commands if item and item[0] == str(RELEASE_READY_CONTROLLER)
-        )
-        release_controller.append("--authorize-external-release-writes")
+        release_materializer.append("--authorize-external-release-writes")
+    if skip_windows_runtime_refresh:
+        release_materializer.append("--skip-windows-runtime-refresh")
+    if skip_google_oauth_runtime_refresh:
+        release_materializer.append("--skip-google-oauth-runtime-refresh")
     if not public_edge_skip_preflight:
         if public_edge_full_deployment_digest_sha256 or public_edge_pwa_asset_inventory_sha256:
             raise ValueError("public-edge deployment digests require --public-edge-skip-preflight")
@@ -5081,6 +5094,11 @@ def parse_args() -> argparse.Namespace:
         help="Read existing Windows watcher/auto-import receipts without invoking their refresh commands.",
     )
     parser.add_argument(
+        "--skip-google-oauth-runtime-refresh",
+        action="store_true",
+        help="Reuse the current OAuth request/proof receipts without refreshing the sign-in flow.",
+    )
+    parser.add_argument(
         "--public-edge-skip-preflight",
         action="store_true",
         help="Use sealed post-fact deployment digests when the running source tree is newer than the active overlay.",
@@ -5105,6 +5123,8 @@ def main() -> int:
             public_edge_pwa_asset_inventory_sha256=args.public_edge_pwa_asset_inventory_sha256,
             public_edge_release_channel_receipt=args.public_edge_release_channel_receipt,
             authorize_external_release_writes=args.authorize_external_release_writes,
+            skip_windows_runtime_refresh=args.skip_windows_runtime_refresh,
+            skip_google_oauth_runtime_refresh=args.skip_google_oauth_runtime_refresh,
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
