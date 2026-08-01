@@ -16,6 +16,9 @@ Chummer.InstallLinking.Postgres.Tool/obj/
 Chummer.InstallLinking.Postgres.Tool/obj/**
 !Chummer.Control.Contracts/
 !Chummer.Control.Contracts/**
+!Chummer.Tests/
+!Chummer.Tests/TestFiles/
+!Chummer.Tests/TestFiles/BLUE.chum5
 !Chummer.Play.Contracts/
 !Chummer.Play.Contracts/**
 !Chummer.Run.Api/

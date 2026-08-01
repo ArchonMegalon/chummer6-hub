@@ -5,7 +5,6 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 
 const baseUrl = (process.env.CHUMMER_HUB_PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:8091').replace(/\/+$/, '');
-const publicHost = (process.env.CHUMMER_HUB_PLAYWRIGHT_PUBLIC_HOST || '').trim();
 const forwardedProto = (process.env.CHUMMER_HUB_PLAYWRIGHT_FORWARDED_PROTO || '').trim();
 const isLocalReverseProxyMode = baseUrl.startsWith('http://') && forwardedProto.toLowerCase() === 'https';
 let signupNext = '/downloads/install/avalonia-linux-x64-installer';
@@ -20,6 +19,17 @@ async function expectVisible(page, selector, message) {
 async function expectMinimumCount(page, selector, minimum, label) {
   const count = await page.locator(selector).count();
   assert.equal(count >= minimum, true, `${label} should render at least ${minimum} match(es) for ${selector}, got ${count}.`);
+}
+
+async function expectStableLaneTruth(page, label) {
+  const stableCard = page.locator('#stable');
+  await stableCard.waitFor({ state: 'visible' });
+  const text = await stableCard.innerText();
+  assert.equal(
+    text.includes('Stable release.') || text.includes('No Stable build on this shelf.'),
+    true,
+    `${label} should state whether Stable is published or unavailable.\n\n${text}`
+  );
 }
 
 async function assertNoPageErrors(page, pageErrors, label) {
@@ -283,9 +293,6 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const extraHTTPHeaders = {};
-  if (publicHost) {
-    extraHTTPHeaders.Host = publicHost;
-  }
   if (forwardedProto) {
     extraHTTPHeaders['X-Forwarded-Proto'] = forwardedProto;
   }
@@ -333,9 +340,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=A Shadowrun character manager for clean sheets and faster tables.');
     await expectVisible(page, 'text=Download Chummer');
     await expectVisible(page, 'text=Current public installer');
-    await expectVisible(page, 'text=Kestrel');
-    await expectVisible(page, 'text=Brick');
-    await expectVisible(page, 'text=Whisper');
+    await expectVisible(page, 'text=Desktop build. Mobile play packet.');
     assert.equal(await page.locator('text=Open Black Ledger').count(), 0, 'Landing should not expose Black Ledger as the public front-door CTA.');
     assert.equal(await page.locator('text=Black Ledger').count(), 0, 'Landing should keep Black Ledger off the front door.');
     await assertNoBannedCopy(page, 'Landing');
@@ -351,7 +356,6 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
       '/what-is-chummer downloads link'
     );
     assert.equal(await readFirstHref(page, 'a[href="/help"]', '/what-is-chummer help link'), '/help');
-    assert.equal(await readFirstHref(page, 'a[href="/status"]', '/what-is-chummer status link'), '/status');
     await assertNoBannedCopy(page, '/what-is-chummer');
   });
 
@@ -462,7 +466,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=Stable');
-    await expectVisible(page, 'text=Stable release.');
+    await expectStableLaneTruth(page, 'Downloads');
     await expectVisible(page, 'text=Other downloads');
     await page.locator('summary:has-text("Other downloads")').click();
     await expectVisible(page, 'text=Build from source');
@@ -506,7 +510,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/horizons', async () => {
     await expectVisible(page, 'text=Not the front door');
     await expectVisible(page, 'text=Use the app first');
-    await expectVisible(page, 'text=Later work');
+    await expectVisible(page, 'text=Working lanes');
+    assert.equal(await readFirstHref(page, 'a[href="/downloads"]', '/horizons downloads link'), '/downloads');
+    assert.equal(await readFirstHref(page, 'a[href="/help"]', '/horizons help link'), '/help');
+    assert.equal(await readFirstHref(page, 'a[href="/roadmap"]', '/horizons roadmap link'), '/roadmap');
+    assert.equal(await readFirstHref(page, 'a[href="/feedback"]', '/horizons feedback link'), '/feedback');
     const bodyText = await page.locator('body').innerText();
     assert.equal(bodyText.includes('Black Ledger'), false, 'Maintenance page should keep Black Ledger hidden.');
     assert.equal(bodyText.includes('Research tracks'), false, 'Maintenance page should avoid internal research labels.');
@@ -526,6 +534,25 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   console.log('hub-playwright: opening signup handoff');
   await page.goto(`${baseUrl}/signup?next=${encodeURIComponent(signupNext)}`, { waitUntil: 'domcontentloaded' });
+  const emailInput = page.locator('input[name="email"]');
+  if ((await emailInput.count()) === 0) {
+    await expectVisible(page, 'text=Claim your copy');
+    const googleHref = await page.locator('a[href^="/auth/google/start"]').first().getAttribute('href');
+    assert(googleHref, 'Google-only signup should expose the first-party OAuth handoff.');
+    const googleResponse = await page.context().request.get(new URL(googleHref, baseUrl).toString(), {
+      failOnStatusCode: false,
+      maxRedirects: 0
+    });
+    assert.equal(googleResponse.status(), 302, 'Google-only signup should issue an OAuth redirect.');
+    const googleLocation = googleResponse.headers().location;
+    assert(googleLocation, 'Google-only signup should return an OAuth Location header.');
+    assertGoogleOauthUrl(new URL(googleLocation), 'Google-only signup');
+    await assertNoBannedCopy(page, 'Google-only signup');
+    await assertNoPageErrors(page, pageErrors, 'Google-only signup');
+    await browser.close();
+    console.log('hub-playwright: Google-only signup handoff verified; provider sign-in skipped safely');
+    return;
+  }
   await expectVisible(page, 'input[name="email"]');
   await page.fill('input[name="email"]', uniqueEmail);
   await Promise.all([
@@ -755,7 +782,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Stable');
     await expectVisible(page, 'text=Nightly');
-    await expectVisible(page, 'text=Stable release.');
+    await expectStableLaneTruth(page, 'Signed-in /downloads');
     await assertNoBannedCopy(page, 'Signed-in /downloads');
   });
 

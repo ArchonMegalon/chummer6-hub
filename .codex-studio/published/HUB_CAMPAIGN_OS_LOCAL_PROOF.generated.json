@@ -3,11 +3,11 @@
   "contract_version": 3,
   "status": "passed",
   "proof_kind": "materializer_owned_executed_smoke_receipt",
-  "run_id": "30d88b9b-e879-43de-9514-597adbd82d9d",
-  "started_at": "2026-08-01T03:03:31Z",
-  "completed_at": "2026-08-01T03:05:28Z",
-  "generated_at": "2026-08-01T03:05:28Z",
-  "expires_at": "2026-08-02T03:05:28Z",
+  "run_id": "4ca7828c-c257-4fd7-a663-8c98e5282dde",
+  "started_at": "2026-08-01T04:33:33Z",
+  "completed_at": "2026-08-01T04:35:22Z",
+  "generated_at": "2026-08-01T04:35:22Z",
+  "expires_at": "2026-08-02T04:35:22Z",
   "invocation": {
     "id": "run_services_smoke",
     "owner": "campaign_os_local_proof_materializer",
@@ -75,7 +75,7 @@
     },
     "assembly": {
       "file_name": "RunServicesSmoke.dll",
-      "sha256": "698465c8f301ab6b08c059819feff85fb6cb35f9852adf20537ea4af851adf66",
+      "sha256": "be447292285176f4d9975dac285f408b528c367fa7c3188cf07d61c501c7b20c",
       "size_bytes": 1042432
     }
   },
@@ -200,8 +200,8 @@
       "project_assets": {
         "root": "project_assets",
         "file_count": 13,
-        "total_size_bytes": 346314,
-        "tree_sha256": "b94d438c11294b63f08e8e7f37f61815571a02d67f43d9d17bd209514f1db6d7"
+        "total_size_bytes": 346379,
+        "tree_sha256": "b3b262f19ca0a98a8491cd39145160b4043b22b6136abb95921a969dc76dd2b3"
       },
       "generated_nuget_imports": {
         "root": "generated_nuget_imports",
@@ -223,7 +223,7 @@
       },
       "project_root_count": 13,
       "runtime_data_root_count": 2,
-      "closure_sha256": "45822d6af961c3ca1414c49c211b6a8742d02c1429ad14e61c01c8a8a81360dd"
+      "closure_sha256": "5b92dcba20ccef8188800f4820a618e99dcfd28c25edabc5524411628bb20475"
     },
     "candidate_source_build_inputs_after": {
       "kind": "candidate_source_build_inputs",
@@ -343,8 +343,8 @@
       "project_assets": {
         "root": "project_assets",
         "file_count": 13,
-        "total_size_bytes": 346314,
-        "tree_sha256": "b94d438c11294b63f08e8e7f37f61815571a02d67f43d9d17bd209514f1db6d7"
+        "total_size_bytes": 346379,
+        "tree_sha256": "b3b262f19ca0a98a8491cd39145160b4043b22b6136abb95921a969dc76dd2b3"
       },
       "generated_nuget_imports": {
         "root": "generated_nuget_imports",
@@ -366,7 +366,7 @@
       },
       "project_root_count": 13,
       "runtime_data_root_count": 2,
-      "closure_sha256": "45822d6af961c3ca1414c49c211b6a8742d02c1429ad14e61c01c8a8a81360dd"
+      "closure_sha256": "5b92dcba20ccef8188800f4820a618e99dcfd28c25edabc5524411628bb20475"
     },
     "staged_candidate_inputs_before": {
       "kind": "staged_candidate_inputs",
@@ -559,72 +559,72 @@
       "entries": [
         {
           "path": "Chummer.Campaign.Contracts.dll",
-          "sha256": "b380e114cd627f73fb92a7f0d3d9c5c8de289489ac8c05bd80826be9b8459887",
+          "sha256": "a3c4d8e725209da5d4547e890b95a3759b2d5fe6d4cea506799babe00009389f",
           "size_bytes": 390144
         },
         {
           "path": "Chummer.Control.Contracts.dll",
-          "sha256": "d06fa5d94a040a588b83efbcc778db3012a20037102a60505ec59bb8d60349e1",
+          "sha256": "d561813826fb23a5df62ad6714e68b4900fea15d2aac642341c681931ebf48ef",
           "size_bytes": 94208
         },
         {
           "path": "Chummer.Engine.Contracts.dll",
-          "sha256": "ace28d0f47dff2b9fd991390e1dec3403f187236216b3c1538a8345ab3bf1349",
+          "sha256": "7796a5921d69bd082260bc1734aa7eb9f8f5134e970c97f25482e72cbaf891cc",
           "size_bytes": 1419776
         },
         {
           "path": "Chummer.Hub.Registry.Contracts.dll",
-          "sha256": "ff307b85221be1d6a98b1ed73a43268029c2380daf2fe9e362b9a5e2d62287e6",
+          "sha256": "c050d62d34ec3ace24a3dc79b376a015455548b9b581530ac5c9a4f4ae09cbd3",
           "size_bytes": 508928
         },
         {
           "path": "Chummer.Media.Contracts.dll",
-          "sha256": "4a281a4036720d8098112dc4731d72146dc933b8d3845aa3c76feec505e2e039",
+          "sha256": "11eb6d084cfb1eab4936885457546322ccecba4b272b0e7e970f19b23ffaed4a",
           "size_bytes": 654336
         },
         {
           "path": "Chummer.Media.Factory.Runtime.dll",
-          "sha256": "ad3dc3a61768057f80ffaa5934e6a0e37f7c9dc74f162c95a3001e7481399559",
+          "sha256": "83823efd84753bb369163a0046e97a0d1b51c5c9d1431e61c0a9ce9b84cf14ca",
           "size_bytes": 644608
         },
         {
           "path": "Chummer.Play.Contracts.dll",
-          "sha256": "7e3215b76805a1bbf3072d9f437fdd3b1d5de50ef5e95a26e7a5feb0384ddaad",
+          "sha256": "f5722c81eb4f8a5718693ac2d1823c6630af3e700863360ea4f7a5c8ac50507b",
           "size_bytes": 325632
         },
         {
           "path": "Chummer.Run.AI.dll",
-          "sha256": "00c30b6e54fb82a5d0a11dbcd36866ad3ec24d42ca8ed9700c1fa07357700b31",
+          "sha256": "1e144255edf561b6d51d275364194c9938eb2348903cd67930ba4647c7eec5fa",
           "size_bytes": 894464
         },
         {
           "path": "Chummer.Run.Api.dll",
-          "sha256": "98d8f18f90f0622d799d461a14d621e4bef352874397bac44674099d750d5237",
+          "sha256": "27f6fdaa31b1c071ea5450fb9200f5a9f9ca49fbd75c77c5e06d9e74a3a00b89",
           "size_bytes": 12456960
         },
         {
           "path": "Chummer.Run.Contracts.dll",
-          "sha256": "728e018e130c6c46c8b4b6f1728b629f58467a24aa8cf4def48bf8a844a065b8",
+          "sha256": "9bac472dc25cd4d376c49b3dc7961c5c01b21da886f785a0502b0f4431b84b16",
           "size_bytes": 1474048
         },
         {
           "path": "Chummer.Run.Identity.dll",
-          "sha256": "0b2e995674b8bbe280f2857fb856b2e15c505e068ec5d562c7c26420902f23d8",
+          "sha256": "7b906d71dae6a76235e6840b3160545a3c7dc6fa2de2b992ac0951956973cd26",
           "size_bytes": 99328
         },
         {
           "path": "Chummer.Run.Registry.dll",
-          "sha256": "cbe4c175cdc5da4076235d07de0f5acae44ece2bd8f7c0ae8674d7cc31c0f4e9",
+          "sha256": "a4a981a233cdda881d41804ed4a267831f0d898b647451e893a8cde2a3d9fd5b",
           "size_bytes": 244224
         },
         {
           "path": "Chummer.World.Contracts.dll",
-          "sha256": "d5000bf16ccfc002399e9080d61ee091f7ba6afc36d1b57cd71b82edaaad9497",
+          "sha256": "e28f3ada9cfb8abf06fa45b1e1e08f0f5c011c01a50957ac7e36b21e3868f776",
           "size_bytes": 31744
         },
         {
           "path": "RunServicesSmoke.dll",
-          "sha256": "698465c8f301ab6b08c059819feff85fb6cb35f9852adf20537ea4af851adf66",
+          "sha256": "be447292285176f4d9975dac285f408b528c367fa7c3188cf07d61c501c7b20c",
           "size_bytes": 1042432
         },
         {
@@ -649,79 +649,79 @@
         }
       ],
       "entry_count": 18,
-      "manifest_sha256": "e2a25ee1c0ccdd7fbcbaf060668b5171af9faa5d1a998241aa815ea39f17bb5c"
+      "manifest_sha256": "fdf357f4eadf6e8f4f01eaf53c082d180de92c408c62cbc11658bd317d150727"
     },
     "runtime_manifest_after": {
       "algorithm": "sha256",
       "entries": [
         {
           "path": "Chummer.Campaign.Contracts.dll",
-          "sha256": "b380e114cd627f73fb92a7f0d3d9c5c8de289489ac8c05bd80826be9b8459887",
+          "sha256": "a3c4d8e725209da5d4547e890b95a3759b2d5fe6d4cea506799babe00009389f",
           "size_bytes": 390144
         },
         {
           "path": "Chummer.Control.Contracts.dll",
-          "sha256": "d06fa5d94a040a588b83efbcc778db3012a20037102a60505ec59bb8d60349e1",
+          "sha256": "d561813826fb23a5df62ad6714e68b4900fea15d2aac642341c681931ebf48ef",
           "size_bytes": 94208
         },
         {
           "path": "Chummer.Engine.Contracts.dll",
-          "sha256": "ace28d0f47dff2b9fd991390e1dec3403f187236216b3c1538a8345ab3bf1349",
+          "sha256": "7796a5921d69bd082260bc1734aa7eb9f8f5134e970c97f25482e72cbaf891cc",
           "size_bytes": 1419776
         },
         {
           "path": "Chummer.Hub.Registry.Contracts.dll",
-          "sha256": "ff307b85221be1d6a98b1ed73a43268029c2380daf2fe9e362b9a5e2d62287e6",
+          "sha256": "c050d62d34ec3ace24a3dc79b376a015455548b9b581530ac5c9a4f4ae09cbd3",
           "size_bytes": 508928
         },
         {
           "path": "Chummer.Media.Contracts.dll",
-          "sha256": "4a281a4036720d8098112dc4731d72146dc933b8d3845aa3c76feec505e2e039",
+          "sha256": "11eb6d084cfb1eab4936885457546322ccecba4b272b0e7e970f19b23ffaed4a",
           "size_bytes": 654336
         },
         {
           "path": "Chummer.Media.Factory.Runtime.dll",
-          "sha256": "ad3dc3a61768057f80ffaa5934e6a0e37f7c9dc74f162c95a3001e7481399559",
+          "sha256": "83823efd84753bb369163a0046e97a0d1b51c5c9d1431e61c0a9ce9b84cf14ca",
           "size_bytes": 644608
         },
         {
           "path": "Chummer.Play.Contracts.dll",
-          "sha256": "7e3215b76805a1bbf3072d9f437fdd3b1d5de50ef5e95a26e7a5feb0384ddaad",
+          "sha256": "f5722c81eb4f8a5718693ac2d1823c6630af3e700863360ea4f7a5c8ac50507b",
           "size_bytes": 325632
         },
         {
           "path": "Chummer.Run.AI.dll",
-          "sha256": "00c30b6e54fb82a5d0a11dbcd36866ad3ec24d42ca8ed9700c1fa07357700b31",
+          "sha256": "1e144255edf561b6d51d275364194c9938eb2348903cd67930ba4647c7eec5fa",
           "size_bytes": 894464
         },
         {
           "path": "Chummer.Run.Api.dll",
-          "sha256": "98d8f18f90f0622d799d461a14d621e4bef352874397bac44674099d750d5237",
+          "sha256": "27f6fdaa31b1c071ea5450fb9200f5a9f9ca49fbd75c77c5e06d9e74a3a00b89",
           "size_bytes": 12456960
         },
         {
           "path": "Chummer.Run.Contracts.dll",
-          "sha256": "728e018e130c6c46c8b4b6f1728b629f58467a24aa8cf4def48bf8a844a065b8",
+          "sha256": "9bac472dc25cd4d376c49b3dc7961c5c01b21da886f785a0502b0f4431b84b16",
           "size_bytes": 1474048
         },
         {
           "path": "Chummer.Run.Identity.dll",
-          "sha256": "0b2e995674b8bbe280f2857fb856b2e15c505e068ec5d562c7c26420902f23d8",
+          "sha256": "7b906d71dae6a76235e6840b3160545a3c7dc6fa2de2b992ac0951956973cd26",
           "size_bytes": 99328
         },
         {
           "path": "Chummer.Run.Registry.dll",
-          "sha256": "cbe4c175cdc5da4076235d07de0f5acae44ece2bd8f7c0ae8674d7cc31c0f4e9",
+          "sha256": "a4a981a233cdda881d41804ed4a267831f0d898b647451e893a8cde2a3d9fd5b",
           "size_bytes": 244224
         },
         {
           "path": "Chummer.World.Contracts.dll",
-          "sha256": "d5000bf16ccfc002399e9080d61ee091f7ba6afc36d1b57cd71b82edaaad9497",
+          "sha256": "e28f3ada9cfb8abf06fa45b1e1e08f0f5c011c01a50957ac7e36b21e3868f776",
           "size_bytes": 31744
         },
         {
           "path": "RunServicesSmoke.dll",
-          "sha256": "698465c8f301ab6b08c059819feff85fb6cb35f9852adf20537ea4af851adf66",
+          "sha256": "be447292285176f4d9975dac285f408b528c367fa7c3188cf07d61c501c7b20c",
           "size_bytes": 1042432
         },
         {
@@ -746,42 +746,42 @@
         }
       ],
       "entry_count": 18,
-      "manifest_sha256": "e2a25ee1c0ccdd7fbcbaf060668b5171af9faa5d1a998241aa815ea39f17bb5c"
+      "manifest_sha256": "fdf357f4eadf6e8f4f01eaf53c082d180de92c408c62cbc11658bd317d150727"
     },
     "checkpoint_log": {
       "file_name": "campaign-os-checkpoints.jsonl",
-      "sha256": "842aaf415708d3290256fab6ebaf1d46e03a2cddc38e2dc3b9f752758ccd8cb3",
+      "sha256": "8a39a67710e61b7c142a8ddee663838bf31373699ba29bd48eab920312e3f2bc",
       "size_bytes": 865
     },
     "runtime_checkpoints": [
       {
         "checkpoint_id": "install_claim_restore_continue.run_services_smoke_exit_zero",
-        "run_id": "30d88b9b-e879-43de-9514-597adbd82d9d",
+        "run_id": "4ca7828c-c257-4fd7-a663-8c98e5282dde",
         "status": "passed"
       },
       {
         "checkpoint_id": "build_explain_publish.run_services_smoke_exit_zero",
-        "run_id": "30d88b9b-e879-43de-9514-597adbd82d9d",
+        "run_id": "4ca7828c-c257-4fd7-a663-8c98e5282dde",
         "status": "passed"
       },
       {
         "checkpoint_id": "campaign_session_recover_recap.run_services_smoke_exit_zero",
-        "run_id": "30d88b9b-e879-43de-9514-597adbd82d9d",
+        "run_id": "4ca7828c-c257-4fd7-a663-8c98e5282dde",
         "status": "passed"
       },
       {
         "checkpoint_id": "recover_from_sync_conflict.run_services_smoke_exit_zero",
-        "run_id": "30d88b9b-e879-43de-9514-597adbd82d9d",
+        "run_id": "4ca7828c-c257-4fd7-a663-8c98e5282dde",
         "status": "passed"
       },
       {
         "checkpoint_id": "report_cluster_release_notify.run_services_smoke_exit_zero",
-        "run_id": "30d88b9b-e879-43de-9514-597adbd82d9d",
+        "run_id": "4ca7828c-c257-4fd7-a663-8c98e5282dde",
         "status": "passed"
       },
       {
         "checkpoint_id": "organize_community_and_close_loop.run_services_smoke_exit_zero",
-        "run_id": "30d88b9b-e879-43de-9514-597adbd82d9d",
+        "run_id": "4ca7828c-c257-4fd7-a663-8c98e5282dde",
         "status": "passed"
       }
     ],

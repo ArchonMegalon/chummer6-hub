@@ -155,13 +155,27 @@ if [[ "$RUN_HUB_PLAYWRIGHT" == "1" ]]; then
 
   playwright_log="$(mktemp)"
   playwright_base_url="$HUB_BASE_URL"
+  playwright_docker_args=(--rm --network host)
+  if [[ "$HUB_BASE_URL" == http://* ]]; then
+    playwright_base_url="$({ python3 - "$HUB_BASE_URL" "$HUB_PUBLIC_HOST" <<'PY'
+import sys
+from urllib.parse import urlsplit, urlunsplit
+
+source = urlsplit(sys.argv[1])
+public_host = sys.argv[2].strip()
+port = f":{source.port}" if source.port is not None else ""
+print(urlunsplit((source.scheme, f"{public_host}{port}", source.path, source.query, source.fragment)))
+PY
+    } )"
+    playwright_docker_args+=(--add-host "$HUB_PUBLIC_HOST:127.0.0.1")
+  fi
   export CHUMMER_RUN_CF_TUNNEL_TOKEN="${CHUMMER_RUN_CF_TUNNEL_TOKEN:-disabled-for-local-hub-e2e}"
   set +e
   docker compose -p "$HUB_PLAYWRIGHT_PROJECT_NAME" -f legacy/tooling/docker/docker-compose.yml --profile test build \
     chummer-playwright-hub 2>&1 | tee "$playwright_log"
   playwright_status=${PIPESTATUS[0]}
   if [[ "$playwright_status" -eq 0 ]]; then
-    timeout "${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker run --rm --network host \
+    timeout "${HUB_PLAYWRIGHT_TIMEOUT_SECONDS}"s docker run "${playwright_docker_args[@]}" \
       -e CHUMMER_HUB_PLAYWRIGHT_BASE_URL="$playwright_base_url" \
       -e CHUMMER_HUB_PLAYWRIGHT_FORWARDED_PROTO="https" \
       chummer-playwright:local \

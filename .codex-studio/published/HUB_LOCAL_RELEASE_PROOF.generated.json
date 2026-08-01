@@ -5,7 +5,7 @@
   "desktop_client_readiness": {
     "status": "fail",
     "scoped_status": "fail",
-    "generated_at": "2026-08-01T02:59:38Z",
+    "generated_at": "2026-08-01T03:02:38Z",
     "missing_coverage_keys": [
       "desktop_client"
     ],
@@ -19,11 +19,11 @@
     "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
     "channelId": "preview",
     "channel": "preview",
-    "version": "run-20260801-013900",
-    "releaseVersion": "run-20260801-013900",
+    "version": "run-20260801-031406",
+    "releaseVersion": "run-20260801-031406",
     "rolloutState": "coverage_incomplete",
     "supportabilityState": "review_required",
-    "publishedAt": "2026-08-01T00:25:00Z"
+    "publishedAt": "2026-08-01T03:35:45Z"
   },
   "publicTrustSurface": {
     "summary": "This governor-visible trust surface bundle keeps status, current release, downloads, proof shelf, and public pulse routes aligned on the same outward-facing release truth.",
@@ -1652,6 +1652,6 @@
       ]
     }
   ],
-  "generated_at": "2026-08-01T02:59:46Z",
-  "generatedAt": "2026-08-01T02:59:46Z"
+  "generated_at": "2026-08-01T04:46:16Z",
+  "generatedAt": "2026-08-01T04:46:16Z"
 }
