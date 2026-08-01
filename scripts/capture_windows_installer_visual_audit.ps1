@@ -183,18 +183,30 @@ function Find-InstallerSurfaceWindow([string]$SurfaceValue, [bool]$AllowCompleti
         $_.Title.IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0
     })
 
-    foreach ($window in $windows) {
-        $title = [string]$window.Title
-        if ($canonicalSurface -eq "completion") {
+    if ($canonicalSurface -eq "completion") {
+        foreach ($window in $windows) {
+            $title = [string]$window.Title
             if ($title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
                 return (New-InstallerSurfaceWindow $window)
             }
-            if ($AllowCompletionInstallerFallback -and $title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                return (New-InstallerSurfaceWindow $window)
-            }
-            continue
         }
 
+        if ($AllowCompletionInstallerFallback -and (Test-InstallerTraceReportsCompletion)) {
+            foreach ($window in $windows) {
+                $title = [string]$window.Title
+                if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+                    $title.IndexOf(": Installing", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                    Write-Host "Matched generic completion window only after the fresh installer trace reported Install complete."
+                    return (New-InstallerSurfaceWindow $window)
+                }
+            }
+        }
+
+        return $null
+    }
+
+    foreach ($window in $windows) {
+        $title = [string]$window.Title
         if ($title.IndexOf("Installer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
             $title.IndexOf("Install Complete", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
             return (New-InstallerSurfaceWindow $window)
@@ -330,17 +342,47 @@ namespace ChummerInstallerCapture
 "@
 
 $script:LaunchedInstallerProcessId = $null
+$script:LaunchedInstallerStartedAtUtc = $null
 
 function Get-InstallerTraceCandidates {
     $paths = @()
     if (-not [string]::IsNullOrWhiteSpace($env:TEMP)) {
         $paths += (Join-Path $env:TEMP "chummer-desktop-installer-progress.log")
+        $paths += (Join-Path $env:TEMP "Chummer6\installer-temp\chummer-desktop-installer-progress.log")
     }
     if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
         $paths += (Join-Path $env:LOCALAPPDATA "Chummer6\Installer\chummer-desktop-installer-progress.log")
     }
 
     return @($paths | Select-Object -Unique)
+}
+
+function Test-InstallerTraceReportsCompletion {
+    if ($null -eq $script:LaunchedInstallerProcessId -or
+        $null -eq $script:LaunchedInstallerStartedAtUtc) {
+        return $false
+    }
+
+    $freshnessFloor = $script:LaunchedInstallerStartedAtUtc.AddSeconds(-2)
+    foreach ($candidate in Get-InstallerTraceCandidates) {
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            continue
+        }
+
+        $traceFile = Get-Item -LiteralPath $candidate
+        if ($traceFile.LastWriteTimeUtc -lt $freshnessFloor) {
+            continue
+        }
+
+        $completionRows = @(Get-Content -LiteralPath $candidate -Tail 40 -Encoding UTF8 | Where-Object {
+            ([string]$_).Trim() -eq "Install complete"
+        })
+        if ($completionRows.Count -gt 0) {
+            return $true
+        }
+    }
+
+    return $false
 }
 
 function Get-InstallerProcessSnapshotRows {
@@ -522,6 +564,7 @@ else {
 
 if ($LaunchInstaller) {
     Write-Host "Launching installer for visual capture: $installerFullPath"
+    $script:LaunchedInstallerStartedAtUtc = (Get-Date).ToUniversalTime()
     $launchedProcess = Start-Process -FilePath $installerFullPath -PassThru
     $script:LaunchedInstallerProcessId = $launchedProcess.Id
     Start-Sleep -Milliseconds 150
@@ -546,7 +589,8 @@ foreach ($request in $captureRequests) {
     if ($AutoCapture) {
         Write-Host "Waiting up to $effectiveAutoCaptureTimeoutSeconds seconds for the $captureSurface window."
         try {
-            $window = Wait-ForInstallerSurface $captureSurface $effectiveAutoCaptureTimeoutSeconds
+            $allowCompletionInstallerFallback = $canonicalCaptureSurface -eq "completion" -and [bool]$LaunchInstaller
+            $window = Wait-ForInstallerSurface $captureSurface $effectiveAutoCaptureTimeoutSeconds $allowCompletionInstallerFallback
         }
         catch {
             $previousSameSurfaceRows = @($newRows | Where-Object { (Normalize-Surface $_.surface) -eq $canonicalCaptureSurface })

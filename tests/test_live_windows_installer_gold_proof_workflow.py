@@ -90,6 +90,23 @@ def test_windows_gold_proof_receipt_delimits_colon_adjacent_variables() -> None:
     assert '"windows-installer-gold-proof:${HeadId}:${Rid}:${Version}"' in script
 
 
+def test_windows_visual_capture_requires_fresh_trace_before_generic_completion_window() -> None:
+    script = (
+        REPO_ROOT / "scripts/capture_windows_installer_visual_audit.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert '"Chummer6\\installer-temp\\chummer-desktop-installer-progress.log"' in script
+    assert "function Test-InstallerTraceReportsCompletion" in script
+    assert "$traceFile.LastWriteTimeUtc -lt $freshnessFloor" in script
+    assert '([string]$_).Trim() -eq "Install complete"' in script
+    assert '$title.IndexOf(": Installing"' in script
+    assert "if ($AllowCompletionInstallerFallback -and (Test-InstallerTraceReportsCompletion))" in script
+    assert (
+        "Wait-ForInstallerSurface $captureSurface $effectiveAutoCaptureTimeoutSeconds "
+        "$allowCompletionInstallerFallback"
+    ) in script
+
+
 @pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell is unavailable")
 @pytest.mark.parametrize(
     "relative_path",
