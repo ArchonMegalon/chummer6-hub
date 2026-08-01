@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"
+EXPECTED_REGISTRY_COMMIT="${CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT:-}"
 
 DOWNLOADS_DIR="${DOWNLOADS_DIR:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/files}"
 MANIFEST_PATH="${MANIFEST_PATH:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/releases.json}"
@@ -72,6 +73,35 @@ if [[ ! -f "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" ]]; th
   echo "Missing registry materializer: $REGISTRY_ROOT/scripts/materialize_public_release_channel.py" >&2
   exit 1
 fi
+
+resolve_registry_commit() {
+  local registry_commit
+  if ! registry_commit="$(git -C "$REGISTRY_ROOT" rev-parse --verify 'HEAD^{commit}' 2>/dev/null)"; then
+    echo "Registry authority must be an exact Git checkout: $REGISTRY_ROOT" >&2
+    return 1
+  fi
+  if [[ ! "$registry_commit" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Registry authority resolved an invalid commit: $registry_commit" >&2
+    return 1
+  fi
+  if ! git -C "$REGISTRY_ROOT" diff --quiet HEAD --; then
+    echo "Registry authority has tracked changes and cannot be used for release generation: $REGISTRY_ROOT" >&2
+    return 1
+  fi
+  if [[ -n "$EXPECTED_REGISTRY_COMMIT" ]]; then
+    if [[ ! "$EXPECTED_REGISTRY_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+      echo "CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT must be an exact lowercase 40-character commit." >&2
+      return 1
+    fi
+    if [[ "$registry_commit" != "$EXPECTED_REGISTRY_COMMIT" ]]; then
+      echo "Registry authority commit mismatch: expected $EXPECTED_REGISTRY_COMMIT, got $registry_commit" >&2
+      return 1
+    fi
+  fi
+  printf '%s\n' "$registry_commit"
+}
+
+REGISTRY_COMMIT="$(resolve_registry_commit)"
 
 prune_obsolete_regression_packets() {
   local startup_smoke_dir="$1"
@@ -511,6 +541,11 @@ def derive_verifier_owned_value(name: str, current_value):
                 artifacts,
                 channel_id=channel_id,
                 release_version=release_version,
+                proof_freshness_status=(
+                    materializer.proof_freshness_status(payload)
+                    if hasattr(materializer, "proof_freshness_status")
+                    else "fresh"
+                ),
             )
             if tuple_coverage is not None and hasattr(materializer, "artifact_identity_registry")
             else current_value
@@ -521,6 +556,11 @@ def derive_verifier_owned_value(name: str, current_value):
                 artifacts,
                 channel_id=channel_id,
                 release_version=release_version,
+                proof_freshness_status=(
+                    materializer.proof_freshness_status(payload)
+                    if hasattr(materializer, "proof_freshness_status")
+                    else "fresh"
+                ),
             )
             if tuple_coverage is not None and hasattr(materializer, "artifact_publication_bindings")
             else current_value
@@ -620,10 +660,10 @@ if normalized_token(payload.get("status")) == "published" and trust_supportabili
     payload["supportabilityState"] = trust_supportability_state
     if trust_supportability_state == "review_required":
         payload["supportabilitySummary"] = (
-            "Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable."
+            "Stale or incomplete proof receipts still require review before this release can be treated as supportable."
         )
         payload["knownIssueSummary"] = (
-            "Release checks are missing or stale on this shelf, so preview publication is visible but not yet gold-ready."
+            "Stale or incomplete proof receipts keep this preview visible but not yet gold-ready."
         )
 
 # Recompute verifier-owned registry surfaces once more after supportability/trust normalization
@@ -871,6 +911,7 @@ materialize_args=(
   --downloads-prefix "$DOWNLOADS_PREFIX"
   --output "$CANONICAL_MANIFEST_PATH"
   --compat-output "$MANIFEST_PATH"
+  --registry-commit "$REGISTRY_COMMIT"
 )
 
 if [[ -n "$SOURCE_MANIFEST_PATH" && -f "$SOURCE_MANIFEST_PATH" ]]; then
