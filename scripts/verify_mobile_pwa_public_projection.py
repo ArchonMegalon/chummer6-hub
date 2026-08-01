@@ -21,11 +21,15 @@ PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 AUDIT_JSON_NAME = "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"
 AUDIT_MARKDOWN_NAME = "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md"
 CONTRACT_NAME = "chummer.mobile_pwa_public_projection.v2"
-ACTIVE_OVERLAY_BUILD_INFO = (
+PUBLIC_PORTAL_APP_OVERLAY_DIR_ENV = "CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR"
+DEFAULT_ACTIVE_OVERLAY_ROOT = (
     RUN_SERVICES_ROOT
     / ".state"
     / "public-edge-portal-overlay"
     / "app"
+)
+ACTIVE_OVERLAY_BUILD_INFO = (
+    DEFAULT_ACTIVE_OVERLAY_ROOT
     / ".codex-studio"
     / "runtime"
     / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
@@ -108,13 +112,35 @@ def load_static_verifier():
     return module
 
 
+def active_overlay_build_info_path() -> Path:
+    configured_root = str(
+        os.environ.get(PUBLIC_PORTAL_APP_OVERLAY_DIR_ENV) or ""
+    ).strip()
+    if not configured_root:
+        return ACTIVE_OVERLAY_BUILD_INFO
+    overlay_root = Path(configured_root)
+    if not overlay_root.is_absolute():
+        raise RuntimeError(
+            f"{PUBLIC_PORTAL_APP_OVERLAY_DIR_ENV} must be an absolute path"
+        )
+    return (
+        overlay_root
+        / ".codex-studio"
+        / "runtime"
+        / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
+    )
+
+
 def active_full_deployment_digest(
-    path: Path = ACTIVE_OVERLAY_BUILD_INFO,
+    path: Path | None = None,
 ) -> str:
+    resolved_path = path or active_overlay_build_info_path()
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(resolved_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"active overlay build-info is unavailable: {path}") from exc
+        raise RuntimeError(
+            f"active overlay build-info is unavailable: {resolved_path}"
+        ) from exc
     if not isinstance(payload, dict):
         raise RuntimeError("active overlay build-info must be a JSON object")
     if (

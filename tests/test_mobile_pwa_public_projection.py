@@ -60,6 +60,30 @@ def test_current_source_reports_default_off_profile_gated_zero_outbound_contract
     assert all(payload["retiredEnvAbsent"].values())
 
 
+def test_active_overlay_build_info_path_honors_compose_overlay_root(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    overlay_root = tmp_path / "reviewed-overlay" / "app"
+    monkeypatch.setenv(module.PUBLIC_PORTAL_APP_OVERLAY_DIR_ENV, str(overlay_root))
+
+    assert module.active_overlay_build_info_path() == (
+        overlay_root
+        / ".codex-studio"
+        / "runtime"
+        / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
+    )
+
+
+def test_active_overlay_build_info_path_rejects_relative_override(monkeypatch) -> None:
+    module = load_module()
+    monkeypatch.setenv(module.PUBLIC_PORTAL_APP_OVERLAY_DIR_ENV, "relative/app")
+
+    with pytest.raises(RuntimeError, match="must be an absolute path"):
+        module.active_overlay_build_info_path()
+
+
 def test_compose_topology_rejects_default_on_dependency_and_edge_credentials(tmp_path: Path) -> None:
     module = load_module()
     compose = tmp_path / "docker-compose.public-edge.yml"
