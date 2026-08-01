@@ -1,7 +1,7 @@
 {
   "contract": "play-root-worker-public-edge-projection-v2",
   "source": "../chummer-play/src/Chummer.Play.Web/wwwroot/service-worker.js",
-  "sourceSha256": "65d7f5d76dcb62b40c3c3d90d5ceb3a837b9e199bc37f5a4058ee87615e7fb64",
+  "sourceSha256": "cb4ffa6fa18e2334ae88771e86fb6859f402a19f60fd63783b62530866900a72",
   "template": "Chummer.Run.Api/service-worker.public-edge.template.js",
   "templateSha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
   "requiredInventory": "Chummer.Run.Api/play-pwa-required-inventory.json",

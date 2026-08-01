@@ -35,6 +35,11 @@ public sealed class PortalDeploymentIdentityReadinessService(IHostEnvironment en
     [
         "wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
     ];
+    internal static IReadOnlyList<string> StagedPayloadFingerprintExcludedRelativePaths { get; } =
+    [
+        "state/origin-provider-accounts.json",
+        "wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
+    ];
     private const int AtCurrentWorkingDirectory = -100;
     private const int AtSymlinkNoFollow = 0x100;
     private const int AtEmptyPath = 0x1000;
@@ -310,18 +315,18 @@ public sealed class PortalDeploymentIdentityReadinessService(IHostEnvironment en
                 "excludedRelativePaths",
                 JsonValueKind.Array,
                 out JsonElement exclusions)
-            || exclusions.GetArrayLength() != RuntimeMountedPayloadRelativePaths.Count)
+            || exclusions.GetArrayLength() != StagedPayloadFingerprintExcludedRelativePaths.Count)
         {
             return false;
         }
 
-        for (int index = 0; index < RuntimeMountedPayloadRelativePaths.Count; index++)
+        for (int index = 0; index < StagedPayloadFingerprintExcludedRelativePaths.Count; index++)
         {
             JsonElement exclusion = exclusions[index];
             if (exclusion.ValueKind != JsonValueKind.String
                 || !string.Equals(
                     exclusion.GetString(),
-                    RuntimeMountedPayloadRelativePaths[index],
+                    StagedPayloadFingerprintExcludedRelativePaths[index],
                     StringComparison.Ordinal))
             {
                 return false;
@@ -698,7 +703,7 @@ public sealed class PortalDeploymentIdentityReadinessService(IHostEnvironment en
                     modeRow.RelativePath,
                     OverlayBuildInfoRelativePath,
                     StringComparison.Ordinal)
-                || RuntimeMountedPayloadRelativePaths.Contains(
+                || StagedPayloadFingerprintExcludedRelativePaths.Contains(
                     modeRow.RelativePath,
                     StringComparer.Ordinal))
             {

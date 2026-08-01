@@ -21,11 +21,21 @@ public sealed class PortalDeploymentIdentityReadinessTests
     private const string Fingerprint =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private const string FullDeploymentDigest =
-        "d18fab514e165b8aac313743f216ba1f836ccc4e6f4315cc81a6b2be4c1eaa28";
+        "e6613c2be0dcfcf5846c3bf39e08aefaedac75fb7fe9251ab76dbf669bf8aebd";
     private const string StagedPayloadFingerprint =
         "a2bded2b38854bb46591aa4a17210de8ecf91180f73fe3f21d7fa1a5f08159cd";
     private const string RuntimeProofRelativePath =
         "wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json";
+    private const string RuntimeProviderAccountsRelativePath =
+        "state/origin-provider-accounts.json";
+
+    [Fact]
+    public void Runtime_mount_exclusions_match_the_overlay_fingerprint_contract()
+    {
+        Assert.Equal(
+            new[] { RuntimeProviderAccountsRelativePath, RuntimeProofRelativePath },
+            PortalDeploymentIdentityReadinessService.StagedPayloadFingerprintExcludedRelativePaths);
+    }
 
     [Fact]
     public void Production_accepts_current_overlay_identity_contract()
@@ -46,7 +56,7 @@ public sealed class PortalDeploymentIdentityReadinessTests
     public void Production_matches_python_canonical_json_for_unicode_deployment_identity()
     {
         const string pythonDigest =
-            "81393cbb2442ef5f5bf8711f687b01035aded29376a210790e28a405a1b854ec";
+            "619174b17be0cfac393eaddd84ea06d40ccff488439a709f4cefdac6642e8293";
         using var root = new TemporaryContentRoot();
         var payload = CurrentBuildInfo(Fingerprint);
         var sourceFingerprint = (Dictionary<string, object?>)payload["sourceFingerprint"]!;
@@ -576,7 +586,11 @@ public sealed class PortalDeploymentIdentityReadinessTests
                 ["algorithm"] = PortalDeploymentIdentityReadinessService.StagedPayloadFingerprintAlgorithm,
                 ["aggregateSha256"] = StagedPayloadFingerprint,
                 ["fileCount"] = 1,
-                ["excludedRelativePaths"] = new[] { RuntimeProofRelativePath }
+                ["excludedRelativePaths"] = new[]
+                {
+                    RuntimeProviderAccountsRelativePath,
+                    RuntimeProofRelativePath
+                }
             },
             ["payloadModeReceipt"] = CurrentPayloadModeReceipt(),
             ["fullDeploymentDigest"] = new Dictionary<string, object?>

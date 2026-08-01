@@ -16,7 +16,7 @@
       "contentType": "application/javascript",
       "cacheControl": "no-cache, no-store, must-revalidate",
       "contract": "play-root-worker-public-edge-projection-v2",
-      "sourceSha256": "65d7f5d76dcb62b40c3c3d90d5ceb3a837b9e199bc37f5a4058ee87615e7fb64",
+      "sourceSha256": "cb4ffa6fa18e2334ae88771e86fb6859f402a19f60fd63783b62530866900a72",
       "projectionSha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
       "transformation": {
         "cacheContract": "play-source-v2 -> run-api-projection-v2",
@@ -134,7 +134,7 @@
     "script": "scripts/generate_public_play_worker_projection.py",
     "scriptSha256": "d05c3610bd44546af5dd5cb4703012395eaccb6cae0ffae8768d4ce9518dbf17",
     "config": "Chummer.Run.Api/play-worker-projection.json",
-    "configSha256": "9a27b0b801dde6db8e39300b5c4af0673d3effc4b04a4a7668f58158d3dca1da",
+    "configSha256": "4d9609d32ec31f33f82c5edee43b98d0b05c92b76c7b6346def6cf19bb20ace8",
     "template": "Chummer.Run.Api/service-worker.public-edge.template.js",
     "templateSha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
     "inventory": "Chummer.Run.Api/play-pwa-required-inventory.json",
@@ -152,7 +152,7 @@
         "kind": "json",
         "role": "projection_config",
         "contentType": "application/json",
-        "sha256": "9a27b0b801dde6db8e39300b5c4af0673d3effc4b04a4a7668f58158d3dca1da"
+        "sha256": "4d9609d32ec31f33f82c5edee43b98d0b05c92b76c7b6346def6cf19bb20ace8"
       },
       {
         "path": "Chummer.Run.Api/service-worker.public-edge.template.js",
