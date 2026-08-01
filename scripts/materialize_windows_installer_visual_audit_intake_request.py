@@ -1155,6 +1155,44 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def payload_without_volatile_generation_timestamps(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Return a comparison-safe copy of an intake request.
+
+    The long-running importer refreshes the request on every poll. Generation
+    timestamps are useful when the request changes, but they must not turn an
+    otherwise identical tracked release receipt into a permanently dirty file.
+    """
+    normalized = json.loads(json.dumps(payload))
+    normalized.pop("generated_at_utc", None)
+    materialized_draft = normalized.get("operator_telegram_draft_materialized")
+    if isinstance(materialized_draft, dict):
+        materialized_draft.pop("generated_at_utc", None)
+    return normalized
+
+
+def write_request_if_semantically_changed(
+    output_path: Path,
+    payload: dict[str, Any],
+) -> bool:
+    """Write a request only when non-volatile release evidence changed."""
+    if output_path.is_file():
+        try:
+            existing = json.loads(output_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            existing = None
+        if (
+            isinstance(existing, dict)
+            and payload_without_volatile_generation_timestamps(existing)
+            == payload_without_volatile_generation_timestamps(payload)
+        ):
+            return False
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
 def main() -> int:
     args = parse_args()
     output_path = args.output.expanduser().resolve()
@@ -1208,8 +1246,7 @@ def main() -> int:
             or materialized_draft.get("receipt_name")
             or ""
         )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_request_if_semantically_changed(output_path, payload)
     print(f"windows_installer_visual_audit_intake_request:{payload['status']}")
     return 0
 

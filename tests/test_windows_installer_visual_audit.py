@@ -4969,6 +4969,44 @@ assert not any(name == "PIL" or name.startswith("PIL.") for name in sys.modules)
         self.assertEqual("pass", result["status"])
         self.assertTrue(result["recovery_pack_pass"])
 
+    def test_windows_intake_refresh_does_not_rewrite_timestamp_only_changes(self) -> None:
+        intake = load_intake_module()
+        with tempfile.TemporaryDirectory(prefix="windows-proof-intake-idempotent-") as temp_dir:
+            output_path = Path(temp_dir) / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+            original = {
+                "generated_at_utc": "2026-08-01T00:00:00Z",
+                "status": "external_artifact_required",
+                "release_version": "run-20260801-031406",
+                "operator_telegram_draft_materialized": {
+                    "generated_at_utc": "2026-08-01T00:00:00Z",
+                    "promoted_installer_sha256": "a" * 64,
+                },
+            }
+            output_path.write_text(json.dumps(original, separators=(",", ":")) + "\n", encoding="utf-8")
+            original_bytes = output_path.read_bytes()
+            refreshed = {
+                **original,
+                "generated_at_utc": "2026-08-01T00:01:00Z",
+                "operator_telegram_draft_materialized": {
+                    **original["operator_telegram_draft_materialized"],
+                    "generated_at_utc": "2026-08-01T00:01:00Z",
+                },
+            }
+
+            changed = intake.write_request_if_semantically_changed(output_path, refreshed)
+
+            self.assertFalse(changed)
+            self.assertEqual(original_bytes, output_path.read_bytes())
+
+            refreshed["release_version"] = "run-20260801-040000"
+            changed = intake.write_request_if_semantically_changed(output_path, refreshed)
+
+            self.assertTrue(changed)
+            self.assertEqual(
+                "run-20260801-040000",
+                json.loads(output_path.read_text(encoding="utf-8"))["release_version"],
+            )
+
     def test_verify_windows_installer_visual_audit_intake_request_reports_missing_receipt_structurally(self) -> None:
         verifier = load_verify_intake_module()
         with tempfile.TemporaryDirectory(prefix="windows-proof-intake-verify-missing-") as temp_dir:
