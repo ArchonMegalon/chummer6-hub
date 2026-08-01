@@ -66,6 +66,18 @@ jobs:
             "CHUMMER_PROOF_ROOT=$proofRoot"
           ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Prepare display for native 150 percent layout capture
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          Add-Type -AssemblyName System.Windows.Forms
+          $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          if ($screen.Width -lt 1280 -or $screen.Height -lt 720) {
+            throw "Native layout proof requires at least a 1280x720 capture desktop; observed $($screen.Width)x$($screen.Height)."
+          }
+          Write-Host "Capture desktop: $($screen.Width)x$($screen.Height)"
+
       - name: Authenticate live shelf bytes and download only the promoted installer
         id: live-shelf
         shell: pwsh
@@ -190,6 +202,7 @@ jobs:
             -LaunchInstaller `
             -CaptureVisualAudit `
             -ScaledDpiScale '1.5' `
+            -UseInstallerNativeLayoutScale `
             -AutoCaptureVisualAudit `
             -AutoCaptureDelaySeconds 1 `
             -AutoCaptureTimeoutSeconds 60 `
@@ -218,6 +231,7 @@ jobs:
               [string]$source.status -ne 'pass' -or
               [string]$source.platform -ne 'windows' -or
               -not ([string]$source.hostClass).StartsWith('native-windows') -or
+              [string]$source.scaleEvidenceContract -ne 'chummer.windows_installer_native_layout_scale.v1' -or
               [string]$source.artifactSha256 -ne $env:EXPECTED_INSTALLER_SHA256) {
             throw 'Visual-audit source receipt is not a passing native-Windows binding.'
           }
@@ -228,6 +242,8 @@ jobs:
           }
           $coverage = @{}
           $surfaceHashes = @{}
+          $allImageHashes = [System.Collections.Generic.HashSet[string]]::new()
+          $boundsByCoverage = @{}
           foreach ($row in $rows) {
             $surface = [string]$row.surface
             $dpi = [string]$row.dpiScale
@@ -236,14 +252,25 @@ jobs:
                 [string]$row.clippingStatus -ne 'pass' -or
                 [string]$row.readabilityStatus -ne 'pass' -or
                 [string]$row.hostClass -ne 'native-windows' -or
-                [string]$row.captureMode -notin @('window-bounds', 'reused-same-surface')) {
+                [string]$row.captureMode -ne 'window-bounds' -or
+                [string]$row.scaleMode -ne 'installer-native-layout' -or
+                $row.traceScaleVerified -ne $true -or
+                [int]$row.systemDpi -lt 96 -or
+                [int]$row.systemDpi -gt 480) {
               throw 'Visual proof contains an unsupported surface, DPI, review, host, or capture mode.'
+            }
+            $expectedEffectiveDpi = [int][Math]::Round(
+              [int]$row.systemDpi *
+              [double]::Parse($dpi, [System.Globalization.CultureInfo]::InvariantCulture))
+            if ([int]$row.effectiveDpi -ne $expectedEffectiveDpi) {
+              throw 'Visual proof effective DPI is inconsistent with its observed system DPI and native layout scale.'
             }
             $key = "$surface|$dpi"
             if ($coverage.ContainsKey($key)) {
               throw 'Visual proof contains duplicate surface/DPI coverage.'
             }
             $coverage[$key] = $true
+            $boundsByCoverage[$key] = $row.captureBounds
             $leaf = [System.IO.Path]::GetFileName([string]$row.path)
             if ($leaf -ne [string]$row.path -or -not $leaf.EndsWith('.png')) {
               throw 'Visual proof screenshot path is not a PNG leaf name.'
@@ -264,6 +291,9 @@ jobs:
               $image.Dispose()
             }
             $imageHash = (Get-FileHash -LiteralPath $imagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if (-not $allImageHashes.Add($imageHash)) {
+              throw 'Every required visual proof screenshot must have distinct image bytes.'
+            }
             if (-not $surfaceHashes.ContainsKey($surface)) {
               $surfaceHashes[$surface] = [System.Collections.Generic.HashSet[string]]::new()
             }
@@ -272,6 +302,16 @@ jobs:
           foreach ($required in @('install-progress|1.0', 'install-progress|1.5', 'completion|1.0', 'completion|1.5')) {
             if (-not $coverage.ContainsKey($required)) {
               throw "Visual proof is missing $required coverage."
+            }
+          }
+          foreach ($surface in @('install-progress', 'completion')) {
+            $defaultBounds = $boundsByCoverage["$surface|1.0"]
+            $scaledBounds = $boundsByCoverage["$surface|1.5"]
+            $widthRatio = [double]$scaledBounds.width / [double]$defaultBounds.width
+            $heightRatio = [double]$scaledBounds.height / [double]$defaultBounds.height
+            if ([Math]::Abs($widthRatio - 1.5) -gt 0.15 -or
+                [Math]::Abs($heightRatio - 1.5) -gt 0.15) {
+              throw "Native layout bounds for $surface do not demonstrate the requested 1.5 scale."
             }
           }
           $progressHashes = @($surfaceHashes['install-progress'])

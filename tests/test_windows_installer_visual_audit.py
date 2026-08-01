@@ -1388,10 +1388,18 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn('"install-progress", "completion"', text)
         self.assertIn("[switch]$CaptureRequiredSet", text)
         self.assertIn("$ScaledDpiScale", text)
-        self.assertLess(
-            text.index('[ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale }'),
-            text.index('[ordered]@{ Surface = "completion"; DpiScale = "1.0" }'),
+        native_scale_order = (
+            '[ordered]@{ Surface = "install-progress"; DpiScale = "1.0" },\n'
+            '            [ordered]@{ Surface = "completion"; DpiScale = "1.0" },\n'
+            '            [ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale },\n'
+            '            [ordered]@{ Surface = "completion"; DpiScale = $ScaledDpiScale }'
         )
+        self.assertIn(native_scale_order, text)
+        self.assertIn("function Start-InstallerForNativeLayoutScale", text)
+        self.assertIn("function Test-InstallerTraceReportsScale", text)
+        self.assertIn("public static extern uint GetDpiForWindow", text)
+        self.assertIn("traceScaleVerified = $traceScaleVerified", text)
+        self.assertIn("$surfacesByHash.Keys.Count -ne $requiredScreenshotRows.Count", text)
         self.assertIn("foreach ($request in $captureRequests)", text)
         self.assertIn("function Wait-ForInstallerSurface", text)
         self.assertIn("function New-InstallerSurfaceWindow", text)

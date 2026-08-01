@@ -28,6 +28,7 @@ def test_live_windows_gold_proof_workflow_is_manual_and_read_only() -> None:
     assert "$env:RUNNER_TEMP" in text
     assert "$env:GITHUB_ENV" in text
     assert "Publication/upload/deployment authority: false" in text
+    assert "Set-DisplayResolution -Width 1920 -Height 1080 -Force" in text
 
 
 def test_live_windows_gold_proof_workflow_pins_authority_and_actions() -> None:
@@ -61,6 +62,7 @@ def test_live_windows_gold_proof_workflow_uses_existing_native_capture_contract(
     assert "-CaptureVisualAudit" in text
     assert "-AutoCaptureVisualAudit" in text
     assert "-ScaledDpiScale '1.5'" in text
+    assert "-UseInstallerNativeLayoutScale" in text
     assert "-VisualClippingStatus pass" in text
     assert "-VisualReadabilityStatus pass" in text
     assert "Visual proof must contain exactly four screenshot rows" in text
@@ -69,6 +71,9 @@ def test_live_windows_gold_proof_workflow_uses_existing_native_capture_contract(
     assert "completion|1.0" in text
     assert "completion|1.5" in text
     assert "Progress and completion surfaces must not reuse identical image bytes" in text
+    assert "chummer.windows_installer_native_layout_scale.v1" in text
+    assert "Every required visual proof screenshot must have distinct image bytes" in text
+    assert "do not demonstrate the requested 1.5 scale" in text
 
 
 def test_live_windows_gold_proof_workflow_never_uploads_installer_bytes() -> None:
@@ -109,6 +114,27 @@ def test_windows_visual_capture_requires_fresh_trace_before_generic_completion_w
         "Wait-ForInstallerSurface $captureSurface $effectiveAutoCaptureTimeoutSeconds "
         "$allowCompletionInstallerFallback"
     ) in script
+
+
+def test_windows_visual_capture_uses_trace_verified_native_layout_scale() -> None:
+    script = (
+        REPO_ROOT / "scripts/capture_windows_installer_visual_audit.ps1"
+    ).read_text(encoding="utf-8")
+    wrapper = (
+        REPO_ROOT / "scripts/capture_windows_installer_gold_proof.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "[switch]$UseInstallerNativeLayoutScale" in script
+    assert "function Start-InstallerForNativeLayoutScale" in script
+    assert '"--visual-audit-scale"' in script
+    assert "GetDpiForWindow" in script
+    assert "function Test-InstallerTraceReportsScale" in script
+    assert "mode=installer-native-layout" in script
+    assert "traceScaleVerified = $traceScaleVerified" in script
+    assert "if ($UseInstallerNativeLayoutScale) {\n                throw" in script
+    assert "$surfacesByHash.Keys.Count -ne $requiredScreenshotRows.Count" in script
+    assert "[switch]$UseInstallerNativeLayoutScale" in wrapper
+    assert '$captureArgs["UseInstallerNativeLayoutScale"] = $true' in wrapper
 
 
 @pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell is unavailable")

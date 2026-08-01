@@ -11,6 +11,7 @@ param(
     [switch]$LaunchInstaller,
     [switch]$CaptureRequiredSet,
     [string]$ScaledDpiScale = "1.5",
+    [switch]$UseInstallerNativeLayoutScale,
     [switch]$AutoCapture,
     [int]$AutoCaptureDelaySeconds = 3,
 [int]$AutoCaptureTimeoutSeconds = 45
@@ -248,6 +249,13 @@ $effectiveAutoCaptureTimeoutSeconds = [Math]::Max(1, [Math]::Min($AutoCaptureTim
 if ($AutoCapture -and $effectiveAutoCaptureTimeoutSeconds -ne $AutoCaptureTimeoutSeconds) {
     Write-Host "Auto-capture timeout capped at $effectiveAutoCaptureTimeoutSeconds seconds per surface."
 }
+if ($UseInstallerNativeLayoutScale -and
+    (-not $CaptureRequiredSet -or -not $AutoCapture -or -not $LaunchInstaller)) {
+    throw "Installer-native layout scaling requires CaptureRequiredSet, AutoCapture, and LaunchInstaller."
+}
+if ($UseInstallerNativeLayoutScale -and $ScaledDpiScale -ne "1.5") {
+    throw "Installer-native layout scaling accepts only the fixed scaled DPI value 1.5."
+}
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -300,6 +308,9 @@ namespace ChummerInstallerCapture
 
         [DllImport("user32.dll")]
         public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern uint GetDpiForWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
@@ -392,6 +403,39 @@ function Test-InstallerTraceReportsCompletion {
     return $false
 }
 
+function Test-InstallerTraceReportsScale(
+    [string]$ScaleValue,
+    [string]$SurfaceValue,
+    [int]$SystemDpi,
+    [int]$EffectiveDpi) {
+    if ($null -eq $script:LaunchedInstallerProcessId -or
+        $null -eq $script:LaunchedInstallerStartedAtUtc) {
+        return $false
+    }
+
+    $freshnessFloor = $script:LaunchedInstallerStartedAtUtc.AddSeconds(-2)
+    $expected = "visual audit render scale observed=$ScaleValue mode=installer-native-layout surface=$SurfaceValue system_dpi=$SystemDpi effective_dpi=$EffectiveDpi"
+    foreach ($candidate in Get-InstallerTraceCandidates) {
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            continue
+        }
+
+        $traceFile = Get-Item -LiteralPath $candidate
+        if ($traceFile.LastWriteTimeUtc -lt $freshnessFloor) {
+            continue
+        }
+
+        $matchingRows = @(Get-Content -LiteralPath $candidate -Tail 80 -Encoding UTF8 | Where-Object {
+            ([string]$_).IndexOf($expected, [System.StringComparison]::Ordinal) -ge 0
+        })
+        if ($matchingRows.Count -gt 0) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Get-InstallerProcessSnapshotRows {
     return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
         ([string]$_.Name).IndexOf("Chummer", [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -or
@@ -472,6 +516,19 @@ function Invoke-InstallerCaptureCleanup {
     Start-Sleep -Seconds 2
     Stop-LaunchedInstallerProcess
     Stop-InstallerSurfaceProcesses
+    $script:LaunchedInstallerProcessId = $null
+    $script:LaunchedInstallerStartedAtUtc = $null
+}
+
+function Start-InstallerForNativeLayoutScale([string]$ScaleValue) {
+    Write-Host "Launching installer for native layout scale $ScaleValue visual capture: $installerFullPath"
+    $script:LaunchedInstallerStartedAtUtc = (Get-Date).ToUniversalTime()
+    $launchedProcess = Start-Process -FilePath $installerFullPath -ArgumentList @(
+        "--visual-audit-scale",
+        $ScaleValue
+    ) -PassThru
+    $script:LaunchedInstallerProcessId = $launchedProcess.Id
+    Start-Sleep -Milliseconds 150
 }
 
 function Get-CaptureBounds([object]$Window, [bool]$AllowScreenFallback = $true) {
@@ -558,18 +615,28 @@ function Get-AutomationCaptureBounds([IntPtr]$Handle) {
 
 $captureRequests = @()
 if ($CaptureRequiredSet) {
-    $captureRequests = @(
-        [ordered]@{ Surface = "install-progress"; DpiScale = "1.0" },
-        [ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale },
-        [ordered]@{ Surface = "completion"; DpiScale = "1.0" },
-        [ordered]@{ Surface = "completion"; DpiScale = $ScaledDpiScale }
-    )
+    if ($UseInstallerNativeLayoutScale) {
+        $captureRequests = @(
+            [ordered]@{ Surface = "install-progress"; DpiScale = "1.0" },
+            [ordered]@{ Surface = "completion"; DpiScale = "1.0" },
+            [ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale },
+            [ordered]@{ Surface = "completion"; DpiScale = $ScaledDpiScale }
+        )
+    }
+    else {
+        $captureRequests = @(
+            [ordered]@{ Surface = "install-progress"; DpiScale = "1.0" },
+            [ordered]@{ Surface = "install-progress"; DpiScale = $ScaledDpiScale },
+            [ordered]@{ Surface = "completion"; DpiScale = "1.0" },
+            [ordered]@{ Surface = "completion"; DpiScale = $ScaledDpiScale }
+        )
+    }
 }
 else {
     $captureRequests = @([ordered]@{ Surface = $Surface; DpiScale = $DpiScale })
 }
 
-if ($LaunchInstaller) {
+if ($LaunchInstaller -and -not $UseInstallerNativeLayoutScale) {
     Write-Host "Launching installer for visual capture: $installerFullPath"
     $script:LaunchedInstallerStartedAtUtc = (Get-Date).ToUniversalTime()
     $launchedProcess = Start-Process -FilePath $installerFullPath -PassThru
@@ -586,13 +653,21 @@ trap {
 }
 
 $newRows = @()
+$activeNativeLayoutScale = $null
 foreach ($request in $captureRequests) {
     $captureSurface = [string]$request.Surface
     $captureDpiScale = [string]$request.DpiScale
     $canonicalCaptureSurface = Normalize-Surface $captureSurface
     $window = $null
+    if ($UseInstallerNativeLayoutScale -and $captureDpiScale -ne $activeNativeLayoutScale) {
+        if ($null -ne $activeNativeLayoutScale) {
+            Invoke-InstallerCaptureCleanup
+        }
+        Start-InstallerForNativeLayoutScale $captureDpiScale
+        $activeNativeLayoutScale = $captureDpiScale
+    }
     Write-Host "Put the Windows installer surface to audit on screen, then press Enter."
-    Write-Host "Surface: $captureSurface; DPI label: $captureDpiScale; clipping=$ClippingStatus; readability=$ReadabilityStatus"
+    Write-Host "Surface: $captureSurface; requested scale: $captureDpiScale; clipping=$ClippingStatus; readability=$ReadabilityStatus"
     if ($AutoCapture) {
         Write-Host "Waiting up to $effectiveAutoCaptureTimeoutSeconds seconds for the $captureSurface window."
         try {
@@ -600,6 +675,9 @@ foreach ($request in $captureRequests) {
             $window = Wait-ForInstallerSurface $captureSurface $effectiveAutoCaptureTimeoutSeconds $allowCompletionInstallerFallback
         }
         catch {
+            if ($UseInstallerNativeLayoutScale) {
+                throw
+            }
             $previousSameSurfaceRows = @($newRows | Where-Object { (Normalize-Surface $_.surface) -eq $canonicalCaptureSurface })
             if ($previousSameSurfaceRows.Count -eq 0) {
                 throw
@@ -665,6 +743,9 @@ foreach ($request in $captureRequests) {
         $bounds = Get-CaptureBounds $window (-not $AutoCapture)
     }
     catch {
+        if ($UseInstallerNativeLayoutScale) {
+            throw
+        }
         $previousSameSurfaceRows = @($newRows | Where-Object { (Normalize-Surface $_.surface) -eq $canonicalCaptureSurface })
         if ($previousSameSurfaceRows.Count -eq 0) {
             throw
@@ -704,6 +785,29 @@ foreach ($request in $captureRequests) {
     if ($AutoCapture -and (Test-CaptureBoundsLookLikeDesktopFallback $bounds)) {
         throw "Automated installer capture refused full-desktop fallback bounds; expected compact installer window bounds."
     }
+    $scaleMode = "external-dpi"
+    $systemDpi = $null
+    $effectiveDpi = $null
+    $traceScaleVerified = $false
+    if ($UseInstallerNativeLayoutScale) {
+        $scaleMode = "installer-native-layout"
+        $systemDpi = [int][ChummerInstallerCapture.NativeMethods]::GetDpiForWindow($window.MainWindowHandle)
+        if ($systemDpi -lt 96 -or $systemDpi -gt 480) {
+            throw "Installer window reported an unsupported system DPI value: $systemDpi."
+        }
+        $numericScale = [double]::Parse(
+            $captureDpiScale,
+            [System.Globalization.CultureInfo]::InvariantCulture)
+        $effectiveDpi = [int][Math]::Round($systemDpi * $numericScale)
+        $traceScaleVerified = Test-InstallerTraceReportsScale `
+            $captureDpiScale `
+            $canonicalCaptureSurface `
+            $systemDpi `
+            $effectiveDpi
+        if (-not $traceScaleVerified) {
+            throw "Installer trace did not confirm native layout scale $captureDpiScale for $canonicalCaptureSurface at effective DPI $effectiveDpi."
+        }
+    }
     $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     try {
@@ -732,6 +836,11 @@ foreach ($request in $captureRequests) {
         readabilityStatus = $ReadabilityStatus
         hostClass = "native-windows"
         captureMode = $(if ($AutoCapture) { "window-bounds" } else { "manual-screen" })
+        scaleMode = $scaleMode
+        systemDpi = $systemDpi
+        effectiveDpi = $effectiveDpi
+        traceScaleVerified = $traceScaleVerified
+        processId = $(if ($null -ne $window) { [int]$window.ProcessId } else { $null })
         windowTitle = $(if ($null -ne $window) { [string]$window.MainWindowTitle } else { "" })
         captureBounds = [ordered]@{
             left = $bounds.Left
@@ -796,6 +905,16 @@ foreach ($item in $screenshots) {
     }
     $surfaceName = Normalize-Surface $item.surface
     if ($requiredSurfaces -contains $surfaceName) {
+        if ($UseInstallerNativeLayoutScale -and
+            (([string]$item.captureMode) -ne "window-bounds" -or
+             ([string]$item.scaleMode) -ne "installer-native-layout" -or
+             $item.traceScaleVerified -ne $true -or
+             [int]$item.systemDpi -lt 96 -or
+             [int]$item.effectiveDpi -ne [int][Math]::Round(
+                 [int]$item.systemDpi *
+                 [double]::Parse([string]$item.dpiScale, [System.Globalization.CultureInfo]::InvariantCulture)))) {
+            $allPass = $false
+        }
         $screenshotPath = Join-Path $outputFullRoot ([string]$item.path)
         if (Test-Path -LiteralPath $screenshotPath) {
             $screenshotHash = (Get-FileHash -LiteralPath $screenshotPath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -805,6 +924,12 @@ foreach ($item in $screenshots) {
             [void]$surfacesByHash[$screenshotHash].Add($surfaceName)
         }
     }
+}
+$requiredScreenshotRows = @($screenshots | Where-Object {
+    $requiredSurfaces -contains (Normalize-Surface $_.surface)
+})
+if ($surfacesByHash.Keys.Count -ne $requiredScreenshotRows.Count) {
+    $allPass = $false
 }
 foreach ($surfaceSet in $surfacesByHash.Values) {
     if ($surfaceSet.Count -gt 1) {
@@ -835,6 +960,7 @@ $payload = [ordered]@{
     artifactSha256 = $artifactSha
     sourceUpdatedAtUtc = (Get-Date).ToUniversalTime().ToString("o").Replace("+00:00", "Z")
     requiredSurfaces = $requiredSurfaces
+    scaleEvidenceContract = $(if ($UseInstallerNativeLayoutScale) { "chummer.windows_installer_native_layout_scale.v1" } else { $null })
     surfaceCoverage = $surfaceCoverage
     screenshots = $screenshots
 }
