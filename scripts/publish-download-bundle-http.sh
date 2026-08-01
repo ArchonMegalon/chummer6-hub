@@ -50,6 +50,7 @@ UPLOAD_ATTEMPT_RECEIPT_HELPER="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_HELPER:-
 UPLOAD_ATTEMPT_RECEIPT_PATH="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$BUNDLE_DIR/release-upload-handoff.json}"
 STAGE_RESPONSE_PATH="${CHUMMER_RELEASE_UPLOAD_STAGE_RESPONSE_PATH:-$BUNDLE_DIR/release-stage-response.json}"
 STAGED_PROBE_TOKEN_PATH="${CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE:-}"
+RESUME_SESSION_ID="${CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID:-}"
 
 # Keep inherited bearer credentials out of every preflight/materializer child.
 # Bash preserves an inherited export attribute across ordinary assignment, so
@@ -63,12 +64,18 @@ unset \
   CHUMMER_RELEASE_UPLOAD_TICKET \
   CHUMMER_RELEASE_UPLOAD_TICKET_FILE \
   CHUMMER_RELEASE_UPLOAD_TICKET_PATH \
+  CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID \
   CHUMMER_ARTIFACT_FACTORY_TOKEN \
   FLEET_INTERNAL_API_TOKEN \
   UPLOAD_AUTH_VALUE
 
 if [[ ! -d "$BUNDLE_DIR" ]]; then
   echo "Bundle directory not found: $BUNDLE_DIR" >&2
+  exit 1
+fi
+
+if [[ -n "$RESUME_SESSION_ID" && ! "$RESUME_SESSION_ID" =~ ^[0-9a-f]{32}$ ]]; then
+  echo "CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID must be a canonical lowercase 32-hex session identifier." >&2
   exit 1
 fi
 
@@ -1271,6 +1278,9 @@ if to_bool "$DRY_RUN"; then
   echo "Dry run only. Bundle: $BUNDLE_DIR"
   echo "Upload sessions URL: $SESSIONS_URL"
   echo "Files staged: $file_count"
+  if [[ -n "$RESUME_SESSION_ID" ]]; then
+    echo "Resume session: $RESUME_SESSION_ID"
+  fi
   echo
   if (( STAGE_ONLY == 1 )); then
     echo "Exact inert stage command:"
@@ -1292,8 +1302,10 @@ if (( STAGE_ONLY == 1 )); then
   preflight_staged_probe_token_path "$STAGED_PROBE_TOKEN_PATH"
 fi
 
-python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" preflight \
-  --receipt "$UPLOAD_ATTEMPT_RECEIPT_PATH"
+if [[ -z "$RESUME_SESSION_ID" ]]; then
+  python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" preflight \
+    --receipt "$UPLOAD_ATTEMPT_RECEIPT_PATH"
+fi
 
 if ! resolve_upload_token; then
   if to_bool "$CHUMMER_RELEASE_UPLOAD_NON_INTERACTIVE"; then
@@ -1399,21 +1411,11 @@ fi
 
 session_json="$tmp_root/session.json"
 response_json="$tmp_root/response.json"
-
-request_json "$session_json" "create upload session" "$SESSIONS_URL" "${request_common[@]}" -X POST
-session_id="$(resolve_json_field "$session_json" sessionId SessionId session_id id)"
-[[ "$session_id" =~ ^[0-9a-f]{32}$ ]] || {
-  echo "Upload session response contains an unsafe sessionId." >&2
-  exit 1
-}
-files_url="$(resolve_json_field "$session_json" filesUrl FilesUrl files_url files || true)"
-chunks_url="$(resolve_json_field "$session_json" chunksUrl ChunksUrl chunks_url chunks || true)"
-complete_url="$(resolve_json_field "$session_json" completeUrl CompleteUrl complete_url complete || true)"
-expires_at="$(resolve_json_field "$session_json" expiresAtUtc ExpiresAtUtc expires_at_utc expiresAt || true)"
-[[ -n "$session_id" ]] || {
-  echo "Upload session response missing sessionId." >&2
-  exit 1
-}
+session_id=""
+files_url=""
+chunks_url=""
+complete_url=""
+expires_at=""
 
 record_upload_attempt_state() {
   local state="$1"
@@ -1428,9 +1430,32 @@ record_upload_attempt_state() {
     "$@"
 }
 
-if ! record_upload_attempt_state created; then
-  echo "Upload session $session_id was created, but its durable recovery handoff could not be written; no files were uploaded." >&2
-  exit 1
+if [[ -n "$RESUME_SESSION_ID" ]]; then
+  session_id="$RESUME_SESSION_ID"
+  if ! expires_at="$(python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" validate-resume \
+      --receipt "$UPLOAD_ATTEMPT_RECEIPT_PATH" \
+      --summary "$candidate_summary" \
+      --sessions-url "$SESSIONS_URL" \
+      --session-id "$session_id")"; then
+    echo "Durable upload session $session_id is not safe to resume." >&2
+    exit 1
+  fi
+  echo "Resuming durably recorded upload session $session_id without creating another session."
+else
+  request_json "$session_json" "create upload session" "$SESSIONS_URL" "${request_common[@]}" -X POST
+  session_id="$(resolve_json_field "$session_json" sessionId SessionId session_id id)"
+  [[ "$session_id" =~ ^[0-9a-f]{32}$ ]] || {
+    echo "Upload session response contains an unsafe sessionId." >&2
+    exit 1
+  }
+  files_url="$(resolve_json_field "$session_json" filesUrl FilesUrl files_url files || true)"
+  chunks_url="$(resolve_json_field "$session_json" chunksUrl ChunksUrl chunks_url chunks || true)"
+  complete_url="$(resolve_json_field "$session_json" completeUrl CompleteUrl complete_url complete || true)"
+  expires_at="$(resolve_json_field "$session_json" expiresAtUtc ExpiresAtUtc expires_at_utc expiresAt || true)"
+  if ! record_upload_attempt_state created; then
+    echo "Upload session $session_id was created, but its durable recovery handoff could not be written; no files were uploaded." >&2
+    exit 1
+  fi
 fi
 
 [[ -n "$files_url" ]] || files_url="${SESSIONS_URL%/}/${session_id}/files"

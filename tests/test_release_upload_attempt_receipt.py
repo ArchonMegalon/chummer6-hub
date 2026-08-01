@@ -100,6 +100,92 @@ def test_attempt_receipt_is_owner_only_exact_and_monotonic(tmp_path: Path) -> No
     assert "reconcile or archive it" in blocked.stderr
 
 
+def test_attempt_receipt_validates_only_exact_unexpired_created_resume(
+    tmp_path: Path,
+) -> None:
+    _bundle, _canonical, summary, receipt = make_candidate(tmp_path)
+    session_id = "0123456789abcdef0123456789abcdef"
+    sessions_url = "https://chummer.run/api/internal/releases/upload-sessions"
+    created = run_helper(
+        "transition",
+        "--receipt",
+        str(receipt),
+        "--summary",
+        str(summary),
+        "--sessions-url",
+        sessions_url,
+        "--session-id",
+        session_id,
+        "--expires-at",
+        "2099-07-16T00:00:00Z",
+        "--state",
+        "created",
+    )
+    assert created.returncode == 0, created.stderr
+
+    resumable = run_helper(
+        "validate-resume",
+        "--receipt",
+        str(receipt),
+        "--summary",
+        str(summary),
+        "--sessions-url",
+        sessions_url,
+        "--session-id",
+        session_id,
+    )
+    assert resumable.returncode == 0, resumable.stderr
+    assert resumable.stdout.strip() == "2099-07-16T00:00:00Z"
+
+    wrong_origin = run_helper(
+        "validate-resume",
+        "--receipt",
+        str(receipt),
+        "--summary",
+        str(summary),
+        "--sessions-url",
+        "https://other.invalid/api/internal/releases/upload-sessions",
+        "--session-id",
+        session_id,
+    )
+    assert wrong_origin.returncode != 0
+    assert "session binding does not match" in wrong_origin.stderr
+
+    assert transition(summary, receipt, "uploaded").returncode == 0
+    already_uploaded = run_helper(
+        "validate-resume",
+        "--receipt",
+        str(receipt),
+        "--summary",
+        str(summary),
+        "--sessions-url",
+        sessions_url,
+        "--session-id",
+        session_id,
+    )
+    assert already_uploaded.returncode != 0
+    assert "state 'created'" in already_uploaded.stderr
+
+
+def test_attempt_receipt_rejects_expired_resume(tmp_path: Path) -> None:
+    _bundle, _canonical, summary, receipt = make_candidate(tmp_path)
+    assert transition(summary, receipt, "created").returncode == 0
+
+    expired = run_helper(
+        "validate-resume",
+        "--receipt",
+        str(receipt),
+        "--summary",
+        str(summary),
+        "--sessions-url",
+        "https://chummer.run/api/internal/releases/upload-sessions",
+        "--session-id",
+        "0123456789abcdef0123456789abcdef",
+    )
+    assert expired.returncode != 0
+    assert "session has expired" in expired.stderr
+
+
 def test_attempt_receipt_rejects_invalid_transition_and_candidate_tamper(tmp_path: Path) -> None:
     _bundle, _canonical, summary, receipt = make_candidate(tmp_path)
     assert transition(summary, receipt, "created").returncode == 0

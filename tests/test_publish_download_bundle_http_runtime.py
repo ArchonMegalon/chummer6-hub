@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import threading
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -429,6 +430,7 @@ def run_publish_with_script(
     env.pop("CHUMMER_RELEASE_UPLOAD_TOKEN_FILE", None)
     env.pop("CHUMMER_RELEASE_UPLOAD_TOKEN_PATH", None)
     env.pop("CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE", None)
+    env.pop("CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID", None)
     env.pop("CHUMMER_ARTIFACT_FACTORY_TOKEN", None)
     env.pop("CHUMMER_RELEASE_UPLOAD_ALLOW_PROOF_ONLY_VISUAL_HANDOFF", None)
     env.pop("CHUMMER_FORCE_NIGHTLY_PUBLISH", None)
@@ -777,6 +779,91 @@ def test_publish_download_bundle_http_stages_exact_windows_scope_without_complet
     for manifest_name, sealed_bytes in sealed_manifest_bytes.items():
         assert (bundle_root / manifest_name).read_bytes() == sealed_bytes
     assert "owner-only finalize_staged_release.py" in result.stdout
+
+
+def test_publish_download_bundle_http_resumes_exact_created_session_without_recreating_it(
+    tmp_path: Path,
+) -> None:
+    bundle_root = write_bundle(tmp_path / "bundle")
+    registry_root = write_registry(tmp_path / "registry")
+    private_dir = tmp_path / "private"
+    private_dir.mkdir()
+    private_dir.chmod(0o700)
+    probe_token_path = private_dir / "staged-probe-token"
+    summary_path = tmp_path / "candidate.json"
+    recorder = UploadRecorder()
+
+    with serve_upload_api(recorder) as base_url:
+        summarized = subprocess.run(
+            [
+                sys.executable,
+                str(UPLOAD_ATTEMPT_RECEIPT_HELPER),
+                "summarize",
+                "--bundle-root",
+                str(bundle_root),
+                "--canonical-manifest",
+                str(bundle_root / "RELEASE_CHANNEL.generated.json"),
+                "--output",
+                str(summary_path),
+                "--file",
+                str(bundle_root / "releases.json"),
+                "--file",
+                str(bundle_root / "RELEASE_CHANNEL.generated.json"),
+                "--file",
+                str(bundle_root / "files" / "notes.txt"),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert summarized.returncode == 0, summarized.stderr
+        created = subprocess.run(
+            [
+                sys.executable,
+                str(UPLOAD_ATTEMPT_RECEIPT_HELPER),
+                "transition",
+                "--receipt",
+                str(bundle_root / "release-upload-handoff.json"),
+                "--summary",
+                str(summary_path),
+                "--sessions-url",
+                f"{base_url}/api/internal/releases/upload-sessions",
+                "--session-id",
+                SESSION_ID,
+                "--expires-at",
+                "2099-07-16T00:00:00Z",
+                "--state",
+                "created",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert created.returncode == 0, created.stderr
+
+        result = run_publish_with_script(
+            SCRIPT,
+            bundle_root,
+            base_url,
+            registry_root,
+            extra_env={
+                "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1",
+                "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE": str(probe_token_path),
+                "CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID": SESSION_ID,
+            },
+        )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert recorder.session_posts == 0
+    assert recorder.file_posts == 3
+    assert recorder.stage_posts == 1
+    assert recorder.complete_posts == 0
+    assert f"Resuming durably recorded upload session {SESSION_ID}" in result.stdout
+    receipt = json.loads(
+        (bundle_root / "release-upload-handoff.json").read_text(encoding="utf-8")
+    )
+    assert receipt["completion"]["state"] == "staged"
+    assert probe_token_path.read_text(encoding="ascii") == STAGE_PROBE_TOKEN + "\n"
 
 
 def test_publish_download_bundle_http_scrubs_reflected_stage_probe_token(

@@ -395,6 +395,36 @@ def preflight(args: argparse.Namespace) -> int:
     )
 
 
+def validate_resume(args: argparse.Namespace) -> int:
+    receipt = Path(args.receipt)
+    payload = read_json_object(receipt)
+    candidate = validate_candidate(read_json_object(Path(args.summary)))
+    session_id = validate_session_id(args.session_id)
+    api_origin = normalized_api_origin(args.sessions_url)
+
+    if payload.get("schemaVersion") != SCHEMA_VERSION:
+        raise ValueError("durable upload receipt schema is not resumable")
+    if payload.get("sessionId") != session_id or payload.get("apiOrigin") != api_origin:
+        raise ValueError("durable upload receipt session binding does not match the resume request")
+    if payload.get("candidate") != candidate:
+        raise ValueError("durable upload receipt candidate binding does not match the current bundle")
+    completion = payload.get("completion")
+    if not isinstance(completion, dict) or completion.get("state") != "created":
+        raise ValueError("only a durable upload receipt in state 'created' can be resumed for upload")
+    if "stageResponse" in payload:
+        raise ValueError("a durable upload receipt with staged response state cannot be resumed for upload")
+
+    expiry = normalize_expiry(str(payload.get("expiresAtUtc") or ""))
+    if expiry is None:
+        raise ValueError("durable upload receipt is missing its session expiry")
+    parsed_expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+    if parsed_expiry <= datetime.now(timezone.utc):
+        raise ValueError("durable upload receipt session has expired")
+
+    print(expiry)
+    return 0
+
+
 def transition(args: argparse.Namespace) -> int:
     state = args.state
     if state not in VALID_STATES:
@@ -506,6 +536,13 @@ def build_parser() -> argparse.ArgumentParser:
     preflight_parser = subparsers.add_parser("preflight")
     preflight_parser.add_argument("--receipt", required=True)
     preflight_parser.set_defaults(handler=preflight)
+
+    resume_parser = subparsers.add_parser("validate-resume")
+    resume_parser.add_argument("--receipt", required=True)
+    resume_parser.add_argument("--summary", required=True)
+    resume_parser.add_argument("--sessions-url", required=True)
+    resume_parser.add_argument("--session-id", required=True)
+    resume_parser.set_defaults(handler=validate_resume)
 
     summary_parser = subparsers.add_parser("summarize")
     summary_parser.add_argument("--bundle-root", required=True)
