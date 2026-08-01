@@ -293,6 +293,22 @@ def command_option_value(arguments_text: str, option: str) -> str:
     return ""
 
 
+def command_flag_present(arguments_text: str, option: str) -> bool:
+    try:
+        arguments = shlex.split(arguments_text)
+    except ValueError:
+        return False
+    return option in arguments
+
+
+def nonnegative_int_option(value: Any, fallback: float) -> float:
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return fallback
+    return float(parsed) if parsed >= 0 else fallback
+
+
 def kill_and_reap_process(
     process: subprocess.Popen[bytes],
     *,
@@ -484,7 +500,7 @@ def scan_matching_watcher_pids(command: list[str]) -> dict[str, Any]:
         ["ps", "-ww", "-eo", "pid=,args="],
     )
     pids: list[int] = []
-    bindings_by_pid: dict[str, dict[str, str]] = {}
+    bindings_by_pid: dict[str, dict[str, Any]] = {}
     stdout = capture.get("stdout")
     stdout_bytes = stdout if isinstance(stdout, bytes) else b""
     for raw_line in stdout_bytes.decode("utf-8", errors="replace").splitlines():
@@ -517,6 +533,18 @@ def scan_matching_watcher_pids(command: list[str]) -> dict[str, Any]:
                 "watcher_process_started_at_utc": command_option_value(
                     args_text,
                     "--watcher-started-at-utc",
+                ),
+                "wait_seconds": command_option_value(
+                    args_text,
+                    "--wait-seconds",
+                ),
+                "poll_seconds": command_option_value(
+                    args_text,
+                    "--poll-seconds",
+                ),
+                "refresh_intake_request": command_flag_present(
+                    args_text,
+                    "--refresh-intake-request",
                 ),
             }
     return {
@@ -987,6 +1015,9 @@ def resolve_running_process_state(pid_file: Path, command: list[str]) -> dict[st
         "process_scan_process_reaped": bool(scan.get("process_reaped", True)),
         "watcher_instance_id": "",
         "watcher_process_started_at_utc": "",
+        "active_wait_seconds": None,
+        "active_poll_seconds": None,
+        "active_refresh_intake_request": None,
         "pid_file_present_before_resolution": bool(pid_state.get("present")),
         "pid_file_state_before_resolution": str(pid_state.get("state") or "missing"),
         "pid_file_recorded_pid": recorded_pid,
@@ -1009,6 +1040,11 @@ def resolve_running_process_state(pid_file: Path, command: list[str]) -> dict[st
             )
             result["watcher_process_started_at_utc"] = str(
                 process_binding.get("watcher_process_started_at_utc") or ""
+            )
+            result["active_wait_seconds"] = process_binding.get("wait_seconds")
+            result["active_poll_seconds"] = process_binding.get("poll_seconds")
+            result["active_refresh_intake_request"] = process_binding.get(
+                "refresh_intake_request"
             )
         return result
 
@@ -1035,6 +1071,11 @@ def resolve_running_process_state(pid_file: Path, command: list[str]) -> dict[st
             )
             result["watcher_process_started_at_utc"] = str(
                 process_binding.get("watcher_process_started_at_utc") or ""
+            )
+            result["active_wait_seconds"] = process_binding.get("wait_seconds")
+            result["active_poll_seconds"] = process_binding.get("poll_seconds")
+            result["active_refresh_intake_request"] = process_binding.get(
+                "refresh_intake_request"
             )
         return result
 
@@ -1224,6 +1265,37 @@ def status(args: argparse.Namespace) -> int:
     matching_pids = list(resolution.get("matching_process_pids") or [])
     adopted = bool(resolution.get("adopted_existing_process"))
     process_scan_complete = bool(resolution.get("process_scan_complete"))
+    if running_pid is not None:
+        wait_seconds = nonnegative_int_option(
+            resolution.get("active_wait_seconds"),
+            args.wait_seconds,
+        )
+        poll_seconds = nonnegative_int_option(
+            resolution.get("active_poll_seconds"),
+            args.poll_seconds,
+        )
+        observed_refresh = resolution.get("active_refresh_intake_request")
+        refresh_intake_request = (
+            observed_refresh
+            if isinstance(observed_refresh, bool)
+            else args.refresh_intake_request
+        )
+        command = watcher_command(
+            args.intake_request,
+            wait_seconds=wait_seconds,
+            poll_seconds=poll_seconds,
+            refresh_intake_request=refresh_intake_request,
+            watcher_instance_id=str(
+                resolution.get("watcher_instance_id") or ""
+            ),
+            watcher_started_at_utc=str(
+                resolution.get("watcher_process_started_at_utc") or ""
+            ),
+        )
+    else:
+        wait_seconds = args.wait_seconds
+        poll_seconds = args.poll_seconds
+        refresh_intake_request = args.refresh_intake_request
     payload = build_payload(
         status=(
             "process_state_unknown"
@@ -1243,9 +1315,9 @@ def status(args: argparse.Namespace) -> int:
         pid_file=args.pid_file,
         log_file=args.log_file,
         intake_request=args.intake_request,
-        wait_seconds=args.wait_seconds,
-        poll_seconds=args.poll_seconds,
-        refresh_intake_request=args.refresh_intake_request,
+        wait_seconds=wait_seconds,
+        poll_seconds=poll_seconds,
+        refresh_intake_request=refresh_intake_request,
         adopted_existing_process=adopted,
         resolution=resolution,
         note=(

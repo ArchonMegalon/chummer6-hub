@@ -21,6 +21,20 @@ def load_module():
     return module
 
 
+def complete_scan(*pids: int, bindings_by_pid=None):
+    return {
+        "pids": list(pids),
+        "bindings_by_pid": bindings_by_pid or {},
+        "complete": True,
+        "error_code": "",
+        "timed_out": False,
+        "output_truncated": False,
+        "cleanup_complete": True,
+        "process_reaped": True,
+        "returncode": 0,
+    }
+
+
 class ManageWindowsInstallerGoldProofWatcherTests(unittest.TestCase):
     def test_list_matching_watcher_pids_uses_wide_ps_and_extracts_all_matches(self) -> None:
         module = load_module()
@@ -40,17 +54,26 @@ class ManageWindowsInstallerGoldProofWatcherTests(unittest.TestCase):
         )
 
         with (
-            mock.patch.object(module.subprocess, "run", return_value=mock.Mock(returncode=0, stdout=ps_stdout)) as run_mock,
+            mock.patch.object(
+                module,
+                "bounded_subprocess_capture",
+                return_value={
+                    "stdout": ps_stdout.encode("utf-8"),
+                    "complete": True,
+                    "error_code": "",
+                    "timed_out": False,
+                    "output_truncated": False,
+                    "cleanup_complete": True,
+                    "process_reaped": True,
+                    "returncode": 0,
+                },
+            ) as capture_mock,
             mock.patch.object(module, "is_process_alive", side_effect=lambda pid: pid in (111, 222)),
         ):
             pids = module.list_matching_watcher_pids(command)
 
         self.assertEqual([111, 222], pids)
-        run_mock.assert_called_once()
-        self.assertEqual(["ps", "-ww", "-eo", "pid=,args="], run_mock.call_args.args[0])
-        env = run_mock.call_args.kwargs.get("env")
-        self.assertIsInstance(env, dict)
-        self.assertTrue(str(env.get("TMPDIR") or "").strip())
+        capture_mock.assert_called_once_with(["ps", "-ww", "-eo", "pid=,args="])
 
     def test_start_launches_process_with_start_new_session_and_writes_state(self) -> None:
         module = load_module()
@@ -65,7 +88,7 @@ class ManageWindowsInstallerGoldProofWatcherTests(unittest.TestCase):
 
             with (
                 mock.patch.object(module.subprocess, "Popen", return_value=process) as popen,
-                mock.patch.object(module, "list_matching_watcher_pids", return_value=[]),
+                mock.patch.object(module, "scan_matching_watcher_pids", return_value=complete_scan()),
                 mock.patch.object(module, "is_process_alive", side_effect=lambda pid: pid not in (None, 0)),
                 redirect_stdout(io.StringIO()),
             ):
@@ -112,7 +135,7 @@ class ManageWindowsInstallerGoldProofWatcherTests(unittest.TestCase):
             log_file = root / "watcher.log"
 
             with (
-                mock.patch.object(module, "list_matching_watcher_pids", return_value=[5150]),
+                mock.patch.object(module, "scan_matching_watcher_pids", return_value=complete_scan(5150)),
                 mock.patch.object(module, "is_process_alive", side_effect=lambda pid: pid not in (None, 0)),
                 mock.patch.object(module.subprocess, "Popen") as popen,
                 redirect_stdout(io.StringIO()),
@@ -152,7 +175,7 @@ class ManageWindowsInstallerGoldProofWatcherTests(unittest.TestCase):
             log_file = root / "watcher.log"
 
             with (
-                mock.patch.object(module, "list_matching_watcher_pids", return_value=[5150, 6161]),
+                mock.patch.object(module, "scan_matching_watcher_pids", return_value=complete_scan(5150, 6161)),
                 mock.patch.object(module, "is_process_alive", side_effect=lambda pid: pid not in (None, 0)),
                 redirect_stdout(io.StringIO()),
             ):
@@ -180,6 +203,56 @@ class ManageWindowsInstallerGoldProofWatcherTests(unittest.TestCase):
             self.assertIn("duplicate watchers detected", payload["note"])
             self.assertEqual("5150", pid_file.read_text(encoding="utf-8").strip())
 
+    def test_status_reports_active_no_refresh_process_arguments(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="windows-watcher-active-mode-") as temp_dir:
+            root = Path(temp_dir)
+            intake_request = root / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+            intake_request.write_text("{}\n", encoding="utf-8")
+            state_path = root / "watcher.generated.json"
+            pid_file = root / "watcher.pid"
+            log_file = root / "watcher.log"
+            bindings = {
+                "5150": {
+                    "watcher_instance_id": "active-instance",
+                    "watcher_process_started_at_utc": "2026-08-01T09:00:00Z",
+                    "wait_seconds": "120",
+                    "poll_seconds": "7",
+                    "refresh_intake_request": False,
+                }
+            }
+
+            with (
+                mock.patch.object(
+                    module,
+                    "scan_matching_watcher_pids",
+                    return_value=complete_scan(5150, bindings_by_pid=bindings),
+                ),
+                mock.patch.object(module, "is_process_alive", side_effect=lambda pid: pid == 5150),
+                redirect_stdout(io.StringIO()),
+            ):
+                result = module.main(
+                    [
+                        "status",
+                        "--intake-request",
+                        str(intake_request),
+                        "--state-path",
+                        str(state_path),
+                        "--pid-file",
+                        str(pid_file),
+                        "--log-file",
+                        str(log_file),
+                    ]
+                )
+
+            self.assertEqual(0, result)
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertFalse(payload["refresh_intake_request"])
+            self.assertNotIn("--refresh-intake-request", payload["command"])
+            self.assertEqual(120, payload["wait_seconds"])
+            self.assertEqual(7, payload["poll_seconds"])
+            self.assertIn("active-instance", payload["command"])
+
     def test_stop_terminates_all_matching_process_groups_and_clears_pid_file(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="windows-watcher-stop-") as temp_dir:
@@ -192,7 +265,7 @@ class ManageWindowsInstallerGoldProofWatcherTests(unittest.TestCase):
             log_file = root / "watcher.log"
 
             with (
-                mock.patch.object(module, "list_matching_watcher_pids", return_value=[6363, 7474]),
+                mock.patch.object(module, "scan_matching_watcher_pids", return_value=complete_scan(6363, 7474)),
                 mock.patch.object(module, "is_process_alive", side_effect=lambda pid: pid in (6363, 7474)),
                 mock.patch.object(module, "terminate_process_group", side_effect=[(True, False), (True, False)]) as terminate,
                 mock.patch.object(module.os, "killpg") as killpg,
