@@ -141,7 +141,9 @@ def test_windows_build_provenance_uses_the_canonical_authority_and_input_sets() 
     assert '--build-type "windows-desktop-release"' in script
     assert '--release-version "$VERSION"' in script
     assert '--artifact-kind "desktop_download"' in script
+    assert '--artifact-kind "desktop_payload"' in script
     assert '--artifact-id "avalonia-win-x64-installer"' in script
+    assert '--artifact-id "avalonia-win-x64-installer-payload"' in script
     assert '--target-id "desktop-avalonia"' in script
     assert '[[ ! -e "$artifact_path" && ! -L "$artifact_path" ]]' in script
     for repository in (

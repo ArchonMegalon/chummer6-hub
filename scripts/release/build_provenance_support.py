@@ -23,6 +23,33 @@ PROVENANCE_CONTRACT_NAME = "chummer6.build_provenance.v1"
 PROVENANCE_STATE_CONTRACT_NAME = "chummer6.build_provenance_invocation_state.v1"
 EXPECTED_BUILDER_ID = "chummer-mac-hosted-bootstrap"
 EXPECTED_BUILD_TYPE = "macos-desktop-release"
+RECEIPT_POLICY_BY_PLATFORM = {
+    "linux": {
+        "builder_id": "chummer-linux-desktop-exit-gate",
+        "build_type": "chummer6.desktop.linux-self-contained-installer",
+        "build_inputs": {"source_snapshot_manifest"},
+    },
+    "windows": {
+        "builder_id": "chummer-windows-release-bootstrap",
+        "build_type": "windows-desktop-release",
+        "build_inputs": {
+            "desktop-project",
+            "desktop-installer-recipe",
+            "windows-bootstrap-recipe",
+            "dotnet-sdk-selection",
+        },
+    },
+    "macos": {
+        "builder_id": EXPECTED_BUILDER_ID,
+        "build_type": EXPECTED_BUILD_TYPE,
+        "build_inputs": {
+            "hosted-bootstrap",
+            "desktop-project",
+            "desktop-installer-recipe",
+            "dotnet-sdk-selection",
+        },
+    },
+}
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 TARGET_BY_HEAD = {"avalonia": "desktop-avalonia", "blazor-desktop": "desktop-blazor"}
@@ -362,7 +389,7 @@ def _governed_files(root: Path, failures: list[str]) -> tuple[list[Path], list[P
 
 
 def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
-    """Validate exact Mac artifact, receipt, and SBOM identity inside a bundle."""
+    """Validate exact desktop artifact, receipt, and SBOM identity inside a bundle."""
 
     bundle_root = bundle_root.resolve()
     failures: list[str] = []
@@ -376,7 +403,10 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
         return ["canonical release manifest artifacts must be a list"]
     expected: dict[str, dict[str, object]] = {}
     for row in artifacts:
-        if not isinstance(row, dict) or _normalized_platform(row.get("platform")) != "macos":
+        if not isinstance(row, dict):
+            continue
+        platform = _normalized_platform(row.get("platform"))
+        if platform not in RECEIPT_POLICY_BY_PLATFORM:
             continue
         head = str(row.get("head") or "").strip().lower()
         target_id = TARGET_BY_HEAD.get(head)
@@ -393,22 +423,55 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
             or isinstance(size, bool)
             or size <= 0
         ):
-            failures.append(f"Mac artifact row is incomplete for provenance: {artifact_id or file_name or '<unknown>'}")
+            failures.append(f"Desktop artifact row is incomplete for provenance: {artifact_id or file_name or '<unknown>'}")
             continue
         artifact_path = bundle_root / "files" / file_name
         if not artifact_path.is_file() or artifact_path.is_symlink():
-            failures.append(f"Mac artifact bytes are unavailable for provenance: {artifact_id}")
+            failures.append(f"Desktop artifact bytes are unavailable for provenance: {artifact_id}")
             continue
         if artifact_path.stat().st_size != size or sha256_file(artifact_path) != sha256:
-            failures.append(f"Mac artifact identity does not match its manifest row: {artifact_id}")
+            failures.append(f"Desktop artifact identity does not match its manifest row: {artifact_id}")
             continue
         expected[artifact_id] = {
             "artifact_id": artifact_id,
+            "artifact_kind": "desktop_download",
             "artifact_name": file_name,
             "artifact_sha256": sha256,
             "artifact_size_bytes": size,
             "target_id": target_id,
+            "platform": platform,
         }
+        payload_name = str(row.get("payloadFileName") or "").strip()
+        payload_sha256 = str(row.get("payloadSha256") or "").strip().lower().removeprefix("sha256:")
+        payload_size = row.get("payloadSizeBytes")
+        if payload_name or payload_sha256 or payload_size is not None:
+            payload_id = f"{artifact_id}-payload"
+            if (
+                Path(payload_name).name != payload_name
+                or not payload_name
+                or not SHA256_RE.fullmatch(payload_sha256)
+                or not isinstance(payload_size, int)
+                or isinstance(payload_size, bool)
+                or payload_size <= 0
+            ):
+                failures.append(f"Desktop payload row is incomplete for provenance: {artifact_id}")
+                continue
+            payload_path = bundle_root / "files" / payload_name
+            if not payload_path.is_file() or payload_path.is_symlink():
+                failures.append(f"Desktop payload bytes are unavailable for provenance: {artifact_id}")
+                continue
+            if payload_path.stat().st_size != payload_size or sha256_file(payload_path) != payload_sha256:
+                failures.append(f"Desktop payload identity does not match its manifest row: {artifact_id}")
+                continue
+            expected[payload_id] = {
+                "artifact_id": payload_id,
+                "artifact_kind": "desktop_payload",
+                "artifact_name": payload_name,
+                "artifact_sha256": payload_sha256,
+                "artifact_size_bytes": payload_size,
+                "target_id": target_id,
+                "platform": platform,
+            }
     if not expected:
         return failures
 
@@ -459,8 +522,6 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
             receipt.get("contract_name") != PROVENANCE_CONTRACT_NAME
             or receipt.get("receipt_kind") != "invocation"
             or receipt.get("status") != "pass"
-            or receipt.get("builder_id") != EXPECTED_BUILDER_ID
-            or receipt.get("build_type") != EXPECTED_BUILD_TYPE
             or receipt.get("failures") not in ([], None)
             or not SAFE_ID_RE.fullmatch(invocation_id)
             or path.name != f"{invocation_id}.json"
@@ -497,20 +558,12 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
             for field in ("provenance_generator_sha256", "supply_chain_verifier_sha256")
         ):
             failures.append(f"build provenance tool binding is invalid: {path.name}")
-        expected_inputs = {
-            "hosted-bootstrap",
-            "desktop-project",
-            "desktop-installer-recipe",
-            "dotnet-sdk-selection",
-        }
         input_rows = [item for item in state.get("build_inputs") or [] if isinstance(item, dict)]
         input_names = {
             str(item.get("label") or "")
             for item in input_rows
             if SHA256_RE.fullmatch(str(item.get("sha256") or "").strip().lower())
         }
-        if input_names != expected_inputs or len(input_rows) != len(expected_inputs):
-            failures.append(f"build provenance input set is incomplete or invalid: {path.name}")
         source = state.get("source") if isinstance(state.get("source"), dict) else {}
         if (
             source.get("repository") != "chummer-presentation"
@@ -543,8 +596,17 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
         if expected_row is None:
             failures.append(f"build provenance contains an unexpected subject: {artifact_id or '<blank>'}")
             continue
+        policy = RECEIPT_POLICY_BY_PLATFORM[str(expected_row["platform"])]
+        expected_inputs = set(policy["build_inputs"])
+        if (
+            receipt.get("builder_id") != policy["builder_id"]
+            or receipt.get("build_type") != policy["build_type"]
+        ):
+            failures.append(f"build provenance invocation contract is invalid: {path.name}")
+        if input_names != expected_inputs or len(input_rows) != len(expected_inputs):
+            failures.append(f"build provenance input set is incomplete or invalid: {path.name}")
         comparisons = {
-            "artifact_kind": (subject.get("artifact_kind"), "desktop_download"),
+            "artifact_kind": (subject.get("artifact_kind"), expected_row["artifact_kind"]),
             "artifact_name": (subject.get("artifact_name"), expected_row["artifact_name"]),
             "artifact_sha256": (subject.get("artifact_sha256"), expected_row["artifact_sha256"]),
             "artifact_size_bytes": (subject.get("artifact_size_bytes"), expected_row["artifact_size_bytes"]),
@@ -555,7 +617,7 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
             "invocation_id": (subject.get("invocation_id"), invocation_id),
             "declared artifact id": (declared.get("artifact_id"), artifact_id),
             "declared artifact name": (declared.get("artifact_name"), expected_row["artifact_name"]),
-            "declared artifact kind": (declared.get("artifact_kind"), "desktop_download"),
+            "declared artifact kind": (declared.get("artifact_kind"), expected_row["artifact_kind"]),
             "declared artifact binding": (declared.get("artifact_binding_type"), "file"),
             "declared artifact path": (
                 Path(str(declared.get("artifact_path") or "")).name,
@@ -592,8 +654,8 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
             subjects[artifact_id] = subject
     missing = sorted(set(expected).difference(subjects))
     if missing:
-        failures.append(f"build provenance is missing Mac artifact subjects: {','.join(missing)}")
+        failures.append(f"build provenance is missing desktop artifact subjects: {','.join(missing)}")
     expected_targets = {str(row["target_id"]) for row in expected.values()}
     if set(sbom_by_target) != expected_targets:
-        failures.append("build provenance SBOM target set does not match the Mac artifact target set")
+        failures.append("build provenance SBOM target set does not match the desktop artifact target set")
     return list(dict.fromkeys(failures))

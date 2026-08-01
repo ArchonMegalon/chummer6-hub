@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed unless a release bundle carries exact governed Mac provenance."""
+"""Fail closed unless a release bundle carries exact governed desktop provenance."""
 
 from __future__ import annotations
 

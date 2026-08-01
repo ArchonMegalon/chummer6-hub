@@ -276,8 +276,10 @@ def begin(args: argparse.Namespace) -> int:
         failures.append("artifact name must be a basename")
     if not SAFE_ID_RE.fullmatch(args.artifact_id) or not SAFE_ID_RE.fullmatch(args.target_id):
         failures.append("artifact id or target id is blank or unsafe")
-    if args.artifact_kind != "desktop_download":
-        failures.append("portable file provenance only accepts artifact kind desktop_download")
+    if args.artifact_kind not in {"desktop_download", "desktop_payload"}:
+        failures.append(
+            "portable file provenance only accepts artifact kind desktop_download or desktop_payload"
+        )
 
     started_epoch_ns = time.time_ns()
     started_at = utc_now()

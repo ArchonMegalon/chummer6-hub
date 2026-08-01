@@ -358,6 +358,193 @@ def test_portable_generator_and_bundle_validator_bind_final_artifact_bytes(tmp_p
     assert "artifact identity does not match" in rejected.stderr
 
 
+def test_bundle_validator_requires_linux_windows_and_payload_provenance(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    project = make_primary_repo(primary)
+    material_names = (
+        "chummer-core-engine",
+        "chummer.run-services",
+        "chummer-ui-kit",
+        "chummer-hub-registry",
+        "chummer-media-factory",
+        "chummer5a",
+    )
+    materials: dict[str, Path] = {}
+    for name in material_names:
+        material = tmp_path / "materials" / name
+        init_repo(material)
+        materials[name] = material
+
+    bundle = primary / "dist" / "promotion-bundle"
+    proof_root = bundle / "proof" / "build-provenance" / "v1"
+    sbom = proof_root / "sbom" / "desktop-avalonia.cdx.json"
+    artifacts = (
+        {
+            "artifact_id": "avalonia-linux-x64-installer",
+            "artifact_kind": "desktop_download",
+            "artifact_name": "chummer-avalonia-linux-x64-installer.deb",
+            "builder_id": "chummer-linux-desktop-exit-gate",
+            "build_type": "chummer6.desktop.linux-self-contained-installer",
+            "invocation_id": "run-test.avalonia.linux-x64.installer",
+            "inputs": {"source_snapshot_manifest": primary / "bootstrap.sh"},
+            "bytes": b"linux-installer-bytes",
+        },
+        {
+            "artifact_id": "avalonia-win-x64-installer",
+            "artifact_kind": "desktop_download",
+            "artifact_name": "chummer-avalonia-win-x64-installer.exe",
+            "builder_id": "chummer-windows-release-bootstrap",
+            "build_type": "windows-desktop-release",
+            "invocation_id": "run-test.avalonia.win-x64.installer",
+            "inputs": {
+                "desktop-project": project,
+                "desktop-installer-recipe": primary / "scripts" / "build-desktop-installer.sh",
+                "windows-bootstrap-recipe": primary / "bootstrap.sh",
+                "dotnet-sdk-selection": primary / "global.json",
+            },
+            "bytes": b"windows-installer-bytes",
+        },
+        {
+            "artifact_id": "avalonia-win-x64-installer-payload",
+            "artifact_kind": "desktop_payload",
+            "artifact_name": "chummer-avalonia-win-x64-payload.zip",
+            "builder_id": "chummer-windows-release-bootstrap",
+            "build_type": "windows-desktop-release",
+            "invocation_id": "run-test.avalonia.win-x64.payload",
+            "inputs": {
+                "desktop-project": project,
+                "desktop-installer-recipe": primary / "scripts" / "build-desktop-installer.sh",
+                "windows-bootstrap-recipe": primary / "bootstrap.sh",
+                "dotnet-sdk-selection": primary / "global.json",
+            },
+            "bytes": b"windows-payload-bytes",
+        },
+    )
+
+    for artifact_spec in artifacts:
+        artifact = bundle / "files" / str(artifact_spec["artifact_name"])
+        invocation_id = str(artifact_spec["invocation_id"])
+        receipt = proof_root / "invocations" / f"{invocation_id}.json"
+        state = tmp_path / f"{invocation_id}.state.json"
+        command = [
+            sys.executable,
+            str(GENERATOR),
+            "begin",
+            "--state",
+            str(state),
+            "--output",
+            str(receipt),
+            "--builder-id",
+            str(artifact_spec["builder_id"]),
+            "--build-type",
+            str(artifact_spec["build_type"]),
+            "--invocation-id",
+            invocation_id,
+            "--support-script",
+            str(SUPPORT),
+            "--source-repository",
+            "chummer-presentation",
+            "--source-repo-root",
+            str(primary),
+            "--build-root",
+            str(primary),
+            "--target-id",
+            "desktop-avalonia",
+            "--project-path",
+            str(project.relative_to(primary)),
+            "--artifact-id",
+            str(artifact_spec["artifact_id"]),
+            "--artifact-kind",
+            str(artifact_spec["artifact_kind"]),
+            "--artifact-name",
+            str(artifact_spec["artifact_name"]),
+            "--artifact-path",
+            str(artifact),
+            "--sbom-path",
+            str(sbom),
+        ]
+        for name, path in materials.items():
+            command.extend(["--source-material", f"{name}={path}"])
+        for name, path in dict(artifact_spec["inputs"]).items():
+            command.extend(["--build-input", f"{name}={path}"])
+        begun = subprocess.run(command, capture_output=True, text=True, check=False)
+        assert begun.returncode == 0, begun.stderr
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_bytes(bytes(artifact_spec["bytes"]))
+        os.utime(artifact, None)
+        finalized = subprocess.run(
+            [
+                sys.executable,
+                str(GENERATOR),
+                "finalize",
+                "--state",
+                str(state),
+                "--output",
+                str(receipt),
+                "--builder-id",
+                str(artifact_spec["builder_id"]),
+                "--build-type",
+                str(artifact_spec["build_type"]),
+                "--invocation-id",
+                invocation_id,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert finalized.returncode == 0, finalized.stderr
+
+    linux = bundle / "files" / "chummer-avalonia-linux-x64-installer.deb"
+    windows = bundle / "files" / "chummer-avalonia-win-x64-installer.exe"
+    payload = bundle / "files" / "chummer-avalonia-win-x64-payload.zip"
+    manifest = {
+        "artifacts": [
+            {
+                "artifactId": "avalonia-linux-x64-installer",
+                "head": "avalonia",
+                "platform": "linux",
+                "rid": "linux-x64",
+                "kind": "installer",
+                "fileName": linux.name,
+                "sha256": hashlib.sha256(linux.read_bytes()).hexdigest(),
+                "sizeBytes": linux.stat().st_size,
+            },
+            {
+                "artifactId": "avalonia-win-x64-installer",
+                "head": "avalonia",
+                "platform": "windows",
+                "rid": "win-x64",
+                "kind": "installer",
+                "fileName": windows.name,
+                "sha256": hashlib.sha256(windows.read_bytes()).hexdigest(),
+                "sizeBytes": windows.stat().st_size,
+                "payloadFileName": payload.name,
+                "payloadSha256": hashlib.sha256(payload.read_bytes()).hexdigest(),
+                "payloadSizeBytes": payload.stat().st_size,
+            },
+        ]
+    }
+    (bundle / "RELEASE_CHANNEL.generated.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    validated = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(bundle)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert validated.returncode == 0, validated.stderr
+
+    payload.write_bytes(b"tampered-payload")
+    rejected = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(bundle)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert rejected.returncode == 1
+    assert "payload identity does not match" in rejected.stderr
+
+
 def test_generator_fails_closed_when_source_changes_after_begin(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
     project = make_primary_repo(primary)
