@@ -1,18 +1,18 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-07-31T22:15:16Z",
-  "base_url": "http://127.0.0.1:44081",
+  "generated_at_utc": "2026-08-01T04:48:40Z",
+  "base_url": "http://127.0.0.1:58097",
   "require_brilliant_directories_checkout": false,
   "release_posture": {
-    "url": "http://127.0.0.1:44081/downloads/RELEASE_CHANNEL.generated.json",
-    "final_url": "http://127.0.0.1:44081/downloads/RELEASE_CHANNEL.generated.json",
+    "url": "http://127.0.0.1:58097/downloads/RELEASE_CHANNEL.generated.json",
+    "final_url": "http://127.0.0.1:58097/downloads/RELEASE_CHANNEL.generated.json",
     "status_code": 200,
     "redirect_location": null,
     "redirect_chain": [],
     "fetch_error": null,
     "parse_error": null,
     "status": "published",
-    "version": "run-20260731-095000",
+    "version": "run-20260801-031406",
     "channel": "preview",
     "supportability_state": "review_required",
     "rollout_state": "coverage_incomplete",
@@ -26,8 +26,8 @@
   "results": [
     {
       "path": "/",
-      "url": "http://127.0.0.1:44081/",
-      "final_url": "http://127.0.0.1:44081/",
+      "url": "http://127.0.0.1:58097/",
+      "final_url": "http://127.0.0.1:58097/",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -78,8 +78,8 @@
     },
     {
       "path": "/downloads",
-      "url": "http://127.0.0.1:44081/downloads",
-      "final_url": "http://127.0.0.1:44081/downloads",
+      "url": "http://127.0.0.1:58097/downloads",
+      "final_url": "http://127.0.0.1:58097/downloads",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -132,8 +132,8 @@
     },
     {
       "path": "/status",
-      "url": "http://127.0.0.1:44081/status",
-      "final_url": "http://127.0.0.1:44081/status",
+      "url": "http://127.0.0.1:58097/status",
+      "final_url": "http://127.0.0.1:58097/status",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -218,14 +218,14 @@
     },
     {
       "path": "/account/billing",
-      "url": "http://127.0.0.1:44081/account/billing",
-      "final_url": "http://127.0.0.1:44081/login?next=%2Faccount%2Fbilling",
+      "url": "http://127.0.0.1:58097/account/billing",
+      "final_url": "http://127.0.0.1:58097/login?next=%2Faccount%2Fbilling",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:44081/login?next=%2Faccount%2Fbilling"
+        "http://127.0.0.1:58097/login?next=%2Faccount%2Fbilling"
       ],
       "fetch_error": null,
       "required_texts": [
@@ -257,8 +257,8 @@
     },
     {
       "path": "/participate",
-      "url": "http://127.0.0.1:44081/participate",
-      "final_url": "http://127.0.0.1:44081/participate",
+      "url": "http://127.0.0.1:58097/participate",
+      "final_url": "http://127.0.0.1:58097/participate",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -301,14 +301,14 @@
     },
     {
       "path": "/participate/board",
-      "url": "http://127.0.0.1:44081/participate/board",
-      "final_url": "http://127.0.0.1:44081/participate",
+      "url": "http://127.0.0.1:58097/participate/board",
+      "final_url": "http://127.0.0.1:58097/participate",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:44081/participate"
+        "http://127.0.0.1:58097/participate"
       ],
       "fetch_error": null,
       "required_texts": [
@@ -346,8 +346,8 @@
     },
     {
       "path": "/roadmap",
-      "url": "http://127.0.0.1:44081/roadmap",
-      "final_url": "http://127.0.0.1:44081/roadmap",
+      "url": "http://127.0.0.1:58097/roadmap",
+      "final_url": "http://127.0.0.1:58097/roadmap",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -380,15 +380,15 @@
     },
     {
       "path": "/roadmap/board",
-      "url": "http://127.0.0.1:44081/roadmap/board",
-      "final_url": "http://127.0.0.1:44081/participate",
+      "url": "http://127.0.0.1:58097/roadmap/board",
+      "final_url": "http://127.0.0.1:58097/participate",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:44081/participate/board",
-        "http://127.0.0.1:44081/participate"
+        "http://127.0.0.1:58097/participate/board",
+        "http://127.0.0.1:58097/participate"
       ],
       "fetch_error": null,
       "required_texts": [
@@ -417,8 +417,8 @@
     },
     {
       "path": "/mobile",
-      "url": "http://127.0.0.1:44081/mobile",
-      "final_url": "http://127.0.0.1:44081/mobile",
+      "url": "http://127.0.0.1:58097/mobile",
+      "final_url": "http://127.0.0.1:58097/mobile",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -465,8 +465,8 @@
     },
     {
       "path": "/mobile/player",
-      "url": "http://127.0.0.1:44081/mobile/player",
-      "final_url": "http://127.0.0.1:44081/mobile/player",
+      "url": "http://127.0.0.1:58097/mobile/player",
+      "final_url": "http://127.0.0.1:58097/mobile/player",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -513,8 +513,8 @@
     },
     {
       "path": "/mobile/gm",
-      "url": "http://127.0.0.1:44081/mobile/gm",
-      "final_url": "http://127.0.0.1:44081/mobile/gm",
+      "url": "http://127.0.0.1:58097/mobile/gm",
+      "final_url": "http://127.0.0.1:58097/mobile/gm",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -561,8 +561,8 @@
     },
     {
       "path": "/mobile/observer",
-      "url": "http://127.0.0.1:44081/mobile/observer",
-      "final_url": "http://127.0.0.1:44081/mobile/observer",
+      "url": "http://127.0.0.1:58097/mobile/observer",
+      "final_url": "http://127.0.0.1:58097/mobile/observer",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -609,14 +609,14 @@
     },
     {
       "path": "/play",
-      "url": "http://127.0.0.1:44081/play",
-      "final_url": "http://127.0.0.1:44081/mobile/player",
+      "url": "http://127.0.0.1:58097/play",
+      "final_url": "http://127.0.0.1:58097/mobile/player",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:44081/mobile/player"
+        "http://127.0.0.1:58097/mobile/player"
       ],
       "fetch_error": null,
       "required_texts": [
@@ -659,8 +659,8 @@
     },
     {
       "path": "/play/continuity",
-      "url": "http://127.0.0.1:44081/play/continuity",
-      "final_url": "http://127.0.0.1:44081/play/continuity",
+      "url": "http://127.0.0.1:58097/play/continuity",
+      "final_url": "http://127.0.0.1:58097/play/continuity",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -691,14 +691,14 @@
     },
     {
       "path": "/ledger",
-      "url": "http://127.0.0.1:44081/ledger",
-      "final_url": "http://127.0.0.1:44081/ledger/map",
+      "url": "http://127.0.0.1:58097/ledger",
+      "final_url": "http://127.0.0.1:58097/ledger/map",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:44081/ledger/map"
+        "http://127.0.0.1:58097/ledger/map"
       ],
       "fetch_error": null,
       "required_texts": [
@@ -733,14 +733,14 @@
     },
     {
       "path": "/ledger/newsroom",
-      "url": "http://127.0.0.1:44081/ledger/newsroom",
-      "final_url": "http://127.0.0.1:44081/ledger/newsroom/turn-2-newsreel",
+      "url": "http://127.0.0.1:58097/ledger/newsroom",
+      "final_url": "http://127.0.0.1:58097/ledger/newsroom/turn-2-newsreel",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:44081/ledger/newsroom/turn-2-newsreel"
+        "http://127.0.0.1:58097/ledger/newsroom/turn-2-newsreel"
       ],
       "fetch_error": null,
       "required_texts": [
