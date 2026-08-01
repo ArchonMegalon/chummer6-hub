@@ -110,7 +110,8 @@ def public_state_projection(state: dict[str, object]) -> dict[str, object]:
 
     target_id = str(declaration.get("target_id") or "target")
     sbom = projected.get("sbom") if isinstance(projected.get("sbom"), dict) else {}
-    sbom["path"] = f"proof/build-provenance/v1/sbom/{target_id}.cdx.json"
+    sbom_source_name = Path(str(sbom.get("path") or f"{target_id}.cdx.json")).name
+    sbom["path"] = f"proof/build-provenance/v1/sbom/{sbom_source_name}"
     sbom["source_assets_path"] = f"build-inputs/{target_id}.project.assets.json"
 
     tools = projected.get("build_tools") if isinstance(projected.get("build_tools"), dict) else {}

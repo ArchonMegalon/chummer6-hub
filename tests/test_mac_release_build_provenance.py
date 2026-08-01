@@ -377,7 +377,6 @@ def test_bundle_validator_requires_linux_windows_and_payload_provenance(tmp_path
 
     bundle = primary / "dist" / "promotion-bundle"
     proof_root = bundle / "proof" / "build-provenance" / "v1"
-    sbom = proof_root / "sbom" / "desktop-avalonia.cdx.json"
     artifacts = (
         {
             "artifact_id": "avalonia-linux-x64-installer",
@@ -423,6 +422,7 @@ def test_bundle_validator_requires_linux_windows_and_payload_provenance(tmp_path
 
     for artifact_spec in artifacts:
         artifact = bundle / "files" / str(artifact_spec["artifact_name"])
+        sbom = proof_root / "sbom" / f"{artifact_spec['artifact_id']}.cdx.json"
         invocation_id = str(artifact_spec["invocation_id"])
         receipt = proof_root / "invocations" / f"{invocation_id}.json"
         state = tmp_path / f"{invocation_id}.state.json"

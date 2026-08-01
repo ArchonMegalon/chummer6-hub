@@ -476,10 +476,9 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
         return failures
 
     invocation_paths, sbom_paths = _governed_files(bundle_root, failures)
-    sbom_by_target: dict[str, tuple[Path, str]] = {}
+    sbom_by_name: dict[str, tuple[Path, str, str]] = {}
     for path in sbom_paths:
-        target_id = path.name[: -len(".cdx.json")]
-        if target_id not in set(TARGET_BY_HEAD.values()) or path.stat().st_size > 16 * 1024 * 1024:
+        if path.stat().st_size > 16 * 1024 * 1024:
             failures.append(f"governed build provenance contains an unexpected or oversized SBOM: {path.name}")
             continue
         try:
@@ -488,20 +487,23 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
             failures.append(f"SBOM is malformed ({path.name}): {type(exc).__name__}")
             continue
         component = ((payload.get("metadata") or {}).get("component") or {}) if isinstance(payload, dict) else {}
+        target_id = str(component.get("name") or "")
         if (
             payload.get("bomFormat") != "CycloneDX"
             or payload.get("specVersion") != "1.5"
+            or target_id not in set(TARGET_BY_HEAD.values())
             or component.get("name") != target_id
             or component.get("bom-ref") != f"urn:chummer:project:{target_id}"
         ):
             failures.append(f"SBOM contract or target binding is invalid: {path.name}")
             continue
-        if target_id in sbom_by_target:
-            failures.append(f"governed build provenance contains duplicate SBOM target: {target_id}")
+        if path.name in sbom_by_name:
+            failures.append(f"governed build provenance contains duplicate SBOM name: {path.name}")
             continue
-        sbom_by_target[target_id] = (path, sha256_file(path))
+        sbom_by_name[path.name] = (path, sha256_file(path), target_id)
 
     subjects: dict[str, dict[str, object]] = {}
+    referenced_sbom_names: set[str] = set()
     now = datetime.now(timezone.utc)
     for path in invocation_paths:
         if path.stat().st_size > 4 * 1024 * 1024:
@@ -592,7 +594,16 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
         sbom = state.get("sbom") if isinstance(state.get("sbom"), dict) else {}
         expected_row = expected.get(artifact_id)
         target_id = str(subject.get("target_id") or "")
-        sbom_record = sbom_by_target.get(target_id)
+        sbom_path_text = str(sbom.get("path") or "")
+        sbom_prefix = "proof/build-provenance/v1/sbom/"
+        sbom_name = sbom_path_text.removeprefix(sbom_prefix)
+        if (
+            not sbom_path_text.startswith(sbom_prefix)
+            or Path(sbom_name).name != sbom_name
+            or not sbom_name.endswith(".cdx.json")
+        ):
+            sbom_name = ""
+        sbom_record = sbom_by_name.get(sbom_name)
         if expected_row is None:
             failures.append(f"build provenance contains an unexpected subject: {artifact_id or '<blank>'}")
             continue
@@ -644,10 +655,13 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
             sbom_record is None
             or subject.get("sbom_sha256") != sbom_record[1]
             or sbom.get("sha256") != sbom_record[1]
+            or sbom_record[2] != target_id
             or subject.get("sbom_generator") != "deterministic_project.assets.json_inventory.v1"
             or sbom.get("generator") != "deterministic_project.assets.json_inventory.v1"
         ):
             failures.append(f"build provenance SBOM identity mismatch: {artifact_id}")
+        elif sbom_name:
+            referenced_sbom_names.add(sbom_name)
         if artifact_id in subjects:
             failures.append(f"build provenance contains duplicate subject: {artifact_id}")
         else:
@@ -655,7 +669,6 @@ def validate_release_bundle_build_provenance(bundle_root: Path) -> list[str]:
     missing = sorted(set(expected).difference(subjects))
     if missing:
         failures.append(f"build provenance is missing desktop artifact subjects: {','.join(missing)}")
-    expected_targets = {str(row["target_id"]) for row in expected.values()}
-    if set(sbom_by_target) != expected_targets:
-        failures.append("build provenance SBOM target set does not match the desktop artifact target set")
+    if set(sbom_by_name) != referenced_sbom_names:
+        failures.append("build provenance SBOM set does not match the desktop artifact receipts")
     return list(dict.fromkeys(failures))
