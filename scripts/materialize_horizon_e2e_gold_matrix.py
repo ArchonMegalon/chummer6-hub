@@ -335,6 +335,21 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def playwright_command(args: argparse.Namespace, artifacts_dir: Path) -> list[str]:
+    """Keep Playwright scratch state inside the disposable evidence directory."""
+    return [
+        str(args.node.resolve()),
+        str(args.playwright_cli.resolve()),
+        "test",
+        "--config",
+        str(args.config.resolve()),
+        str(args.spec.resolve()),
+        "--reporter=json",
+        "--output",
+        str((artifacts_dir / "playwright-test-results").resolve()),
+    ]
+
+
 def main() -> int:
     args = parse_args()
     base_url = str(args.base_url).strip().rstrip("/")
@@ -356,15 +371,6 @@ def main() -> int:
 
     registry_rows, registry_failures = load_registry(args.registry)
     run_started_at = utc_now()
-    command = [
-        str(args.node.resolve()),
-        str(args.playwright_cli.resolve()),
-        "test",
-        "--config",
-        str(args.config.resolve()),
-        str(args.spec.resolve()),
-        "--reporter=json",
-    ]
     environment = dict(os.environ)
     environment.pop("FORCE_COLOR", None)
     environment["NO_COLOR"] = "1"
@@ -375,6 +381,7 @@ def main() -> int:
     returncode = 1
     with tempfile.TemporaryDirectory(prefix="chummer-horizon-e2e-gold-") as temporary:
         artifacts_dir = Path(temporary)
+        command = playwright_command(args, artifacts_dir)
         environment["CHUMMER_COMPLETION_DIR"] = str(artifacts_dir)
         try:
             completed = subprocess.run(
@@ -405,6 +412,8 @@ def main() -> int:
                 "playwright.config.ts",
                 "tests/public/horizon-e2e-gold.spec.ts",
                 "--reporter=json",
+                "--output",
+                "$CHUMMER_COMPLETION_DIR/playwright-test-results",
             ],
             "returncode": returncode,
             "timed_out": timed_out,

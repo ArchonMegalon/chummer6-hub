@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from argparse import Namespace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -87,6 +88,24 @@ def passing_runner() -> dict:
         },
         "parse_failure": "",
     }
+
+
+def test_playwright_command_keeps_scratch_inside_completion_dir(tmp_path: Path) -> None:
+    artifacts = tmp_path / "completion"
+    args = Namespace(
+        node=tmp_path / "node",
+        playwright_cli=tmp_path / "playwright" / "cli.js",
+        config=tmp_path / "playwright.config.ts",
+        spec=tmp_path / "horizon-e2e-gold.spec.ts",
+    )
+
+    command = module.playwright_command(args, artifacts)
+
+    assert command[-2:] == [
+        "--output",
+        str((artifacts / "playwright-test-results").resolve()),
+    ]
+    assert str(Path.cwd() / "test-results") not in command
 
 
 def test_build_matrix_passes_only_with_all_nine_fresh_executed_receipts(tmp_path: Path) -> None:

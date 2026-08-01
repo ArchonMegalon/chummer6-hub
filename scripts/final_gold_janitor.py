@@ -3002,9 +3002,50 @@ def suppress_dependent_summary_gate_failures_for_final_gold(
             failures.remove("operator_release_dashboard has failing required checks")
 
 
-def run_materializers() -> list[dict[str, Any]]:
+def configured_materializers(
+    *,
+    public_edge_skip_preflight: bool = False,
+    public_edge_full_deployment_digest_sha256: str = "",
+    public_edge_pwa_asset_inventory_sha256: str = "",
+    public_edge_release_channel_receipt: str = "",
+) -> list[list[str]]:
+    commands = [list(command) for command in MATERIALIZERS]
+    if not public_edge_skip_preflight:
+        if public_edge_full_deployment_digest_sha256 or public_edge_pwa_asset_inventory_sha256:
+            raise ValueError("public-edge deployment digests require --public-edge-skip-preflight")
+        return commands
+
+    for label, value in (
+        ("full deployment digest", public_edge_full_deployment_digest_sha256),
+        ("PWA asset inventory digest", public_edge_pwa_asset_inventory_sha256),
+    ):
+        if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+            raise ValueError(f"public-edge {label} must be a lowercase SHA-256")
+
+    command = next(
+        item
+        for item in commands
+        if "scripts/verify_public_edge_postdeploy_gate.py" in item
+    )
+    insertion_index = command.index("--output")
+    runtime_args = [
+        "--skip-preflight",
+        "--expected-full-deployment-digest-sha256",
+        public_edge_full_deployment_digest_sha256,
+        "--expected-pwa-asset-inventory-sha256",
+        public_edge_pwa_asset_inventory_sha256,
+    ]
+    if public_edge_release_channel_receipt:
+        runtime_args.extend(
+            ["--release-channel-receipt", public_edge_release_channel_receipt]
+        )
+    command[insertion_index:insertion_index] = runtime_args
+    return commands
+
+
+def run_materializers(materializers: list[list[str]] | None = None) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for command in MATERIALIZERS:
+    for command in materializers or MATERIALIZERS:
         timeout_seconds = materializer_timeout_seconds(command)
         started_at_utc = now_iso()
         stdout_file = tempfile.TemporaryFile()
@@ -5028,12 +5069,29 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Read existing Windows watcher/auto-import receipts without invoking their refresh commands.",
     )
+    parser.add_argument(
+        "--public-edge-skip-preflight",
+        action="store_true",
+        help="Use sealed post-fact deployment digests when the running source tree is newer than the active overlay.",
+    )
+    parser.add_argument("--public-edge-full-deployment-digest-sha256", default="")
+    parser.add_argument("--public-edge-pwa-asset-inventory-sha256", default="")
+    parser.add_argument("--public-edge-release-channel-receipt", default="")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    command_results = [] if args.skip_materializers else run_materializers()
+    try:
+        materializers = configured_materializers(
+            public_edge_skip_preflight=args.public_edge_skip_preflight,
+            public_edge_full_deployment_digest_sha256=args.public_edge_full_deployment_digest_sha256,
+            public_edge_pwa_asset_inventory_sha256=args.public_edge_pwa_asset_inventory_sha256,
+            public_edge_release_channel_receipt=args.public_edge_release_channel_receipt,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    command_results = [] if args.skip_materializers else run_materializers(materializers)
     payload = build_payload(
         command_results,
         refresh_windows_runtime_receipts=not (

@@ -1450,6 +1450,36 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn(str(module.PUBLIC_EDGE_FRONTDOOR_ARTIFACT_DIR), command_text)
         self.assertIn("PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json", command_text)
 
+    def test_public_edge_postdeploy_gate_can_use_sealed_post_fact_identity(self) -> None:
+        module = load_module()
+        full_digest = "a" * 64
+        pwa_digest = "b" * 64
+        release_receipt = "/proof/RELEASE_CHANNEL.generated.json"
+
+        materializers = module.configured_materializers(
+            public_edge_skip_preflight=True,
+            public_edge_full_deployment_digest_sha256=full_digest,
+            public_edge_pwa_asset_inventory_sha256=pwa_digest,
+            public_edge_release_channel_receipt=release_receipt,
+        )
+        command = next(
+            item
+            for item in materializers
+            if "scripts/verify_public_edge_postdeploy_gate.py" in item
+        )
+        command_text = " ".join(command)
+
+        self.assertIn("--skip-preflight", command)
+        self.assertIn(f"--expected-full-deployment-digest-sha256 {full_digest}", command_text)
+        self.assertIn(f"--expected-pwa-asset-inventory-sha256 {pwa_digest}", command_text)
+        self.assertIn(f"--release-channel-receipt {release_receipt}", command_text)
+
+    def test_public_edge_postdeploy_gate_rejects_unsealed_skip_preflight(self) -> None:
+        module = load_module()
+
+        with self.assertRaisesRegex(ValueError, "full deployment digest"):
+            module.configured_materializers(public_edge_skip_preflight=True)
+
     def test_teable_important_work_sync_is_required_and_materialized(self) -> None:
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]
