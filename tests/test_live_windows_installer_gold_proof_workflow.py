@@ -1,4 +1,9 @@
+import os
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -74,3 +79,47 @@ def test_live_windows_gold_proof_workflow_never_uploads_installer_bytes() -> Non
     assert "${{ env.CHUMMER_PROOF_ROOT }}/*.png" in text
     assert "path: ${{ env.CHUMMER_DOWNLOADS_ROOT }}" not in text
     assert "Remove installer and proof bytes from the runner" in text
+
+
+def test_windows_gold_proof_receipt_delimits_colon_adjacent_variables() -> None:
+    script = (
+        REPO_ROOT / "scripts/capture_windows_installer_gold_proof.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert '"windows-installer-gold-proof:$HeadId:$Rid:$Version"' not in script
+    assert '"windows-installer-gold-proof:${HeadId}:${Rid}:${Version}"' in script
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell is unavailable")
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "scripts/capture_windows_installer_gold_proof.ps1",
+        "scripts/capture_windows_installer_visual_audit.ps1",
+    ),
+)
+def test_windows_gold_proof_capture_scripts_parse_in_powershell(
+    relative_path: str,
+) -> None:
+    script_path = REPO_ROOT / relative_path
+    env = os.environ.copy()
+    env["CHUMMER_POWERSHELL_PARSE_TARGET"] = str(script_path)
+    result = subprocess.run(
+        (
+            "pwsh",
+            "-NoProfile",
+            "-Command",
+            "$tokens=$null; $errors=$null; "
+            "[System.Management.Automation.Language.Parser]::ParseFile("
+            "$env:CHUMMER_POWERSHELL_PARSE_TARGET, [ref]$tokens, [ref]$errors) "
+            "| Out-Null; if ($errors.Count -ne 0) { "
+            "$errors | ForEach-Object { Write-Error $_.Message }; exit 1 }",
+        ),
+        check=False,
+        capture_output=True,
+        env=env,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
