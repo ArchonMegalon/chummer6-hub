@@ -91,6 +91,7 @@
     "QBITTORRENT_STAGING_HYGIENE.generated.json",
     "QUEUE.generated.yaml",
     "READY_MOBILE_HANDOFF.generated.json",
+    "RELEASE_READY.generated.json",
     "RULESET_READINESS.generated.json",
     "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
     "RUST_MARKET_AUDIO_LIVE_REPAIR.generated.json",
@@ -113,7 +114,7 @@
   },
   "dispatchable_truth_ready": true,
   "lifecycle": "live",
-  "published_at": "2026-07-31T22:20:43Z",
+  "published_at": "2026-08-01T03:02:38Z",
   "schema_version": "2026-03-10.v1",
   "stages": {
     "capacity_compile": true,
