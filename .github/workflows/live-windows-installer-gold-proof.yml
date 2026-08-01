@@ -1,0 +1,336 @@
+name: Live Windows installer gold-proof recapture
+run-name: live-windows-gold-proof-${{ inputs.release_version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Exact release version in the live release-channel manifest
+        required: true
+        type: string
+      live_manifest_sha256:
+        description: Exact SHA-256 of the live RELEASE_CHANNEL.generated.json bytes
+        required: true
+        type: string
+      installer_sha256:
+        description: Exact SHA-256 of the promoted avalonia-win-x64-installer
+        required: true
+        type: string
+      installer_size_bytes:
+        description: Exact byte length of the promoted Windows installer
+        required: true
+        type: string
+      expected_contract_sha:
+        description: Exact current main SHA containing this recapture contract
+        required: true
+        type: string
+      capture_confirmed:
+        description: Capture evidence only; do not publish, deploy, or alter the shelf
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-windows-installer-gold-proof-${{ inputs.installer_sha256 }}
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    name: Recapture exact promoted installer on hosted Windows
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CHUMMER_LIVE_BASE_URL: https://chummer.run
+      CHUMMER_PROOF_WORK_ROOT: ${{ runner.temp }}\chummer-live-windows-proof
+      CHUMMER_DOWNLOADS_ROOT: ${{ runner.temp }}\chummer-live-windows-proof\downloads
+      CHUMMER_PROOF_ROOT: ${{ runner.temp }}\chummer-live-windows-proof\downloads\visual-audit\windows-installer
+    steps:
+      - name: Check out the exact recapture contract
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Authenticate live shelf bytes and download only the promoted installer
+        id: live-shelf
+        shell: pwsh
+        env:
+          CAPTURE_CONFIRMED: ${{ inputs.capture_confirmed }}
+          EXPECTED_CONTRACT_SHA: ${{ inputs.expected_contract_sha }}
+          EXPECTED_RELEASE_VERSION: ${{ inputs.release_version }}
+          EXPECTED_LIVE_MANIFEST_SHA256: ${{ inputs.live_manifest_sha256 }}
+          EXPECTED_INSTALLER_SHA256: ${{ inputs.installer_sha256 }}
+          EXPECTED_INSTALLER_SIZE_BYTES: ${{ inputs.installer_size_bytes }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
+          if ($env:CAPTURE_CONFIRMED -ne 'true') {
+            throw 'capture_confirmed must be true.'
+          }
+          if ($env:GITHUB_REPOSITORY -ne 'ArchonMegalon/chummer6-hub' -or
+              $env:GITHUB_REF -ne 'refs/heads/main' -or
+              $env:GITHUB_SHA -ne $env:EXPECTED_CONTRACT_SHA -or
+              $env:GITHUB_ACTOR -ne $env:GITHUB_TRIGGERING_ACTOR) {
+            throw 'Recapture must be a same-actor dispatch from the exact authorized main SHA.'
+          }
+          if ($env:EXPECTED_CONTRACT_SHA -notmatch '^[0-9a-f]{40}$' -or
+              $env:EXPECTED_LIVE_MANIFEST_SHA256 -notmatch '^[0-9a-f]{64}$' -or
+              $env:EXPECTED_INSTALLER_SHA256 -notmatch '^[0-9a-f]{64}$' -or
+              $env:EXPECTED_RELEASE_VERSION -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$' -or
+              $env:EXPECTED_INSTALLER_SIZE_BYTES -notmatch '^[1-9][0-9]{0,11}$') {
+            throw 'One or more recapture inputs are malformed.'
+          }
+          $expectedSize = [long]$env:EXPECTED_INSTALLER_SIZE_BYTES
+          if ($expectedSize -gt 64MB) {
+            throw 'Installer size exceeds the fixed recapture bound.'
+          }
+
+          New-Item -ItemType Directory -Path (Join-Path $env:CHUMMER_DOWNLOADS_ROOT 'files') -Force | Out-Null
+          $manifestPath = Join-Path $env:CHUMMER_DOWNLOADS_ROOT 'RELEASE_CHANNEL.generated.json'
+          $manifestUri = [Uri]::new("$($env:CHUMMER_LIVE_BASE_URL)/downloads/RELEASE_CHANNEL.generated.json")
+
+          $handler = [System.Net.Http.HttpClientHandler]::new()
+          $handler.AllowAutoRedirect = $false
+          $client = [System.Net.Http.HttpClient]::new($handler)
+          $client.Timeout = [TimeSpan]::FromSeconds(45)
+          $client.DefaultRequestHeaders.AcceptEncoding.Clear()
+          try {
+            $manifestResponse = $client.GetAsync($manifestUri).GetAwaiter().GetResult()
+            if ($manifestResponse.StatusCode -ne [System.Net.HttpStatusCode]::OK) {
+              throw "Live release manifest returned HTTP $([int]$manifestResponse.StatusCode)."
+            }
+            $manifestBytes = $manifestResponse.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()
+            if ($manifestBytes.Length -lt 1 -or $manifestBytes.Length -gt 2MB) {
+              throw 'Live release manifest size is outside the fixed bound.'
+            }
+            [System.IO.File]::WriteAllBytes($manifestPath, $manifestBytes)
+            $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($manifestHash -ne $env:EXPECTED_LIVE_MANIFEST_SHA256) {
+              throw 'Live release manifest SHA-256 differs from the authorized bytes.'
+            }
+
+            $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ([string]$manifest.version -ne $env:EXPECTED_RELEASE_VERSION -or
+                [string]$manifest.channelId -ne 'preview' -or
+                [string]$manifest.status -ne 'published') {
+              throw 'Live release tuple differs from the authorized published preview tuple.'
+            }
+            $matches = @($manifest.artifacts | Where-Object {
+              [string]$_.artifactId -eq 'avalonia-win-x64-installer' -and
+              [string]$_.platform -eq 'windows' -and
+              [string]$_.rid -eq 'win-x64' -and
+              [string]$_.kind -eq 'installer'
+            })
+            if ($matches.Count -ne 1) {
+              throw 'Live manifest must contain one promoted avalonia-win-x64-installer row.'
+            }
+            $artifact = $matches[0]
+            if ([string]$artifact.sha256 -ne $env:EXPECTED_INSTALLER_SHA256 -or
+                [long]$artifact.sizeBytes -ne $expectedSize -or
+                [string]$artifact.fileName -ne 'chummer-avalonia-win-x64-installer.exe') {
+              throw 'Live installer identity differs from the authorized digest, size, or file name.'
+            }
+            $downloadPath = [string]$artifact.downloadUrl
+            if ($downloadPath -notmatch '^/downloads/g/gen-[A-Za-z0-9._-]+/files/chummer-avalonia-win-x64-installer\.exe$') {
+              throw 'Live installer download path is not an immutable generation path.'
+            }
+            $downloadUri = [Uri]::new($manifestUri, $downloadPath)
+            if ($downloadUri.Scheme -ne 'https' -or $downloadUri.Host -ne 'chummer.run') {
+              throw 'Live installer download URI escaped the canonical HTTPS origin.'
+            }
+
+            $installerResponse = $client.GetAsync($downloadUri).GetAwaiter().GetResult()
+            if ($installerResponse.StatusCode -ne [System.Net.HttpStatusCode]::OK) {
+              throw "Live installer returned HTTP $([int]$installerResponse.StatusCode)."
+            }
+            $installerBytes = $installerResponse.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()
+            if ($installerBytes.LongLength -ne $expectedSize) {
+              throw 'Downloaded installer byte length differs from the live manifest.'
+            }
+            $installerPath = Join-Path $env:CHUMMER_DOWNLOADS_ROOT 'files\chummer-avalonia-win-x64-installer.exe'
+            [System.IO.File]::WriteAllBytes($installerPath, $installerBytes)
+            $installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($installerHash -ne $env:EXPECTED_INSTALLER_SHA256) {
+              throw 'Downloaded installer SHA-256 differs from the live manifest.'
+            }
+          }
+          finally {
+            $client.Dispose()
+            $handler.Dispose()
+          }
+
+          "installer_path=$installerPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Capture the required native installer surfaces
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & pwsh -NoProfile -File ./scripts/capture_windows_installer_gold_proof.ps1 `
+            -InstallerPath '${{ steps.live-shelf.outputs.installer_path }}' `
+            -DownloadsRoot $env:CHUMMER_DOWNLOADS_ROOT `
+            -HeadId avalonia `
+            -Version '${{ inputs.release_version }}' `
+            -ChannelId preview `
+            -LaunchInstaller `
+            -CaptureVisualAudit `
+            -ScaledDpiScale '1.5' `
+            -AutoCaptureVisualAudit `
+            -AutoCaptureDelaySeconds 1 `
+            -AutoCaptureTimeoutSeconds 60 `
+            -VisualClippingStatus pass `
+            -VisualReadabilityStatus pass
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Native Windows installer gold-proof capture failed.'
+          }
+
+      - name: Revalidate and package only the importable proof bundle
+        id: package
+        shell: pwsh
+        env:
+          EXPECTED_RELEASE_VERSION: ${{ inputs.release_version }}
+          EXPECTED_INSTALLER_SHA256: ${{ inputs.installer_sha256 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
+          $sourcePath = Join-Path $env:CHUMMER_PROOF_ROOT 'WINDOWS_INSTALLER_VISUAL_AUDIT.source.json'
+          if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+            throw 'Visual-audit source receipt is missing.'
+          }
+          $source = Get-Content -LiteralPath $sourcePath -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ([string]$source.contract_name -ne 'chummer.windows_installer_visual_audit.source' -or
+              [string]$source.status -ne 'pass' -or
+              [string]$source.platform -ne 'windows' -or
+              -not ([string]$source.hostClass).StartsWith('native-windows') -or
+              [string]$source.artifactSha256 -ne $env:EXPECTED_INSTALLER_SHA256) {
+            throw 'Visual-audit source receipt is not a passing native-Windows binding.'
+          }
+
+          $rows = @($source.screenshots)
+          if ($rows.Count -ne 4) {
+            throw 'Visual proof must contain exactly four screenshot rows.'
+          }
+          $coverage = @{}
+          $surfaceHashes = @{}
+          foreach ($row in $rows) {
+            $surface = [string]$row.surface
+            $dpi = [string]$row.dpiScale
+            if ($surface -notin @('install-progress', 'completion') -or
+                $dpi -notin @('1.0', '1.5') -or
+                [string]$row.clippingStatus -ne 'pass' -or
+                [string]$row.readabilityStatus -ne 'pass' -or
+                [string]$row.hostClass -ne 'native-windows' -or
+                [string]$row.captureMode -notin @('window-bounds', 'reused-same-surface')) {
+              throw 'Visual proof contains an unsupported surface, DPI, review, host, or capture mode.'
+            }
+            $key = "$surface|$dpi"
+            if ($coverage.ContainsKey($key)) {
+              throw 'Visual proof contains duplicate surface/DPI coverage.'
+            }
+            $coverage[$key] = $true
+            $leaf = [System.IO.Path]::GetFileName([string]$row.path)
+            if ($leaf -ne [string]$row.path -or -not $leaf.EndsWith('.png')) {
+              throw 'Visual proof screenshot path is not a PNG leaf name.'
+            }
+            $imagePath = Join-Path $env:CHUMMER_PROOF_ROOT $leaf
+            if (-not (Test-Path -LiteralPath $imagePath -PathType Leaf) -or
+                (Get-Item -LiteralPath $imagePath).Length -lt 4096) {
+              throw 'Visual proof screenshot is missing or too small.'
+            }
+            Add-Type -AssemblyName System.Drawing
+            $image = [System.Drawing.Image]::FromFile($imagePath)
+            try {
+              if ($image.Width -lt 240 -or $image.Height -lt 160) {
+                throw 'Visual proof screenshot dimensions are too small.'
+              }
+            }
+            finally {
+              $image.Dispose()
+            }
+            $imageHash = (Get-FileHash -LiteralPath $imagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if (-not $surfaceHashes.ContainsKey($surface)) {
+              $surfaceHashes[$surface] = [System.Collections.Generic.HashSet[string]]::new()
+            }
+            [void]$surfaceHashes[$surface].Add($imageHash)
+          }
+          foreach ($required in @('install-progress|1.0', 'install-progress|1.5', 'completion|1.0', 'completion|1.5')) {
+            if (-not $coverage.ContainsKey($required)) {
+              throw "Visual proof is missing $required coverage."
+            }
+          }
+          $progressHashes = @($surfaceHashes['install-progress'])
+          $completionHashes = @($surfaceHashes['completion'])
+          if (@($progressHashes | Where-Object { $completionHashes -contains $_ }).Count -ne 0) {
+            throw 'Progress and completion surfaces must not reuse identical image bytes.'
+          }
+
+          $digestPrefix = $env:EXPECTED_INSTALLER_SHA256.Substring(0, 12)
+          $bundleName = "windows-installer-gold-proof-$digestPrefix"
+          $bundlePath = Join-Path $env:CHUMMER_PROOF_WORK_ROOT "$bundleName.zip"
+          Compress-Archive -Path (Join-Path $env:CHUMMER_PROOF_ROOT '*') -DestinationPath $bundlePath -CompressionLevel Optimal
+          if (-not (Test-Path -LiteralPath $bundlePath -PathType Leaf) -or
+              (Get-Item -LiteralPath $bundlePath).Length -lt 16384) {
+            throw 'Packaged proof bundle is missing or too small.'
+          }
+          "bundle_name=$bundleName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "bundle_path=$bundlePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload only the exact Windows gold-proof bundle
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ steps.package.outputs.bundle_name }}
+          path: ${{ steps.package.outputs.bundle_path }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+
+      - name: Record evidence-only artifact identity
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          set -euo pipefail
+          {
+            echo '### Live Windows installer gold proof'
+            echo
+            echo "Release: \`${{ inputs.release_version }}\`"
+            echo "Installer SHA-256: \`${{ inputs.installer_sha256 }}\`"
+            echo "Artifact ID: \`$ARTIFACT_ID\`"
+            echo "Artifact digest: \`$ARTIFACT_DIGEST\`"
+            echo "Artifact URL: $ARTIFACT_URL"
+            echo
+            echo 'Publication/upload/deployment authority: false'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload failure-only sanitized capture diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: live-windows-installer-gold-proof-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.CHUMMER_PROOF_ROOT }}/WINDOWS_INSTALLER_CAPTURE_FAILURE.txt
+            ${{ env.CHUMMER_PROOF_ROOT }}/*.png
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+
+      - name: Remove installer and proof bytes from the runner
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath $env:CHUMMER_PROOF_WORK_ROOT) {
+            Remove-Item -LiteralPath $env:CHUMMER_PROOF_WORK_ROOT -Recurse -Force
+          }
