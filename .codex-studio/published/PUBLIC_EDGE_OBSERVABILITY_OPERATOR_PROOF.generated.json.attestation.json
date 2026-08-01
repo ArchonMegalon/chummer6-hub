@@ -3,18 +3,18 @@
   "algorithm": "ed25519",
   "key_id": "local-observability-operator-2026",
   "role": "observability_operator",
-  "generated_at_utc": "2026-07-31T20:17:23.020020Z",
-  "subject_sha256": "87d5750aab0a4ec48d80843891a8591b57ca0f4cb7ac2023208f6017b7ba7163",
-  "challenge_nonce": "7aba783f21b9eb8355dab1ffc3683f767d6d8d136719012f481840916c456b04",
-  "request_sha256": "c0f2409777f6bb3e395b2adb3b2074387b3337bffccf41a22a4fc53e35a65611",
+  "generated_at_utc": "2026-08-01T10:03:28.404203Z",
+  "subject_sha256": "dc6a5200aa436a31d9651556068f7ce1c81273d8ca9f39d20bc69d6628c76e3a",
+  "challenge_nonce": "f9b7f85b81def03fcb028e809e5637f8710b5749a3fed65f0147b0a9723d0c61",
+  "request_sha256": "c483bde50e54f16af71964f07c16746b209b7c27f7eebb24f57588584d48c2fb",
   "bindings": {
     "policy_sha256": "84f5f06b98be9b9fad583b371ebbe50c2cb1dfb306aab26aeec4a6cdae7f6ba4",
     "release_candidate": {
-      "sha256": "0b8ea9f24560180e61f3822e2578f9a2a7a401f5509e01bf0f810358b25a0d2b",
-      "version": "run-20260731-095000",
+      "sha256": "3124f921f693d2afc1a1f4b272eda2960460bcbc0f439565c148b6b466a64fbd",
+      "version": "run-20260801-031406",
       "channel": "preview"
     },
     "runtime_source_fingerprint_sha256": "a87ad402115bebdb06c02fc25d8af2afe6c8ef6ed00550a7d9a4beb47a348232"
   },
-  "signature": "7Rm6sMTTtFL1eBz5lgrH5IGeUII4yp44ONx3WJQnkNfurFYo2fVSuxNuVELarwP/UM33QQvM87+4V59QKvc7Bw=="
+  "signature": "r4oCL6JRxGtbiXVlTOloXgDnQw+Wux3zT2om2QCkMDMTMlqNZLxs4hn5J3OAA1222nU4Y1ApWj2RkzSHHtn2AQ=="
 }
