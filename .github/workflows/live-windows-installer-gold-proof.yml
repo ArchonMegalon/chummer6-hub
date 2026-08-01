@@ -46,15 +46,25 @@ jobs:
       contents: read
     env:
       CHUMMER_LIVE_BASE_URL: https://chummer.run
-      CHUMMER_PROOF_WORK_ROOT: ${{ runner.temp }}\chummer-live-windows-proof
-      CHUMMER_DOWNLOADS_ROOT: ${{ runner.temp }}\chummer-live-windows-proof\downloads
-      CHUMMER_PROOF_ROOT: ${{ runner.temp }}\chummer-live-windows-proof\downloads\visual-audit\windows-installer
     steps:
       - name: Check out the exact recapture contract
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
           fetch-depth: 1
+
+      - name: Initialize isolated runner paths
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $workRoot = Join-Path $env:RUNNER_TEMP 'chummer-live-windows-proof'
+          $downloadsRoot = Join-Path $workRoot 'downloads'
+          $proofRoot = Join-Path $downloadsRoot 'visual-audit\windows-installer'
+          @(
+            "CHUMMER_PROOF_WORK_ROOT=$workRoot"
+            "CHUMMER_DOWNLOADS_ROOT=$downloadsRoot"
+            "CHUMMER_PROOF_ROOT=$proofRoot"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Authenticate live shelf bytes and download only the promoted installer
         id: live-shelf

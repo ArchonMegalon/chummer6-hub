@@ -19,6 +19,9 @@ def test_live_windows_gold_proof_workflow_is_manual_and_read_only() -> None:
     assert "runs-on: windows-latest" in text
     assert "https://chummer.run" in text
     assert "${{ secrets." not in text
+    assert "${{ runner.temp }}" not in text
+    assert "$env:RUNNER_TEMP" in text
+    assert "$env:GITHUB_ENV" in text
     assert "Publication/upload/deployment authority: false" in text
 
 
