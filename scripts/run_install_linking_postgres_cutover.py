@@ -148,6 +148,17 @@ SOURCE_REPLAY_PREFLIGHT_CONTRACT = (
 )
 JOB_RECEIPT_CONTRACT = "chummer.install_linking_postgres_operator_job.v1"
 START_INTENT_CONTRACT = "chummer.install_linking_postgres_start_intent.v1"
+REVIEWED_HUB_REGISTRY_DOCKERIGNORE = (
+    b".git\n"
+    b".github\n"
+    b".runtime\n"
+    b".tmp\n"
+    b".vexp\n"
+    b"**/bin\n"
+    b"**/obj\n"
+    b"**/__pycache__\n"
+    b"*.log\n"
+)
 JOB_TIMEOUT_SECONDS = 180
 COMMAND_TIMEOUT_SECONDS = 30
 SYNTHETIC_GIT_FSCK_TIMEOUT_SECONDS = 5 * 60
@@ -1776,6 +1787,20 @@ class GovernedCutoverRunner:
             )
         return sha256_bytes(raw)
 
+    @staticmethod
+    def _require_exact_dockerignore(
+        path: Path,
+        *,
+        label: str,
+        expected: bytes,
+    ) -> str:
+        raw = read_regular_file_bytes(path, maximum_bytes=256 * 1024)
+        if raw != expected:
+            raise CutoverError(
+                f"{label} Docker ignore does not match its reviewed contract"
+            )
+        return sha256_bytes(raw)
+
     def _validate_build_workspace_paths(self) -> None:
         validate_build_workspace_paths(self.inputs)
 
@@ -2111,6 +2136,11 @@ class GovernedCutoverRunner:
                 "external media contracts restore is not SDK-only"
             )
 
+        hub_registry_dockerignore_sha256 = self._require_exact_dockerignore(
+            hub_dockerignore_path,
+            label="hub registry",
+            expected=REVIEWED_HUB_REGISTRY_DOCKERIGNORE,
+        )
         context_policies = {
             build_context_name: {
                 "contextBoundary": (
@@ -2147,8 +2177,10 @@ class GovernedCutoverRunner:
             },
             "hub-registry-source": {
                 "contextBoundary": "exact-clean-repository",
-                "dockerignoreSha256": None,
-                "effectiveDockerignoreSha256": None,
+                "dockerignoreSha256": hub_registry_dockerignore_sha256,
+                "effectiveDockerignoreSha256": (
+                    hub_registry_dockerignore_sha256
+                ),
                 "repositoryContained": True,
             },
             "fleet-media-factory-contracts": {
@@ -2174,10 +2206,6 @@ class GovernedCutoverRunner:
                 "repositoryContained": True,
             },
         }
-        if hub_dockerignore_path.exists():
-            raise CutoverError(
-                "hub registry context gained an unreviewed Docker ignore"
-            )
         if fleet_dockerignore_path.exists():
             raise CutoverError(
                 "fleet media context gained an unreviewed Docker ignore"

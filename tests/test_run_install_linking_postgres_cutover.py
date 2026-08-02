@@ -135,6 +135,36 @@ def make_pinned_final_bind_runner(module, tmp_path: Path):
     return runner, commands
 
 
+def test_hub_registry_dockerignore_requires_exact_reviewed_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    commands = FakeCommands(lambda *_args: module.CommandResult(0, b"", b""))
+    runner = make_runner(module, tmp_path, commands)
+    dockerignore = tmp_path / ".dockerignore"
+    dockerignore.write_bytes(module.REVIEWED_HUB_REGISTRY_DOCKERIGNORE)
+
+    digest = runner._require_exact_dockerignore(
+        dockerignore,
+        label="hub registry",
+        expected=module.REVIEWED_HUB_REGISTRY_DOCKERIGNORE,
+    )
+
+    assert digest == module.sha256_bytes(
+        module.REVIEWED_HUB_REGISTRY_DOCKERIGNORE
+    )
+
+    dockerignore.write_bytes(
+        module.REVIEWED_HUB_REGISTRY_DOCKERIGNORE + b"unreviewed-output\n"
+    )
+    with pytest.raises(module.CutoverError, match="reviewed contract"):
+        runner._require_exact_dockerignore(
+            dockerignore,
+            label="hub registry",
+            expected=module.REVIEWED_HUB_REGISTRY_DOCKERIGNORE,
+        )
+
+
 def test_public_edge_compose_build_syntax_accepts_canonical_project_name() -> None:
     module = load_module()
     compose = (ROOT / "docker-compose.public-edge.yml").read_text(
