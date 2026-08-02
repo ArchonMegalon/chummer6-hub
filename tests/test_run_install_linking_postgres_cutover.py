@@ -1550,7 +1550,7 @@ def test_started_container_accepts_exact_network_identity(
     )
 
 
-def test_local_store_proof_rejects_decoy_store_path(
+def test_local_store_proof_rejects_decoy_and_accepts_compose_none_network(
     tmp_path: Path,
 ) -> None:
     module = load_module()
@@ -1626,6 +1626,37 @@ def test_local_store_proof_rejects_decoy_store_path(
     with pytest.raises(
         module.CutoverError,
         match="critical environment drifted",
+    ):
+        runner._inspect_container(
+            container_name=str(payload_holder["payload"]["Name"])[1:],
+            service=service,
+            project=project,
+            command=["prove-local-store-absent"],
+        )
+
+    payload_holder["payload"]["Config"]["Env"][1] = (
+        f"CHUMMER_INSTALL_LINKING_STORE_PATH={canonical_store}"
+    )
+    payload_holder["payload"]["NetworkSettings"]["Networks"] = {
+        "none": {}
+    }
+    container_id, topology = runner._inspect_container(
+        container_name=str(payload_holder["payload"]["Name"])[1:],
+        service=service,
+        project=project,
+        command=["prove-local-store-absent"],
+    )
+
+    assert container_id == CONTAINER_ID
+    assert topology["networkId"] == ""
+    assert topology["networkMode"] == "none"
+
+    payload_holder["payload"]["NetworkSettings"]["Networks"] = {
+        "bridge": {"NetworkID": "a" * 64}
+    }
+    with pytest.raises(
+        module.CutoverError,
+        match="stopped operator container contract drifted",
     ):
         runner._inspect_container(
             container_name=str(payload_holder["payload"]["Name"])[1:],

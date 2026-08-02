@@ -2940,10 +2940,20 @@ class GovernedCutoverRunner:
         )
         expected_mounts = EXPECTED_MOUNTS[service]
         networks = network_settings.get("Networks")
-        expected_networks = (
-            set()
-            if service == "chummer-install-linking-postgres-import-presence-proof"
-            else {self.public_network_name}
+        observed_network_names = (
+            set(networks) if isinstance(networks, dict) else set()
+        )
+        local_store_proof = (
+            service
+            == "chummer-install-linking-postgres-import-presence-proof"
+        )
+        # Docker Engine may serialize ``network_mode: none`` as either no
+        # network entries or one synthetic ``none`` entry. HostConfig below
+        # must still be literal ``none``; every connectable network is denied.
+        network_contract_valid = (
+            observed_network_names.issubset({"none"})
+            if local_store_proof
+            else observed_network_names == {self.public_network_name}
         )
         if (
             re.fullmatch(r"[0-9a-f]{64}", container_id) is None
@@ -2964,7 +2974,7 @@ class GovernedCutoverRunner:
             or state.get("Status") != "created"
             or state.get("Running") is not False
             or not isinstance(networks, dict)
-            or set(networks) != expected_networks
+            or not network_contract_valid
             or observed_mount_source_sha256
             != self.expected_mount_source_sha256[service]
             or re.fullmatch(
@@ -2974,7 +2984,7 @@ class GovernedCutoverRunner:
             is None
         ):
             raise CutoverError("stopped operator container contract drifted")
-        if service == "chummer-install-linking-postgres-import-presence-proof":
+        if local_store_proof:
             observed_network_id = ""
         else:
             network = networks.get(self.public_network_name)
