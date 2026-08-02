@@ -189,8 +189,8 @@ def build_info(tmp_path: Path) -> Path:
                     },
                     "hub-registry-source": {
                         "contextBoundary": "exact-clean-repository",
-                        "dockerignoreSha256": None,
-                        "effectiveDockerignoreSha256": None,
+                        "dockerignoreSha256": "e" * 64,
+                        "effectiveDockerignoreSha256": "e" * 64,
                         "repositoryContained": True,
                     },
                     "run-services-source": {
@@ -2077,6 +2077,7 @@ def test_candidate_build_info_rejects_adversarial_synthetic_provenance(
         "context-policy-opened",
         "root-ignore-disagrees",
         "run-ignore-disagrees",
+        "hub-ignore-disagrees",
         "hub-ignored-input",
         "fleet-ignored-input",
         "external-restore-not-sdk-only",
@@ -2119,6 +2120,10 @@ def test_candidate_build_info_rejects_dependency_provenance_drift(
         ] = "0" * 64
     elif mutation == "run-ignore-disagrees":
         dependency["contextPolicies"]["run-services-source"][
+            "effectiveDockerignoreSha256"
+        ] = "0" * 64
+    elif mutation == "hub-ignore-disagrees":
+        dependency["contextPolicies"]["hub-registry-source"][
             "effectiveDockerignoreSha256"
         ] = "0" * 64
     elif mutation == "hub-ignored-input":

@@ -751,12 +751,12 @@ BUILD_CONTEXT_POLICY_BUILD_BOUNDARIES = {
 BUILD_CONTEXT_POLICY_NULL_DOCKERIGNORE_NAMES = frozenset(
     {
         "fleet-media-factory-contracts",
-        "hub-registry-source",
     }
 )
 BUILD_CONTEXT_POLICY_EXACT_DOCKERIGNORE_NAMES = frozenset(
     {
         "design-product",
+        "hub-registry-source",
         "run-services-source",
     }
 )
