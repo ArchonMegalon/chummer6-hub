@@ -630,6 +630,19 @@ public sealed record InstallLinkingPostgresEmptyAuthorityProof(
     string AuthorityIdentitySha256,
     string Code);
 
+public sealed record InstallLinkingPostgresAuthorityReadyProof(
+    bool Valid,
+    bool CurrentRoleMatches,
+    bool LeastPrivilegeValid,
+    bool SchemaValid,
+    int AppliedSchemaVersion,
+    long? HeadGeneration,
+    long CommitCount,
+    bool Empty,
+    string AuthorityIdentitySha256,
+    string AuthorityStateSha256,
+    string Code);
+
 public sealed record InstallLinkingPostgresReadiness(
     bool Ready,
     string Code,

@@ -80,14 +80,14 @@ START_INTENT_CONTRACT = "chummer.install_linking_postgres_start_intent.v1"
 CUTOVER_RUN_CONTRACT = "chummer.install_linking_postgres_cutover_run.v1"
 POSTQUIESCE_PROOF_KINDS = (
     "prove-local-store-absent",
-    "prove-empty-authority",
+    "prove-authority-ready",
     "prove-runtime-role",
 )
 EXPECTED_PHASE_JOBS = {
     "prepare_completed": (
         "transport-proof",
         "prepare",
-        "prove-empty-authority",
+        "prove-authority-ready",
         "prove-runtime-role",
     ),
     IMPORT_SKIPPED_PHASE: ("prove-local-store-absent",),
@@ -96,8 +96,8 @@ EXPECTED_PHASE_JOBS = {
 EXPECTED_PROOF_CONTRACTS = {
     "transport-proof": "chummer.postgres_transport_proof.v1",
     "prepare": "chummer.install_linking_postgres_prepare.v1",
-    "prove-empty-authority": (
-        "chummer.install_linking_postgres_empty_authority_proof.v1"
+    "prove-authority-ready": (
+        "chummer.install_linking_postgres_authority_readiness_proof.v1"
     ),
     "prove-runtime-role": (
         "chummer.install_linking_postgres_runtime_role_proof.v1"
@@ -110,7 +110,7 @@ EXPECTED_PROOF_CONTRACTS = {
 EXPECTED_JOB_SERVICES = {
     "transport-proof": "chummer-install-linking-postgres-admin",
     "prepare": "chummer-install-linking-postgres-admin",
-    "prove-empty-authority": "chummer-install-linking-postgres-runtime-proof",
+    "prove-authority-ready": "chummer-install-linking-postgres-runtime-proof",
     "prove-runtime-role": "chummer-install-linking-postgres-runtime-proof",
     "prove-local-store-absent": (
         "chummer-install-linking-postgres-import-presence-proof"
@@ -240,7 +240,7 @@ TOPOLOGY_LABEL_KEYS = {
 EXPECTED_JOB_COMMANDS = {
     "transport-proof": ["transport-proof"],
     "prepare": ["prepare"],
-    "prove-empty-authority": ["prove-empty-authority"],
+    "prove-authority-ready": ["prove-authority-ready"],
     "prove-runtime-role": ["prove-runtime-role"],
     "prove-local-store-absent": ["prove-local-store-absent"],
     "validate": ["validate"],
@@ -823,9 +823,10 @@ EXPECTED_PROOF_KEYS = {
         "runtimeRoleSha256",
         "status",
     },
-    "prove-empty-authority": {
+    "prove-authority-ready": {
         "appliedSchemaVersion",
         "authorityIdentitySha256",
+        "authorityStateSha256",
         "commitCount",
         "contractName",
         "currentRoleMatches",
@@ -1254,23 +1255,40 @@ def _validate_proof_payload(job_name: str, payload: dict[str, Any]) -> None:
         )
     ):
         raise ValueError("prepare proof is incomplete")
-    if proof_kind == "prove-empty-authority" and not (
+    if proof_kind == "prove-authority-ready" and not (
         type(payload.get("appliedSchemaVersion")) is int
         and payload.get("appliedSchemaVersion") == 2
         and type(payload.get("commitCount")) is int
-        and payload.get("commitCount") == 0
+        and payload.get("commitCount") >= 0
         and payload.get("currentRoleMatches") is True
-        and payload.get("empty") is True
+        and type(payload.get("empty")) is bool
         and type(payload.get("headGeneration")) is int
-        and payload.get("headGeneration") == 0
+        and payload.get("headGeneration") >= 0
         and payload.get("leastPrivilegeValid") is True
         and payload.get("schemaValid") is True
         and re.fullmatch(
             r"[0-9a-f]{64}",
+            str(payload.get("authorityStateSha256") or ""),
+        )
+        and re.fullmatch(
+            r"[0-9a-f]{64}",
             str(payload.get("runtimeRoleSha256") or ""),
         )
+        and (
+            (
+                payload.get("empty") is True
+                and payload.get("headGeneration") == 0
+                and payload.get("commitCount") == 0
+            )
+            or (
+                payload.get("empty") is False
+                and payload.get("headGeneration") > 0
+                and payload.get("commitCount")
+                == payload.get("headGeneration")
+            )
+        )
     ):
-        raise ValueError("empty-authority proof is incomplete")
+        raise ValueError("authority-readiness proof is incomplete")
     if proof_kind == "prove-runtime-role" and not (
         payload.get("currentRoleMatches") is True
         and payload.get("leastPrivilegeValid") is True
@@ -2097,7 +2115,7 @@ def bind_phase_evidence(
             proof_payloads[name].get("runtimeRoleSha256")
             for name in (
                 "prepare",
-                "prove-empty-authority",
+                "prove-authority-ready",
                 "prove-runtime-role",
             )
         }

@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -808,6 +809,182 @@ public sealed partial class InstallLinkingPostgresMigrator
             commitCount,
             empty,
             authorityIdentitySha256,
+            code);
+    }
+
+    public async Task<InstallLinkingPostgresAuthorityReadyProof>
+        ProveRuntimeAuthorityReadyAsync(
+            string expectedRuntimeRole,
+            CancellationToken cancellationToken = default)
+    {
+        if (!RuntimeRolePattern().IsMatch(expectedRuntimeRole))
+        {
+            return new(
+                false,
+                false,
+                false,
+                false,
+                0,
+                null,
+                0,
+                false,
+                string.Empty,
+                string.Empty,
+                "runtime_role_invalid");
+        }
+
+        await using NpgsqlConnection connection =
+            await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction =
+            await connection.BeginTransactionAsync(
+                IsolationLevel.RepeatableRead,
+                cancellationToken);
+        await SetTransactionReadOnlyAsync(
+            connection,
+            transaction,
+            cancellationToken);
+        string authorityIdentitySha256 =
+            await InstallLinkingPostgresAuthorityIdentity.ComputeSha256Async(
+                connection,
+                transaction,
+                cancellationToken);
+        (string SessionRole, string CurrentRole) identity =
+            await ReadCurrentIdentityAsync(
+                connection,
+                transaction,
+                cancellationToken);
+        bool roleMatches =
+            string.Equals(
+                identity.SessionRole,
+                expectedRuntimeRole,
+                StringComparison.Ordinal)
+            && string.Equals(
+                identity.CurrentRole,
+                expectedRuntimeRole,
+                StringComparison.Ordinal);
+        InstallLinkingPostgresSchemaValidation schema =
+            await ValidateOnConnectionAsync(
+                connection,
+                transaction,
+                cancellationToken);
+        if (!schema.Valid
+            || schema.AppliedVersion != InstallLinkingPostgresSchema.CurrentVersion)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new(
+                false,
+                roleMatches,
+                false,
+                false,
+                schema.AppliedVersion,
+                null,
+                0,
+                false,
+                authorityIdentitySha256,
+                string.Empty,
+                "schema_invalid");
+        }
+
+        bool privilegesValid = roleMatches
+            && await ValidateRuntimePrivilegesOnConnectionAsync(
+                connection,
+                expectedRuntimeRole,
+                cancellationToken,
+                transaction);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT
+                head.generation,
+                head.commit_id,
+                head.envelope_version,
+                encode(head.snapshot_sha256, 'hex'),
+                encode(head.envelope_sha256, 'hex'),
+                head.protected_envelope IS NOT NULL,
+                (SELECT COUNT(*)::bigint
+                 FROM install_linking.snapshot_commits)
+            FROM install_linking.snapshot_head AS head
+            WHERE head.singleton = true
+            """;
+        long headGeneration;
+        Guid? commitId;
+        int? envelopeVersion;
+        string? snapshotSha256;
+        string? envelopeSha256;
+        bool protectedEnvelopePresent;
+        long commitCount;
+        await using (NpgsqlDataReader reader =
+                     await command.ExecuteReaderAsync(cancellationToken))
+        {
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                throw new InvalidOperationException(
+                    "The InstallLinking authority-readiness proof returned no row.");
+            }
+
+            headGeneration = reader.GetInt64(0);
+            commitId = reader.IsDBNull(1) ? null : reader.GetGuid(1);
+            envelopeVersion = reader.IsDBNull(2) ? null : reader.GetInt32(2);
+            snapshotSha256 = reader.IsDBNull(3) ? null : reader.GetString(3);
+            envelopeSha256 = reader.IsDBNull(4) ? null : reader.GetString(4);
+            protectedEnvelopePresent = reader.GetBoolean(5);
+            commitCount = reader.GetInt64(6);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                throw new InvalidOperationException(
+                    "The InstallLinking authority-readiness proof returned multiple rows.");
+            }
+        }
+
+        bool empty = headGeneration == 0
+            && commitId is null
+            && envelopeVersion is null
+            && snapshotSha256 is null
+            && envelopeSha256 is null
+            && !protectedEnvelopePresent
+            && commitCount == 0;
+        bool seeded = headGeneration > 0
+            && commitId is not null
+            && envelopeVersion
+                == InstallLinkingPostgresDurabilityInvariants.ProtectedEnvelopeVersion
+            && snapshotSha256 is { Length: 64 }
+            && envelopeSha256 is { Length: 64 }
+            && protectedEnvelopePresent
+            && commitCount == headGeneration;
+        string statePayload = string.Join(
+            '\n',
+            "chummer.install_linking_postgres_authority_state.v1",
+            headGeneration.ToString(CultureInfo.InvariantCulture),
+            commitId?.ToString("D") ?? string.Empty,
+            envelopeVersion?.ToString(CultureInfo.InvariantCulture)
+                ?? string.Empty,
+            snapshotSha256 ?? string.Empty,
+            envelopeSha256 ?? string.Empty,
+            commitCount.ToString(CultureInfo.InvariantCulture)) + "\n";
+        string authorityStateSha256 = Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(statePayload)));
+        await transaction.RollbackAsync(cancellationToken);
+        bool valid = roleMatches
+            && privilegesValid
+            && (empty || seeded);
+        string code = valid
+            ? empty
+                ? "empty_authority_ready"
+                : "seeded_authority_ready"
+            : !roleMatches || !privilegesValid
+                ? "runtime_role_privileges_invalid"
+                : "authority_state_invalid";
+        return new(
+            valid,
+            roleMatches,
+            privilegesValid,
+            true,
+            schema.AppliedVersion,
+            headGeneration,
+            commitCount,
+            empty,
+            authorityIdentitySha256,
+            authorityStateSha256,
             code);
     }
 

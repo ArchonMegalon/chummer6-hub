@@ -409,12 +409,13 @@ def proof_payload(job_name: str) -> dict:
             "runtimeRoleSha256": "9" * 64,
             "status": "pass",
         },
-        "prove-empty-authority": {
+        "prove-authority-ready": {
             "appliedSchemaVersion": 2,
             "authorityIdentitySha256": "e" * 64,
+            "authorityStateSha256": "a" * 64,
             "commitCount": 0,
             "contractName": (
-                "chummer.install_linking_postgres_empty_authority_proof.v1"
+                "chummer.install_linking_postgres_authority_readiness_proof.v1"
             ),
             "currentRoleMatches": True,
             "empty": True,
@@ -454,7 +455,7 @@ def proof_payload(job_name: str) -> dict:
     if job_name not in payloads and job_name.startswith("postquiesce-"):
         for proof_kind in (
             "prove-local-store-absent",
-            "prove-empty-authority",
+            "prove-authority-ready",
             "prove-runtime-role",
         ):
             if job_name.endswith(f"-{proof_kind}"):
@@ -1259,8 +1260,8 @@ def test_phase_evidence_closes_every_nested_schema(
 @pytest.mark.parametrize(
     ("job_name", "field"),
     [
-        ("prove-empty-authority", "commitCount"),
-        ("prove-empty-authority", "headGeneration"),
+        ("prove-authority-ready", "commitCount"),
+        ("prove-authority-ready", "headGeneration"),
         ("validate", "appliedSchemaVersion"),
     ],
 )
@@ -1274,6 +1275,20 @@ def test_proof_numeric_fields_reject_boolean_type_confusion(
     payload[field] = False
     with pytest.raises(ValueError):
         module._validate_proof_payload(job_name, payload)
+
+
+def test_authority_readiness_accepts_consistent_seeded_state_and_rejects_drift() -> None:
+    module = load_module()
+    payload = proof_payload("prove-authority-ready")
+    payload["empty"] = False
+    payload["headGeneration"] = 1
+    payload["commitCount"] = 1
+
+    module._validate_proof_payload("prove-authority-ready", payload)
+
+    payload["commitCount"] = 2
+    with pytest.raises(ValueError, match="authority-readiness proof"):
+        module._validate_proof_payload("prove-authority-ready", payload)
 
 
 def test_job_and_topology_numeric_fields_reject_boolean_type_confusion(

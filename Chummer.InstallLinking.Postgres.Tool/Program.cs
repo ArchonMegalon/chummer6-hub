@@ -17,7 +17,8 @@ if (!HasValidArguments(args))
     Console.Error.WriteLine(
         "Usage: Chummer.InstallLinking.Postgres.Tool "
         + "<migrate|validate|grant-runtime|prepare> [runtime-role], "
-        + "transport-proof, prove-empty-authority [runtime-role], "
+        + "transport-proof, prove-authority-ready [runtime-role], "
+        + "prove-empty-authority [runtime-role], "
         + "prove-runtime-role [runtime-role], prove-local-store-absent, "
         + "or import-local --confirm-empty-authority");
     return 64;
@@ -36,6 +37,7 @@ if (args[0] == "prove-local-store-absent")
 string? runtimeRole = null;
 if (args[0] is "grant-runtime"
         or "prepare"
+        or "prove-authority-ready"
         or "prove-empty-authority"
         or "prove-runtime-role"
     && !InstallLinkingPostgresToolArguments.TryResolveRuntimeRole(
@@ -48,7 +50,9 @@ if (args[0] is "grant-runtime"
     return 78;
 }
 
-if (args[0] is "prove-empty-authority" or "prove-runtime-role")
+if (args[0] is "prove-authority-ready"
+        or "prove-empty-authority"
+        or "prove-runtime-role")
 {
     return await ProveRuntimeAuthorityAsync(args[0], runtimeRole!);
 }
@@ -175,8 +179,8 @@ static bool HasValidArguments(string[] values)
         ["prove-local-store-absent"] => true,
         ["grant-runtime" or "prepare"] => true,
         ["grant-runtime" or "prepare", _] => true,
-        ["prove-empty-authority" or "prove-runtime-role"] => true,
-        ["prove-empty-authority" or "prove-runtime-role", _] => true,
+        ["prove-authority-ready" or "prove-empty-authority" or "prove-runtime-role"] => true,
+        ["prove-authority-ready" or "prove-empty-authority" or "prove-runtime-role", _] => true,
         ["import-local", "--confirm-empty-authority"] => true,
         _ => false
     };
@@ -239,6 +243,38 @@ static async Task<int> ProveRuntimeAuthorityAsync(
                     ["currentRoleMatches"] = proof.CurrentRoleMatches,
                     ["leastPrivilegeValid"] = proof.LeastPrivilegeValid,
                     ["runtimeRoleSha256"] = roleSha256,
+                    ["status"] = "pass"
+                });
+            return 0;
+        }
+
+        if (command == "prove-authority-ready")
+        {
+            InstallLinkingPostgresAuthorityReadyProof proof =
+                await migrator.ProveRuntimeAuthorityReadyAsync(runtimeRole);
+            if (!proof.Valid)
+            {
+                Console.Error.WriteLine(
+                    "InstallLinking PostgreSQL authority-readiness proof failed.");
+                return 1;
+            }
+
+            WriteCanonicalJson(
+                new SortedDictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["appliedSchemaVersion"] = proof.AppliedSchemaVersion,
+                    ["authorityIdentitySha256"] =
+                        proof.AuthorityIdentitySha256,
+                    ["authorityStateSha256"] = proof.AuthorityStateSha256,
+                    ["commitCount"] = proof.CommitCount,
+                    ["contractName"] =
+                        "chummer.install_linking_postgres_authority_readiness_proof.v1",
+                    ["currentRoleMatches"] = proof.CurrentRoleMatches,
+                    ["empty"] = proof.Empty,
+                    ["headGeneration"] = proof.HeadGeneration,
+                    ["leastPrivilegeValid"] = proof.LeastPrivilegeValid,
+                    ["runtimeRoleSha256"] = roleSha256,
+                    ["schemaValid"] = proof.SchemaValid,
                     ["status"] = "pass"
                 });
             return 0;

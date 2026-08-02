@@ -130,6 +130,8 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
                 await runtimeMigrator.ProveCurrentRuntimeRoleAsync(role);
             InstallLinkingPostgresEmptyAuthorityProof emptyProof =
                 await runtimeMigrator.ProveEmptyRuntimeAuthorityAsync(role);
+            InstallLinkingPostgresAuthorityReadyProof readyProof =
+                await runtimeMigrator.ProveRuntimeAuthorityReadyAsync(role);
             await using NpgsqlConnection adminConnection =
                 await _fixture.AdminDataSource.OpenConnectionAsync();
             string adminAuthorityIdentitySha256 =
@@ -147,6 +149,11 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
             Assert.Equal(0, emptyProof.HeadGeneration);
             Assert.Equal(0, emptyProof.CommitCount);
             Assert.True(emptyProof.Empty);
+            Assert.True(readyProof.Valid, readyProof.Code);
+            Assert.True(readyProof.Empty);
+            Assert.Equal(0, readyProof.HeadGeneration);
+            Assert.Equal(0, readyProof.CommitCount);
+            Assert.Matches("^[0-9a-f]{64}$", readyProof.AuthorityStateSha256);
             Assert.Equal(
                 adminAuthorityIdentitySha256,
                 roleProof.AuthorityIdentitySha256);
@@ -264,12 +271,20 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
             InstallLinkingPostgresEmptyAuthorityProof proof =
                 await new InstallLinkingPostgresMigrator(runtimeDataSource)
                     .ProveEmptyRuntimeAuthorityAsync(role);
+            InstallLinkingPostgresAuthorityReadyProof readyProof =
+                await new InstallLinkingPostgresMigrator(runtimeDataSource)
+                    .ProveRuntimeAuthorityReadyAsync(role);
 
             Assert.False(proof.Valid);
             Assert.Equal("authority_nonempty", proof.Code);
             Assert.Equal(1, proof.HeadGeneration);
             Assert.Equal(1, proof.CommitCount);
             Assert.False(proof.Empty);
+            Assert.True(readyProof.Valid, readyProof.Code);
+            Assert.False(readyProof.Empty);
+            Assert.Equal(1, readyProof.HeadGeneration);
+            Assert.Equal(1, readyProof.CommitCount);
+            Assert.Matches("^[0-9a-f]{64}$", readyProof.AuthorityStateSha256);
             Assert.Equal(
                 headBefore,
                 await _fixture.ScalarBytesAsync(
