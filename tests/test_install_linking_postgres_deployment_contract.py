@@ -455,7 +455,7 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         materializer = (
             ROOT / "scripts" / "materialize_install_linking_cutover_boundary.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("importSkippedNoLocalStore", materializer)
+        self.assertIn("importNotRequiredSeededAuthority", materializer)
         self.assertIn(
             "chummer.public_edge_mutation_lock_recovery.v1",
             (ROOT / "scripts" / "recover_public_edge_mutation_lock.py").read_text(

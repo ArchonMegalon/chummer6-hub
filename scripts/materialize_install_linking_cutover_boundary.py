@@ -39,8 +39,8 @@ except ModuleNotFoundError:  # Direct ``python3 scripts/...`` execution.
     )
 
 
-CONTRACT_NAME = "chummer.install_linking_postgres_cutover_boundary.v3"
-IMPORT_SKIPPED_PHASE = "import_skipped_no_local_store"
+CONTRACT_NAME = "chummer.install_linking_postgres_cutover_boundary.v4"
+IMPORT_SKIPPED_PHASE = "import_not_required_seeded_authority"
 PHASES = (
     "prepare_starting",
     "prepare_completed",
@@ -79,7 +79,7 @@ JOB_RECEIPT_CONTRACT = "chummer.install_linking_postgres_operator_job.v1"
 START_INTENT_CONTRACT = "chummer.install_linking_postgres_start_intent.v1"
 CUTOVER_RUN_CONTRACT = "chummer.install_linking_postgres_cutover_run.v1"
 POSTQUIESCE_PROOF_KINDS = (
-    "prove-local-store-absent",
+    "prove-local-store-state",
     "prove-authority-ready",
     "prove-runtime-role",
 )
@@ -90,7 +90,10 @@ EXPECTED_PHASE_JOBS = {
         "prove-authority-ready",
         "prove-runtime-role",
     ),
-    IMPORT_SKIPPED_PHASE: ("prove-local-store-absent",),
+    IMPORT_SKIPPED_PHASE: (
+        "prove-authority-ready",
+        "prove-local-store-state",
+    ),
     "validate_completed": ("validate",),
 }
 EXPECTED_PROOF_CONTRACTS = {
@@ -102,8 +105,8 @@ EXPECTED_PROOF_CONTRACTS = {
     "prove-runtime-role": (
         "chummer.install_linking_postgres_runtime_role_proof.v1"
     ),
-    "prove-local-store-absent": (
-        "chummer.install_linking_local_store_absence_proof.v1"
+    "prove-local-store-state": (
+        "chummer.install_linking_local_store_state_proof.v1"
     ),
     "validate": "chummer.install_linking_postgres_schema_validation.v1",
 }
@@ -112,7 +115,7 @@ EXPECTED_JOB_SERVICES = {
     "prepare": "chummer-install-linking-postgres-admin",
     "prove-authority-ready": "chummer-install-linking-postgres-runtime-proof",
     "prove-runtime-role": "chummer-install-linking-postgres-runtime-proof",
-    "prove-local-store-absent": (
+    "prove-local-store-state": (
         "chummer-install-linking-postgres-import-presence-proof"
     ),
     "validate": "chummer-install-linking-postgres-admin",
@@ -167,6 +170,7 @@ PHASE_EVIDENCE_KEYS = {
     "cutoverId",
     "jobReceiptChainSha256",
     "jobReceipts",
+    "localStorePresent",
     "phase",
     "status",
 }
@@ -242,7 +246,7 @@ EXPECTED_JOB_COMMANDS = {
     "prepare": ["prepare"],
     "prove-authority-ready": ["prove-authority-ready"],
     "prove-runtime-role": ["prove-runtime-role"],
-    "prove-local-store-absent": ["prove-local-store-absent"],
+    "prove-local-store-state": ["prove-local-store-state"],
     "validate": ["validate"],
 }
 START_INTENT_KEYS = {
@@ -269,7 +273,7 @@ BOUNDARY_RECEIPT_KEYS = {
     "dataProtectionKeyRingPosture",
     "importCompleted",
     "importDisposition",
-    "importSkippedNoLocalStore",
+    "importNotRequiredSeededAuthority",
     "irreversibleDatabaseBoundaryMayHaveBeenEntered",
     "localStorePresentAtCutover",
     "operatorContainerImageId",
@@ -845,10 +849,11 @@ EXPECTED_PROOF_KEYS = {
         "runtimeRoleSha256",
         "status",
     },
-    "prove-local-store-absent": {
+    "prove-local-store-state": {
         "checkedPathCount",
         "contractName",
         "localStorePresent",
+        "presentPathCount",
         "status",
     },
     "validate": {
@@ -1228,7 +1233,7 @@ def _validate_proof_payload(job_name: str, payload: dict[str, Any]) -> None:
     ):
         raise ValueError(f"{job_name} proof contract is not passing")
     if (
-        proof_kind != "prove-local-store-absent"
+        proof_kind != "prove-local-store-state"
         and re.fullmatch(
             r"[0-9a-f]{64}",
             str(payload.get("authorityIdentitySha256") or ""),
@@ -1295,12 +1300,16 @@ def _validate_proof_payload(job_name: str, payload: dict[str, Any]) -> None:
         and re.fullmatch(r"[0-9a-f]{64}", str(payload.get("runtimeRoleSha256") or ""))
     ):
         raise ValueError("runtime-role proof is incomplete")
-    if proof_kind == "prove-local-store-absent" and not (
+    if proof_kind == "prove-local-store-state" and not (
         type(payload.get("checkedPathCount")) is int
         and payload.get("checkedPathCount") == 3
-        and payload.get("localStorePresent") is False
+        and type(payload.get("presentPathCount")) is int
+        and payload.get("presentPathCount") in range(4)
+        and type(payload.get("localStorePresent")) is bool
+        and payload.get("localStorePresent")
+        is (payload.get("presentPathCount") > 0)
     ):
-        raise ValueError("local-store absence proof is incomplete")
+        raise ValueError("local-store state proof is incomplete")
     if proof_kind == "validate" and not (
         type(payload.get("appliedSchemaVersion")) is int
         and payload.get("appliedSchemaVersion") == 2
@@ -1431,10 +1440,10 @@ def bind_state_volume_inventory(
             continue
         job_name = consumer.get("jobName")
         if not isinstance(job_name, str) or (
-            job_name != "prove-local-store-absent"
+            job_name != "prove-local-store-state"
             and re.fullmatch(
                 r"postquiesce-[a-z0-9][a-z0-9-]{7,31}-"
-                r"prove-local-store-absent",
+                r"prove-local-store-state",
                 job_name,
             )
             is None
@@ -1757,6 +1766,17 @@ def bind_phase_evidence(
             raise ValueError(
                 "public acceptance cannot bind post-quiesce proof without its boundary"
             )
+        boundary_summary, _ = _read_private_json(
+            boundary_output,
+            label="InstallLinking cutover boundary summary",
+        )
+        local_store_present_at_cutover = boundary_summary.get(
+            "localStorePresentAtCutover"
+        )
+        if type(local_store_present_at_cutover) is not bool:
+            raise ValueError(
+                "InstallLinking cutover boundary lacks seeded local-store state"
+            )
         bound_reproofs = bind_all_postquiesce_reproofs(
             boundary_output,
             cutover_id=cutover_id,
@@ -1800,6 +1820,8 @@ def bind_phase_evidence(
             != postquiesce_phase.get("authorityIdentitySha256")
             or runtime_authority_readiness.get("runtimeRoleSha256")
             != postquiesce_phase.get("runtimeRoleSha256")
+            or postquiesce_phase.get("localStorePresent")
+            is not local_store_present_at_cutover
         ):
             raise ValueError("post-quiesce reproof digest drifted")
         return Path(os.path.abspath(path)), evidence_sha256, evidence
@@ -1826,6 +1848,18 @@ def bind_phase_evidence(
         is None
     ):
         raise ValueError("InstallLinking phase evidence identity drifted")
+    local_store_state_phase = phase in {
+        IMPORT_SKIPPED_PHASE,
+        POSTQUIESCE_REPROOF_PHASE,
+    }
+    if (
+        local_store_state_phase
+        and type(evidence.get("localStorePresent")) is not bool
+    ) or (
+        not local_store_state_phase
+        and evidence.get("localStorePresent") is not None
+    ):
+        raise ValueError("InstallLinking phase local-store state drifted")
     if phase == POSTQUIESCE_REPROOF_PHASE:
         inventory_path = Path(
             str(evidence.get("volumeInventoryReceiptPath") or "")
@@ -2096,7 +2130,7 @@ def bind_phase_evidence(
         _validate_proof_payload(expected_name, proof)
         if (
             _proof_kind(expected_name)
-            != "prove-local-store-absent"
+            != "prove-local-store-state"
             and proof.get("authorityIdentitySha256")
             != evidence.get("authorityIdentitySha256")
         ):
@@ -2122,6 +2156,21 @@ def bind_phase_evidence(
         if len(role_hashes) != 1:
             raise ValueError(
                 "runtime-role proof binding drifted across the prepare phase"
+            )
+    if phase in {IMPORT_SKIPPED_PHASE, POSTQUIESCE_REPROOF_PHASE}:
+        proofs_by_kind = {
+            _proof_kind(name): payload
+            for name, payload in proof_payloads.items()
+        }
+        authority_proof = proofs_by_kind.get("prove-authority-ready", {})
+        local_store_proof = proofs_by_kind.get("prove-local-store-state", {})
+        if (
+            authority_proof.get("empty") is not False
+            or evidence.get("localStorePresent")
+            is not local_store_proof.get("localStorePresent")
+        ):
+            raise ValueError(
+                "seeded authority and local-store state binding drifted"
             )
     if phase == POSTQUIESCE_REPROOF_PHASE:
         role_hashes = {
@@ -2157,6 +2206,7 @@ def validate_existing_boundary_chain(
     created_at: str | None = None
     latest: dict[str, Any] | None = None
     authority_identity_sha256: str | None = None
+    local_store_present_at_cutover: bool | None = None
     for index, expected_phase in enumerate(PHASES[: prior_index + 1]):
         receipt_path = output.with_name(f"{output.name}.{expected_phase}.json")
         receipt, receipt_sha256 = _read_private_json(
@@ -2176,6 +2226,7 @@ def validate_existing_boundary_chain(
             or candidate == "public_acceptance_completed"
         )
         phase_evidence = receipt.get("phaseEvidence")
+        import_selected = index >= PHASE_SEQUENCE[IMPORT_SKIPPED_PHASE]
         if (
             set(receipt) != BOUNDARY_RECEIPT_KEYS
             or receipt.get("contractName") != CONTRACT_NAME
@@ -2203,15 +2254,35 @@ def validate_existing_boundary_chain(
             != evidence_phases
         ):
             raise ValueError("cutover boundary append-only phase chain drifted")
+        observed_local_store_present = receipt.get(
+            "localStorePresentAtCutover"
+        )
+        if import_selected:
+            if type(observed_local_store_present) is not bool:
+                raise ValueError(
+                    "seeded cutover local-store state is invalid"
+                )
+            if local_store_present_at_cutover is None:
+                local_store_present_at_cutover = observed_local_store_present
+            elif (
+                observed_local_store_present
+                is not local_store_present_at_cutover
+            ):
+                raise ValueError(
+                    "seeded cutover local-store state changed"
+                )
+        elif observed_local_store_present is not None:
+            raise ValueError(
+                "pre-authority cutover selected local-store state"
+            )
         accepted = expected_phase == "public_acceptance_completed"
-        import_selected = index >= PHASE_SEQUENCE[IMPORT_SKIPPED_PHASE]
         expected_operator_image = (
             candidate_tool_image_id
             if expected_phase in OPERATOR_COMPLETION_PHASES
             else None
         )
         expected_import_disposition = (
-            "skipped_no_local_store" if import_selected else None
+            "not_required_seeded_authority" if import_selected else None
         )
         recovery = receipt.get("recoveryAuthority")
         if (
@@ -2223,11 +2294,10 @@ def validate_existing_boundary_chain(
             is not (index >= PHASE_SEQUENCE["prepare_completed"])
             or receipt.get("importDisposition") != expected_import_disposition
             or receipt.get("importCompleted") is not False
-            or receipt.get("importSkippedNoLocalStore") is not import_selected
-            or receipt.get("localStorePresentAtCutover")
-            is not (False if import_selected else None)
+            or receipt.get("importNotRequiredSeededAuthority")
+            is not import_selected
             or receipt.get("dataProtectionKeyRingPosture")
-            != "isolated_v2_requires_no_legacy_import"
+            != "postgres_seeded_replaces_validated_local_mirror"
             or receipt.get("validateCompleted")
             is not (index >= PHASE_SEQUENCE["validate_completed"])
             or receipt.get("publicAcceptanceCompleted") is not accepted
@@ -2861,13 +2931,15 @@ def bind_cutover_run_receipt(
     )
     job_references = run.get("jobReceipts")
     expected_names = tuple(
-        name
-        for phase in (
-            "prepare_completed",
-            IMPORT_SKIPPED_PHASE,
-            "validate_completed",
+        dict.fromkeys(
+            name
+            for phase in (
+                "prepare_completed",
+                IMPORT_SKIPPED_PHASE,
+                "validate_completed",
+            )
+            for name in EXPECTED_PHASE_JOBS[phase]
         )
-        for name in EXPECTED_PHASE_JOBS[phase]
     )
     if (
         set(run) != CUTOVER_RUN_KEYS
@@ -3408,6 +3480,7 @@ def materialize(
     )
     evidence_path: Path | None = None
     evidence_sha256: str | None = None
+    bound_evidence: dict[str, Any] = {}
     if phase in OPERATOR_COMPLETION_PHASES or phase == "public_acceptance_completed":
         if evidence_receipt is None:
             raise ValueError("completed cutover phase requires bound operator evidence")
@@ -3450,23 +3523,33 @@ def materialize(
             raise ValueError("cutover boundary phase cannot skip an irreversible checkpoint")
         created_at = str(existing.get("createdAtUtc") or created_at)
     if phase == IMPORT_SKIPPED_PHASE:
-        import_disposition = "skipped_no_local_store"
+        import_disposition = "not_required_seeded_authority"
     elif existing is None:
         import_disposition = None
     else:
         import_disposition = existing.get("importDisposition")
     if (
         phase_index >= PHASE_SEQUENCE[IMPORT_SKIPPED_PHASE]
-        and import_disposition != "skipped_no_local_store"
+        and import_disposition != "not_required_seeded_authority"
     ):
         raise ValueError("cutover boundary import disposition is missing or invalid")
     if (
         phase == "public_acceptance_completed"
-        and import_disposition != "skipped_no_local_store"
+        and import_disposition != "not_required_seeded_authority"
     ):
         raise ValueError(
-            "isolated v2 Data Protection acceptance requires the explicit "
-            "no-local-store import checkpoint"
+            "public acceptance requires the explicit seeded-authority "
+            "import disposition"
+        )
+    if phase == IMPORT_SKIPPED_PHASE:
+        local_store_present_at_cutover = bound_evidence.get(
+            "localStorePresent"
+        )
+    elif existing is None:
+        local_store_present_at_cutover = None
+    else:
+        local_store_present_at_cutover = existing.get(
+            "localStorePresentAtCutover"
         )
     accepted = phase == "public_acceptance_completed"
     phase_evidence = [] if existing is None else list(existing.get("phaseEvidence") or [])
@@ -3502,12 +3585,12 @@ def materialize(
         "prepareCompleted": phase_index >= PHASES.index("prepare_completed"),
         "importDisposition": import_disposition,
         "importCompleted": False,
-        "importSkippedNoLocalStore": import_disposition == "skipped_no_local_store",
-        "localStorePresentAtCutover": (
-            None if import_disposition is None else import_disposition == "completed"
+        "importNotRequiredSeededAuthority": (
+            import_disposition == "not_required_seeded_authority"
         ),
+        "localStorePresentAtCutover": local_store_present_at_cutover,
         "dataProtectionKeyRingPosture": (
-            "isolated_v2_requires_no_legacy_import"
+            "postgres_seeded_replaces_validated_local_mirror"
         ),
         "validateCompleted": phase_index >= PHASE_SEQUENCE["validate_completed"],
         "publicAcceptanceCompleted": accepted,

@@ -294,10 +294,10 @@ JOB_SPECS: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
         "chummer.install_linking_postgres_runtime_role_proof.v1",
     ),
     (
-        "prove-local-store-absent",
+        "prove-local-store-state",
         "chummer-install-linking-postgres-import-presence-proof",
-        ("prove-local-store-absent",),
-        "chummer.install_linking_local_store_absence_proof.v1",
+        ("prove-local-store-state",),
+        "chummer.install_linking_local_store_state_proof.v1",
     ),
     (
         "validate",
@@ -310,10 +310,10 @@ POSTQUIESCE_BASE_JOB_SPECS: tuple[
     tuple[str, str, tuple[str, ...], str], ...
 ] = (
     (
-        "prove-local-store-absent",
+        "prove-local-store-state",
         "chummer-install-linking-postgres-import-presence-proof",
-        ("prove-local-store-absent",),
-        "chummer.install_linking_local_store_absence_proof.v1",
+        ("prove-local-store-state",),
+        "chummer.install_linking_local_store_state_proof.v1",
     ),
     (
         "prove-authority-ready",
@@ -336,7 +336,10 @@ PHASE_JOB_NAMES = {
         "prove-authority-ready",
         "prove-runtime-role",
     ),
-    "import_skipped_no_local_store": ("prove-local-store-absent",),
+    "import_not_required_seeded_authority": (
+        "prove-authority-ready",
+        "prove-local-store-state",
+    ),
     "validate_completed": ("validate",),
 }
 
@@ -1390,6 +1393,7 @@ class GovernedCutoverRunner:
         self.volume_inventory_receipt_sha256 = ""
         self.runtime_role_sha256 = ""
         self.authority_identity_sha256 = ""
+        self.local_store_present_at_cutover: bool | None = None
 
     def _docker(self, *arguments: str) -> list[str]:
         return [
@@ -3547,9 +3551,10 @@ class GovernedCutoverRunner:
                         and stdout_bytes
                         == canonical_json_bytes(proof, label=f"{job_name} proof")
                     )
-                    if proof_contract != (
-                        "chummer.install_linking_local_store_absence_proof.v1"
-                    ):
+                    local_store_proof = proof_contract == (
+                        "chummer.install_linking_local_store_state_proof.v1"
+                    )
+                    if not local_store_proof:
                         authority_identity_sha256 = str(
                             proof.get("authorityIdentitySha256") or ""
                         )
@@ -3569,6 +3574,20 @@ class GovernedCutoverRunner:
                             self.authority_identity_sha256 = (
                                 authority_identity_sha256
                             )
+                    elif (
+                        type(proof.get("checkedPathCount")) is not int
+                        or proof.get("checkedPathCount") != 3
+                        or type(proof.get("localStorePresent")) is not bool
+                        or type(proof.get("presentPathCount")) is not int
+                        or proof.get("presentPathCount") not in range(4)
+                        or proof.get("localStorePresent")
+                        is not (proof.get("presentPathCount") > 0)
+                    ):
+                        proof_valid = False
+                    elif proof_valid:
+                        self.local_store_present_at_cutover = bool(
+                            proof["localStorePresent"]
+                        )
                 except StrictJsonContractError:
                     proof_valid = False
                 if proof_valid:
@@ -3710,6 +3729,7 @@ class GovernedCutoverRunner:
             "cutoverId": self.inputs.cutover_id,
             "jobReceiptChainSha256": aggregate.hexdigest(),
             "jobReceipts": references,
+            "localStorePresent": self.local_store_present_at_cutover,
             "phase": phase,
             "status": "pass",
         }
@@ -4083,10 +4103,10 @@ class GovernedCutoverRunner:
                 proof_contract=proof_contract,
             )
             import_evidence = self._write_phase_evidence(
-                "import_skipped_no_local_store"
+                "import_not_required_seeded_authority"
             )
             self._materialize(
-                "import_skipped_no_local_store",
+                "import_not_required_seeded_authority",
                 evidence=import_evidence,
                 operator_image=True,
             )

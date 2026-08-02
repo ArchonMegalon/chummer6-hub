@@ -413,13 +413,13 @@ def proof_payload(job_name: str) -> dict:
             "appliedSchemaVersion": 2,
             "authorityIdentitySha256": "e" * 64,
             "authorityStateSha256": "a" * 64,
-            "commitCount": 0,
+            "commitCount": 1,
             "contractName": (
                 "chummer.install_linking_postgres_authority_readiness_proof.v1"
             ),
             "currentRoleMatches": True,
-            "empty": True,
-            "headGeneration": 0,
+            "empty": False,
+            "headGeneration": 1,
             "leastPrivilegeValid": True,
             "runtimeRoleSha256": "9" * 64,
             "schemaValid": True,
@@ -435,12 +435,13 @@ def proof_payload(job_name: str) -> dict:
             "runtimeRoleSha256": "9" * 64,
             "status": "pass",
         },
-        "prove-local-store-absent": {
+        "prove-local-store-state": {
             "checkedPathCount": 3,
             "contractName": (
-                "chummer.install_linking_local_store_absence_proof.v1"
+                "chummer.install_linking_local_store_state_proof.v1"
             ),
-            "localStorePresent": False,
+            "localStorePresent": True,
+            "presentPathCount": 2,
             "status": "pass",
         },
         "validate": {
@@ -454,7 +455,7 @@ def proof_payload(job_name: str) -> dict:
     }
     if job_name not in payloads and job_name.startswith("postquiesce-"):
         for proof_kind in (
-            "prove-local-store-absent",
+            "prove-local-store-state",
             "prove-authority-ready",
             "prove-runtime-role",
         ):
@@ -732,6 +733,17 @@ def phase_evidence(
         else module.EXPECTED_PHASE_JOBS[phase]
     )
     for index, job_name in enumerate(job_names):
+        job_path = root / f"{job_name}.job-receipt.json"
+        if job_path.exists():
+            job_sha = hashlib.sha256(job_path.read_bytes()).hexdigest()
+            references.append(
+                {"name": job_name, "path": str(job_path), "sha256": job_sha}
+            )
+            aggregate.update(job_name.encode())
+            aggregate.update(b"\0")
+            aggregate.update(job_sha.encode())
+            aggregate.update(b"\n")
+            continue
         proof_path = root / f"{job_name}.proof.json"
         proof_sha = write_canonical(
             module,
@@ -826,7 +838,6 @@ def phase_evidence(
         stderr_path.write_bytes(b"")
         stderr_path.chmod(0o600)
         stderr_sha = hashlib.sha256(b"").hexdigest()
-        job_path = root / f"{job_name}.job-receipt.json"
         job_sha = write_canonical(
             module,
             job_path,
@@ -888,6 +899,14 @@ def phase_evidence(
         "cutoverId": "2026-07-17T12:00:00Z",
         "jobReceiptChainSha256": aggregate.hexdigest(),
         "jobReceipts": references,
+        "localStorePresent": (
+            True
+            if phase in {
+                module.IMPORT_SKIPPED_PHASE,
+                module.POSTQUIESCE_REPROOF_PHASE,
+            }
+            else None
+        ),
         "phase": phase,
         "status": "pass",
     }
@@ -918,13 +937,15 @@ def write_passing_final_run(
     active_build_info: Path,
 ) -> Path:
     job_names = tuple(
-        name
-        for phase in (
-            "prepare_completed",
-            module.IMPORT_SKIPPED_PHASE,
-            "validate_completed",
+        dict.fromkeys(
+            name
+            for phase in (
+                "prepare_completed",
+                module.IMPORT_SKIPPED_PHASE,
+                "validate_completed",
+            )
+            for name in module.EXPECTED_PHASE_JOBS[phase]
         )
-        for name in module.EXPECTED_PHASE_JOBS[phase]
     )
     job_references = []
     for name in job_names:
@@ -1015,7 +1036,7 @@ def test_boundary_rejects_legacy_import_phase_for_isolated_v2(
         )
 
 
-def test_boundary_receipt_records_no_local_store_branch_before_validation(
+def test_boundary_receipt_records_seeded_authority_branch_before_validation(
     tmp_path: Path,
 ) -> None:
     module = load_module()
@@ -1033,12 +1054,12 @@ def test_boundary_receipt_records_no_local_store_branch_before_validation(
 
     assert receipt["status"] == "pass"
     assert receipt["sequence"] == 5
-    assert receipt["importDisposition"] == "skipped_no_local_store"
+    assert receipt["importDisposition"] == "not_required_seeded_authority"
     assert receipt["importCompleted"] is False
-    assert receipt["importSkippedNoLocalStore"] is True
-    assert receipt["localStorePresentAtCutover"] is False
+    assert receipt["importNotRequiredSeededAuthority"] is True
+    assert receipt["localStorePresentAtCutover"] is True
     assert receipt["dataProtectionKeyRingPosture"] == (
-        "isolated_v2_requires_no_legacy_import"
+        "postgres_seeded_replaces_validated_local_mirror"
     )
     assert receipt["validateCompleted"] is True
     skipped_receipt = output.with_name(
@@ -1291,6 +1312,75 @@ def test_authority_readiness_accepts_consistent_seeded_state_and_rejects_drift()
         module._validate_proof_payload("prove-authority-ready", payload)
 
 
+def test_seeded_checkpoint_rejects_an_empty_authority(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    active_build_info = build_info(tmp_path)
+    evidence_path = phase_evidence(
+        module,
+        tmp_path,
+        active_build_info,
+        module.IMPORT_SKIPPED_PHASE,
+    )
+    evidence = read_json(evidence_path)
+    job = read_json(Path(evidence["jobReceipts"][0]["path"]))
+    proof_path = Path(job["proofPath"])
+    proof = read_json(proof_path)
+    proof["empty"] = True
+    proof["headGeneration"] = 0
+    proof["commitCount"] = 0
+    job["proofSha256"] = write_canonical(module, proof_path, proof)
+    job["stdoutSha256"] = write_canonical(
+        module,
+        Path(job["stdoutPath"]),
+        proof,
+    )
+    rewrite_job_chain(module, evidence_path, 0, job)
+
+    with pytest.raises(ValueError, match="seeded authority"):
+        module.bind_phase_evidence(
+            evidence_path,
+            phase=module.IMPORT_SKIPPED_PHASE,
+            cutover_id="2026-07-17T12:00:00Z",
+            candidate_image_id=CANDIDATE_IMAGE,
+            candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+            candidate_build_info_sha256=hashlib.sha256(
+                active_build_info.read_bytes()
+            ).hexdigest(),
+            candidate_build_info=read_json(active_build_info),
+        )
+
+
+def test_seeded_checkpoint_rejects_local_state_summary_drift(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    active_build_info = build_info(tmp_path)
+    evidence_path = phase_evidence(
+        module,
+        tmp_path,
+        active_build_info,
+        module.IMPORT_SKIPPED_PHASE,
+    )
+    evidence = read_json(evidence_path)
+    evidence["localStorePresent"] = False
+    write_canonical(module, evidence_path, evidence)
+
+    with pytest.raises(ValueError, match="local-store state binding"):
+        module.bind_phase_evidence(
+            evidence_path,
+            phase=module.IMPORT_SKIPPED_PHASE,
+            cutover_id="2026-07-17T12:00:00Z",
+            candidate_image_id=CANDIDATE_IMAGE,
+            candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+            candidate_build_info_sha256=hashlib.sha256(
+                active_build_info.read_bytes()
+            ).hexdigest(),
+            candidate_build_info=read_json(active_build_info),
+        )
+
+
 def test_job_and_topology_numeric_fields_reject_boolean_type_confusion(
     tmp_path: Path,
 ) -> None:
@@ -1301,7 +1391,7 @@ def test_job_and_topology_numeric_fields_reject_boolean_type_confusion(
             module,
             tmp_path,
             active_build_info,
-            "import_skipped_no_local_store",
+            module.IMPORT_SKIPPED_PHASE,
         )
         evidence = read_json(evidence_path)
         job_path = Path(evidence["jobReceipts"][0]["path"])
@@ -1314,7 +1404,7 @@ def test_job_and_topology_numeric_fields_reject_boolean_type_confusion(
         with pytest.raises(ValueError):
             module.bind_phase_evidence(
                 evidence_path,
-                phase="import_skipped_no_local_store",
+                phase=module.IMPORT_SKIPPED_PHASE,
                 cutover_id="2026-07-17T12:00:00Z",
                 candidate_image_id=CANDIDATE_IMAGE,
                 candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
@@ -1799,7 +1889,7 @@ def test_postquiesce_safe_fail_rejects_any_start_evidence(
     )
     if mutation == "durable-start-intent":
         durable = tmp_path / (
-            "postquiesce-attempt01-prove-local-store-absent."
+            "postquiesce-attempt01-prove-local-store-state."
             "start-intent.json"
         )
         durable.write_bytes(b"{}\n")
