@@ -1666,6 +1666,29 @@ def test_local_store_proof_rejects_decoy_and_accepts_compose_none_network(
         )
 
 
+def test_validate_phase_does_not_restate_prior_local_store_observation(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    runner = make_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    job_path = tmp_path / "validate.job-receipt.json"
+    job_path.write_bytes(b"{}\n")
+    job_path.chmod(0o600)
+    runner.job_receipts["validate"] = (job_path, "a" * 64)
+    runner.candidate_build_info_sha256 = "d" * 64
+    runner.authority_identity_sha256 = "e" * 64
+    runner.local_store_present_at_cutover = True
+
+    evidence_path = runner._write_phase_evidence("validate_completed")
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+
+    assert evidence["localStorePresent"] is None
+
+
 def test_nonzero_docker_logs_result_is_not_accepted_as_captured(
     tmp_path: Path,
 ) -> None:
