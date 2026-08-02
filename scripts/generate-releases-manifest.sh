@@ -871,7 +871,11 @@ for row in rows:
         "downloadUrl": payload_download_url,
         "sha256": str(row.get("payloadSha256") or "").strip(),
         "sizeBytes": int(row.get("payloadSizeBytes") or 0),
+        "releaseVersion": str(row.get("releaseVersion") or row.get("version") or "").strip(),
     }
+    payload_acquisition_mode = str(row.get("payloadAcquisitionMode") or "").strip()
+    if payload_acquisition_mode:
+        sidecar["payloadAcquisitionMode"] = payload_acquisition_mode
     sidecar_path.parent.mkdir(parents=True, exist_ok=True)
     sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
     raise SystemExit(0)
@@ -1000,6 +1004,14 @@ for artifact in payload.get("artifacts") or []:
             seen.add(sidecar_name)
 PY
 )
+
+for file_name in "${promoted_file_names[@]}"; do
+  if [[ "$file_name" == chummer-*-payload.zip.json && ! -f "$DOWNLOADS_DIR/$file_name" ]]; then
+    materialize_windows_payload_sidecar_from_manifest \
+      "$CANONICAL_MANIFEST_PATH" \
+      "$DOWNLOADS_DIR/$file_name"
+  fi
+done
 
 resolved_manifest_path="$(realpath "$MANIFEST_PATH")"
 resolved_portal_manifest_path="$(realpath -m "$PORTAL_MANIFEST_PATH")"

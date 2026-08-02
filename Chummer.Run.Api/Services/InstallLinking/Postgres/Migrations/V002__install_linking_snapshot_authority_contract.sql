@@ -170,6 +170,11 @@ BEFORE UPDATE ON install_linking.snapshot_head
 FOR EACH ROW
 EXECUTE FUNCTION install_linking.guard_snapshot_head_advance_v2();
 
+ALTER TABLE install_linking.snapshot_commits
+    ENABLE ALWAYS TRIGGER snapshot_commit_monotonic_append_v2;
+ALTER TABLE install_linking.snapshot_head
+    ENABLE ALWAYS TRIGGER snapshot_head_monotonic_advance_v2;
+
 REVOKE ALL ON ALL TABLES IN SCHEMA install_linking FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA install_linking FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA install_linking FROM PUBLIC;

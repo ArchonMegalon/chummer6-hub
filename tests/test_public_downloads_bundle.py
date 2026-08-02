@@ -44,6 +44,7 @@ FIXTURE_PROOF_ROUTES = (
     "/home/work",
     "/account/access",
     "/account/work",
+    "/account/roster",
     "/account/support",
     "/contact",
     "/downloads",
@@ -860,6 +861,11 @@ class PublicDownloadsBundleTests(unittest.TestCase):
             self.assertEqual(sidecar_payload.get("downloadUrl"), payload_download_url)
             self.assertEqual(sidecar_payload.get("sha256"), windows_installer.get("payloadSha256"))
             self.assertEqual(int(sidecar_payload.get("sizeBytes") or 0), int(windows_installer.get("payloadSizeBytes") or 0))
+            self.assertEqual(sidecar_payload.get("releaseVersion"), windows_installer.get("releaseVersion"))
+            self.assertEqual(
+                sidecar_payload.get("payloadAcquisitionMode"),
+                windows_installer.get("payloadAcquisitionMode"),
+            )
 
             macos_installer = next(
                 (item for item in downloads if str(item.get("id") or "") == "avalonia-osx-arm64-installer"),

@@ -154,8 +154,13 @@ public sealed class InstallLinkingStoreActivation : IInstallLinkingStoreReadines
 
             return new ActivationResult(store, new InstallLinkingStoreReadiness(true, "store_activated"));
         }
-        catch
+        catch (Exception exception)
         {
+            _loggerFactory
+                .CreateLogger<InstallLinkingStoreActivation>()
+                .LogError(
+                    exception,
+                    "Install-linking durable store activation failed.");
             return Failure("store_activation_failed");
         }
     }

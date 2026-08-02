@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 if (!HasValidArguments(args))
@@ -15,7 +16,7 @@ if (!HasValidArguments(args))
     Console.Error.WriteLine(
         "Usage: Chummer.InstallLinking.Postgres.Tool "
         + "<migrate|validate|grant-runtime|prepare> [runtime-role], "
-        + "transport-proof, "
+        + "transport-proof, reconcile-local --confirm-authority-mirror, "
         + "or import-local --confirm-empty-authority");
     return 64;
 }
@@ -23,6 +24,11 @@ if (!HasValidArguments(args))
 if (args[0] == "import-local")
 {
     return await ImportLocalAsync();
+}
+
+if (args[0] == "reconcile-local")
+{
+    return await ReconcileLocalAsync();
 }
 
 string? runtimeRole = null;
@@ -133,11 +139,103 @@ static bool HasValidArguments(string[] values)
     {
         ["migrate" or "validate"] => true,
         ["transport-proof"] => true,
+        ["reconcile-local", "--confirm-authority-mirror"] => true,
         ["grant-runtime" or "prepare"] => true,
         ["grant-runtime" or "prepare", _] => true,
         ["import-local", "--confirm-empty-authority"] => true,
         _ => false
     };
+
+static async Task<int> ReconcileLocalAsync()
+{
+    IConfiguration configuration = new ConfigurationBuilder()
+        .AddEnvironmentVariables()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ASPNETCORE_ENVIRONMENT"] = Environments.Production
+        })
+        .Build();
+    if (string.IsNullOrWhiteSpace(
+            configuration["CHUMMER_DATA_PROTECTION_KEYS_PATH"]))
+    {
+        Console.Error.WriteLine(
+            "The local reconciliation requires an explicit data-protection key-ring path.");
+        return 78;
+    }
+
+    var environment = new ImportHostEnvironment();
+    var services = new ServiceCollection();
+    string keyRingPath = HubRuntimePathDefaults.ResolveDataProtectionKeysPath(
+        configuration,
+        environment);
+    DataProtectionKeyProtectionStatus keyProtection =
+        DataProtectionKeyProtectionConfigurator.Configure(
+            services,
+            configuration,
+            environment,
+            keyRingPath);
+    if (!keyProtection.Ready)
+    {
+        Console.Error.WriteLine(
+            $"install_linking local reconciliation failed ({keyProtection.Code}).");
+        return 1;
+    }
+
+    string runtimeConnectionString;
+    try
+    {
+        runtimeConnectionString = InstallLinkingPostgresConnectionConfiguration
+            .LoadRuntimeConnectionString(configuration, environment);
+    }
+    catch (Exception exception) when (
+        exception is InvalidOperationException
+            or InvalidDataException
+            or IOException
+            or UnauthorizedAccessException
+            or PlatformNotSupportedException)
+    {
+        Console.Error.WriteLine(
+            $"install_linking local reconciliation failed ({exception.GetType().Name}).");
+        return 1;
+    }
+
+    await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+    IDataProtectionProvider dataProtectionProvider =
+        serviceProvider.GetRequiredService<IDataProtectionProvider>();
+    using ILoggerFactory loggerFactory = LoggerFactory.Create(static _ => { });
+    try
+    {
+        await using NpgsqlDataSource runtimeDataSource =
+            NpgsqlDataSource.Create(runtimeConnectionString);
+        var authority = new InstallLinkingPostgresAuthorityCoordinator(
+            new NpgsqlInstallLinkingSnapshotAuthority(runtimeDataSource));
+        using var store = new InstallLinkingStore(
+            configuration,
+            dataProtectionProvider,
+            loggerFactory.CreateLogger<InstallLinkingStore>(),
+            authority);
+        InstallLinkingRollbackAuthorityReadiness readiness = authority.Evaluate();
+        Console.WriteLine(
+            readiness.Ready
+                ? "install_linking local mirror was reconciled and exactly bound to PostgreSQL authority."
+                : $"install_linking local reconciliation failed ({readiness.Code}).");
+        return readiness.Ready ? 0 : 1;
+    }
+    catch (Exception exception) when (exception is
+        NpgsqlException or
+        InvalidOperationException or
+        InvalidDataException or
+        CryptographicException or
+        IOException or
+        UnauthorizedAccessException or
+        PlatformNotSupportedException or
+        NotSupportedException)
+    {
+        Console.Error.WriteLine(
+            $"install_linking local reconciliation failed ({exception.GetType().Name}: {exception.Message}).");
+        return 1;
+    }
+}
 
 static async Task<int> VerifyTransportAsync(
     NpgsqlDataSource tlsDataSource,
