@@ -90,6 +90,34 @@ def function_node(name: str) -> ast.FunctionDef:
     return matches[0]
 
 
+def test_playwright_browser_authority_accepts_stable_private_cache_link(
+    tmp_path: Path,
+) -> None:
+    cache_parent = tmp_path / "cache"
+    cache_parent.mkdir()
+    target = tmp_path / "private-browser-cache"
+    target.mkdir(mode=0o700)
+    source = cache_parent / "ms-playwright"
+    source.symlink_to(target)
+
+    assert controller.resolve_playwright_browser_authority_root(source) == target
+
+
+def test_playwright_browser_authority_rejects_nonprivate_link_target(
+    tmp_path: Path,
+) -> None:
+    cache_parent = tmp_path / "cache"
+    cache_parent.mkdir()
+    target = tmp_path / "public-browser-cache"
+    target.mkdir(mode=0o755)
+    target.chmod(0o755)
+    source = cache_parent / "ms-playwright"
+    source.symlink_to(target)
+
+    with pytest.raises(controller.CutoverError, match="private directory is unsafe"):
+        controller.resolve_playwright_browser_authority_root(source)
+
+
 def class_method_node(class_name: str, method_name: str) -> ast.FunctionDef:
     tree = ast.parse(CONTROLLER_PATH.read_text(encoding="utf-8"))
     classes = [

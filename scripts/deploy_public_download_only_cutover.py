@@ -3197,6 +3197,51 @@ def _validate_playwright_python_closure(root: Path) -> None:
             )
 
 
+def resolve_playwright_browser_authority_root(source: Path) -> Path:
+    try:
+        if source.parent.resolve(strict=True) != source.parent:
+            raise CutoverError(
+                "host Playwright browser authority has an aliased parent"
+            )
+        before = source.lstat()
+    except OSError as exc:
+        raise CutoverError(
+            "host Playwright browser authority is unavailable"
+        ) from exc
+    if not stat.S_ISLNK(before.st_mode):
+        return private_directory(source, create=False)
+    if before.st_uid != os.getuid() or before.st_nlink != 1:
+        raise CutoverError("host Playwright browser authority link is unsafe")
+    try:
+        link_value = os.readlink(source)
+        resolved = source.resolve(strict=True)
+        after = source.lstat()
+        link_value_after = os.readlink(source)
+    except OSError as exc:
+        raise CutoverError(
+            "host Playwright browser authority link is unavailable"
+        ) from exc
+    if (
+        link_value != link_value_after
+        or (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+        )
+        != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+        )
+    ):
+        raise CutoverError(
+            "host Playwright browser authority link changed while resolved"
+        )
+    return private_directory(resolved, create=False)
+
+
 def prepare_operation_host_build(
     config: SidecarConfig,
 ) -> dict[str, Any]:
@@ -3222,9 +3267,8 @@ def prepare_operation_host_build(
     )
     if not source_python_root.is_dir() or source_python_root.is_symlink():
         raise CutoverError("host Playwright Python authority is unavailable")
-    browser_root = private_directory(
-        account_home / ".cache" / "ms-playwright",
-        create=False,
+    browser_root = resolve_playwright_browser_authority_root(
+        account_home / ".cache" / "ms-playwright"
     )
     for relative_executable in PLAYWRIGHT_BROWSER_EXECUTABLES:
         executable = browser_root / relative_executable
