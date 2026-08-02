@@ -2498,13 +2498,15 @@ def test_build_and_create_dispatches_are_immediately_preceded_by_final_bind(
     ]
 
     create_events: list[str] = []
+    observed_create_commands: list[tuple[str, ...]] = []
     command_count = 0
 
-    def create_callback(_arguments, _timeout, _check):
+    def create_callback(arguments, _timeout, _check):
         nonlocal command_count
         command_count += 1
         if command_count == 1:
             return module.CommandResult(1, b"", b"")
+        observed_create_commands.append(tuple(arguments))
         create_events.append("compose-create")
         raise StopAtCompose
 
@@ -2546,6 +2548,14 @@ def test_build_and_create_dispatches_are_immediately_preceded_by_final_bind(
         "final-bind",
         "compose-create",
     ]
+    assert len(observed_create_commands) == 1
+    assert "--no-deps" not in observed_create_commands[0]
+    assert observed_create_commands[0][-4:] == (
+        "create",
+        "--no-build",
+        "--no-recreate",
+        "chummer-install-linking-postgres-runtime-proof",
+    )
     source_tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
     runner_class = next(
         node
