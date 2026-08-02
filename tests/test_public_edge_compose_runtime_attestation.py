@@ -60,6 +60,9 @@ def rendered_compose(
             "dockerfile": str(source_root / "Chummer.Run.Api" / "Dockerfile"),
             "additional_contexts": {
                 "run-services-source": str(source_root),
+                "hub-registry-source": (
+                    "/docker/chummercomplete/chummer-hub-registry"
+                ),
                 "fleet-media-factory-contracts": (
                     "/docker/fleet/repos/chummer-media-factory/src/"
                     "Chummer.Media.Contracts"
@@ -181,7 +184,14 @@ def rendered_compose(
                     "CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED": "false",
                     "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED": "false",
                     "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED": "false",
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE": (
+                        "chummer_install_linking"
+                    ),
                     "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST": "db.example.net",
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT": "5432",
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE": (
+                        "chummer_runtime"
+                    ),
                     "SECRET_NOT_ALLOWED_IN_RECEIPT": "do-not-copy",
                 },
                 "volumes": [
@@ -257,15 +267,9 @@ def rendered_compose(
                 "healthcheck": {
                     "test": [
                         "CMD",
-                        "curl",
-                        "--fail",
-                        "--silent",
-                        "--show-error",
-                        "--max-time",
-                        "5",
-                        "--header",
-                        "Host: chummer.run",
-                        "http://127.0.0.1:8080/api/ready",
+                        "dotnet",
+                        "/app/loopback-probe/Chummer.Run.LoopbackProbe.dll",
+                        "/api/ready",
                     ],
                     "interval": "15s",
                     "timeout": "5s",
@@ -295,7 +299,11 @@ def rendered_compose(
                         "/run/chummer-secrets/"
                         "install-linking-postgres-migrator.connection-string"
                     ),
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE": (
+                        "chummer_install_linking"
+                    ),
                     "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST": "db.example.net",
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT": "5432",
                     "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE": "chummer_runtime",
                 },
                 "volumes": [
@@ -344,7 +352,11 @@ def rendered_compose(
                         "/run/chummer-secrets/"
                         "install-linking-postgres-runtime.connection-string"
                     ),
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE": (
+                        "chummer_install_linking"
+                    ),
                     "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST": "db.example.net",
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT": "5432",
                 },
                 "volumes": [
                     volume("chummer-run-api-state", "/app/state"),
@@ -514,6 +526,47 @@ def test_compose_attestation_accepts_consistent_nonroot_operator_identity(
         build["runtimeIdentityConsistent"] is True
         for build in receipt["builds"].values()
     )
+
+
+def test_compose_attestation_accepts_reviewed_single_label_postgres_host(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=projection_root,
+    )
+    services = payload["services"]
+    reviewed_host = "chummer-private-stage-install-linking-postgres"
+    reviewed_mapping = f"{reviewed_host}=172.25.0.12"
+    services["chummer-portal"]["environment"][
+        "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"
+    ] = reviewed_host
+    services["chummer-portal"]["extra_hosts"][0] = reviewed_mapping
+    for service_name in (
+        "chummer-install-linking-postgres-admin",
+        "chummer-install-linking-postgres-import",
+    ):
+        services[service_name]["environment"][
+            "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"
+        ] = reviewed_host
+        services[service_name]["extra_hosts"] = [reviewed_mapping]
+
+    receipt = module.validate_runtime(
+        payload,
+        project_name="chummer6-hub",
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=projection_root,
+        runtime_proof_bind_source=fixture_runtime_proof(projection_root),
+        published_port=8091,
+    )
+
+    assert receipt["status"] == "pass"
 
 
 @pytest.mark.parametrize(
@@ -953,6 +1006,9 @@ def test_compose_attestation_accepts_postgres_tool_runtime_role_contract(
     payload["services"]["chummer-install-linking-postgres-admin"][
         "environment"
     ]["CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE"] = runtime_role
+    payload["services"]["chummer-portal"]["environment"][
+        "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE"
+    ] = runtime_role
 
     receipt = module.validate_runtime(
         payload,
@@ -1200,6 +1256,14 @@ def test_compose_attestation_rejects_roles_rejected_by_postgres_tool(
             lambda payload: payload["services"]["chummer-portal"]["build"][
                 "args"
             ].update(CHUMMER_RUNTIME_UID="0"),
+            "build authority drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"]["build"][
+                "additional_contexts"
+            ].__setitem__(
+                "hub-registry-source", "/tmp/untrusted-hub-registry"
+            ),
             "build authority drifted",
         ),
         (

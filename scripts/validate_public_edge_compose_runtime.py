@@ -30,6 +30,8 @@ MAX_RENDERED_COMPOSE_BYTES = 16 * 1024 * 1024
 EXPECTED_PORTAL_IMAGE = "chummer-run-api:local"
 EXPECTED_TOOL_IMAGE = "chummer-install-linking-postgres-tool:local"
 EXPECTED_TOOL_TARGET = "install-linking-postgres-tool-final"
+EXPECTED_POSTGRES_DATABASE = "chummer_install_linking"
+EXPECTED_POSTGRES_PORT = "5432"
 PROXY_GATE_KEYS = (
     "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED",
     "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED",
@@ -45,6 +47,7 @@ EXPECTED_FLEET_MEDIA_CONTEXT = (
     "/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts"
 )
 EXPECTED_DESIGN_PRODUCT_CONTEXT = "/docker/chummercomplete/chummer-design"
+EXPECTED_HUB_REGISTRY_CONTEXT = "/docker/chummercomplete/chummer-hub-registry"
 EXPECTED_DOWNLOADS_SOURCE = (
     "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
 )
@@ -87,15 +90,9 @@ RELEASE_SHELF_POSTURES = {
 EXPECTED_PORTAL_HEALTHCHECK = {
     "test": [
         "CMD",
-        "curl",
-        "--fail",
-        "--silent",
-        "--show-error",
-        "--max-time",
-        "5",
-        "--header",
-        "Host: chummer.run",
-        "http://127.0.0.1:8080/api/ready",
+        "dotnet",
+        "/app/loopback-probe/Chummer.Run.LoopbackProbe.dll",
+        "/api/ready",
     ],
     "interval": "15s",
     "timeout": "5s",
@@ -116,8 +113,8 @@ EXPECTED_TOOL_PROFILE = ["install-linking-postgres-admin"]
 EXPECTED_TOOL_TMPFS = ["/tmp:rw,noexec,nosuid,nodev,mode=1777"]
 POSTGRES_RUNTIME_ROLE_PATTERN = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 POSTGRES_DNS_NAME_PATTERN = re.compile(
-    r"(?=.{1,253}\Z)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
-    r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z"
+    r"(?=.{1,253}\Z)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+    r"(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*\Z"
 )
 EXPECTED_PORTAL_RESOURCES = {
     "cpu_shares": 256,
@@ -622,6 +619,7 @@ def require_exact_build(
     actual_target = str(build.get("target") or "")
     expected_contexts = {
         "run-services-source": str(source_root),
+        "hub-registry-source": EXPECTED_HUB_REGISTRY_CONTEXT,
         "fleet-media-factory-contracts": EXPECTED_FLEET_MEDIA_CONTEXT,
         "design-product": EXPECTED_DESIGN_PRODUCT_CONTEXT,
     }
@@ -1004,13 +1002,23 @@ def validate_runtime(
             or key.startswith("CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_")
         ) and key not in PROXY_GATE_KEYS:
             raise ValueError(f"rendered portal contains unrecognized proxy key {key}")
+    for key, expected_value in {
+        "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE": (
+            EXPECTED_POSTGRES_DATABASE
+        ),
+        "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT": EXPECTED_POSTGRES_PORT,
+    }.items():
+        if environment.get(key) != expected_value:
+            raise ValueError(f"rendered portal {key} drifted")
 
     admin_environment = mapping(
         admin.get("environment"), label="rendered PostgreSQL admin environment"
     )
     if set(admin_environment) != {
         "CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE",
         "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT",
         "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE",
     }:
         raise ValueError("rendered PostgreSQL admin environment fields drifted")
@@ -1027,6 +1035,15 @@ def validate_runtime(
             "rendered PostgreSQL runtime role must match "
             "^[a-z_][a-z0-9_]{0,62}$"
         )
+    if (
+        admin_environment.get("CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE")
+        != EXPECTED_POSTGRES_DATABASE
+        or admin_environment.get("CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT")
+        != EXPECTED_POSTGRES_PORT
+    ):
+        raise ValueError("rendered PostgreSQL admin database identity drifted")
+    if environment.get("CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE") != runtime_role:
+        raise ValueError("rendered portal PostgreSQL runtime role drifted")
 
     require_exact_mapping(
         importer.get("environment"),
@@ -1047,7 +1064,11 @@ def validate_runtime(
             "CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE": (
                 "/run/chummer-secrets/install-linking-postgres-runtime.connection-string"
             ),
+            "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE": (
+                EXPECTED_POSTGRES_DATABASE
+            ),
             "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST": postgres_expected_host,
+            "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT": EXPECTED_POSTGRES_PORT,
         },
         label="PostgreSQL import environment",
     )
