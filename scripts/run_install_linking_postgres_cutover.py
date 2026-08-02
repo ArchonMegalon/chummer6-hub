@@ -3375,13 +3375,15 @@ class GovernedCutoverRunner:
             raise AmbiguousCutoverError(
                 f"deterministic operator container already exists: {container_name}"
             )
+        # Compose v5 does not support ``create --no-deps``. The rendered
+        # operator-service allowlists reject ``depends_on``, so selecting one
+        # governed service cannot create an uninspected dependency container.
         create_command = self._compose(
             "--profile",
             "install-linking-postgres-admin",
             "create",
             "--no-build",
             "--no-recreate",
-            "--no-deps",
             service,
             overrides=(override,),
             project=project,
