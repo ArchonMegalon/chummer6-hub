@@ -67,6 +67,8 @@ class BlazorGoldReleaseGateTests(unittest.TestCase):
         self.assertIn("FullyQualifiedName~HubApiRequestGuardrailMiddlewareTests", text)
         self.assertIn("FullyQualifiedName~HubApiGuardrailPolicyTests", text)
         self.assertIn("--no-restore", text)
+        self.assertIn("--disable-build-servers", text)
+        self.assertIn("-m:1", text)
 
     def test_release_ready_script_always_requires_blazor_gold(self) -> None:
         text = RELEASE_READY_SCRIPT.read_text(encoding="utf-8")
