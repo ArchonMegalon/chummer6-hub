@@ -635,6 +635,15 @@ def _sync_local_flagship_readiness_artifact_if_needed(*, out_path: Path, source_
 
 
 def _resolve_served_release_proof_sync_path(*, out_path: Path) -> Path | None:
+    raw_sync = str(
+        os.environ.get("CHUMMER_HUB_LOCAL_RELEASE_PROOF_SERVED_SYNC") or "1"
+    ).strip().casefold()
+    if raw_sync in {"0", "false", "no", "off"}:
+        return None
+    if raw_sync not in {"1", "true", "yes", "on"}:
+        raise RuntimeError(
+            "CHUMMER_HUB_LOCAL_RELEASE_PROOF_SERVED_SYNC must be a boolean value"
+        )
     if out_path.expanduser().resolve() == DEFAULT_HUB_LOCAL_RELEASE_PROOF_PATH.expanduser().resolve():
         return DEFAULT_SERVED_HUB_LOCAL_RELEASE_PROOF_PATH
     return None

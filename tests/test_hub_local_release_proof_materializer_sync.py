@@ -28,6 +28,29 @@ def load_materializer_module():
 
 
 class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
+    def test_served_sync_can_be_disabled_for_runtime_bind_mount_verification(self) -> None:
+        module = load_materializer_module()
+        with mock.patch.dict(
+            os.environ,
+            {"CHUMMER_HUB_LOCAL_RELEASE_PROOF_SERVED_SYNC": "0"},
+        ):
+            self.assertIsNone(
+                module._resolve_served_release_proof_sync_path(
+                    out_path=module.DEFAULT_HUB_LOCAL_RELEASE_PROOF_PATH,
+                )
+            )
+
+    def test_served_sync_rejects_ambiguous_configuration(self) -> None:
+        module = load_materializer_module()
+        with mock.patch.dict(
+            os.environ,
+            {"CHUMMER_HUB_LOCAL_RELEASE_PROOF_SERVED_SYNC": "sometimes"},
+        ):
+            with self.assertRaisesRegex(RuntimeError, "must be a boolean value"):
+                module._resolve_served_release_proof_sync_path(
+                    out_path=module.DEFAULT_HUB_LOCAL_RELEASE_PROOF_PATH,
+                )
+
     def test_private_absolute_mutation_lock_override_keeps_secure_identity_checks(self) -> None:
         module = load_materializer_module()
         with tempfile.TemporaryDirectory(prefix="hub-proof-private-lock-") as temp_dir:

@@ -708,9 +708,12 @@ def canonical_release_gate_specs(
             f"{bash} {desktop_gold_entrypoints[1]}",
             f"{bash} {desktop_gold_entrypoints[2]}",
             (
-                f"cd {services} && {python} {desktop_gold_entrypoints[3]} "
+                f"cd {services} && CHUMMER_HUB_LOCAL_RELEASE_PROOF_SERVED_SYNC=0 "
+                f"{python} {desktop_gold_entrypoints[3]} "
                 f".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json "
                 f"{public_base} docker-compose.yml 120 true >/dev/null && "
+                "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH="
+                ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json "
                 f"{python} {desktop_gold_entrypoints[4]}"
             ),
             f"{bash} {desktop_gold_entrypoints[5]}",
