@@ -1,8 +1,8 @@
 # Next Session Handoff
 
-Updated: 2026-08-01T04:58:36+02:00
+Updated: 2026-08-01T16:16:56+02:00
 
-## Handoff refresh (2026-08-01T04:58:36+02:00)
+## Handoff refresh (2026-08-01T16:16:56+02:00)
 
 - Canonical live handoffs for the release/controller lane are:
   - `/docker/chummercomplete/CODEX_HANDOFF_2026-07-06.md`
@@ -16,22 +16,22 @@ Updated: 2026-08-01T04:58:36+02:00
   - `blocked_route:avalonia:macos:osx-arm64`
 - Current authoritative receipts:
   - `RELEASE_BLOCKERS.generated.json`
-    - `generated_at=2026-08-01T03:01:30Z`
+    - `generated_at=2026-08-01T14:19:05Z`
     - `load_status=loaded`
     - `release_posture:non_flagship_channel` now includes:
-      - `stable_promotion_command=RELEASE_CHANNEL=public_stable RELEASE_VERSION=run-20260801-013900 RELEASE_PUBLISHED_AT=2026-08-01T00:25:00Z bash /docker/chummercomplete/chummer6-ui/scripts/publish-download-bundle.sh /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads`
+      - `stable_promotion_command=RELEASE_CHANNEL=public_stable RELEASE_VERSION=run-20260801-031406 RELEASE_PUBLISHED_AT=2026-08-01T12:20:52Z bash /docker/chummercomplete/chummer6-ui/scripts/publish-download-bundle.sh /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads`
       - stable promotion guard: The public_stable publisher fails closed unless RELEASE_BLOCKERS.generated.json is fresh and contains no root blockers other than release_posture:non_flagship_channel.
       - `stable_promotion_guard_max_age_seconds=86400`
       - `stable_promotion_guard_env=CHUMMER_PUBLIC_STABLE_BLOCKERS_MAX_AGE_SECONDS`
       - `post_promotion_verify_command=python3 scripts/materialize_release_ready_receipt.py --force-global-verifier && python3 scripts/materialize_operator_release_dashboard.py && python3 scripts/final_gold_janitor.py && python3 ../scripts/release/_release_gate_common.py && python3 ../scripts/materialize_codex_flagship_handoff.py --timestamp "$(date --iso-8601=seconds)"`
   - `chummer.run-services/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json`
-    - `generated_at_utc=2026-08-01T03:01:08Z`
+    - `generated_at_utc=2026-08-01T14:18:44Z`
     - `status=fail`
     - stale source digest still recorded: `80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a`
-    - promoted digest still required: `5555a5571bc12c2e92f3b79b52527564cc522bd9a9b056e94bf739ef6869c56d`
-    - missing gold-proof bundle path: `/docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-5555a5571bc1.zip`
+    - promoted digest still required: `39a1fcc3533f82a42169d4453abed67a24dd6ce08d77914224b83dfa71bbf74f`
+    - missing gold-proof bundle path: `/docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-39a1fcc3533f.zip`
   - `chummer.run-services/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json`
-    - `generated_at_utc=2026-08-01T03:01:35Z`
+    - `generated_at_utc=2026-08-01T14:19:06Z`
     - `status=waiting_for_artifact`
     - `actionable_candidate_count=0`
     - `all_discovery_roots_checked=/docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof; /tmp; ~/Downloads; ~/pCloud Drive/EA`
@@ -43,26 +43,26 @@ Updated: 2026-08-01T04:58:36+02:00
     - `stage_startup_smoke_receipt_count=0`
     - `matching_promoted_stage_startup_smoke_receipt_count=0`
   - `chummer.run-services/.state/windows_installer_gold_proof_watcher.generated.json`
-    - `generated_at_utc=2026-08-01T03:01:30Z`
+    - `generated_at_utc=2026-08-01T14:19:05Z`
     - `status=running`
-    - `pid=1620308`
+    - `pid=1951323`
     - `process_alive=True`
     - `matching_process_count=1`
     - `duplicate_process_count=0`
     - watcher sees `auto_import_receipt_status=waiting_for_artifact`
-    - watcher sees `auto_import_receipt_generated_at_utc=2026-08-01T03:01:30Z`
+    - watcher sees `auto_import_receipt_generated_at_utc=2026-08-01T14:19:05Z`
   - `chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json`
-    - `generated_at_utc=2026-08-01T03:00:59Z`
+    - `generated_at_utc=2026-08-01T14:18:36Z`
     - `release_lane_posture` now carries the exact stable promotion command and post-promotion verify chain
   - `chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json`
-    - `generated_at_utc=2026-08-01T03:00:59Z`
+    - `generated_at_utc=2026-08-01T14:18:36Z`
     - `release_lane_posture` now carries the exact stable promotion command and post-promotion verify chain
   - `chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json`
-    - `generated_at_utc=2026-08-01T03:01:33Z`
+    - `generated_at_utc=2026-08-01T14:19:07Z`
     - `status=fail`
     - `verdict=NOT_FLAGSHIP_PRODUCT_READY`
-    - `launch_critical_nested_blocker_count=69`
-    - `coverage_gap_keys=desktop_client`
+    - `launch_critical_nested_blocker_count=48`
+    - `coverage_gap_keys=none`
   - published markdown surfaces still split the hint families cleanly:
     - `RELEASE_BLOCKERS.generated.md`
     - `chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.md`
