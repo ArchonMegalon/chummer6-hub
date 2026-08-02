@@ -51,6 +51,14 @@ RELEASE_CHANNEL_BLOCKING_ROLLOUT_STATES = {
     "revoked",
     "unpublished",
 }
+RELEASE_CHANNEL_GENERIC_REVIEW_ROLLOUT_STATES = {
+    "public_release_review_required",
+    "release_review_required",
+}
+RELEASE_CHANNEL_SPECIFIC_BLOCKING_ROLLOUT_STATES = (
+    RELEASE_CHANNEL_BLOCKING_ROLLOUT_STATES
+    - RELEASE_CHANNEL_GENERIC_REVIEW_ROLLOUT_STATES
+)
 RELEASE_CHANNEL_RECOGNIZED_ROLLOUT_STATES = (
     RELEASE_CHANNEL_POSITIVE_ROLLOUT_STATES
     | RELEASE_CHANNEL_BLOCKING_ROLLOUT_STATES
@@ -519,6 +527,7 @@ def served_posture_compatibility(
     expected: dict[str, Any],
     *,
     release_channel_receipt_sha256_bound: bool = False,
+    allow_monotonic_review_blocker: bool = False,
 ) -> dict[str, Any]:
     posture = release_manifest_posture(manifest)
     served_supportability_state = release_text(
@@ -610,6 +619,30 @@ def served_posture_compatibility(
         and posture["public_trust_rollout_state"] == expected_public_trust_rollout
         and posture["registry_rollout_state"] == expected_registry_rollout
     )
+    monotonic_review_blocker_valid = bool(
+        allow_monotonic_review_blocker
+        and release_channel_receipt_sha256_bound
+        and expected_supportability_state
+        == expected_public_trust_supportability_state
+        == expected_registry_supportability_state
+        == RELEASE_CHANNEL_REVIEW_SUPPORTABILITY_STATE
+        and served_supportability_state
+        == posture["public_trust_supportability_state"]
+        == posture["registry_supportability_state"]
+        == RELEASE_CHANNEL_REVIEW_SUPPORTABILITY_STATE
+        and expected_proof_freshness_status
+        == posture["proof_freshness_status"]
+        and expected_rollout_state
+        == expected_public_trust_rollout_state
+        == expected_registry_rollout_state
+        and expected_rollout_state
+        in RELEASE_CHANNEL_GENERIC_REVIEW_ROLLOUT_STATES
+        and served_rollout_state
+        == posture["public_trust_rollout_state"]
+        == posture["registry_rollout_state"]
+        and served_rollout_state
+        in RELEASE_CHANNEL_SPECIFIC_BLOCKING_ROLLOUT_STATES
+    )
     conservative_floor_applied = bool(
         conservative_floor_valid
         and (supportability_exact is False or rollout_exact is False)
@@ -619,9 +652,14 @@ def served_posture_compatibility(
         "supportability_exact": supportability_exact,
         "rollout_exact": rollout_exact,
         "supportability_compatible": supportability_exact is not False or conservative_floor_valid,
-        "rollout_compatible": rollout_exact is not False or conservative_floor_valid,
+        "rollout_compatible": (
+            rollout_exact is not False
+            or conservative_floor_valid
+            or monotonic_review_blocker_valid
+        ),
         "conservative_review_floor_valid": conservative_floor_valid,
         "conservative_review_floor_applied": conservative_floor_applied,
+        "monotonic_review_blocker_valid": monotonic_review_blocker_valid,
         "internal_supportability_consistent": (
             served_supportability_state
             == posture["public_trust_supportability_state"]
@@ -1348,6 +1386,7 @@ def verify_public_release_manifest(
     expected: dict[str, Any],
     *,
     release_channel_receipt_sha256_bound: bool = False,
+    allow_monotonic_review_blocker: bool = False,
 ) -> tuple[dict[str, Any], list[str]]:
     failures: list[str] = []
     manifest = load_optional_json(path)
@@ -1450,6 +1489,18 @@ def verify_public_release_manifest(
         if expected_registry_rollout_state
         else None
     )
+    compatibility = served_posture_compatibility(
+        manifest,
+        expected,
+        release_channel_receipt_sha256_bound=(
+            release_channel_receipt_sha256_bound
+        ),
+        allow_monotonic_review_blocker=allow_monotonic_review_blocker,
+    )
+    rollout_compatible = compatibility["rollout_compatible"]
+    monotonic_review_blocker_valid = compatibility[
+        "monotonic_review_blocker_valid"
+    ]
 
     if status_matches is False:
         failures.append("public release manifest status does not match release channel")
@@ -1459,7 +1510,7 @@ def verify_public_release_manifest(
         failures.append("public release manifest channel does not match release channel")
     if supportability_matches is False:
         failures.append("public release manifest supportabilityState does not match release channel")
-    if rollout_matches is False:
+    if rollout_matches is False and not rollout_compatible:
         failures.append("public release manifest rolloutState does not match release channel")
     if published_at_matches is False:
         failures.append("public release manifest publishedAt does not match release channel")
@@ -1467,11 +1518,11 @@ def verify_public_release_manifest(
         failures.append("public release manifest proofFreshness.status does not match release channel")
     if public_trust_supportability_matches is False:
         failures.append("public release manifest publicTrustMetrics release-channel supportabilityState does not match release channel")
-    if public_trust_rollout_matches is False:
+    if public_trust_rollout_matches is False and not monotonic_review_blocker_valid:
         failures.append("public release manifest publicTrustMetrics release-channel rolloutState does not match release channel")
     if registry_supportability_matches is False:
         failures.append("public release manifest registryBoundaryCoverage release-channel supportabilityState does not match release channel")
-    if registry_rollout_matches is False:
+    if registry_rollout_matches is False and not monotonic_review_blocker_valid:
         failures.append("public release manifest registryBoundaryCoverage release-channel rolloutState does not match release channel")
     copy_safety, copy_failures = release_manifest_copy_safety(manifest, "public")
     failures.extend(copy_failures)
@@ -1509,6 +1560,8 @@ def verify_public_release_manifest(
         "public_release_supportability_matches_release_channel": supportability_matches,
         "public_release_rollout_state": public_rollout_state,
         "public_release_rollout_matches_release_channel": rollout_matches,
+        "public_release_rollout_compatible_with_release_channel": rollout_compatible,
+        "public_release_monotonic_review_blocker_valid": monotonic_review_blocker_valid,
         "public_release_published_at": public_posture["published_at"],
         "public_release_published_at_matches_release_channel": published_at_matches,
         "public_release_proof_freshness_status": public_posture["proof_freshness_status"],
@@ -1547,6 +1600,7 @@ def verify_live(
     expected_registry_rollout_state: str | None = None,
     expected_contract_name: str | None = None,
     release_channel_receipt_sha256_bound: bool = False,
+    allow_monotonic_review_blocker: bool = False,
 ) -> tuple[dict[str, Any], list[str]]:
     failures: list[str] = []
     downloads_status, downloads_headers, downloads_html = fetch(base_url, "/downloads", timeout)
@@ -1878,6 +1932,7 @@ def verify_live(
                 "registry_rollout_state": expected_registry_rollout_state,
             },
             release_channel_receipt_sha256_bound=release_channel_receipt_sha256_bound,
+            allow_monotonic_review_blocker=allow_monotonic_review_blocker,
         )
         release_manifest_supportability_compatible = compatibility["supportability_compatible"]
         release_manifest_rollout_compatible = compatibility["rollout_compatible"]
@@ -1937,6 +1992,7 @@ def verify_live(
             if (
                 not release_manifest_public_trust_rollout_matches
                 and not compatibility["conservative_review_floor_valid"]
+                and not compatibility["monotonic_review_blocker_valid"]
             ):
                 failures.append("/downloads RELEASE_CHANNEL publicTrustMetrics release-channel rolloutState does not match release channel")
         if expected_registry_supportability_state:
@@ -1956,6 +2012,7 @@ def verify_live(
             if (
                 not release_manifest_registry_rollout_matches
                 and not compatibility["conservative_review_floor_valid"]
+                and not compatibility["monotonic_review_blocker_valid"]
             ):
                 failures.append("/downloads RELEASE_CHANNEL registryBoundaryCoverage release-channel rolloutState does not match release channel")
         live_copy_safety, live_copy_failures = release_manifest_copy_safety(live_release_manifest, "live")
@@ -2433,6 +2490,8 @@ def summarize_checks(checks: list[dict[str, Any]]) -> dict[str, Any]:
                 "public_release_supportability_matches_release_channel": public_release_check.get("public_release_supportability_matches_release_channel"),
                 "public_release_rollout_state": public_release_check.get("public_release_rollout_state"),
                 "public_release_rollout_matches_release_channel": public_release_check.get("public_release_rollout_matches_release_channel"),
+                "public_release_rollout_compatible_with_release_channel": public_release_check.get("public_release_rollout_compatible_with_release_channel"),
+                "public_release_monotonic_review_blocker_valid": public_release_check.get("public_release_monotonic_review_blocker_valid"),
                 "public_release_published_at": public_release_check.get("public_release_published_at"),
                 "public_release_published_at_matches_release_channel": public_release_check.get("public_release_published_at_matches_release_channel"),
                 "public_release_proof_freshness_status": public_release_check.get("public_release_proof_freshness_status"),
@@ -2589,6 +2648,14 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--allow-monotonic-review-blocker",
+        action="store_true",
+        help=(
+            "Allow a SHA-256-bound generic review-required rollout to be served "
+            "as one internally consistent, recognized, more-specific blocking state."
+        ),
+    )
+    parser.add_argument(
         "--allow-unbound-release-channel",
         action="store_true",
         help=(
@@ -2674,6 +2741,7 @@ def main(argv: list[str] | None = None) -> int:
             release_channel_receipt_sha256_bound=(
                 release_channel_receipt_sha256_bound
             ),
+            allow_monotonic_review_blocker=args.allow_monotonic_review_blocker,
         )
         checks.append(public_release_result)
         failures.extend(public_release_failures)
@@ -2697,6 +2765,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_registry_rollout_state=release_expectations.get("registry_rollout_state", ""),
                 expected_contract_name=release_expectations.get("contract_name", ""),
                 release_channel_receipt_sha256_bound=release_channel_receipt_sha256_bound,
+                allow_monotonic_review_blocker=args.allow_monotonic_review_blocker,
             )
         except RuntimeError as exc:
             live_result = {

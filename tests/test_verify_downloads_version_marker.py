@@ -1296,6 +1296,28 @@ def test_summary_promotes_source_and_live_fields_for_handoff_receipts() -> None:
     assert summary["status_redirect_version"] == "Version run-20260630"
 
 
+def test_summary_promotes_public_release_monotonic_blocker_authority() -> None:
+    module = load_module()
+
+    summary = module.summarize_checks(
+        [
+            {
+                "mode": "source",
+            },
+            {
+                "mode": "public_release_manifest",
+                "public_release_rollout_matches_release_channel": False,
+                "public_release_rollout_compatible_with_release_channel": True,
+                "public_release_monotonic_review_blocker_valid": True,
+            },
+        ]
+    )
+
+    assert summary["public_release_rollout_matches_release_channel"] is False
+    assert summary["public_release_rollout_compatible_with_release_channel"] is True
+    assert summary["public_release_monotonic_review_blocker_valid"] is True
+
+
 def test_downloads_version_marker_exposes_stable_receipt_contract() -> None:
     module = load_module()
 
@@ -2644,6 +2666,69 @@ def test_conservative_review_floor_preserves_recognized_blockers_and_rejects_unk
     assert compatibility["conservative_review_floor_valid"] is False
     assert compatibility["supportability_compatible"] is False
     assert compatibility["effective_review_rollout_state"] == ""
+
+
+def test_monotonic_review_blocker_is_opt_in_and_rejects_unknown_or_optimistic_states() -> None:
+    module = load_module()
+
+    def posture(rollout_state: str) -> dict[str, Any]:
+        return {
+            "supportabilityState": "review_required",
+            "rolloutState": rollout_state,
+            "publicTrustMetrics": {
+                "proofFreshness": {"status": "stale"},
+                "releaseChannel": {
+                    "supportabilityState": "review_required",
+                    "rolloutState": rollout_state,
+                },
+            },
+            "registryBoundaryCoverage": {
+                "releaseChannel": {
+                    "supportabilityState": "review_required",
+                    "rolloutState": rollout_state,
+                },
+            },
+        }
+
+    expected = {
+        "supportability_state": "review_required",
+        "rollout_state": "public_release_review_required",
+        "proof_freshness_status": "stale",
+        "public_trust_supportability_state": "review_required",
+        "public_trust_rollout_state": "public_release_review_required",
+        "registry_supportability_state": "review_required",
+        "registry_rollout_state": "public_release_review_required",
+    }
+    strict = module.served_posture_compatibility(
+        posture("coverage_incomplete"),
+        expected,
+        release_channel_receipt_sha256_bound=True,
+    )
+    monotonic = module.served_posture_compatibility(
+        posture("coverage_incomplete"),
+        expected,
+        release_channel_receipt_sha256_bound=True,
+        allow_monotonic_review_blocker=True,
+    )
+    optimistic = module.served_posture_compatibility(
+        posture("public_stable"),
+        expected,
+        release_channel_receipt_sha256_bound=True,
+        allow_monotonic_review_blocker=True,
+    )
+    unknown = module.served_posture_compatibility(
+        posture("future_unreviewed_state"),
+        expected,
+        release_channel_receipt_sha256_bound=True,
+        allow_monotonic_review_blocker=True,
+    )
+
+    assert strict["rollout_compatible"] is False
+    assert strict["monotonic_review_blocker_valid"] is False
+    assert monotonic["rollout_compatible"] is True
+    assert monotonic["monotonic_review_blocker_valid"] is True
+    assert optimistic["rollout_compatible"] is False
+    assert unknown["rollout_compatible"] is False
 
 
 def test_sha_bound_static_public_manifest_requires_authority_identity_and_consistent_aliases(

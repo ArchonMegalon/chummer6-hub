@@ -36,6 +36,18 @@ SURFACE_PROFILES = {
     SURFACE_PROFILE_FLAGSHIP,
     SURFACE_PROFILE_PUBLIC_DOWNLOAD,
 }
+GENERIC_REVIEW_ROLLOUT_STATES = {
+    "public_release_review_required",
+    "release_review_required",
+}
+SPECIFIC_BLOCKING_ROLLOUT_STATES = {
+    "blocked",
+    "coverage_incomplete",
+    "desktop_polish_needed",
+    "disabled",
+    "revoked",
+    "unpublished",
+}
 
 def truthy_env(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
@@ -789,7 +801,12 @@ def downloads_under_review(payload: dict[str, Any], artifact_available: bool) ->
     )
 
 
-def release_posture_expected_failures(payload: dict[str, Any], expected: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+def release_posture_expected_failures(
+    payload: dict[str, Any],
+    expected: dict[str, Any],
+    *,
+    surface_profile: str = SURFACE_PROFILE_FLAGSHIP,
+) -> tuple[dict[str, Any], list[str]]:
     if not expected:
         return {}, []
 
@@ -804,6 +821,13 @@ def release_posture_expected_failures(payload: dict[str, Any], expected: dict[st
     expected_supportability = first_text(expected, "supportabilityState", "supportability_state")
     expected_rollout = first_text(expected, "rolloutState", "rollout_state")
 
+    rollout_matches = live_rollout == expected_rollout if expected_rollout else None
+    monotonic_review_blocker_valid = bool(
+        surface_profile == SURFACE_PROFILE_PUBLIC_DOWNLOAD
+        and expected_supportability == live_supportability == "review_required"
+        and expected_rollout in GENERIC_REVIEW_ROLLOUT_STATES
+        and live_rollout in SPECIFIC_BLOCKING_ROLLOUT_STATES
+    )
     fields = {
         "expected_status": expected_status,
         "expected_version": expected_version,
@@ -814,7 +838,11 @@ def release_posture_expected_failures(payload: dict[str, Any], expected: dict[st
         "version_matches_expected": live_version == expected_version if expected_version else None,
         "channel_matches_expected": live_channel == expected_channel if expected_channel else None,
         "supportability_matches_expected": live_supportability == expected_supportability if expected_supportability else None,
-        "rollout_matches_expected": live_rollout == expected_rollout if expected_rollout else None,
+        "rollout_matches_expected": rollout_matches,
+        "rollout_compatible_with_expected": (
+            rollout_matches is not False or monotonic_review_blocker_valid
+        ),
+        "monotonic_review_blocker_valid": monotonic_review_blocker_valid,
     }
     failures: list[str] = []
     for key, label in (
@@ -831,10 +859,13 @@ def release_posture_expected_failures(payload: dict[str, Any], expected: dict[st
         ("version_matches_expected", "version"),
         ("channel_matches_expected", "channel"),
         ("supportability_matches_expected", "supportabilityState"),
-        ("rollout_matches_expected", "rolloutState"),
     ):
         if fields[key] is False:
             failures.append(f"live release manifest {label} does not match expected release channel")
+    if fields["rollout_compatible_with_expected"] is False:
+        failures.append(
+            "live release manifest rolloutState does not match expected release channel"
+        )
     return fields, failures
 
 
@@ -842,6 +873,8 @@ def load_release_posture(
     base_url: str,
     expected_release_channel: dict[str, Any] | None = None,
     deadline_monotonic: float | None = None,
+    *,
+    surface_profile: str = SURFACE_PROFILE_FLAGSHIP,
 ) -> dict[str, Any]:
     manifest_url = urllib.parse.urljoin(f"{base_url.rstrip('/')}/", "downloads/RELEASE_CHANNEL.generated.json")
     if deadline_monotonic is None:
@@ -876,7 +909,11 @@ def load_release_posture(
         installer_available = public_installer_available(payload)
         artifact_available = public_download_artifact_available(payload)
         under_review = downloads_under_review(payload, artifact_available)
-    expected_fields, expected_failures = release_posture_expected_failures(payload, expected_release_channel or {})
+    expected_fields, expected_failures = release_posture_expected_failures(
+        payload,
+        expected_release_channel or {},
+        surface_profile=surface_profile,
+    )
 
     return {
         "url": manifest_url,
@@ -923,12 +960,17 @@ def verify(
     require_brilliant_directories_checkout = truthy_env("CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT") or is_public_chummer_run_base(base_origin)
     expected_release_channel = load_optional_json(release_channel_receipt)
     if deadline_monotonic is None:
-        release_posture = load_release_posture(base, expected_release_channel)
+        release_posture = load_release_posture(
+            base,
+            expected_release_channel,
+            surface_profile=surface_profile,
+        )
     else:
         release_posture = load_release_posture(
             base,
             expected_release_channel,
             deadline_monotonic,
+            surface_profile=surface_profile,
         )
     if surface_profile == SURFACE_PROFILE_PUBLIC_DOWNLOAD:
         surfaces = build_public_download_surfaces(

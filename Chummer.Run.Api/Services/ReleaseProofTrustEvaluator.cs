@@ -42,25 +42,48 @@ internal static partial class ReleaseProofTrustEvaluator
     private const int FlagshipReadinessMaxBlockers = 128;
     private const int FlagshipReadinessMaxCoverageGaps = 128;
 
-    private static readonly string[] RequiredJourneys =
+    private static readonly string[][] KnownJourneyContracts =
     [
-        "install_claim_restore_continue",
-        "build_explain_publish",
-        "campaign_session_recover_recap",
-        "report_cluster_release_notify",
-        "organize_community_and_close_loop"
+        [
+            "install_claim_restore_continue",
+            "build_explain_publish",
+            "campaign_session_recover_recap",
+            "report_cluster_release_notify",
+            "organize_community_and_close_loop"
+        ],
+        [
+            "install_claim_restore_continue",
+            "build_explain_publish",
+            "campaign_session_recover_recap",
+            "recover_from_sync_conflict",
+            "report_cluster_release_notify",
+            "organize_community_and_close_loop"
+        ]
     ];
 
-    private static readonly string[] RequiredRoutePrefix =
+    private static readonly string[][] KnownRoutePrefixes =
     [
-        "/downloads/install/avalonia-linux-x64-installer",
-        "/home/access",
-        "/home/work",
-        "/account/access",
-        "/account/work",
-        "/account/support",
-        "/contact",
-        "/downloads"
+        [
+            "/downloads/install/avalonia-linux-x64-installer",
+            "/home/access",
+            "/home/work",
+            "/account/access",
+            "/account/work",
+            "/account/support",
+            "/contact",
+            "/downloads"
+        ],
+        [
+            "/downloads/install/avalonia-linux-x64-installer",
+            "/home/access",
+            "/home/work",
+            "/account/access",
+            "/account/work",
+            "/account/roster",
+            "/account/support",
+            "/contact",
+            "/downloads"
+        ]
     ];
 
     private static readonly string[] RequiredShippingLocales =
@@ -172,7 +195,10 @@ internal static partial class ReleaseProofTrustEvaluator
             return Invalid("releaseProof baseUrl is not an allowed canonical release origin");
         }
 
-        if (!ReadExactStringArray(releaseProof["journeysPassed"], RequiredJourneys, out _))
+        if (!ReadKnownExactStringArray(
+                releaseProof["journeysPassed"],
+                KnownJourneyContracts,
+                out _))
         {
             return Invalid("releaseProof journeysPassed does not match the canonical ordered journey contract");
         }
@@ -229,30 +255,20 @@ internal static partial class ReleaseProofTrustEvaluator
 
     private static bool ValidateProofRoutes(JsonNode? node)
     {
-        if (node is not JsonArray routes || routes.Count < RequiredRoutePrefix.Length)
+        if (!ReadCanonicalStringList(node, out IReadOnlyList<string> values))
         {
             return false;
         }
 
-        List<string> values = [];
-        foreach (JsonNode? route in routes)
-        {
-            string? value = GetString(route);
-            if (string.IsNullOrWhiteSpace(value) || value != value.Trim())
-            {
-                return false;
-            }
-
-            values.Add(value);
-        }
-
-        if (values.Distinct(StringComparer.Ordinal).Count() != values.Count
-            || !values.Take(RequiredRoutePrefix.Length).SequenceEqual(RequiredRoutePrefix, StringComparer.Ordinal))
+        IReadOnlyList<string>? matchedPrefix = KnownRoutePrefixes.FirstOrDefault(
+            prefix => values.Count >= prefix.Length
+                      && values.Take(prefix.Length).SequenceEqual(prefix, StringComparer.Ordinal));
+        if (matchedPrefix is null)
         {
             return false;
         }
 
-        string[] extensions = values.Skip(RequiredRoutePrefix.Length).ToArray();
+        string[] extensions = values.Skip(matchedPrefix.Count).ToArray();
         return extensions.All(static route => ArtifactInstallRouteRegex().IsMatch(route))
                && extensions.SequenceEqual(extensions.Order(StringComparer.Ordinal), StringComparer.Ordinal);
     }
@@ -660,6 +676,22 @@ internal static partial class ReleaseProofTrustEvaluator
         }
 
         return values.SequenceEqual(expected, StringComparer.Ordinal);
+    }
+
+    private static bool ReadKnownExactStringArray(
+        JsonNode? node,
+        IReadOnlyList<string[]> knownContracts,
+        out IReadOnlyList<string> values)
+    {
+        values = [];
+        if (!ReadCanonicalStringList(node, out values))
+        {
+            return false;
+        }
+
+        IReadOnlyList<string> canonicalValues = values;
+        return knownContracts.Any(
+            contract => canonicalValues.SequenceEqual(contract, StringComparer.Ordinal));
     }
 
     private static bool ReadCanonicalStringList(JsonNode? node, out IReadOnlyList<string> values)

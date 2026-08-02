@@ -4102,8 +4102,8 @@ trusted_source_python "$SOURCE_ROOT/scripts/publish_public_edge_portal_overlay.p
   --downloads-source-root "$CANONICAL_RELEASE_SHELF_ROOT" \
   --playwright-authority "$PLAYWRIGHT_AUTHORITY" \
   --playwright-authority-sha256 "$PLAYWRIGHT_AUTHORITY_SHA256" \
-  --surface-profile flagship \
-  --delivery-phase flagship \
+  --surface-profile public-download \
+  --delivery-phase windows-preview \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$OVERLAY_STAGE_OUTPUT"
@@ -5703,8 +5703,8 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/publish_public_edge_portal_over
   --downloads-source-root "$CANONICAL_RELEASE_SHELF_ROOT" \
   --playwright-authority "$PLAYWRIGHT_AUTHORITY" \
   --playwright-authority-sha256 "$PLAYWRIGHT_AUTHORITY_SHA256" \
-  --surface-profile flagship \
-  --delivery-phase flagship \
+  --surface-profile public-download \
+  --delivery-phase windows-preview \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$OVERLAY_ACTIVATION_OUTPUT"; then
