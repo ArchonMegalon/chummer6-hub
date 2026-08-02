@@ -94,18 +94,23 @@ The database-administration boundary is evidence, not application deployment orc
    seeded, internally consistent authority; it records the authority state digest, generation, and
    commit count without exposing the protected envelope. The separate `prove-empty-authority`
    command remains mandatory for `import-local --confirm-empty-authority` and is never weakened.
-   Then run the non-mutating local-store presence probe. The flagship isolated-v2 Data Protection
-   cutover requires that probe to prove no local store exists and the boundary to record the
-   `import_skipped_no_local_store` phase. Its accepted receipt must contain
-   `importSkippedNoLocalStore=true` and `localStorePresentAtCutover=false`. If a local store exists,
-   stop: a legacy snapshot cannot be imported with the new v2 ring through the flagship lane.
+   For an empty generation-0 authority, the strict `prove-local-store-absent` proof remains
+   mandatory before an explicit import decision; never overwrite retained local state into an
+   empty authority implicitly. For a seeded authority, run the metadata-only
+   `prove-local-store-state` job. It records only whether the canonical store, floor, or import
+   intent exists and rejects symlinks, reparse points, or unsafe path shapes without reading
+   protected contents. The boundary records `import_not_required_seeded_authority`,
+   `importNotRequiredSeededAuthority=true`, and the observed `localStorePresentAtCutover` value.
+   Candidate startup validates PostgreSQL first, rejects any local generation that leads the
+   authoritative head, and replaces a missing, stale, or damaged mirror only with the exact
+   validated authoritative bytes.
 3. Run `validate` after prepare/import and retain its bounded operator receipt. Preserve the
    append-only phase journal, exact portal/tool image identities, operator container identities, and
    source/release/runtime-proof authority bindings.
 4. Materialize the boundary with
    `scripts/materialize_install_linking_cutover_boundary.py`. Public acceptance fails closed unless
-   the explicit no-local-store checkpoint is present and records
-   `dataProtectionKeyRingPosture=isolated_v2_requires_no_legacy_import`. The tool records the
+   the explicit seeded-authority checkpoint is present and records
+   `dataProtectionKeyRingPosture=postgres_seeded_replaces_validated_local_mirror`. The tool records the
    governed DBA result; it is not a shell cutover shortcut and does not authorize direct Compose
    mutation.
 5. Do not begin the application deployment until the boundary receipt is complete and independently

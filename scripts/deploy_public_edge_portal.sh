@@ -4788,10 +4788,10 @@ else:
         raise SystemExit(1)
     job_name = container_name[len(prefix):]
     if (
-        job_name != "prove-local-store-absent"
+        job_name != "prove-local-store-state"
         and re.fullmatch(
             r"postquiesce-[a-z0-9][a-z0-9-]{7,31}-"
-            r"prove-local-store-absent",
+            r"prove-local-store-state",
             job_name,
         )
         is None
@@ -5101,7 +5101,7 @@ additions = [
     if identifier not in before_by_id
 ]
 attempt_id = before.get("attemptId")
-expected_job = f"postquiesce-{attempt_id}-prove-local-store-absent"
+expected_job = f"postquiesce-{attempt_id}-prove-local-store-state"
 if (
     len(additions) != 1
     or additions[0].get("classification")
@@ -5574,8 +5574,8 @@ if ! INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY_SHA256="$(
 fi
 
 # With the incumbent portal and both canonical tunnel connectors quiesced,
-# repeat the no-local-store,
-# remote generation-zero, and runtime-role proofs from the exact retained
+# repeat the metadata-only local-state, seeded-authority, and runtime-role
+# proofs from the exact retained
 # candidate tool image. The runner inherits this wrapper's canonical mutation
 # lease and preserves every job container/receipt on ambiguous outcomes.
 postquiesce_status=0

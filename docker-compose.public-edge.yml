@@ -740,8 +740,8 @@ services:
     networks:
       public-origin: {}
 
-  # Existence-only local import-source proof. The state volume is read-only and this service has
-  # no network or credential mounts; it cannot decrypt, import, or contact PostgreSQL.
+  # Metadata-only local state proof. The state volume is read-only and this service has no network
+  # or credential mounts; it cannot decrypt, import, or contact PostgreSQL.
   chummer-install-linking-postgres-import-presence-proof:
     image: chummer-install-linking-postgres-tool:local
     profiles: ["install-linking-postgres-admin"]
@@ -774,7 +774,7 @@ services:
       CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
     volumes:
       - chummer-run-api-state:/app/state:ro
-    command: ["prove-local-store-absent"]
+    command: ["prove-local-store-state"]
     network_mode: "none"
 
   chummer-install-linking-postgres-import:

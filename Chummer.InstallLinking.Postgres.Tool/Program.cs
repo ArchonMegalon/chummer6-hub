@@ -19,7 +19,8 @@ if (!HasValidArguments(args))
         + "<migrate|validate|grant-runtime|prepare> [runtime-role], "
         + "transport-proof, prove-authority-ready [runtime-role], "
         + "prove-empty-authority [runtime-role], "
-        + "prove-runtime-role [runtime-role], prove-local-store-absent, "
+        + "prove-runtime-role [runtime-role], prove-local-store-state, "
+        + "prove-local-store-absent, "
         + "or import-local --confirm-empty-authority");
     return 64;
 }
@@ -32,6 +33,11 @@ if (args[0] == "import-local")
 if (args[0] == "prove-local-store-absent")
 {
     return ProveLocalStoreAbsent();
+}
+
+if (args[0] == "prove-local-store-state")
+{
+    return ProveLocalStoreState();
 }
 
 string? runtimeRole = null;
@@ -176,6 +182,7 @@ static bool HasValidArguments(string[] values)
     {
         ["migrate" or "validate"] => true,
         ["transport-proof"] => true,
+        ["prove-local-store-state"] => true,
         ["prove-local-store-absent"] => true,
         ["grant-runtime" or "prepare"] => true,
         ["grant-runtime" or "prepare", _] => true,
@@ -378,6 +385,77 @@ static int ProveLocalStoreAbsent()
     {
         Console.Error.WriteLine(
             $"InstallLinking local-store absence proof failed ({exception.GetType().Name}).");
+        return 1;
+    }
+}
+
+static int ProveLocalStoreState()
+{
+    try
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddEnvironmentVariables()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = Environments.Production
+            })
+            .Build();
+        string storagePath = InstallLinkingStore.ResolveStoragePath(configuration);
+        if (!string.Equals(
+                storagePath,
+                InstallLinkingLocalStoreAbsenceProof.CanonicalStorePath,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "InstallLinking local-store state proof requires the canonical state path.");
+        }
+
+        string[] paths =
+        [
+            storagePath,
+            $"{storagePath}.floor",
+            $"{storagePath}.postgres-import.intent"
+        ];
+        int presentPathCount = 0;
+        foreach (string path in paths)
+        {
+            InstallLinkingLocalStoreEntryState state =
+                InstallLinkingLocalStoreAbsenceProof
+                    .InspectRetainedEntry(path);
+            if (state == InstallLinkingLocalStoreEntryState.Unsafe)
+            {
+                Console.Error.WriteLine(
+                    "InstallLinking local-store state proof found an unsafe path.");
+                return 1;
+            }
+
+            if (state == InstallLinkingLocalStoreEntryState.Present)
+            {
+                presentPathCount++;
+            }
+        }
+
+        WriteCanonicalJson(
+            new SortedDictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["checkedPathCount"] = paths.Length,
+                ["contractName"] =
+                    "chummer.install_linking_local_store_state_proof.v1",
+                ["localStorePresent"] = presentPathCount > 0,
+                ["presentPathCount"] = presentPathCount,
+                ["status"] = "pass"
+            });
+        return 0;
+    }
+    catch (Exception exception) when (
+        exception is InvalidOperationException
+            or ArgumentException
+            or IOException
+            or UnauthorizedAccessException
+            or NotSupportedException)
+    {
+        Console.Error.WriteLine(
+            $"InstallLinking local-store state proof failed ({exception.GetType().Name}).");
         return 1;
     }
 }

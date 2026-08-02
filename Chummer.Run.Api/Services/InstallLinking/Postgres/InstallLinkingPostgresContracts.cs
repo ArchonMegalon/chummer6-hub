@@ -412,6 +412,13 @@ public static class InstallLinkingPostgresAuthorityIdentity
     }
 }
 
+public enum InstallLinkingLocalStoreEntryState
+{
+    Absent,
+    Present,
+    Unsafe
+}
+
 public static class InstallLinkingLocalStoreAbsenceProof
 {
     public const string TrustedStateRoot = "/app/state";
@@ -419,6 +426,12 @@ public static class InstallLinkingLocalStoreAbsenceProof
         "/app/state/install-linking/install-linking-store.json";
 
     public static bool HasRetainedEntryOrUnsafeAncestor(
+        string path,
+        string trustedRoot = TrustedStateRoot)
+        => InspectRetainedEntry(path, trustedRoot)
+            != InstallLinkingLocalStoreEntryState.Absent;
+
+    public static InstallLinkingLocalStoreEntryState InspectRetainedEntry(
         string path,
         string trustedRoot = TrustedStateRoot)
     {
@@ -445,7 +458,7 @@ public static class InstallLinkingLocalStoreAbsenceProof
             current = Path.Combine(current, components[index]);
             if (IsSymbolicLink(current))
             {
-                return true;
+                return InstallLinkingLocalStoreEntryState.Unsafe;
             }
 
             FileAttributes attributes;
@@ -455,31 +468,33 @@ public static class InstallLinkingLocalStoreAbsenceProof
             }
             catch (FileNotFoundException)
             {
-                return false;
+                return InstallLinkingLocalStoreEntryState.Absent;
             }
             catch (DirectoryNotFoundException)
             {
-                return false;
+                return InstallLinkingLocalStoreEntryState.Absent;
             }
 
             if ((attributes & FileAttributes.ReparsePoint) != 0)
             {
-                return true;
+                return InstallLinkingLocalStoreEntryState.Unsafe;
             }
 
             bool final = index == components.Length - 1;
             if (final)
             {
-                return true;
+                return (attributes & FileAttributes.Directory) == 0
+                    ? InstallLinkingLocalStoreEntryState.Present
+                    : InstallLinkingLocalStoreEntryState.Unsafe;
             }
 
             if ((attributes & FileAttributes.Directory) == 0)
             {
-                return true;
+                return InstallLinkingLocalStoreEntryState.Unsafe;
             }
         }
 
-        return false;
+        return InstallLinkingLocalStoreEntryState.Absent;
     }
 
     private static bool IsSymbolicLink(string path)

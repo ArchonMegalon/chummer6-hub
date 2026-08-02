@@ -206,7 +206,12 @@ def verify_boundary(
         or receipt.get("validateCompleted") is not True
         or receipt.get("publicAcceptanceCompleted")
         is not expected_public_acceptance
-        or receipt.get("importDisposition") != "skipped_no_local_store"
+        or receipt.get("importDisposition")
+        != "not_required_seeded_authority"
+        or receipt.get("importNotRequiredSeededAuthority") is not True
+        or type(receipt.get("localStorePresentAtCutover")) is not bool
+        or receipt.get("dataProtectionKeyRingPosture")
+        != "postgres_seeded_replaces_validated_local_mirror"
     ):
         raise ValueError("cutover boundary is not the complete predeploy checkpoint")
     build_info_path = Path(str(receipt.get("activeBuildInfoPath") or ""))

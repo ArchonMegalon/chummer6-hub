@@ -1025,7 +1025,7 @@ case "$*" in
     ;;
   "container inspect --format {{json .Id}}"*" $FAKE_POSTQUIESCE_PROOF_CONTAINER_ID")
     attempt="$(/usr/bin/cat "$FAKE_POSTQUIESCE_COMPLETED_STATE")"
-    job_name="postquiesce-${attempt}-prove-local-store-absent"
+    job_name="postquiesce-${attempt}-prove-local-store-state"
     job_hash="$(printf '%s' "$job_name" | /usr/bin/sha256sum | /usr/bin/awk '{print substr($1,1,12)}')"
     project_prefix="$(printf '%s' "$FAKE_CUTOVER_NAME_SUFFIX" | /usr/bin/cut -c1-16)"
     container_name="chummer-install-linking-cutover-${FAKE_CUTOVER_NAME_SUFFIX}-${job_name}"

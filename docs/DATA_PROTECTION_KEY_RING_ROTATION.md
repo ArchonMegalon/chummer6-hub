@@ -48,10 +48,11 @@ receipts.
 Changing the ring invalidates values protected with the old ring even though the old files remain
 available for incumbent rollback:
 
-- InstallLinking protected snapshots/floors require the matching ring. For this release, the local
-  store and floor must be absent. The predeploy import job already selects the empty v2 ring and
-  therefore cannot decrypt a legacy local snapshot. If the presence probe finds one, stop the
-  release; a separately reviewed dual-ring migration is required.
+- InstallLinking protected snapshots/floors require the matching ring. PostgreSQL is authoritative
+  for a seeded cutover: candidate startup validates and decrypts the PostgreSQL envelope before it
+  evaluates the local mirror, rejects a parseable local generation that leads PostgreSQL, and then
+  replaces a missing, stale, or damaged mirror with exact authoritative bytes. An empty authority
+  still requires the strict absence proof and an explicit import decision.
 - Campaign invite-creation idempotency replays can fail closed until their 30-day lifetime plus
   7-day retention expires. Already issued invite redemption hashes do not use Data Protection.
 - Play-authorization idempotency retries can fail closed until their 30-day ciphertext receipts
@@ -70,9 +71,10 @@ environment file; do not extract, print, or duplicate it into deployment receipt
    `chummer-portal` and `chummer-install-linking-postgres-import` resolve
    `CHUMMER_DATA_PROTECTION_KEYS_PATH=/app/state/data-protection-keys-v2`.
    The InstallLinking boundary receipt must reach public acceptance with
-   `importSkippedNoLocalStore=true`, `localStorePresentAtCutover=false`, and
-   `dataProtectionKeyRingPosture=isolated_v2_requires_no_legacy_import`; the materializer rejects
-   any imported-local-store acceptance.
+   `importNotRequiredSeededAuthority=true`, a boolean `localStorePresentAtCutover`, and
+   `dataProtectionKeyRingPosture=postgres_seeded_replaces_validated_local_mirror`; the materializer
+   rejects an empty authority, unsafe local paths, authority drift, or post-quiesce local-state
+   drift.
 2. Use only `scripts/deploy_public_edge_portal.sh`. Its shared mutation lease, durable journal,
    blue/green candidate, readiness gate, browser-backed postdeploy proof, promotion, and recovery
    remain the sole production deployment transaction.

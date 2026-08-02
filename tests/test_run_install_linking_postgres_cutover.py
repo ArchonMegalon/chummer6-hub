@@ -1565,7 +1565,7 @@ def test_local_store_proof_rejects_decoy_and_accepts_compose_none_network(
 
     runner = make_runner(module, tmp_path, FakeCommands(callback))
     service = "chummer-install-linking-postgres-import-presence-proof"
-    job_name = "prove-local-store-absent"
+    job_name = "prove-local-store-state"
     project = runner._job_project(job_name)
     canonical_store = "/app/state/install-linking/install-linking-store.json"
     runner.expected_mount_source_sha256[service] = {
@@ -1581,7 +1581,7 @@ def test_local_store_proof_rejects_decoy_and_accepts_compose_none_network(
     )
     payload_holder["payload"] = {
         "Config": {
-            "Cmd": ["prove-local-store-absent"],
+            "Cmd": ["prove-local-store-state"],
             "Env": [
                 f"CHUMMER_CUTOVER_SECRET_CANARY={runner.secret_canary}",
                 (
@@ -1631,7 +1631,7 @@ def test_local_store_proof_rejects_decoy_and_accepts_compose_none_network(
             container_name=str(payload_holder["payload"]["Name"])[1:],
             service=service,
             project=project,
-            command=["prove-local-store-absent"],
+            command=["prove-local-store-state"],
         )
 
     payload_holder["payload"]["Config"]["Env"][1] = (
@@ -1644,7 +1644,7 @@ def test_local_store_proof_rejects_decoy_and_accepts_compose_none_network(
         container_name=str(payload_holder["payload"]["Name"])[1:],
         service=service,
         project=project,
-        command=["prove-local-store-absent"],
+        command=["prove-local-store-state"],
     )
 
     assert container_id == CONTAINER_ID
@@ -1662,7 +1662,7 @@ def test_local_store_proof_rejects_decoy_and_accepts_compose_none_network(
             container_name=str(payload_holder["payload"]["Name"])[1:],
             service=service,
             project=project,
-            command=["prove-local-store-absent"],
+            command=["prove-local-store-state"],
         )
 
 

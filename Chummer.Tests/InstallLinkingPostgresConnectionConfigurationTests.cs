@@ -409,6 +409,63 @@ public sealed class InstallLinkingPostgresConnectionConfigurationTests
         }
     }
 
+    [Fact]
+    public void Local_state_proof_distinguishes_absent_and_present_files()
+    {
+        string root = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            $"install-linking-state-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            string parent = System.IO.Path.Combine(root, "install-linking");
+            string store = System.IO.Path.Combine(parent, "store.json");
+
+            Assert.Equal(
+                InstallLinkingLocalStoreEntryState.Absent,
+                InstallLinkingLocalStoreAbsenceProof
+                    .InspectRetainedEntry(store, root));
+
+            Directory.CreateDirectory(parent);
+            File.WriteAllText(store, "retained");
+
+            Assert.Equal(
+                InstallLinkingLocalStoreEntryState.Present,
+                InstallLinkingLocalStoreAbsenceProof
+                    .InspectRetainedEntry(store, root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Local_state_proof_rejects_a_directory_at_the_store_path()
+    {
+        string root = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            $"install-linking-state-unsafe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            string store = System.IO.Path.Combine(
+                root,
+                "install-linking",
+                "store.json");
+            Directory.CreateDirectory(store);
+
+            Assert.Equal(
+                InstallLinkingLocalStoreEntryState.Unsafe,
+                InstallLinkingLocalStoreAbsenceProof
+                    .InspectRetainedEntry(store, root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static IConfiguration Configuration(
         params (string Key, string? Value)[] values)
     {
