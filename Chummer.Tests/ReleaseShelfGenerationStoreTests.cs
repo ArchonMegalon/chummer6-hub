@@ -1730,6 +1730,14 @@ public sealed class ReleaseShelfGenerationStoreTests
                     };
                     manifest["desktopTupleCoverage"] = new Dictionary<string, object?>
                     {
+                        ["externalProofRequests"] = new object[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["expectedPublicInstallRoute"] =
+                                    "/downloads/install/missing-installer"
+                            }
+                        },
                         ["desktopRouteTruth"] = new object[]
                         {
                             new Dictionary<string, object?> { ["publicInstallRoute"] = route },

@@ -1918,6 +1918,10 @@ public sealed class ReleaseShelfGenerationStore
                   && path[1] == "desktopRouteTruth"
                   && path[2] == "[]"
                   && path[3] == "publicInstallRoute")
+                 || (path[0] == "desktopTupleCoverage"
+                     && path[1] == "externalProofRequests"
+                     && path[2] == "[]"
+                     && path[3] == "expectedPublicInstallRoute")
                  || (path[0] == "installAwareArtifactRegistry"
                      && path[1] == "[]"
                      && path[2] == "recoveryProofRefs"
