@@ -234,6 +234,7 @@ PUBLIC_DOWNLOAD_OPERATION_ID="${CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID-}"
 PUBLIC_DOWNLOAD_OPERATION_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/chummer-public-download-$PUBLIC_DOWNLOAD_OPERATION_ID"
 PUBLIC_DOWNLOAD_OPERATION_JOURNAL="$CANONICAL_DEPLOY_RECEIPT_ROOT/chummer-public-download-$PUBLIC_DOWNLOAD_OPERATION_ID.operation.json"
 PUBLIC_DOWNLOAD_CONTROLLER="$SOURCE_ROOT/scripts/deploy_public_download_only_cutover.py"
+PLAYWRIGHT_AUTHORITY_PREPARER="$SOURCE_ROOT/scripts/prepare_operation_playwright_authority.py"
 CANONICAL_RELEASE_SHELF_ROOT="/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
 CUTOVER_RECOVERY_REEXEC=0
 CUTOVER_STEADY_HANDOFF=0
@@ -2795,6 +2796,9 @@ OVERLAY_ACTIVE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/active-overlay-preflight.js
 OVERLAY_POSTRECREATE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/postrecreate-overlay-preflight.json"
 PREACTIVATION_COMPOSE_ATTESTATION_OUTPUT="$DEPLOY_RECEIPT_DIR/preactivation-compose-runtime-attestation.json"
 DEPLOY_RECOVERY_OUTPUT="$DEPLOY_RECEIPT_DIR/deploy-recovery.json"
+PUBLIC_EDGE_HOST_BUILD_ROOT="$DEPLOY_RECEIPT_DIR/host-build"
+PLAYWRIGHT_AUTHORITY="$PUBLIC_EDGE_HOST_BUILD_ROOT/playwright-authority.json"
+PLAYWRIGHT_AUTHORITY_PREPARATION="$DEPLOY_RECEIPT_DIR/playwright-authority-preparation.json"
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 0)); then
   RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT="$DEPLOY_RECEIPT_DIR/release-upload-ticket-epoch-rotation.json"
 fi
@@ -2856,7 +2860,8 @@ if ((RECOVERY_ROUTE_REQUESTED == 0)); then
   for cutover_authority in \
     "$INSTALL_LINKING_CUTOVER_VERIFIER" \
     "$INSTALL_LINKING_CUTOVER_RUNNER" \
-    "$INSTALL_LINKING_CUTOVER_MATERIALIZER"; do
+    "$INSTALL_LINKING_CUTOVER_MATERIALIZER" \
+    "$PLAYWRIGHT_AUTHORITY_PREPARER"; do
     if [[ ! -f "$cutover_authority" || -L "$cutover_authority" \
       || ! -O "$cutover_authority" \
       || "$("$TRUSTED_STAT" -c '%h' -- "$cutover_authority")" != 1 ]]; then
@@ -2871,6 +2876,7 @@ if ((RECOVERY_ROUTE_REQUESTED == 0)); then
     fi
   done
 fi
+
 COMPOSE_SOURCE_ATTESTOR="$SOURCE_ROOT/scripts/attest_public_edge_compose_source.py"
 if [[ ! -f "$COMPOSE_SOURCE_ATTESTOR" || -L "$COMPOSE_SOURCE_ATTESTOR" \
   || ! -O "$COMPOSE_SOURCE_ATTESTOR" \
@@ -4068,12 +4074,36 @@ fi
 # Materialize and locally verify the replacement bind-mounted payload before either
 # the image tag or live runtime is touched. The independent release-receipt digest
 # binds both this staging pass and the later reuse-only activation pass.
+"$TRUSTED_INSTALL" -d -m 0700 -- "$PUBLIC_EDGE_HOST_BUILD_ROOT"
+trusted_source_python "$PLAYWRIGHT_AUTHORITY_PREPARER" \
+  --host-build-root "$PUBLIC_EDGE_HOST_BUILD_ROOT" \
+  --output "$PLAYWRIGHT_AUTHORITY_PREPARATION"
+if [[ ! -f "$PLAYWRIGHT_AUTHORITY" || -L "$PLAYWRIGHT_AUTHORITY" \
+  || ! -O "$PLAYWRIGHT_AUTHORITY" \
+  || "$("$TRUSTED_STAT" -c '%h' -- "$PLAYWRIGHT_AUTHORITY")" != 1 ]]; then
+  echo "operation-private Playwright authority is unsafe" >&2
+  exit 2
+fi
+PLAYWRIGHT_AUTHORITY_SHA256="$(
+  "$TRUSTED_SHA256SUM" -- "$PLAYWRIGHT_AUTHORITY"
+)"
+PLAYWRIGHT_AUTHORITY_SHA256="${PLAYWRIGHT_AUTHORITY_SHA256%% *}"
+if [[ ! "$PLAYWRIGHT_AUTHORITY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "operation-private Playwright authority digest is malformed" >&2
+  exit 70
+fi
 trusted_source_python "$SOURCE_ROOT/scripts/publish_public_edge_portal_overlay.py" \
   --source-root "$SOURCE_ROOT" \
   --active-root "$OVERLAY_ROOT" \
   --staging-root "$OVERLAY_STAGING_ROOT" \
   --backup-root "$OVERLAY_BACKUP_ROOT" \
   --build-root "$OVERLAY_BUILD_ROOT" \
+  --host-build-root "$PUBLIC_EDGE_HOST_BUILD_ROOT" \
+  --downloads-source-root "$CANONICAL_RELEASE_SHELF_ROOT" \
+  --playwright-authority "$PLAYWRIGHT_AUTHORITY" \
+  --playwright-authority-sha256 "$PLAYWRIGHT_AUTHORITY_SHA256" \
+  --surface-profile public-download \
+  --delivery-phase windows-preview \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$OVERLAY_STAGE_OUTPUT"
@@ -5669,6 +5699,12 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/publish_public_edge_portal_over
   --staging-root "$OVERLAY_STAGING_ROOT" \
   --backup-root "$OVERLAY_BACKUP_ROOT" \
   --build-root "$OVERLAY_BUILD_ROOT" \
+  --host-build-root "$PUBLIC_EDGE_HOST_BUILD_ROOT" \
+  --downloads-source-root "$CANONICAL_RELEASE_SHELF_ROOT" \
+  --playwright-authority "$PLAYWRIGHT_AUTHORITY" \
+  --playwright-authority-sha256 "$PLAYWRIGHT_AUTHORITY_SHA256" \
+  --surface-profile public-download \
+  --delivery-phase windows-preview \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$OVERLAY_ACTIVATION_OUTPUT"; then

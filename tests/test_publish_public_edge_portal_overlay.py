@@ -4327,6 +4327,7 @@ def test_downloads_verifier_relaxation_is_windows_preview_public_download_only(
         "--public-release-manifest",
         str(manifest),
         "--allow-non-launch-supported-release-channel",
+        "--allow-monotonic-review-blocker",
     ]
     assert module.downloads_verifier_phase_arguments(
         delivery_phase="flagship",
@@ -4683,6 +4684,35 @@ def test_pass_receipt_contract_rejects_binding_only_pass_shape(tmp_path: Path) -
             ),
         }
     ) is False
+
+
+def test_pass_receipt_contract_accepts_only_proven_monotonic_review_blocker(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(
+        tmp_path
+    )
+    verification_receipt = tmp_path / "verification.json"
+    write_child_verification_receipt(
+        verification_receipt,
+        release_channel_receipt,
+        release_channel_receipt_sha256,
+        "invocation-id",
+        public_release_rollout_matches_release_channel=False,
+        public_release_rollout_compatible_with_release_channel=True,
+        public_release_monotonic_review_blocker_valid=True,
+    )
+    payload = json.loads(verification_receipt.read_text(encoding="utf-8"))
+
+    assert module.pass_receipt_satisfies_overlay_contract(payload) is True
+
+    payload["public_release_monotonic_review_blocker_valid"] = False
+    assert module.pass_receipt_satisfies_overlay_contract(payload) is False
+
+    payload["public_release_monotonic_review_blocker_valid"] = True
+    payload["public_release_rollout_compatible_with_release_channel"] = False
+    assert module.pass_receipt_satisfies_overlay_contract(payload) is False
 
 
 def test_verify_published_overlay_rejects_pass_receipt_without_selected_input_binding(

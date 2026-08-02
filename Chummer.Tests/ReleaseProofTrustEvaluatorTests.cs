@@ -45,6 +45,42 @@ public sealed class ReleaseProofTrustEvaluatorTests
     }
 
     [Fact]
+    public void CurrentCampaignRecoveryContractIsAccepted()
+    {
+        JsonObject releaseProof = ReleaseProofEvidenceTestData.CreateReleaseProof(GeneratedAt);
+        JsonArray journeys = releaseProof["journeysPassed"]!.AsArray();
+        journeys.Insert(3, "recover_from_sync_conflict");
+        JsonArray routes = releaseProof["proofRoutes"]!.AsArray();
+        routes.Insert(5, "/account/roster");
+
+        ReleaseProofTrustEvaluation result = ReleaseProofTrustEvaluator.Validate(releaseProof);
+
+        Assert.True(result.IsValid, result.Reason);
+    }
+
+    [Fact]
+    public void UnknownJourneyContractExtensionIsRejected()
+    {
+        JsonObject releaseProof = ReleaseProofEvidenceTestData.CreateReleaseProof(GeneratedAt);
+        releaseProof["journeysPassed"]!.AsArray().Add("future_unreviewed_journey");
+
+        ReleaseProofTrustEvaluation result = ReleaseProofTrustEvaluator.Validate(releaseProof);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void UnknownSemanticRouteContractExtensionIsRejected()
+    {
+        JsonObject releaseProof = ReleaseProofEvidenceTestData.CreateReleaseProof(GeneratedAt);
+        releaseProof["proofRoutes"]!.AsArray().Insert(5, "/account/unreviewed");
+
+        ReleaseProofTrustEvaluation result = ReleaseProofTrustEvaluator.Validate(releaseProof);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
     public void NonCanonicalReadinessStatusIsRejectedEvenWithMatchingDigest()
     {
         JsonObject releaseProof = ReleaseProofEvidenceTestData.CreateReleaseProof(

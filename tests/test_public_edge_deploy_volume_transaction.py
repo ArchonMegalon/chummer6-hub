@@ -854,6 +854,7 @@ def make_fake_authority_source(
         "attest_public_edge_compose_source.py",
         "run_install_linking_postgres_cutover.py",
         "materialize_install_linking_cutover_boundary.py",
+        "prepare_operation_playwright_authority.py",
     ):
         (source / "scripts" / name).write_text(
             "#!/usr/bin/env python3\nraise SystemExit(0)\n",
@@ -942,6 +943,16 @@ case "$*" in
     /usr/bin/chmod 0600 "$receipt";;
   *"attest_public_edge_compose_source.py verify"*)
     [ -f "$(arg_value --snapshot "$@")" ] || exit 90;;
+  *prepare_operation_playwright_authority.py*)
+    host_build_root="$(arg_value --host-build-root "$@")"
+    output="$(arg_value --output "$@")"
+    /usr/bin/mkdir -p "$host_build_root"
+    /usr/bin/chmod 0700 "$host_build_root"
+    printf '%s\n' '{"contractName":"chummer.operation-private-playwright-authority/v1"}' \
+      > "$host_build_root/playwright-authority.json"
+    /usr/bin/chmod 0600 "$host_build_root/playwright-authority.json"
+    printf '%s\n' '{"status":"pass"}' > "$output"
+    /usr/bin/chmod 0600 "$output";;
   *"publish_public_edge_portal_overlay.py --activate"*)
     if [ "${FAKE_MUTATE_COMPOSE_ENV_AFTER_ATTESTATION:-0}" = 1 ]; then
       printf '%s\n' 'CHUMMER_PUBLIC_CANONICAL_ORIGIN=http://stale.invalid' \
@@ -4484,8 +4495,7 @@ def test_guarded_deploy_fails_closed_when_prior_runtime_capture_fails(
     fake_bin.mkdir()
     docker_log = tmp_path / "docker.log"
     fake_python = fake_bin / "python3"
-    fake_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    fake_python.chmod(0o755)
+    write_fake_transaction_python(fake_python)
     fake_docker = fake_bin / "docker"
     fake_docker.write_text(
         """#!/bin/sh

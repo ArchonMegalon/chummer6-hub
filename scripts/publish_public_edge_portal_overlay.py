@@ -386,6 +386,7 @@ OVERLAY_PASS_RECEIPT_REQUIRED_TRUE_FIELDS = tuple(
     if field
     not in {
         "public_release_has_preview_or_review_caveat",
+        "public_release_rollout_matches_release_channel",
         "release_manifest_has_preview_or_review_caveat",
     }
 )
@@ -4458,6 +4459,20 @@ def pass_receipt_satisfies_overlay_contract(receipt_payload: dict[str, Any]) -> 
         if receipt_payload.get(field) != expected:
             return False
 
+    public_release_rollout_authority_satisfied = bool(
+        receipt_payload.get("public_release_rollout_matches_release_channel") is True
+        or (
+            receipt_payload.get(
+                "public_release_rollout_compatible_with_release_channel"
+            )
+            is True
+            and receipt_payload.get("public_release_monotonic_review_blocker_valid")
+            is True
+        )
+    )
+    if not public_release_rollout_authority_satisfied:
+        return False
+
     return True
 
 
@@ -5112,6 +5127,7 @@ def downloads_verifier_phase_arguments(
             "--public-release-manifest",
             str(manifest),
             "--allow-non-launch-supported-release-channel",
+            "--allow-monotonic-review-blocker",
         ]
     return []
 

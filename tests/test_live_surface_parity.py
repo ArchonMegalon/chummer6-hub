@@ -599,6 +599,40 @@ class LiveSurfaceParityTests(unittest.TestCase):
             payload["failures"],
         )
 
+    def test_public_download_profile_accepts_only_a_known_more_specific_review_blocker(self) -> None:
+        module = load_module()
+        live = {
+            "status": "published",
+            "version": "run-test",
+            "channel": "preview",
+            "supportabilityState": "review_required",
+            "rolloutState": "coverage_incomplete",
+        }
+        expected = {
+            **live,
+            "rolloutState": "public_release_review_required",
+        }
+
+        public_fields, public_failures = module.release_posture_expected_failures(
+            live,
+            expected,
+            surface_profile=module.SURFACE_PROFILE_PUBLIC_DOWNLOAD,
+        )
+        flagship_fields, flagship_failures = module.release_posture_expected_failures(
+            live,
+            expected,
+            surface_profile=module.SURFACE_PROFILE_FLAGSHIP,
+        )
+
+        self.assertEqual([], public_failures)
+        self.assertTrue(public_fields["monotonic_review_blocker_valid"])
+        self.assertFalse(public_fields["rollout_matches_expected"])
+        self.assertIn(
+            "live release manifest rolloutState does not match expected release channel",
+            flagship_failures,
+        )
+        self.assertFalse(flagship_fields["monotonic_review_blocker_valid"])
+
     def test_verify_allows_stable_copy_only_when_release_manifest_is_gold_supported(self) -> None:
         module = load_module()
         _SurfaceHandler.downloads_mode = "gold"
