@@ -2983,7 +2983,10 @@ class GovernedCutoverRunner:
                 if isinstance(network, dict)
                 else ""
             )
-            if observed_network_id != self.public_network_id:
+            if (
+                not isinstance(network, dict)
+                or observed_network_id not in {"", self.public_network_id}
+            ):
                 raise CutoverError("operator network identity drifted")
         if (
             service == "chummer-install-linking-postgres-import-presence-proof"
@@ -3121,7 +3124,12 @@ class GovernedCutoverRunner:
                 }
                 for destination, read_write in sorted(observed_mounts.items())
             ],
-            "networkId": observed_network_id,
+            "networkId": (
+                ""
+                if service
+                == "chummer-install-linking-postgres-import-presence-proof"
+                else self.public_network_id
+            ),
             "networkMode": str(host.get("NetworkMode") or ""),
             "noNewPrivileges": True,
             "readOnlyRootFilesystem": True,
@@ -3150,6 +3158,51 @@ class GovernedCutoverRunner:
                 )
             except CutoverError:
                 continue
+
+    def _require_observed_network_identity(
+        self,
+        *,
+        container_id: str,
+        service: str,
+    ) -> None:
+        if service == "chummer-install-linking-postgres-import-presence-proof":
+            return
+        try:
+            raw = self.commands.run(
+                self._docker("container", "inspect", container_id)
+            ).stdout
+            decoded = json.loads(raw)
+            payload = decoded[0]
+            host = payload["HostConfig"]
+            network_settings = payload["NetworkSettings"]
+            networks = network_settings["Networks"]
+            network = networks[self.public_network_name]
+            state = payload["State"]
+        except (
+            CutoverError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            IndexError,
+            KeyError,
+            TypeError,
+        ) as exc:
+            raise CutoverError(
+                "started operator network identity is unavailable"
+            ) from exc
+        if (
+            not isinstance(payload, dict)
+            or payload.get("Id") != container_id
+            or not isinstance(host, dict)
+            or host.get("NetworkMode") != self.public_network_name
+            or not isinstance(network_settings, dict)
+            or not isinstance(networks, dict)
+            or set(networks) != {self.public_network_name}
+            or not isinstance(network, dict)
+            or network.get("NetworkID") != self.public_network_id
+            or not isinstance(state, dict)
+            or state.get("Status") != "exited"
+        ):
+            raise CutoverError("started operator network identity drifted")
 
     def _inspect_observed_state(
         self,
@@ -3450,6 +3503,10 @@ class GovernedCutoverRunner:
                 raise AmbiguousCutoverError(
                     "operator container final state did not bind to docker wait"
                 )
+            self._require_observed_network_identity(
+                container_id=container_id,
+                service=service,
+            )
             (
                 stdout_path,
                 stdout_sha256,

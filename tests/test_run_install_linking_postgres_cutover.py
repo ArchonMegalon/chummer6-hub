@@ -1142,7 +1142,7 @@ def admin_inspection(module, runner) -> dict:
         "Name": f"/{name}",
         "NetworkSettings": {
             "Networks": {
-                "chummer5a_default": {"NetworkID": NETWORK_ID},
+                "chummer5a_default": {"NetworkID": ""},
             },
         },
         "State": {"Running": False, "Status": "created"},
@@ -1410,6 +1410,114 @@ def test_valid_inspection_emits_closed_non_secret_source_and_network_identity(
     assert all(
         len(item["sourceIdentitySha256"]) == 64
         for item in topology["mounts"]
+    )
+
+
+def test_stopped_container_rejects_nonempty_network_id_drift(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    payload_holder: dict[str, object] = {}
+
+    def callback(_arguments, _timeout, _check):
+        return module.CommandResult(
+            0,
+            json.dumps([payload_holder["payload"]]).encode(),
+            b"",
+        )
+
+    runner = make_runner(module, tmp_path, FakeCommands(callback))
+    payload = admin_inspection(module, runner)
+    payload["NetworkSettings"]["Networks"]["chummer5a_default"][
+        "NetworkID"
+    ] = "f" * 64
+    payload_holder["payload"] = payload
+
+    with pytest.raises(module.CutoverError, match="network identity drifted"):
+        runner._inspect_container(
+            container_name=payload["Name"][1:],
+            service="chummer-install-linking-postgres-admin",
+            project=runner._job_project("prepare"),
+            command=["prepare"],
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("network-id", "network-mode", "state", "extra-network"),
+)
+def test_started_container_requires_exact_network_identity(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    module = load_module()
+    payload = {
+        "HostConfig": {"NetworkMode": "chummer5a_default"},
+        "Id": CONTAINER_ID,
+        "NetworkSettings": {
+            "Networks": {
+                "chummer5a_default": {"NetworkID": NETWORK_ID},
+            },
+        },
+        "State": {"Status": "exited"},
+    }
+    if mutation == "network-id":
+        payload["NetworkSettings"]["Networks"]["chummer5a_default"][
+            "NetworkID"
+        ] = "f" * 64
+    elif mutation == "network-mode":
+        payload["HostConfig"]["NetworkMode"] = "replacement"
+    elif mutation == "state":
+        payload["State"]["Status"] = "created"
+    elif mutation == "extra-network":
+        payload["NetworkSettings"]["Networks"]["replacement"] = {
+            "NetworkID": "f" * 64,
+        }
+
+    def callback(_arguments, _timeout, _check):
+        return module.CommandResult(
+            0,
+            json.dumps([payload]).encode(),
+            b"",
+        )
+
+    runner = make_runner(module, tmp_path, FakeCommands(callback))
+    with pytest.raises(
+        module.CutoverError,
+        match="started operator network identity drifted",
+    ):
+        runner._require_observed_network_identity(
+            container_id=CONTAINER_ID,
+            service="chummer-install-linking-postgres-admin",
+        )
+
+
+def test_started_container_accepts_exact_network_identity(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    payload = {
+        "HostConfig": {"NetworkMode": "chummer5a_default"},
+        "Id": CONTAINER_ID,
+        "NetworkSettings": {
+            "Networks": {
+                "chummer5a_default": {"NetworkID": NETWORK_ID},
+            },
+        },
+        "State": {"Status": "exited"},
+    }
+
+    def callback(_arguments, _timeout, _check):
+        return module.CommandResult(
+            0,
+            json.dumps([payload]).encode(),
+            b"",
+        )
+
+    runner = make_runner(module, tmp_path, FakeCommands(callback))
+    runner._require_observed_network_identity(
+        container_id=CONTAINER_ID,
+        service="chummer-install-linking-postgres-admin",
     )
 
 
