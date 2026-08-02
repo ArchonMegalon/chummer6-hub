@@ -588,6 +588,8 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('materializer_path = verifier_path.with_name("materialize_public_release_channel.py")', script_text)
         self.assertIn("def fallback_tuple_coverage(local_payload: dict)", script_text)
         self.assertIn('materializer.desktop_surface_refs(', script_text)
+        self.assertIn('freshness_helper = getattr(module, "proof_freshness_status", None)', script_text)
+        self.assertEqual(script_text.count('proof_freshness_status=proof_freshness_status,'), 2)
         self.assertIn('"expected_external_proof_request_rows"', script_text)
         self.assertIn('"expected_desktop_route_truth_rows"', script_text)
         self.assertIn('"expected_install_aware_artifact_registry_rows"', script_text)

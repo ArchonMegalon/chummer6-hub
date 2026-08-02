@@ -524,6 +524,12 @@ def derive_verifier_owned_value(name: str, current_value):
     artifacts = payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else []
     channel_id = str(payload.get("channelId") or payload.get("channel") or "").strip().lower()
     release_version = str(payload.get("version") or payload.get("releaseVersion") or "").strip()
+    freshness_helper = getattr(module, "proof_freshness_status", None)
+    proof_freshness_status = (
+        str(freshness_helper(payload) or "fresh")
+        if callable(freshness_helper)
+        else "fresh"
+    )
     fallback_helpers = {
         "expected_external_proof_request_rows": lambda: (tuple_coverage or {}).get("externalProofRequests") or current_value,
         "expected_desktop_route_truth_rows": lambda: (tuple_coverage or {}).get("desktopRouteTruth") or current_value,
@@ -553,6 +559,7 @@ def derive_verifier_owned_value(name: str, current_value):
                 artifacts,
                 channel_id=channel_id,
                 release_version=release_version,
+                proof_freshness_status=proof_freshness_status,
             )
             if tuple_coverage is not None and hasattr(materializer, "artifact_identity_registry")
             else current_value
@@ -563,6 +570,7 @@ def derive_verifier_owned_value(name: str, current_value):
                 artifacts,
                 channel_id=channel_id,
                 release_version=release_version,
+                proof_freshness_status=proof_freshness_status,
             )
             if tuple_coverage is not None and hasattr(materializer, "artifact_publication_bindings")
             else current_value
