@@ -109,6 +109,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:1fa23fc4872d95fd71c2833ebe65d7e
 ARG CHUMMER_RUNTIME_UID=1654
 ARG CHUMMER_RUNTIME_GID=1654
 WORKDIR /app
+COPY --from=build /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2 /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2.2 /usr/lib/x86_64-linux-gnu/libk5crypto.so.3 /usr/lib/x86_64-linux-gnu/libk5crypto.so.3.1 /usr/lib/x86_64-linux-gnu/libkeyutils.so.1 /usr/lib/x86_64-linux-gnu/libkeyutils.so.1.10 /usr/lib/x86_64-linux-gnu/libkrb5.so.3 /usr/lib/x86_64-linux-gnu/libkrb5.so.3.3 /usr/lib/x86_64-linux-gnu/libkrb5support.so.0 /usr/lib/x86_64-linux-gnu/libkrb5support.so.0.1 /usr/lib/x86_64-linux-gnu/
 COPY --from=build /app/install-linking-postgres-tool .
 RUN set -eu; link="$(find -P /app -xdev -type l -print -quit)"; test -z "$link"; find -P /app -xdev -type d -exec chmod 0755 {} +; find -P /app -xdev -type f -exec chmod 0644 {} +
 USER ${CHUMMER_RUNTIME_UID}:${CHUMMER_RUNTIME_GID}

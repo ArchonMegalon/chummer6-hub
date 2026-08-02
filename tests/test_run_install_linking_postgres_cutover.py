@@ -1015,6 +1015,35 @@ def test_compose_exposes_all_cutover_build_sources_with_canonical_defaults() -> 
     assert "COPY chummer-hub-registry/black-ledger/" not in dockerfile
 
 
+def test_install_linking_tool_bundles_pinned_gss_runtime_without_package_install() -> None:
+    dockerfile = (ROOT / "Chummer.Run.Api" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    tool_stage = dockerfile.split(
+        " AS install-linking-postgres-tool-final\n",
+        1,
+    )[1].split("\nFROM ", 1)[0]
+
+    for library in (
+        "libgssapi_krb5.so.2",
+        "libgssapi_krb5.so.2.2",
+        "libk5crypto.so.3",
+        "libk5crypto.so.3.1",
+        "libkeyutils.so.1",
+        "libkeyutils.so.1.10",
+        "libkrb5.so.3",
+        "libkrb5.so.3.3",
+        "libkrb5support.so.0",
+        "libkrb5support.so.0.1",
+    ):
+        assert f"/usr/lib/x86_64-linux-gnu/{library}" in tool_stage
+    assert "COPY --from=build" in tool_stage
+    assert not any(
+        package_manager in tool_stage
+        for package_manager in ("apt-get", "apt ", "apk ", "dnf ", "yum ")
+    )
+
+
 @pytest.mark.parametrize(
     "path",
     (
