@@ -3729,7 +3729,14 @@ class GovernedCutoverRunner:
             "cutoverId": self.inputs.cutover_id,
             "jobReceiptChainSha256": aggregate.hexdigest(),
             "jobReceipts": references,
-            "localStorePresent": self.local_store_present_at_cutover,
+            "localStorePresent": (
+                self.local_store_present_at_cutover
+                if phase in {
+                    "import_not_required_seeded_authority",
+                    POSTQUIESCE_REPROOF_PHASE,
+                }
+                else None
+            ),
             "phase": phase,
             "status": "pass",
         }
