@@ -282,10 +282,10 @@ JOB_SPECS: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
         "chummer.install_linking_postgres_prepare.v1",
     ),
     (
-        "prove-empty-authority",
+        "prove-authority-ready",
         "chummer-install-linking-postgres-runtime-proof",
-        ("prove-empty-authority",),
-        "chummer.install_linking_postgres_empty_authority_proof.v1",
+        ("prove-authority-ready",),
+        "chummer.install_linking_postgres_authority_readiness_proof.v1",
     ),
     (
         "prove-runtime-role",
@@ -316,10 +316,10 @@ POSTQUIESCE_BASE_JOB_SPECS: tuple[
         "chummer.install_linking_local_store_absence_proof.v1",
     ),
     (
-        "prove-empty-authority",
+        "prove-authority-ready",
         "chummer-install-linking-postgres-runtime-proof",
-        ("prove-empty-authority",),
-        "chummer.install_linking_postgres_empty_authority_proof.v1",
+        ("prove-authority-ready",),
+        "chummer.install_linking_postgres_authority_readiness_proof.v1",
     ),
     (
         "prove-runtime-role",
@@ -333,7 +333,7 @@ PHASE_JOB_NAMES = {
     "prepare_completed": (
         "transport-proof",
         "prepare",
-        "prove-empty-authority",
+        "prove-authority-ready",
         "prove-runtime-role",
     ),
     "import_skipped_no_local_store": ("prove-local-store-absent",),

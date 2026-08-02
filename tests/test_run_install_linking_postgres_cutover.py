@@ -1747,7 +1747,7 @@ def test_start_latency_consumes_the_single_monotonic_job_budget(
         def _job_override(self, **_kwargs):
             return (
                 self.inputs.receipt_root / "override.json",
-                "postquiesce-attempt01-prove-empty-authority",
+                "postquiesce-attempt01-prove-authority-ready",
                 "chummer6-ilpg-test",
             )
 
@@ -1776,11 +1776,11 @@ def test_start_latency_consumes_the_single_monotonic_job_budget(
 
     with pytest.raises(module.AmbiguousCutoverError):
         runner._run_job(
-            job_name="postquiesce-attempt01-prove-empty-authority",
+            job_name="postquiesce-attempt01-prove-authority-ready",
             service="chummer-install-linking-postgres-runtime-proof",
-            command=("prove-empty-authority",),
+            command=("prove-authority-ready",),
             proof_contract=(
-                "chummer.install_linking_postgres_empty_authority_proof.v1"
+                "chummer.install_linking_postgres_authority_readiness_proof.v1"
             ),
         )
 
@@ -2424,7 +2424,7 @@ def test_compose_input_final_bind_covers_every_effective_file(
     )
     runner = Harness(base.inputs, command_runner=base.commands)
     override = tmp_path / "job.override.json"
-    command = ("prove-empty-authority",)
+    command = ("prove-authority-ready",)
 
     runner._final_bind_compose_inputs(
         job_override=override,
@@ -2474,7 +2474,7 @@ def test_final_bind_rejects_base_env_or_override_mutated_during_provenance(
     module = load_module()
     runner, commands = make_pinned_final_bind_runner(module, tmp_path)
     service = "chummer-install-linking-postgres-runtime-proof"
-    command = ("prove-empty-authority",)
+    command = ("prove-authority-ready",)
     override, container_name, project = runner._job_override(
         job_name="final-bind-proof",
         service=service,
@@ -2548,9 +2548,9 @@ def test_generated_job_override_is_exactly_sealed_before_create(
         lambda *_args: module.CommandResult(0, b"", b"")
     )
     runner = make_runner(module, tmp_path, commands)
-    command = ("prove-empty-authority",)
+    command = ("prove-authority-ready",)
     override, container_name, _project = runner._job_override(
-        job_name="prove-empty-authority",
+        job_name="prove-authority-ready",
         service="chummer-install-linking-postgres-runtime-proof",
         command=command,
     )
@@ -2673,11 +2673,11 @@ def test_build_and_create_dispatches_are_immediately_preceded_by_final_bind(
 
     with pytest.raises(StopAtCompose):
         create_runner._run_job(
-            job_name="prove-empty-authority",
+            job_name="prove-authority-ready",
             service="chummer-install-linking-postgres-runtime-proof",
-            command=("prove-empty-authority",),
+            command=("prove-authority-ready",),
             proof_contract=(
-                "chummer.install_linking_postgres_empty_authority_proof.v1"
+                "chummer.install_linking_postgres_authority_readiness_proof.v1"
             ),
         )
     assert create_events == [

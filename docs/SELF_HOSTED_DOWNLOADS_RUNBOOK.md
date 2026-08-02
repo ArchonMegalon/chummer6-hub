@@ -88,12 +88,17 @@ The database-administration boundary is evidence, not application deployment orc
 1. Establish point-in-time recovery and keep data-protection key custody independent from the
    PostgreSQL backup. Record the approved recovery authority as
    `postgres_pitr_or_governed_recovery`.
-2. Run the governed `prepare` phase, then the non-mutating local-store presence probe. The flagship
-   isolated-v2 Data Protection cutover requires the probe to prove no local store exists and the
-   boundary to record the `import_skipped_no_local_store` phase. Its accepted receipt must contain
+2. Run the governed `prepare` phase and the read-only `prove-authority-ready` job. The readiness
+   proof requires the exact schema, complete monotonic commit chain, current runtime identity, and
+   least-privilege grants. It accepts either a genuinely empty generation-0 authority or an already
+   seeded, internally consistent authority; it records the authority state digest, generation, and
+   commit count without exposing the protected envelope. The separate `prove-empty-authority`
+   command remains mandatory for `import-local --confirm-empty-authority` and is never weakened.
+   Then run the non-mutating local-store presence probe. The flagship isolated-v2 Data Protection
+   cutover requires that probe to prove no local store exists and the boundary to record the
+   `import_skipped_no_local_store` phase. Its accepted receipt must contain
    `importSkippedNoLocalStore=true` and `localStorePresentAtCutover=false`. If a local store exists,
-   stop: `import-local --confirm-empty-authority` cannot decrypt a legacy snapshot with the new v2
-   ring and is not a supported flagship-release path.
+   stop: a legacy snapshot cannot be imported with the new v2 ring through the flagship lane.
 3. Run `validate` after prepare/import and retain its bounded operator receipt. Preserve the
    append-only phase journal, exact portal/tool image identities, operator container identities, and
    source/release/runtime-proof authority bindings.
