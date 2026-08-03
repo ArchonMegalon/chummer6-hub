@@ -136,6 +136,58 @@ public sealed class IdentityEmailDeliveryServiceTests
     }
 
     [Fact]
+    public void DeliverMagicLinkUsesDedicatedRuntimeSecretWithoutInlineApiKey()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-run-identity-email-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            const string secret = "dedicated-runtime-emailit-key";
+            string? authorizationParameter = null;
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_PROVIDER_ORDER"] = "emailit_api",
+                    ["CHUMMER_IDENTITY_EMAILIT_API_KEY_SECRET"] = secret,
+                    ["IDENTITY_EMAILIT_FROM_EMAIL"] = "concierge@chummer.run",
+                    ["CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH"] = Path.Combine(tempRoot, "identity-email-delivery.json")
+                })
+                .Build();
+
+            var service = new IdentityEmailDeliveryService(
+                configuration,
+                NullLogger<IdentityEmailDeliveryService>.Instance,
+                new HttpClient(new StubHttpMessageHandler(request =>
+                {
+                    authorizationParameter = request.Headers.Authorization?.Parameter;
+                    return new HttpResponseMessage(HttpStatusCode.Accepted)
+                    {
+                        Content = new StringContent("{\"data\":{\"id\":\"email_secret_123\"}}", Encoding.UTF8, "application/json")
+                    };
+                })));
+
+            IdentityEmailDeliveryResult result = service.DeliverMagicLink(
+                email: "runner@example.invalid",
+                displayName: "Runner Demo",
+                ticketId: "ticket-dedicated-secret",
+                nextPath: "/home",
+                expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
+
+            Assert.True(result.Delivered);
+            Assert.Equal(secret, authorizationParameter);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void DeliverMagicLinkDoesNotPreviewInlineTicketWhenProductionFlagIsMisconfigured()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-run-identity-email-tests", Guid.NewGuid().ToString("N"));
@@ -235,6 +287,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 {
                     ["ASPNETCORE_ENVIRONMENT"] = "Production",
                     ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
                     ["IDENTITY_EMAIL_START_WINDOW_SECONDS"] = "900",
                     ["IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_WINDOW"] = "10",
                     ["IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_RECIPIENT_PER_WINDOW"] = "3",
@@ -386,6 +439,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 {
                     ["ASPNETCORE_ENVIRONMENT"] = "Production",
                     ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
                     ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true",
                     ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json"),
                     ["CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH"] = Path.Combine(tempRoot, "identity-email-delivery.json")
@@ -431,6 +485,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 {
                     ["ASPNETCORE_ENVIRONMENT"] = "Production",
                     ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
                     ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json")
                 })
                 .Build();
@@ -470,6 +525,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 {
                     ["ASPNETCORE_ENVIRONMENT"] = "Development",
                     ["IDENTITY_PUBLIC_BASE_URL"] = "http://localhost:5101",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
                     ["CHUMMER_IDENTITY_STORE_PATH"] = storePath
                 })
                 .Build();

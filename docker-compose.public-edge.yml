@@ -137,6 +137,9 @@ services:
         fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+    env_file:
+      - path: ${CHUMMER_IDENTITY_EMAIL_SECRET_ENV_FILE:-/docker/fleet/state/chummer-secrets/chummer-run-identity/emailit.env}
+        required: false
     environment:
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
       IDENTITY_ENABLE_HTTPS_REDIRECTION: ${IDENTITY_ENABLE_HTTPS_REDIRECTION:-false}
