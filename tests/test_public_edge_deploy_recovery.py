@@ -32,6 +32,10 @@ CANDIDATE_PROOF_BYTES = b"candidate-proof-authority\n"
 PRIOR_PROOF_BYTES = b"prior-proof-authority\n"
 CANDIDATE_PROOF_SHA256 = hashlib.sha256(CANDIDATE_PROOF_BYTES).hexdigest()
 PRIOR_PROOF_SHA256 = hashlib.sha256(PRIOR_PROOF_BYTES).hexdigest()
+PROOF_AUTHORITY_PATH = "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json"
+PROOF_PUBLIC_PATH = (
+    "/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
+)
 
 
 def write_public_projection_snapshot(root: Path, *, variant: bytes = b"") -> Path:
@@ -181,6 +185,7 @@ class FakeRuntime:
             ): PRIOR_PROOF_SHA256,
         }
         self.bound_proof_sha256 = CANDIDATE_PROOF_SHA256
+        self.proof_bind_source: Path | None = None
         self.actions: list[tuple[object, ...]] = []
 
     def add_candidate(self, *, running: bool = True) -> None:
@@ -232,6 +237,14 @@ class FakeRuntime:
     def set_container_running(self, container_id: str, running: bool) -> None:
         self.actions.append(("running", container_id, running))
         self.containers[container_id]["running"] = running
+        if (
+            container_id == PRIOR_PORTAL
+            and running
+            and self.proof_bind_source is not None
+        ):
+            digest = hashlib.sha256(self.proof_bind_source.read_bytes()).hexdigest()
+            self.proof_digests[(PRIOR_PORTAL, PROOF_AUTHORITY_PATH)] = digest
+            self.proof_digests[(PRIOR_PORTAL, PROOF_PUBLIC_PATH)] = digest
 
     def wait_container_healthy(self, container_id: str) -> None:
         if self.containers[container_id].get("health") != "healthy":
@@ -253,6 +266,16 @@ class FakeRuntime:
             return self.proof_digests[(container_id, path)]
         except KeyError as exc:
             raise RuntimeError("runtime proof mount is unavailable") from exc
+
+    def container_bind_source(self, container_id: str, path: str) -> Path:
+        if container_id != PRIOR_PORTAL or path not in {
+            PROOF_AUTHORITY_PATH,
+            PROOF_PUBLIC_PATH,
+        }:
+            raise RuntimeError("runtime proof bind source is unavailable")
+        if self.proof_bind_source is None:
+            raise RuntimeError("runtime proof bind source is unavailable")
+        return self.proof_bind_source
 
 
 def prior_state(
@@ -675,6 +698,50 @@ def test_recovery_command_consumes_journal_and_writes_prior_runtime_authority(
     assert not journal.exists()
     assert second_status == 0
     assert second_receipt["disposition"] == "already_reconciled"
+
+
+def test_recovery_rebinds_prior_proof_before_restarting_stopped_portal(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "public_edge_mutation_lock",
+        lambda **_kwargs: nullcontext(None),
+    )
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "overlay_publish_lock",
+        lambda *_args, **_kwargs: nullcontext(None),
+    )
+    source_root, active_root, journal = write_deploy_journal(module, tmp_path)
+    legacy_proof = (
+        tmp_path / "public-projection" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+    legacy_proof.write_bytes(b"stale-current-proof\n")
+    legacy_proof.chmod(0o644)
+    runtime = FakeRuntime()
+    runtime.containers[PRIOR_PORTAL]["running"] = False
+    runtime.containers[PRIOR_TUNNEL]["running"] = False
+    runtime.proof_bind_source = legacy_proof
+    monkeypatch.setattr(module, "DockerRuntime", lambda **_kwargs: runtime)
+
+    status = module.main(recovery_argv(tmp_path, source_root, active_root))
+    receipt = json.loads((tmp_path / "recovery.json").read_text(encoding="utf-8"))
+
+    assert status == 0
+    assert receipt["exactPriorStateRestored"] is True
+    assert runtime.container_running(PRIOR_PORTAL) is True
+    assert runtime.container_running(PRIOR_TUNNEL) is True
+    assert runtime.proof_digests[(PRIOR_PORTAL, PROOF_AUTHORITY_PATH)] == (
+        PRIOR_PROOF_SHA256
+    )
+    assert runtime.proof_digests[(PRIOR_PORTAL, PROOF_PUBLIC_PATH)] == (
+        PRIOR_PROOF_SHA256
+    )
+    assert legacy_proof.read_bytes() == CANDIDATE_PROOF_BYTES
+    assert not journal.exists()
 
 
 def test_public_recovery_restores_exact_prior_authority_before_journal_retirement(
