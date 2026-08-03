@@ -193,6 +193,20 @@ def validate_compose(payload: dict[str, Any]) -> list[str]:
                 f"{service_name} mem_limit must be overrideable with default {expected_limit}"
             )
 
+    public_blazor = services.get("chummer-public-blazor")
+    if isinstance(public_blazor, dict):
+        environment = public_blazor.get("environment")
+        if not isinstance(environment, dict) or str(
+            environment.get("ASPNETCORE_FORWARDEDHEADERS_ENABLED")
+        ).lower() != "true":
+            failures.append(
+                "chummer-public-blazor must honor the portal proxy HTTPS scheme"
+            )
+        if "ports" in public_blazor:
+            failures.append(
+                "chummer-public-blazor must remain internal-only when trusting forwarded headers"
+            )
+
     for service_name in CLOUDFLARED_SERVICES:
         cloudflared = services.get(service_name)
         if not isinstance(cloudflared, dict):
