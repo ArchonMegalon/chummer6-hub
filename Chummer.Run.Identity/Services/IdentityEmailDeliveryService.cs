@@ -74,7 +74,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
 
         public IdentityEmailTransportResult Send(IdentityEmailMessage message)
         {
-            var apiKey = _configuration["IDENTITY_EMAILIT_API_KEY"]?.Trim();
+            var apiKey = ResolveEmailitApiKey(_configuration);
             if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(message.FromEmail))
             {
                 return new IdentityEmailTransportResult(
@@ -498,9 +498,17 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
     {
         var enabled = ResolveTransportOrderKeys();
         return enabled.Contains("emailit_api", StringComparer.OrdinalIgnoreCase)
-                   && !string.IsNullOrWhiteSpace(_configuration["IDENTITY_EMAILIT_API_KEY"]?.Trim())
+                   && !string.IsNullOrWhiteSpace(ResolveEmailitApiKey(_configuration))
                || enabled.Contains("smtp", StringComparer.OrdinalIgnoreCase)
                    && !string.IsNullOrWhiteSpace(_configuration["IDENTITY_SMTP_HOST"]?.Trim());
+    }
+
+    private static string? ResolveEmailitApiKey(IConfiguration configuration)
+    {
+        string? dedicatedSecret = configuration["CHUMMER_IDENTITY_EMAILIT_API_KEY_SECRET"]?.Trim();
+        return string.IsNullOrWhiteSpace(dedicatedSecret)
+            ? configuration["IDENTITY_EMAILIT_API_KEY"]?.Trim()
+            : dedicatedSecret;
     }
 
     private string[] ResolveTransportOrderKeys()
