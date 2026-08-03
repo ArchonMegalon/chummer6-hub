@@ -24,3 +24,10 @@ def test_identity_email_sign_in_remains_fail_closed_without_operator_activation(
 
     assert "IDENTITY_EMAIL_PROVIDER_ORDER: ${IDENTITY_EMAIL_PROVIDER_ORDER:-none}" in compose
     assert "IDENTITY_EMAIL_START_ENABLED: ${IDENTITY_EMAIL_START_ENABLED:-false}" in compose
+
+
+def test_identity_docker_context_includes_the_identity_service() -> None:
+    dockerignore = Path(".dockerignore").read_text(encoding="utf-8")
+
+    assert "!Chummer.Run.Identity/" in dockerignore
+    assert "!Chummer.Run.Identity/**" in dockerignore

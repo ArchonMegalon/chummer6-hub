@@ -29,6 +29,8 @@ Chummer.Run.LoopbackProbe/obj/**
 !Chummer.Control.Contracts/**
 !Chummer.Play.Contracts/
 !Chummer.Play.Contracts/**
+!Chummer.Run.Identity/
+!Chummer.Run.Identity/**
 !Chummer.Run.Api/
 !Chummer.Run.Api/**
 !Chummer.Run.Contracts/
