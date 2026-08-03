@@ -3387,6 +3387,154 @@ def windows_only_unsigned_fresh_delta_manifest_pair() -> (
     return pair
 
 
+def linux_retained_unsigned_fresh_delta_manifest_pair() -> (
+    dict[str, dict[str, object]]
+):
+    pair = load_unsigned_fresh_delta_manifest_pair()
+    canonical = pair["canonical"]
+    compatibility = pair["compatibility"]
+    windows = next(
+        artifact
+        for artifact in canonical["artifacts"]
+        if artifact.get("platform") == "windows"
+    )
+    compatibility_windows = next(
+        artifact
+        for artifact in compatibility["downloads"]
+        if artifact.get("platform") == "windows"
+    )
+    linux = {
+        "arch": "x64",
+        "artifactId": "avalonia-linux-x64-installer",
+        "downloadUrl": (
+            "/downloads/g/gen-linux-fixture/files/"
+            "chummer-avalonia-linux-x64-installer.deb"
+        ),
+        "fileName": "chummer-avalonia-linux-x64-installer.deb",
+        "head": "avalonia",
+        "id": "avalonia-linux-x64-installer",
+        "kind": "installer",
+        "platform": "linux",
+        "rid": "linux-x64",
+        "sha256": "1" * 64,
+        "sizeBytes": 37192294,
+    }
+    compatibility_linux = {
+        "artifactId": linux["artifactId"],
+        "fileName": linux["fileName"],
+        "head": "avalonia",
+        "id": linux["artifactId"],
+        "kind": "installer",
+        "platform": "Avalonia Desktop Linux X64 Installer",
+        "platformId": "linux",
+        "rid": "linux-x64",
+        "sha256": linux["sha256"],
+        "sizeBytes": linux["sizeBytes"],
+        "url": linux["downloadUrl"],
+    }
+    canonical["artifacts"] = [linux, windows]
+    compatibility["downloads"] = [compatibility_linux, compatibility_windows]
+
+    windows_routes = [
+        row
+        for row in canonical["desktopTupleCoverage"]["desktopRouteTruth"]
+        if row.get("platform") == "windows"
+    ]
+    coverage = canonical["desktopTupleCoverage"]
+    coverage.update(
+        {
+            "desktopRouteTruth": [
+                {
+                    "artifactId": linux["artifactId"],
+                    "platform": "linux",
+                    "promotionState": "promoted",
+                    "publicInstallRoute": (
+                        "/downloads/install/avalonia-linux-x64-installer"
+                    ),
+                    "routeAuthority": False,
+                    "tupleId": "avalonia:linux:linux-x64",
+                },
+                {
+                    "artifactId": "",
+                    "platform": "linux",
+                    "promotionState": "proof_required",
+                    "publicInstallRoute": (
+                        "/downloads/install/blazor-desktop-linux-x64-installer"
+                    ),
+                    "routeAuthority": False,
+                    "tupleId": "blazor-desktop:linux:linux-x64",
+                },
+                *windows_routes,
+            ],
+            "missingRequiredHeads": [],
+            "promotedInstallerTuples": [{"artifactId": linux["artifactId"]}],
+            "promotedPlatformHeadRidTuples": ["avalonia:linux-x64:linux"],
+            "promotedPlatformHeads": {"linux": ["avalonia"], "windows": []},
+            "requiredDesktopPlatformHeadRidTuples": [
+                "avalonia:linux-x64:linux",
+                "avalonia:win-x64:windows",
+            ],
+            "requiredDesktopPlatforms": ["linux", "windows"],
+        }
+    )
+    compatibility["desktopTupleCoverage"] = json.loads(json.dumps(coverage))
+
+    retained_binding = {
+        "artifactId": linux["artifactId"],
+        "manifestRowSha256": canonical_sha256(linux),
+        "sha256": linux["sha256"],
+        "sizeBytes": linux["sizeBytes"],
+    }
+    compatibility_binding = {
+        "artifactId": linux["artifactId"],
+        "manifestRowSha256": canonical_sha256(compatibility_linux),
+        "sha256": linux["sha256"],
+        "sizeBytes": linux["sizeBytes"],
+    }
+    inventory = []
+    for artifact in canonical["artifacts"]:
+        row = {
+            field: artifact[field]
+            for field in (
+                "artifactId",
+                "head",
+                "platform",
+                "rid",
+                "arch",
+                "kind",
+                "fileName",
+                "sha256",
+                "sizeBytes",
+            )
+        }
+        if artifact.get("payloadFileName") is not None:
+            row.update(
+                {
+                    field: artifact[field]
+                    for field in (
+                        "payloadFileName",
+                        "payloadSha256",
+                        "payloadSizeBytes",
+                    )
+                }
+            )
+        inventory.append(row)
+    for manifest in (canonical, compatibility):
+        provenance = manifest["retainedIncumbentProvenance"]
+        provenance["retainedArtifactBindings"] = [retained_binding]
+        provenance["retainedArtifactBindingsSha256"] = canonical_sha256(
+            [retained_binding]
+        )
+        provenance["retainedCompatibilityBindings"] = [compatibility_binding]
+        provenance["retainedCompatibilityBindingsSha256"] = canonical_sha256(
+            [compatibility_binding]
+        )
+        review = manifest["codeDeployCurrentShelfAuthority"]
+        review["projectedArtifactCount"] = len(inventory)
+        review["projectedArtifactInventorySha256"] = canonical_sha256(inventory)
+    return pair
+
+
 @pytest.mark.parametrize("layer", ["materializer", "projection"])
 def test_unsigned_fresh_delta_manifest_pair_accepts_registry_pushed_commit(
     layer: str,
@@ -3406,6 +3554,45 @@ def test_unsigned_fresh_delta_manifest_pair_accepts_registry_pushed_commit(
         "avalonia-osx-arm64-archive",
         "blazor-desktop-osx-arm64-archive",
     ]
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+def test_unsigned_fresh_delta_manifest_pair_accepts_exact_retained_linux_profile(
+    layer: str,
+) -> None:
+    pair = linux_retained_unsigned_fresh_delta_manifest_pair()
+    validate, _error = unsigned_fresh_delta_manifest_validator(layer)
+
+    result = validate(pair["canonical"], pair["compatibility"])
+
+    assert result["retainedArtifactIds"] == [
+        "avalonia-linux-x64-installer"
+    ]
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+def test_unsigned_retained_linux_profile_rejects_platform_aliasing(
+    layer: str,
+) -> None:
+    pair = linux_retained_unsigned_fresh_delta_manifest_pair()
+    canonical = pair["canonical"]
+    compatibility = pair["compatibility"]
+    retained = canonical["artifacts"][0]
+    retained["platform"] = "macos"
+    provenance = canonical["retainedIncumbentProvenance"]
+    bind_retained_artifacts(provenance, [retained])
+    validate, error = unsigned_retained_provenance_validator(layer)
+
+    with pytest.raises(
+        error,
+        match="platform differs from its exact profile",
+    ):
+        validate(
+            canonical,
+            compatibility,
+            provenance,
+            review=canonical["codeDeployCurrentShelfAuthority"],
+        )
 
 
 @pytest.mark.parametrize("layer", ["materializer", "projection"])

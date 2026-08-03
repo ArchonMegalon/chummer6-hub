@@ -223,6 +223,9 @@ CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS = [
     "avalonia-osx-arm64-archive",
     "blazor-desktop-osx-arm64-archive",
 ]
+CANDIDATE_UNSIGNED_RETAINED_LINUX_ARTIFACT_IDS = [
+    "avalonia-linux-x64-installer",
+]
 CANDIDATE_UNSIGNED_PROFILE_AUTHORITY_FIELDS = {
     "authority",
     "authoritative",
@@ -4001,8 +4004,6 @@ def _candidate_validate_profile_retained_provenance(
     retained_artifacts = [
         artifact for artifact in artifacts if artifact.get("platform") != "windows"
     ]
-    if any(artifact.get("platform") != "macos" for artifact in retained_artifacts):
-        raise ProjectionBlocked("projected retained artifact platform is not exact macOS")
     bindings = provenance.get("retainedArtifactBindings")
     if (
         not isinstance(bindings, list)
@@ -4032,9 +4033,27 @@ def _candidate_validate_profile_retained_provenance(
             )
         retained_ids.append(str(artifact_id))
         retained_by_file[str(artifact.get("fileName"))] = artifact
-    if retained_ids and retained_ids != CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS:
+    if retained_ids not in (
+        [],
+        CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS,
+        CANDIDATE_UNSIGNED_RETAINED_LINUX_ARTIFACT_IDS,
+    ):
         raise ProjectionBlocked(
             "projected retained artifact identities or order drifted"
+        )
+    expected_retained_platform = (
+        "macos"
+        if retained_ids == CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS
+        else "linux"
+        if retained_ids == CANDIDATE_UNSIGNED_RETAINED_LINUX_ARTIFACT_IDS
+        else None
+    )
+    if any(
+        artifact.get("platform") != expected_retained_platform
+        for artifact in retained_artifacts
+    ):
+        raise ProjectionBlocked(
+            "projected retained artifact platform differs from its exact profile"
         )
     compatibility_rows = compatibility.get("downloads")
     if not isinstance(compatibility_rows, list):
@@ -4281,26 +4300,40 @@ def _candidate_validate_unsigned_profile_manifest_pair(
     retains_macos = (
         retained_artifact_ids == CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS
     )
+    retains_linux = (
+        retained_artifact_ids
+        == CANDIDATE_UNSIGNED_RETAINED_LINUX_ARTIFACT_IDS
+    )
     expected_required_platforms = (
-        ["macos", "windows"] if retains_macos else ["windows"]
+        ["macos", "windows"]
+        if retains_macos
+        else ["linux", "windows"]
+        if retains_linux
+        else ["windows"]
     )
     expected_required_tuples = (
         ["avalonia:osx-arm64:macos", "avalonia:win-x64:windows"]
         if retains_macos
+        else ["avalonia:linux-x64:linux", "avalonia:win-x64:windows"]
+        if retains_linux
         else ["avalonia:win-x64:windows"]
     )
-    expected_missing_heads = [] if retains_macos else ["avalonia"]
+    expected_missing_heads = [] if retains_macos or retains_linux else ["avalonia"]
     expected_promoted_platform_tuples = (
         [
             "avalonia:osx-arm64:macos",
             "blazor-desktop:osx-arm64:macos",
         ]
         if retains_macos
+        else ["avalonia:linux-x64:linux"]
+        if retains_linux
         else []
     )
     expected_promoted_platform_heads = (
         {"macos": ["avalonia", "blazor-desktop"], "windows": []}
         if retains_macos
+        else {"linux": ["avalonia"], "windows": []}
+        if retains_linux
         else {"windows": []}
     )
     coverage = canonical.get("desktopTupleCoverage")
@@ -4339,6 +4372,8 @@ def _candidate_validate_unsigned_profile_manifest_pair(
                     "blazor-desktop-osx-arm64-installer",
                 ]
                 if retains_macos
+                else ["avalonia-linux-x64-installer"]
+                if retains_linux
                 else []
             )
         )
@@ -4362,6 +4397,13 @@ def _candidate_validate_unsigned_profile_manifest_pair(
             {
                 "avalonia:macos:osx-arm64",
                 "blazor-desktop:macos:osx-arm64",
+            }
+        )
+    elif retains_linux:
+        expected_route_tuples.update(
+            {
+                "avalonia:linux:linux-x64",
+                "blazor-desktop:linux:linux-x64",
             }
         )
     if (
@@ -4388,6 +4430,8 @@ def _candidate_validate_unsigned_profile_manifest_pair(
             "blazor-desktop:macos:osx-arm64",
         )
         if retains_macos
+        else ("avalonia:linux:linux-x64",)
+        if retains_linux
         else ()
     ):
         row = route_by_tuple.get(tuple_id)
@@ -4398,7 +4442,7 @@ def _candidate_validate_unsigned_profile_manifest_pair(
             or not isinstance(row.get("publicInstallRoute"), str)
         ):
             raise ProjectionBlocked(
-                "projected canonical retained macOS route posture drifted"
+                "projected canonical retained route posture drifted"
             )
     windows = [
         row
@@ -6526,12 +6570,30 @@ def _validate_candidate_import_authority_v3(
             profile_manifest["retainedArtifactIds"]
             == CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS
         )
-        expected_retained_platforms = ["macos"] if profile_retains_macos else []
+        profile_retains_linux = (
+            profile_manifest["retainedArtifactIds"]
+            == CANDIDATE_UNSIGNED_RETAINED_LINUX_ARTIFACT_IDS
+        )
+        expected_retained_platforms = (
+            ["macos"]
+            if profile_retains_macos
+            else ["linux"]
+            if profile_retains_linux
+            else []
+        )
         expected_shelf_platforms = (
-            ["macos", "windows"] if profile_retains_macos else ["windows"]
+            ["macos", "windows"]
+            if profile_retains_macos
+            else ["linux", "windows"]
+            if profile_retains_linux
+            else ["windows"]
         )
         expected_canonical_platforms = (
-            {"macos", "windows"} if profile_retains_macos else {"windows"}
+            {"macos", "windows"}
+            if profile_retains_macos
+            else {"linux", "windows"}
+            if profile_retains_linux
+            else {"windows"}
         )
         if (
             registry_candidate.get("retainedPlatforms")
