@@ -64,6 +64,8 @@ services:
       chummer-presentation-api:
         condition: service_healthy
     environment:
+      # Internal-only service: the portal proxy supplies the canonical HTTPS scheme.
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       CHUMMER_API_BASE_URL: http://chummer-presentation-api:8080
       CHUMMER_BLAZOR_PATH_BASE: /blazor
       CHUMMER_ANALYTICS_PROVIDER: rybbit

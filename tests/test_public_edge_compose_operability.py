@@ -107,6 +107,24 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
         failures = module.validate_compose(payload)
         self.assertTrue(any(failure.startswith("chummer-play-web mem_limit") for failure in failures))
 
+    def test_blazor_trusts_portal_https_headers_only_while_internal(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        service = payload["services"]["chummer-public-blazor"]
+        service["environment"]["ASPNETCORE_FORWARDEDHEADERS_ENABLED"] = "false"
+        service["ports"] = ["8080:8080"]
+
+        failures = module.validate_compose(payload)
+
+        self.assertIn(
+            "chummer-public-blazor must honor the portal proxy HTTPS scheme",
+            failures,
+        )
+        self.assertIn(
+            "chummer-public-blazor must remain internal-only when trusting forwarded headers",
+            failures,
+        )
+
     def test_missing_core_gm_workspace_root_fails_closed(self) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())
