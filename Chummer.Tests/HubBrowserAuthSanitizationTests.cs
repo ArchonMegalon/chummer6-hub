@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.WebUtilities;
 using Xunit;
@@ -118,6 +119,52 @@ public sealed class HubBrowserAuthSanitizationTests
         Assert.Contains("installation-safe", repeatedlyDecoded, StringComparison.Ordinal);
         Assert.DoesNotContain("top-level-secret", repeatedlyDecoded, StringComparison.Ordinal);
         Assert.DoesNotContain("nested-secret", repeatedlyDecoded, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Install_link_next_path_preserves_valid_remote_proof_transport_and_key()
+    {
+        using RSA installationKey = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(installationKey.ExportRSAPublicKey());
+        string requested = QueryHelpers.AddQueryString(
+            "/account/access/install-link",
+            new Dictionary<string, string?>
+            {
+                ["installationId"] = "installation-remote",
+                ["headId"] = "avalonia",
+                ["applicationVersion"] = "6.0.1-preview",
+                ["releaseChannel"] = "preview",
+                ["platform"] = "linux",
+                ["arch"] = "x64",
+                ["installLinkCallbackUri"] = "chummer://install-link",
+                ["installLinkTransport"] = "proof_poll",
+                ["publicKey"] = publicKey,
+                ["accessToken"] = "must-not-survive"
+            });
+
+        string sanitized = HubBrowserAuthService.SanitizeNextPath(requested, "/safe");
+        Dictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
+            QueryHelpers.ParseQuery(new Uri($"https://chummer.run{sanitized}").Query);
+
+        Assert.Equal("proof_poll", query["installLinkTransport"].ToString());
+        Assert.Equal(publicKey, query["publicKey"].ToString());
+        Assert.DoesNotContain("must-not-survive", DecodeRepeatedly(sanitized), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Install_link_next_path_rejects_remote_proof_transport_without_a_valid_rsa_key()
+    {
+        string requested = QueryHelpers.AddQueryString(
+            "/account/access/install-link",
+            new Dictionary<string, string?>
+            {
+                ["installationId"] = "installation-remote",
+                ["installLinkCallbackUri"] = "chummer://install-link",
+                ["installLinkTransport"] = "proof_poll",
+                ["publicKey"] = "not-an-rsa-public-key"
+            });
+
+        Assert.Equal("/safe", HubBrowserAuthService.SanitizeNextPath(requested, "/safe"));
     }
 
     [Fact]

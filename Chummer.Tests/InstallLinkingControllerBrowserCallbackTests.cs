@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
@@ -168,6 +169,103 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
         Assert.Contains($"code={Uri.EscapeDataString(callback.CallbackCode)}", callbackHref, StringComparison.Ordinal);
         AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Browser_install_link_remote_proof_poll_never_exposes_callback_code_or_requires_localhost()
+    {
+        using Fixture fixture = new(authenticated: true);
+        using RSA installationKey = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(installationKey.ExportRSAPublicKey());
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            installationId: "ins-remote-controller",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "linux",
+            arch: "x64",
+            installLinkCallbackUri: "chummer://install-link",
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: "proof_poll",
+            publicKey: publicKey);
+
+        ContentResult page = Assert.IsType<ContentResult>(result);
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        Assert.Equal(publicKey, callback.PublicKey);
+        Assert.Contains("Copy approved", page.Content, StringComparison.Ordinal);
+        Assert.Contains("no localhost callback is required", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain(callback.CallbackCode, page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("code=", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("127.0.0.1", page.Content, StringComparison.Ordinal);
+
+        long issuedAtUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        string nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
+        byte[] proofPayload = Encoding.UTF8.GetBytes(string.Join(
+            '\n',
+            "chummer.install-link.remote-callback.v1",
+            "ins-remote-controller",
+            "avalonia",
+            "6.0.1-preview",
+            "preview",
+            "linux",
+            "x64",
+            issuedAtUnixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            nonce));
+        string signature = Convert.ToBase64String(
+            installationKey.SignData(proofPayload, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> poll = fixture.Controller.PollBrowserCallback(
+            new PollInstallBrowserCallbackRequestDto(
+                "ins-remote-controller",
+                "avalonia",
+                "6.0.1-preview",
+                "preview",
+                "linux",
+                "x64",
+                publicKey,
+                issuedAtUnixSeconds,
+                nonce,
+                signature));
+
+        OkObjectResult accepted = Assert.IsType<OkObjectResult>(poll.Result);
+        ExchangeInstallBrowserCallbackResponseDto exchange =
+            Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(accepted.Value);
+        Assert.Equal(ClaimedInstallationStates.Active, exchange.Installation.Status);
+        Assert.Equal(InstallationGrantStates.Active, exchange.Grant.Status);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Browser_install_link_remote_proof_poll_rejects_invalid_public_key()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            installationId: "ins-invalid-remote-key",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "linux",
+            arch: "x64",
+            installLinkCallbackUri: "chummer://install-link",
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: "proof_poll",
+            publicKey: "not-a-valid-rsa-key");
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+        Assert.Empty(fixture.Store.BrowserCallbacksById);
     }
 
     [Fact]

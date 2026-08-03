@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
@@ -17,13 +19,16 @@ public sealed class InstallLinkingService
     private const int MaxHeadIdLength = 128;
     private const int MaxPlatformLength = 64;
     private const int MaxArchLength = 32;
-    private const int MaxPublicKeyLength = 256;
+    private const int MaxPublicKeyLength = 1024;
     private const int MaxHostLabelLength = 256;
+    private const int RemoteCallbackNonceLength = 48;
+    private const int MaxRemoteCallbackSignatureLength = 1024;
     private const int MaxPendingClaimTicketsPerPrincipal = 16;
     private const int MaxDownloadReceiptsPerPrincipalPerHour = 128;
     private const int MaxPendingBrowserCallbacksPerPrincipal = 8;
     private static readonly TimeSpan DefaultClaimTicketLifetime = TimeSpan.FromDays(1);
     private static readonly TimeSpan DefaultBrowserCallbackLifetime = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan RemoteCallbackClockSkew = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
     private readonly Func<InstallLinkingStore> _storeAccessor;
     private InstallLinkingStore _store => _storeAccessor();
@@ -438,6 +443,10 @@ public sealed class InstallLinkingService
             ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "artifact id is required.");
         string? normalizedCallbackUri = NormalizeOptional(request.CallbackUri)
             ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "callback uri is required.");
+        string? normalizedPublicKey = NormalizeOptional(
+            request.PublicKey,
+            nameof(request.PublicKey),
+            MaxPublicKeyLength);
         string? normalizedUserId = NormalizeOptional(userId);
         string? normalizedSubjectId = NormalizeOptional(subjectId);
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -455,6 +464,7 @@ public sealed class InstallLinkingService
                     normalizedUserId,
                     normalizedSubjectId,
                     normalizedCallbackUri,
+                    normalizedPublicKey,
                     now);
             if (callback is null)
             {
@@ -463,7 +473,8 @@ public sealed class InstallLinkingService
                 {
                     InstallationId = normalizedInstallationId,
                     ArtifactId = normalizedArtifactId,
-                    CallbackUri = normalizedCallbackUri
+                    CallbackUri = normalizedCallbackUri,
+                    PublicKey = normalizedPublicKey
                 }, normalizedUserId, normalizedSubjectId, now);
             }
 
@@ -576,6 +587,139 @@ public sealed class InstallLinkingService
             _store.GrantsById[issuedGrant.GrantId] = issuedGrant;
             _store.PersistLocked();
             return new ExchangeInstallBrowserCallbackResponseDto(callback, installation, issuedGrant, AlreadyClaimed: false);
+        }
+    }
+
+    public ExchangeInstallBrowserCallbackResponseDto? PollBrowserCallback(
+        PollInstallBrowserCallbackRequestDto request)
+    {
+        EnsureDurableStoreReady();
+        ArgumentNullException.ThrowIfNull(request);
+
+        string installationId = NormalizeSignedCallbackValue(
+            request.InstallationId,
+            nameof(request.InstallationId),
+            MaxInstallationIdLength);
+        string headId = NormalizeSignedCallbackValue(request.HeadId, nameof(request.HeadId), MaxHeadIdLength);
+        string applicationVersion = NormalizeSignedCallbackValue(
+            request.ApplicationVersion,
+            nameof(request.ApplicationVersion),
+            MaxVersionLength);
+        string channelId = NormalizeSignedCallbackValue(
+            request.ChannelId,
+            nameof(request.ChannelId),
+            MaxChannelIdLength);
+        string platform = NormalizeSignedCallbackValue(request.Platform, nameof(request.Platform), MaxPlatformLength);
+        string arch = NormalizeSignedCallbackValue(request.Arch, nameof(request.Arch), MaxArchLength);
+        string publicKey = NormalizeSignedCallbackValue(
+            request.PublicKey,
+            nameof(request.PublicKey),
+            MaxPublicKeyLength);
+        string nonce = NormalizeRemoteCallbackNonce(request.Nonce);
+        byte[] signature = DecodeCanonicalBase64(
+            request.Signature,
+            nameof(request.Signature),
+            MaxRemoteCallbackSignatureLength);
+        RSA rsa = ImportRemoteCallbackPublicKey(publicKey);
+        using (rsa)
+        {
+            long nowUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long maximumSkewSeconds = (long)RemoteCallbackClockSkew.TotalSeconds;
+            if (request.IssuedAtUnixSeconds < nowUnixSeconds - maximumSkewSeconds
+                || request.IssuedAtUnixSeconds > nowUnixSeconds + maximumSkewSeconds)
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status400BadRequest,
+                    "browser callback proof timestamp is outside the accepted window.");
+            }
+
+            byte[] payload = BuildRemoteCallbackProofPayload(
+                installationId,
+                headId,
+                applicationVersion,
+                channelId,
+                platform,
+                arch,
+                request.IssuedAtUnixSeconds,
+                nonce);
+            if (!rsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status401Unauthorized,
+                    "browser callback proof signature is invalid.");
+            }
+
+            string proofNonceHash = Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(nonce)))
+                .ToLowerInvariant();
+
+            InstallBrowserCallbackDto? callback;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            lock (_store.Gate)
+            {
+                ExpireBrowserCallbacksLocked(now);
+                ExpireGrantsLocked(now);
+                callback = _store.BrowserCallbacksById.Values
+                    .Where(item => string.Equals(
+                        item.InstallationId,
+                        installationId,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Where(item => item.ExpiresAtUtc > now)
+                    .Where(item => string.Equals(
+                            item.Status,
+                            InstallBrowserCallbackStates.Pending,
+                            StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(
+                            item.Status,
+                            InstallBrowserCallbackStates.Redeemed,
+                            StringComparison.OrdinalIgnoreCase))
+                    .Where(item => !string.IsNullOrWhiteSpace(item.PublicKey)
+                        && FixedTimeEquals(item.PublicKey!, publicKey))
+                    .OrderByDescending(static item => item.CreatedAtUtc)
+                    .FirstOrDefault();
+                if (callback is not null)
+                {
+                    if (!string.IsNullOrWhiteSpace(callback.LastRemoteProofNonceHash)
+                        && FixedTimeEquals(callback.LastRemoteProofNonceHash!, proofNonceHash))
+                    {
+                        throw new InstallLinkingOperationException(
+                            StatusCodes.Status409Conflict,
+                            "browser callback proof nonce was already used.");
+                    }
+
+                    callback = callback with { LastRemoteProofNonceHash = proofNonceHash };
+                    _store.BrowserCallbacksById[callback.CallbackId] = callback;
+                    _store.PersistLocked();
+                }
+            }
+
+            if (callback is null)
+            {
+                return null;
+            }
+
+            ExchangeInstallBrowserCallbackResponseDto exchanged = ExchangeBrowserCallback(
+                new ExchangeInstallBrowserCallbackRequestDto(
+                    CallbackCode: callback.CallbackCode,
+                    InstallationId: installationId,
+                    HeadId: headId,
+                    ApplicationVersion: applicationVersion,
+                    ChannelId: channelId,
+                    Platform: platform,
+                    Arch: arch,
+                    PublicKey: publicKey,
+                    HostLabel: NormalizeOptional(
+                        request.HostLabel,
+                        nameof(request.HostLabel),
+                        MaxHostLabelLength)));
+            return exchanged with
+            {
+                Callback = exchanged.Callback with
+                {
+                    CallbackCode = string.Empty,
+                    CallbackUri = null,
+                    LastRemoteProofNonceHash = null
+                }
+            };
         }
     }
 
@@ -736,6 +880,7 @@ public sealed class InstallLinkingService
         string? userId,
         string? subjectId,
         string callbackUri,
+        string? publicKey,
         DateTimeOffset now)
         => _store.BrowserCallbacksById.Values
             .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
@@ -743,6 +888,7 @@ public sealed class InstallLinkingService
             .Where(item => item.ExpiresAtUtc > now)
             .Where(item => MatchesIdentity(item.UserId, item.SubjectId, userId, subjectId))
             .Where(item => string.Equals(item.CallbackUri, callbackUri, StringComparison.OrdinalIgnoreCase))
+            .Where(item => string.Equals(item.PublicKey, publicKey, StringComparison.Ordinal))
             .OrderByDescending(static item => item.CreatedAtUtc)
             .FirstOrDefault();
 
@@ -1295,6 +1441,102 @@ public sealed class InstallLinkingService
 
     private static string? NormalizeBrowserCallbackCode(string? value)
         => NormalizeOptional(value, "callback code", MaxCallbackCodeLength);
+
+    private static string NormalizeSignedCallbackValue(string? value, string label, int maxLength)
+    {
+        string normalized = NormalizeRequired(value ?? string.Empty, label, maxLength);
+        if (normalized.Any(static character => char.IsControl(character)))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status400BadRequest,
+                $"{label} contains control characters.");
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeRemoteCallbackNonce(string? value)
+    {
+        string nonce = NormalizeSignedCallbackValue(
+            value,
+            "browser callback proof nonce",
+            RemoteCallbackNonceLength);
+        if (nonce.Length != RemoteCallbackNonceLength
+            || nonce.Any(static character => character is not (>= '0' and <= '9')
+                and not (>= 'a' and <= 'f')))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status400BadRequest,
+                "browser callback proof nonce is invalid.");
+        }
+
+        return nonce;
+    }
+
+    private static byte[] DecodeCanonicalBase64(string? value, string label, int maxLength)
+    {
+        string normalized = NormalizeSignedCallbackValue(value, label, maxLength);
+        try
+        {
+            byte[] decoded = Convert.FromBase64String(normalized);
+            if (!string.Equals(Convert.ToBase64String(decoded), normalized, StringComparison.Ordinal))
+            {
+                throw new FormatException("Base64 is not canonical.");
+            }
+
+            return decoded;
+        }
+        catch (FormatException)
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status400BadRequest,
+                $"{label} is not canonical Base64.");
+        }
+    }
+
+    private static RSA ImportRemoteCallbackPublicKey(string publicKey)
+    {
+        byte[] encoded = DecodeCanonicalBase64(publicKey, "public key", MaxPublicKeyLength);
+        RSA rsa = RSA.Create();
+        try
+        {
+            rsa.ImportRSAPublicKey(encoded, out int bytesRead);
+            if (bytesRead != encoded.Length || rsa.KeySize is < 2048 or > 4096)
+            {
+                throw new CryptographicException("RSA key is outside the accepted bounds.");
+            }
+
+            return rsa;
+        }
+        catch (CryptographicException)
+        {
+            rsa.Dispose();
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status400BadRequest,
+                "public key is not a supported RSA installation key.");
+        }
+    }
+
+    private static byte[] BuildRemoteCallbackProofPayload(
+        string installationId,
+        string headId,
+        string applicationVersion,
+        string channelId,
+        string platform,
+        string arch,
+        long issuedAtUnixSeconds,
+        string nonce)
+        => Encoding.UTF8.GetBytes(string.Join(
+            '\n',
+            "chummer.install-link.remote-callback.v1",
+            installationId,
+            headId,
+            applicationVersion,
+            channelId,
+            platform,
+            arch,
+            issuedAtUnixSeconds.ToString(CultureInfo.InvariantCulture),
+            nonce));
 
     private static string NormalizeRequiredArtifactSha256(string? value)
         => NormalizeArtifactSha256OrNull(value)

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -42,6 +43,7 @@ public sealed class HubBrowserAuthService
     private const int TransientRetryAttempts = 2;
     private const int MaxNextPathLength = 4096;
     private const int MaxInstallLinkValueLength = 256;
+    private const int MaxInstallLinkPublicKeyLength = 1024;
     private const int MaxCallbackStateValueLength = 128;
     private const string InstallLinkPath = "/account/access/install-link";
     private const string AppLocalInstallLinkCallbackPath = "/install-link/callback";
@@ -204,6 +206,21 @@ public sealed class HubBrowserAuthService
             return safeFallback;
         }
 
+        string? requestedTransport = SingleQueryValue(query, "installLinkTransport");
+        string? sanitizedTransport = SanitizeInstallLinkTransport(requestedTransport);
+        if (!string.IsNullOrWhiteSpace(requestedTransport) && sanitizedTransport is null)
+        {
+            return safeFallback;
+        }
+
+        string? sanitizedPublicKey = sanitizedTransport is "proof_poll"
+            ? SanitizeInstallLinkPublicKey(SingleQueryValue(query, "publicKey"))
+            : null;
+        if (sanitizedTransport is "proof_poll" && sanitizedPublicKey is null)
+        {
+            return safeFallback;
+        }
+
         return BuildInstallLinkingNextPath(
             SingleQueryValue(query, "installationId"),
             SingleQueryValue(query, "headId"),
@@ -211,7 +228,9 @@ public sealed class HubBrowserAuthService
             SingleQueryValue(query, "releaseChannel"),
             SingleQueryValue(query, "platform"),
             SingleQueryValue(query, "arch"),
-            sanitizedCallback);
+            sanitizedCallback,
+            sanitizedTransport,
+            sanitizedPublicKey);
     }
 
     public static string BuildInstallLinkingNextPath(
@@ -221,10 +240,26 @@ public sealed class HubBrowserAuthService
         string? releaseChannel,
         string? platform,
         string? arch,
-        string installLinkCallbackUri)
+        string installLinkCallbackUri,
+        string? installLinkTransport = null,
+        string? publicKey = null)
     {
         string? callback = SanitizeInstallLinkCallbackUri(installLinkCallbackUri)
             ?? throw new ArgumentException("Install-link callback URI is invalid.", nameof(installLinkCallbackUri));
+        string? transport = SanitizeInstallLinkTransport(installLinkTransport);
+        if (!string.IsNullOrWhiteSpace(installLinkTransport) && transport is null)
+        {
+            throw new ArgumentException("Install-link transport is invalid.", nameof(installLinkTransport));
+        }
+
+        string? installPublicKey = transport is "proof_poll"
+            ? SanitizeInstallLinkPublicKey(publicKey)
+            : null;
+        if (transport is "proof_poll" && installPublicKey is null)
+        {
+            throw new ArgumentException("Install-link public key is invalid.", nameof(publicKey));
+        }
+
         var values = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["installationId"] = SanitizeInstallLinkValue(installationId),
@@ -233,12 +268,59 @@ public sealed class HubBrowserAuthService
             ["releaseChannel"] = SanitizeInstallLinkValue(releaseChannel),
             ["platform"] = SanitizeInstallLinkValue(platform),
             ["arch"] = SanitizeInstallLinkValue(arch),
-            ["installLinkCallbackUri"] = callback
+            ["installLinkCallbackUri"] = callback,
+            ["installLinkTransport"] = transport,
+            ["publicKey"] = installPublicKey
         };
         return QueryHelpers.AddQueryString(
             InstallLinkPath,
             values.Where(static item => item.Value is not null)
                 .ToDictionary(static item => item.Key, static item => item.Value, StringComparer.Ordinal));
+    }
+
+    public static string? SanitizeInstallLinkPublicKey(string? publicKey)
+    {
+        if (string.IsNullOrWhiteSpace(publicKey)
+            || publicKey.Length > MaxInstallLinkPublicKeyLength
+            || !string.Equals(publicKey, publicKey.Trim(), StringComparison.Ordinal)
+            || HasControlOrBackslash(publicKey))
+        {
+            return null;
+        }
+
+        try
+        {
+            byte[] encoded = Convert.FromBase64String(publicKey);
+            if (!string.Equals(Convert.ToBase64String(encoded), publicKey, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            using RSA rsa = RSA.Create();
+            rsa.ImportRSAPublicKey(encoded, out int bytesRead);
+            return bytesRead == encoded.Length && rsa.KeySize is >= 2048 and <= 4096
+                ? publicKey
+                : null;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+    }
+
+    private static string? SanitizeInstallLinkTransport(string? transport)
+    {
+        if (string.IsNullOrWhiteSpace(transport))
+        {
+            return null;
+        }
+
+        string normalized = transport.Trim().ToLowerInvariant();
+        return normalized is "grant_callback" or "proof_poll" ? normalized : null;
     }
 
     public static string? SanitizeInstallLinkCallbackUri(string? callbackUri)

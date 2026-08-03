@@ -174,6 +174,30 @@ public sealed class InstallLinkingController : ControllerBase
         }
     }
 
+    [HttpPost("callbacks/poll")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType<ExchangeInstallBrowserCallbackResponseDto>(StatusCodes.Status200OK)]
+    public ActionResult<ExchangeInstallBrowserCallbackResponseDto> PollBrowserCallback(
+        [FromBody] PollInstallBrowserCallbackRequestDto? request)
+    {
+        ApplySensitiveResponseHeaders();
+        if (request is null)
+        {
+            return BadRequest("browser callback proof payload is required.");
+        }
+
+        try
+        {
+            ExchangeInstallBrowserCallbackResponseDto? result = _installLinking.PollBrowserCallback(request);
+            return result is null ? Accepted() : Ok(result);
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpPost("desktop-launch/exchange")]
     [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<DesktopAccountLaunchExchangeResponseDto>(StatusCodes.Status200OK)]
@@ -217,7 +241,9 @@ public sealed class InstallLinkingController : ControllerBase
         [FromQuery] string? platform,
         [FromQuery] string? arch,
         [FromQuery] string? installLinkCallbackUri,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] string? installLinkTransport = null,
+        [FromQuery] string? publicKey = null)
     {
         ApplySensitiveResponseHeaders();
         try
@@ -226,6 +252,21 @@ public sealed class InstallLinkingController : ControllerBase
             if (normalizedCallbackUri is null)
             {
                 return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link callback uri is invalid.");
+            }
+
+            string? normalizedTransport = NormalizeInstallLinkTransport(installLinkTransport);
+            if (normalizedTransport is null)
+            {
+                return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link transport is invalid.");
+            }
+
+            bool proofPolling = string.Equals(normalizedTransport, "proof_poll", StringComparison.Ordinal);
+            string? normalizedPublicKey = proofPolling
+                ? HubBrowserAuthService.SanitizeInstallLinkPublicKey(publicKey)
+                : null;
+            if (proofPolling && normalizedPublicKey is null)
+            {
+                return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link public key is invalid.");
             }
 
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
@@ -263,33 +304,40 @@ public sealed class InstallLinkingController : ControllerBase
                     Platform: platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
                     Arch: arch ?? artifact.Arch ?? "unknown",
                     CallbackUri: normalizedCallbackUri,
-                    PublicKey: null,
+                    PublicKey: normalizedPublicKey,
                     HostLabel: null,
                     InstallAccessClass: artifact.InstallAccessClass),
                 user.UserId,
                 subject.SubjectId);
 
-            string callbackRedirectUri = BuildBrowserInstallCallbackRedirectUri(
-                normalizedCallbackUri,
-                issued.Callback.CallbackCode,
-                installationId ?? string.Empty,
-                headId ?? artifact.Head ?? "desktop",
-                applicationVersion ?? manifest.Version,
-                releaseChannel ?? manifest.Channel,
-                platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
-                arch ?? artifact.Arch ?? "unknown");
-            bool appLocalCallback = IsAppLocalInstallLinkCallbackUri(callbackRedirectUri);
+            string? callbackRedirectUri = proofPolling
+                ? null
+                : BuildBrowserInstallCallbackRedirectUri(
+                    normalizedCallbackUri,
+                    issued.Callback.CallbackCode,
+                    installationId ?? string.Empty,
+                    headId ?? artifact.Head ?? "desktop",
+                    applicationVersion ?? manifest.Version,
+                    releaseChannel ?? manifest.Channel,
+                    platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
+                    arch ?? artifact.Arch ?? "unknown");
+            bool appLocalCallback = callbackRedirectUri is not null
+                && IsAppLocalInstallLinkCallbackUri(callbackRedirectUri);
             return BuildBrowserInstallLinkStatusPage(
                 statusCode: StatusCodes.Status200OK,
-                heading: appLocalCallback ? "Claim this copy" : "Claim this copy in Chummer",
-                supportLine: appLocalCallback
-                    ? "Your account approved this copy. Keep this tab open while the running app finishes the claim."
-                    : "Your account approved this copy. If Chummer does not open automatically, use the button below from this same browser.",
-                primaryLabel: "Claim this copy",
-                primaryHref: callbackRedirectUri,
+                heading: proofPolling
+                    ? "Copy approved"
+                    : appLocalCallback ? "Claim this copy" : "Claim this copy in Chummer",
+                supportLine: proofPolling
+                    ? "Chummer will retrieve this approval securely over HTTPS, including when the app runs on another computer. Return to the running app; no localhost callback is required."
+                    : appLocalCallback
+                        ? "Your account approved this copy. Keep this tab open while the running app finishes the claim."
+                        : "Your account approved this copy. If Chummer does not open automatically, use the button below from this same browser.",
+                primaryLabel: proofPolling ? "Open installs" : "Claim this copy",
+                primaryHref: proofPolling ? "/account/access" : callbackRedirectUri!,
                 secondaryLabel: "Open installs",
                 secondaryHref: "/account/access",
-                stateLabel: "Copy ready to claim",
+                stateLabel: proofPolling ? "Waiting for Chummer" : "Copy ready to claim",
                 highlights:
                 [
                     $"Install: {NormalizeBrowserInstallLinkLabel(installationId, issued.Callback.InstallationId)}",
@@ -308,7 +356,9 @@ public sealed class InstallLinkingController : ControllerBase
                 releaseChannel,
                 platform,
                 arch,
-                NormalizeCallbackUri(installLinkCallbackUri)!);
+                NormalizeCallbackUri(installLinkCallbackUri)!,
+                installLinkTransport,
+                publicKey);
             return Redirect($"/login?next={Uri.EscapeDataString(returnPath)}");
         }
         catch (HubRequestAuthException ex)
@@ -2131,6 +2181,17 @@ public sealed class InstallLinkingController : ControllerBase
 
     private static string? NormalizeCallbackUri(string? callbackUri)
         => HubBrowserAuthService.SanitizeInstallLinkCallbackUri(callbackUri);
+
+    private static string? NormalizeInstallLinkTransport(string? transport)
+    {
+        if (string.IsNullOrWhiteSpace(transport))
+        {
+            return "grant_callback";
+        }
+
+        string normalized = transport.Trim().ToLowerInvariant();
+        return normalized is "grant_callback" or "proof_poll" ? normalized : null;
+    }
 
     private static bool IsAppLocalCallbackHost(string host)
         => string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)

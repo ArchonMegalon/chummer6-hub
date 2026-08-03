@@ -84,6 +84,112 @@ public sealed class InstallLinkingBrowserCallbackTests
     }
 
     [Fact]
+    public void Signed_remote_poll_exchanges_browser_callback_without_loopback()
+    {
+        using Fixture fixture = new();
+        using RSA installationKey = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(installationKey.ExportRSAPublicKey());
+        fixture.Service.IssueBrowserCallback(
+            new IssueInstallBrowserCallbackRequestDto(
+                InstallationId: "ins-remote-poll-1",
+                ArtifactId: "avalonia-linux-x64-installer",
+                ApplicationVersion: "6.0.1-preview",
+                ChannelId: "preview",
+                HeadId: "avalonia",
+                Platform: "linux",
+                Arch: "x64",
+                CallbackUri: "chummer://install-link",
+                PublicKey: publicKey,
+                HostLabel: "Remote Linux Workstation",
+                InstallAccessClass: InstallAccessClasses.AccountRecommended),
+            userId: "user-archon",
+            subjectId: "subject-archon");
+
+        PollInstallBrowserCallbackRequestDto firstRequest =
+            CreateSignedPollRequest(installationKey, publicKey, "ins-remote-poll-1");
+        ExchangeInstallBrowserCallbackResponseDto? exchanged = fixture.Service.PollBrowserCallback(firstRequest);
+
+        Assert.NotNull(exchanged);
+        Assert.False(exchanged.AlreadyClaimed);
+        Assert.Equal(InstallBrowserCallbackStates.Redeemed, exchanged.Callback.Status);
+        Assert.Empty(exchanged.Callback.CallbackCode);
+        Assert.Null(exchanged.Callback.CallbackUri);
+        Assert.Equal(ClaimedInstallationStates.Active, exchanged.Installation.Status);
+        Assert.Equal(InstallationGrantStates.Active, exchanged.Grant.Status);
+
+        fixture.Reload();
+        InstallLinkingOperationException replay = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.PollBrowserCallback(firstRequest));
+        Assert.Equal(StatusCodes.Status409Conflict, replay.StatusCode);
+
+        ExchangeInstallBrowserCallbackResponseDto? repeated = fixture.Service.PollBrowserCallback(
+            CreateSignedPollRequest(installationKey, publicKey, "ins-remote-poll-1"));
+
+        Assert.NotNull(repeated);
+        Assert.True(repeated.AlreadyClaimed);
+        Assert.Equal(exchanged.Grant.GrantId, repeated.Grant.GrantId);
+        Assert.True(SecretsMatch(exchanged.Grant.AccessToken, repeated.Grant.AccessToken));
+    }
+
+    [Fact]
+    public void Signed_remote_poll_rejects_signature_from_a_different_key()
+    {
+        using Fixture fixture = new();
+        using RSA installationKey = RSA.Create(2048);
+        using RSA attackerKey = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(installationKey.ExportRSAPublicKey());
+        fixture.Service.IssueBrowserCallback(
+            new IssueInstallBrowserCallbackRequestDto(
+                InstallationId: "ins-remote-poll-signature",
+                ArtifactId: "avalonia-linux-x64-installer",
+                ApplicationVersion: "6.0.1-preview",
+                ChannelId: "preview",
+                HeadId: "avalonia",
+                Platform: "linux",
+                Arch: "x64",
+                CallbackUri: "chummer://install-link",
+                PublicKey: publicKey,
+                HostLabel: null,
+                InstallAccessClass: InstallAccessClasses.AccountRecommended),
+            userId: "user-archon",
+            subjectId: "subject-archon");
+
+        InstallLinkingOperationException failure = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.PollBrowserCallback(
+                CreateSignedPollRequest(attackerKey, publicKey, "ins-remote-poll-signature")));
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, failure.StatusCode);
+    }
+
+    [Fact]
+    public void Signed_remote_poll_returns_pending_when_browser_has_not_approved_the_install()
+    {
+        using Fixture fixture = new();
+        using RSA installationKey = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(installationKey.ExportRSAPublicKey());
+
+        ExchangeInstallBrowserCallbackResponseDto? result = fixture.Service.PollBrowserCallback(
+            CreateSignedPollRequest(installationKey, publicKey, "ins-remote-poll-pending"));
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Signed_remote_poll_authenticates_proof_before_reporting_pending_state()
+    {
+        using Fixture fixture = new();
+        using RSA installationKey = RSA.Create(2048);
+        using RSA attackerKey = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(installationKey.ExportRSAPublicKey());
+
+        InstallLinkingOperationException failure = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.PollBrowserCallback(
+                CreateSignedPollRequest(attackerKey, publicKey, "ins-remote-poll-not-issued")));
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, failure.StatusCode);
+    }
+
+    [Fact]
     public void Revoke_grant_unlinks_install_and_revokes_active_grants()
     {
         using Fixture fixture = new();
@@ -443,6 +549,45 @@ public sealed class InstallLinkingBrowserCallbackTests
             CryptographicOperations.ZeroMemory(leftBytes);
             CryptographicOperations.ZeroMemory(rightBytes);
         }
+    }
+
+    private static PollInstallBrowserCallbackRequestDto CreateSignedPollRequest(
+        RSA signingKey,
+        string publicKey,
+        string installationId)
+    {
+        const string headId = "avalonia";
+        const string applicationVersion = "6.0.1-preview";
+        const string channelId = "preview";
+        const string platform = "linux";
+        const string arch = "x64";
+        long issuedAtUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        string nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
+        byte[] payload = Encoding.UTF8.GetBytes(string.Join(
+            '\n',
+            "chummer.install-link.remote-callback.v1",
+            installationId,
+            headId,
+            applicationVersion,
+            channelId,
+            platform,
+            arch,
+            issuedAtUnixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            nonce));
+        string signature = Convert.ToBase64String(
+            signingKey.SignData(payload, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+        return new PollInstallBrowserCallbackRequestDto(
+            installationId,
+            headId,
+            applicationVersion,
+            channelId,
+            platform,
+            arch,
+            publicKey,
+            issuedAtUnixSeconds,
+            nonce,
+            signature,
+            "Remote Linux Workstation");
     }
 
     private sealed class Fixture : IDisposable
