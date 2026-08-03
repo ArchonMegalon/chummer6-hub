@@ -199,11 +199,29 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         ContentResult page = Assert.IsType<ContentResult>(result);
         InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
         Assert.Equal(publicKey, callback.PublicKey);
-        Assert.Contains("Copy approved", page.Content, StringComparison.Ordinal);
-        Assert.Contains("no localhost callback is required", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Approved — Chummer is finishing securely", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Linking this copy", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Account approved", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Secure handoff", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Ready in Chummer", page.Content, StringComparison.Ordinal);
+        Assert.Contains("no localhost callback", page.Content, StringComparison.Ordinal);
+        Assert.Contains("role=\"status\"", page.Content, StringComparison.Ordinal);
+        Assert.Contains("fetch(endpoint", page.Content, StringComparison.Ordinal);
+        Assert.Contains(callback.CallbackId, page.Content, StringComparison.Ordinal);
         Assert.DoesNotContain(callback.CallbackCode, page.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("code=", page.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("127.0.0.1", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("install-link-manual-field", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("iframe", page.Content, StringComparison.Ordinal);
+
+        ActionResult<InstallBrowserCallbackStatusDto> waitingStatus =
+            await fixture.Controller.BrowserInstallLinkStatus(
+                callback.CallbackId,
+                CancellationToken.None);
+        InstallBrowserCallbackStatusDto waiting = Assert.IsType<InstallBrowserCallbackStatusDto>(
+            Assert.IsType<OkObjectResult>(waitingStatus.Result).Value);
+        Assert.Equal("waiting_for_chummer", waiting.State);
+        Assert.False(waiting.Completed);
 
         long issuedAtUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         string nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
@@ -239,6 +257,16 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(accepted.Value);
         Assert.Equal(ClaimedInstallationStates.Active, exchange.Installation.Status);
         Assert.Equal(InstallationGrantStates.Active, exchange.Grant.Status);
+
+        ActionResult<InstallBrowserCallbackStatusDto> linkedStatus =
+            await fixture.Controller.BrowserInstallLinkStatus(
+                callback.CallbackId,
+                CancellationToken.None);
+        InstallBrowserCallbackStatusDto linked = Assert.IsType<InstallBrowserCallbackStatusDto>(
+            Assert.IsType<OkObjectResult>(linkedStatus.Result).Value);
+        Assert.Equal("linked", linked.State);
+        Assert.True(linked.Completed);
+        Assert.True(linked.Terminal);
         AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
     }
 
@@ -266,6 +294,40 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         ObjectResult problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         Assert.Empty(fixture.Store.BrowserCallbacksById);
+    }
+
+    [Fact]
+    public async Task Browser_install_link_status_requires_the_approving_account()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        IssueInstallBrowserCallbackResponseDto issued = fixture.InstallLinking.IssueBrowserCallback(
+            new IssueInstallBrowserCallbackRequestDto(
+                "ins-private-status",
+                "avalonia-linux-x64-installer",
+                "6.0.1-preview",
+                "preview",
+                "avalonia",
+                "linux",
+                "x64",
+                "chummer://install-link",
+                PublicKey: null,
+                HostLabel: null,
+                InstallAccessClass: InstallAccessClasses.AccountRecommended),
+            "user-private",
+            "subject-private");
+
+        ActionResult<InstallBrowserCallbackStatusDto> result =
+            await fixture.Controller.BrowserInstallLinkStatus(
+                issued.Callback.CallbackId,
+                CancellationToken.None);
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, problem.StatusCode);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
     }
 
     [Fact]
@@ -590,6 +652,11 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal("no-cache", headers.Pragma.ToString());
         Assert.Equal("0", headers.Expires.ToString());
         Assert.Equal("no-referrer", headers["Referrer-Policy"].ToString());
+        Assert.Equal("nosniff", headers["X-Content-Type-Options"].ToString());
+        Assert.Equal("DENY", headers["X-Frame-Options"].ToString());
+        Assert.Equal(
+            "camera=(), microphone=(), geolocation=()",
+            headers["Permissions-Policy"].ToString());
     }
 
     private sealed class Fixture : IDisposable

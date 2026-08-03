@@ -89,7 +89,7 @@ public sealed class InstallLinkingBrowserCallbackTests
         using Fixture fixture = new();
         using RSA installationKey = RSA.Create(2048);
         string publicKey = Convert.ToBase64String(installationKey.ExportRSAPublicKey());
-        fixture.Service.IssueBrowserCallback(
+        IssueInstallBrowserCallbackResponseDto issued = fixture.Service.IssueBrowserCallback(
             new IssueInstallBrowserCallbackRequestDto(
                 InstallationId: "ins-remote-poll-1",
                 ArtifactId: "avalonia-linux-x64-installer",
@@ -105,6 +105,14 @@ public sealed class InstallLinkingBrowserCallbackTests
             userId: "user-archon",
             subjectId: "subject-archon");
 
+        InstallBrowserCallbackStatusDto pendingStatus = fixture.Service.GetBrowserCallbackStatus(
+            issued.Callback.CallbackId,
+            "user-archon",
+            "subject-archon");
+        Assert.Equal("waiting_for_chummer", pendingStatus.State);
+        Assert.False(pendingStatus.Completed);
+        Assert.False(pendingStatus.Terminal);
+
         PollInstallBrowserCallbackRequestDto firstRequest =
             CreateSignedPollRequest(installationKey, publicKey, "ins-remote-poll-1");
         ExchangeInstallBrowserCallbackResponseDto? exchanged = fixture.Service.PollBrowserCallback(firstRequest);
@@ -118,6 +126,21 @@ public sealed class InstallLinkingBrowserCallbackTests
         Assert.Equal(InstallationGrantStates.Active, exchanged.Grant.Status);
 
         fixture.Reload();
+        InstallBrowserCallbackStatusDto completedStatus = fixture.Service.GetBrowserCallbackStatus(
+            issued.Callback.CallbackId,
+            "user-archon",
+            "subject-archon");
+        Assert.Equal("linked", completedStatus.State);
+        Assert.True(completedStatus.Completed);
+        Assert.True(completedStatus.Terminal);
+        InstallLinkingOperationException hiddenFromOtherAccount =
+            Assert.Throws<InstallLinkingOperationException>(() =>
+                fixture.Service.GetBrowserCallbackStatus(
+                    issued.Callback.CallbackId,
+                    "user-someone-else",
+                    "subject-someone-else"));
+        Assert.Equal(StatusCodes.Status404NotFound, hiddenFromOtherAccount.StatusCode);
+
         InstallLinkingOperationException replay = Assert.Throws<InstallLinkingOperationException>(() =>
             fixture.Service.PollBrowserCallback(firstRequest));
         Assert.Equal(StatusCodes.Status409Conflict, replay.StatusCode);

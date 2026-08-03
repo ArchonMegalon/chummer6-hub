@@ -13,6 +13,7 @@ public sealed class InstallLinkingService
     private const int MaxInstallationIdLength = 64;
     private const int MaxAccessTokenLength = 256;
     private const int MaxClaimCodeLength = 128;
+    private const int MaxCallbackIdLength = 128;
     private const int MaxCallbackCodeLength = 256;
     private const int MaxVersionLength = 64;
     private const int MaxChannelIdLength = 64;
@@ -220,6 +221,72 @@ public sealed class InstallLinkingService
                 .Take(Math.Max(1, maxItems))
                 .ToArray();
             return new InstallLinkingSummaryDto(receipts, tickets, installations, grants, callbacks);
+        }
+    }
+
+    public InstallBrowserCallbackStatusDto GetBrowserCallbackStatus(
+        string callbackId,
+        string? userId,
+        string? subjectId)
+    {
+        EnsureDurableStoreReady();
+        string normalizedCallbackId = NormalizeRequired(
+            callbackId,
+            nameof(callbackId),
+            MaxCallbackIdLength);
+        string? normalizedUserId = NormalizeOptional(userId);
+        string? normalizedSubjectId = NormalizeOptional(subjectId);
+        if (normalizedUserId is null && normalizedSubjectId is null)
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status401Unauthorized,
+                "Account sign-in is required to view install approval status.");
+        }
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            ExpireBrowserCallbacksLocked(now);
+            ExpireGrantsLocked(now);
+            if (!_store.BrowserCallbacksById.TryGetValue(
+                    normalizedCallbackId,
+                    out InstallBrowserCallbackDto? callback)
+                || !MatchesIdentity(
+                    callback.UserId,
+                    callback.SubjectId,
+                    normalizedUserId,
+                    normalizedSubjectId))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status404NotFound,
+                    "Install approval status was not found.");
+            }
+
+            bool completed = string.Equals(
+                callback.Status,
+                InstallBrowserCallbackStates.Redeemed,
+                StringComparison.OrdinalIgnoreCase);
+            bool expired = string.Equals(
+                callback.Status,
+                InstallBrowserCallbackStates.Expired,
+                StringComparison.OrdinalIgnoreCase)
+                || callback.ExpiresAtUtc <= now;
+            bool revoked = string.Equals(
+                callback.Status,
+                InstallBrowserCallbackStates.Revoked,
+                StringComparison.OrdinalIgnoreCase);
+            string state = completed
+                ? "linked"
+                : expired
+                    ? "expired"
+                    : revoked
+                        ? "revoked"
+                        : "waiting_for_chummer";
+            return new InstallBrowserCallbackStatusDto(
+                State: state,
+                Completed: completed,
+                Terminal: completed || expired || revoked,
+                ExpiresAtUtc: callback.ExpiresAtUtc);
         }
     }
 

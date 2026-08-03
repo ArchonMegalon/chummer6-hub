@@ -232,6 +232,37 @@ public sealed class InstallLinkingController : ControllerBase
             ExpiresAtUtc: claims.ExpiresAtUtc));
     }
 
+    [HttpGet("/account/access/install-link/status")]
+    [ProducesResponseType<InstallBrowserCallbackStatusDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<InstallBrowserCallbackStatusDto>> BrowserInstallLinkStatus(
+        [FromQuery] string? callbackId,
+        CancellationToken cancellationToken)
+    {
+        ApplySensitiveResponseHeaders();
+        if (string.IsNullOrWhiteSpace(callbackId))
+        {
+            return BadRequest("install approval id is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_installLinking.GetBrowserCallbackStatus(
+                callbackId,
+                user.UserId,
+                subject.SubjectId));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("/account/access/install-link")]
     public async Task<IActionResult> BrowserInstallLink(
         [FromQuery] string? installationId,
@@ -326,26 +357,41 @@ public sealed class InstallLinkingController : ControllerBase
             return BuildBrowserInstallLinkStatusPage(
                 statusCode: StatusCodes.Status200OK,
                 heading: proofPolling
-                    ? "Copy approved"
+                    ? "Approved — Chummer is finishing securely"
                     : appLocalCallback ? "Claim this copy" : "Claim this copy in Chummer",
                 supportLine: proofPolling
-                    ? "Chummer will retrieve this approval securely over HTTPS, including when the app runs on another computer. Return to the running app; no localhost callback is required."
+                    ? "Your account approved this exact installation. Chummer is collecting the approval over an encrypted connection, even when it runs on another computer. You can safely close this tab."
                     : appLocalCallback
                         ? "Your account approved this copy. Keep this tab open while the running app finishes the claim."
                         : "Your account approved this copy. If Chummer does not open automatically, use the button below from this same browser.",
-                primaryLabel: proofPolling ? "Open installs" : "Claim this copy",
+                primaryLabel: proofPolling ? "View my installs" : "Claim this copy",
                 primaryHref: proofPolling ? "/account/access" : callbackRedirectUri!,
-                secondaryLabel: "Open installs",
-                secondaryHref: "/account/access",
-                stateLabel: proofPolling ? "Waiting for Chummer" : "Copy ready to claim",
+                secondaryLabel: proofPolling ? "Back to downloads" : "Open installs",
+                secondaryHref: proofPolling ? "/downloads" : "/account/access",
+                stateLabel: proofPolling ? "Secure approval ready" : "Copy ready to claim",
                 highlights:
-                [
-                    $"Install: {NormalizeBrowserInstallLinkLabel(installationId, issued.Callback.InstallationId)}",
-                    $"Installer: {artifact.Id}",
-                    $"Build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}"
-                ],
+                    proofPolling
+                        ?
+                        [
+                            $"Device: {NormalizeBrowserInstallLinkLabel(headId, artifact.Head ?? "desktop")} · {NormalizeBrowserInstallLinkLabel(platform, artifact.PlatformId ?? "unknown")}/{NormalizeBrowserInstallLinkLabel(arch, artifact.Arch ?? "unknown")}",
+                            $"Release: {NormalizeBrowserInstallLinkLabel(releaseChannel, manifest.Channel)} · {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}",
+                            "Protection: device-key signed HTTPS · no localhost callback"
+                        ]
+                        :
+                        [
+                            $"Install: {NormalizeBrowserInstallLinkLabel(installationId, issued.Callback.InstallationId)}",
+                            $"Installer: {artifact.Id}",
+                            $"Build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}"
+                        ],
                 autoOpenHref: callbackRedirectUri,
-                appLocalCallback: appLocalCallback);
+                appLocalCallback: appLocalCallback,
+                remoteProofPolling: proofPolling,
+                completionStatusHref: proofPolling
+                    ? QueryHelpers.AddQueryString(
+                        "/account/access/install-link/status",
+                        "callbackId",
+                        issued.Callback.CallbackId)
+                    : null);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -388,6 +434,9 @@ public sealed class InstallLinkingController : ControllerBase
         headers["Pragma"] = "no-cache";
         headers["Expires"] = "0";
         headers["Referrer-Policy"] = "no-referrer";
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
     }
 
     private static bool MatchesDesktopLaunchIdentity(ClaimedInstallationDto installation, AccountDesktopLaunchTicketClaims claims)
@@ -410,7 +459,9 @@ public sealed class InstallLinkingController : ControllerBase
         string stateLabel,
         IReadOnlyList<string> highlights,
         string? autoOpenHref,
-        bool appLocalCallback)
+        bool appLocalCallback,
+        bool remoteProofPolling = false,
+        string? completionStatusHref = null)
     {
         string clickAttemptMessage = appLocalCallback
             ? "Tried to claim this copy again. If this tab still does not finish, copy the claim link below and open it in the same browser."
@@ -500,9 +551,182 @@ public sealed class InstallLinkingController : ControllerBase
               })();
               </script>
               """;
+        string remoteStatusScript = !remoteProofPolling || string.IsNullOrWhiteSpace(completionStatusHref)
+            ? string.Empty
+            : $$"""
+              <script>
+              (() => {
+                const endpoint = {{JsonSerializer.Serialize(completionStatusHref)}};
+                const status = document.getElementById("install-link-status");
+                const heading = document.getElementById("install-link-heading");
+                const eyebrow = document.getElementById("install-link-eyebrow");
+                const badge = document.getElementById("install-link-badge");
+                const handoffStep = document.getElementById("install-link-step-handoff");
+                const handoffState = document.getElementById("install-link-step-handoff-state");
+                const linkedStep = document.getElementById("install-link-step-linked");
+                const linkedState = document.getElementById("install-link-step-linked-state");
+                let stopped = false;
+                let failureCount = 0;
+                let pollCount = 0;
+                let timer = 0;
+
+                const setStep = (step, stateNode, state, label) => {
+                  if (step) {
+                    step.dataset.state = state;
+                  }
+                  if (stateNode) {
+                    stateNode.textContent = label;
+                  }
+                };
+
+                const setStatus = (message) => {
+                  if (status) {
+                    status.textContent = message;
+                  }
+                };
+
+                const stopWith = (message) => {
+                  stopped = true;
+                  setStatus(message);
+                };
+
+                const schedule = (delay) => {
+                  if (!stopped) {
+                    window.clearTimeout(timer);
+                    timer = window.setTimeout(poll, delay);
+                  }
+                };
+
+                const markLinked = () => {
+                  stopped = true;
+                  setStep(handoffStep, handoffState, "complete", "Complete");
+                  setStep(linkedStep, linkedState, "complete", "Complete");
+                  if (heading) {
+                    heading.textContent = "Linked — ready in Chummer";
+                  }
+                  if (eyebrow) {
+                    eyebrow.textContent = "Secure handoff complete";
+                  }
+                  if (badge) {
+                    badge.textContent = "Device confirmed";
+                  }
+                  setStatus("Chummer confirmed the secure handoff. This copy is now linked to your account, and you can close this tab.");
+                  document.title = "Linked — ready in Chummer · Chummer";
+                };
+
+                const markUnavailable = (message) => {
+                  setStep(handoffStep, handoffState, "attention", "Needs a fresh approval");
+                  setStep(linkedStep, linkedState, "waiting", "Not linked");
+                  stopWith(message);
+                };
+
+                async function poll() {
+                  if (stopped) {
+                    return;
+                  }
+
+                  const controller = new AbortController();
+                  const timeout = window.setTimeout(() => controller.abort(), 8000);
+                  try {
+                    const response = await fetch(endpoint, {
+                      method: "GET",
+                      credentials: "same-origin",
+                      cache: "no-store",
+                      headers: { "Accept": "application/json" },
+                      signal: controller.signal
+                    });
+
+                    if (response.status === 401 || response.status === 403) {
+                      stopWith("Your browser session ended, but the approval remains protected. Keep Chummer running; reopen the link from the app only if it does not finish.");
+                      return;
+                    }
+                    if (response.status === 404) {
+                      markUnavailable("This approval is no longer available. Nothing was linked; start a fresh secure approval from Chummer.");
+                      return;
+                    }
+                    if (!response.ok) {
+                      failureCount += 1;
+                      schedule(Math.min(1500 * Math.pow(1.6, failureCount), 6000));
+                      return;
+                    }
+
+                    const result = await response.json();
+                    failureCount = 0;
+                    pollCount += 1;
+                    if (result.completed === true || result.state === "linked") {
+                      markLinked();
+                      return;
+                    }
+                    if (result.state === "expired" || result.state === "revoked") {
+                      markUnavailable("The approval window closed before Chummer collected it. Nothing was linked; start a fresh secure approval from the app.");
+                      return;
+                    }
+
+                    setStatus("Approval received. Waiting for the running Chummer app to confirm the device-key handoff…");
+                    schedule(document.hidden ? 7000 : pollCount < 4 ? 1400 : 2600);
+                  } catch {
+                    failureCount += 1;
+                    schedule(Math.min(1500 * Math.pow(1.6, failureCount), 6000));
+                  } finally {
+                    window.clearTimeout(timeout);
+                  }
+                }
+
+                document.addEventListener("visibilitychange", () => {
+                  if (!document.hidden && !stopped) {
+                    schedule(100);
+                  }
+                });
+                window.addEventListener("pagehide", () => {
+                  stopped = true;
+                  window.clearTimeout(timer);
+                }, { once: true });
+                schedule(650);
+              })();
+              </script>
+              """;
         string highlightsHtml = string.Join(
             string.Empty,
             highlights.Select(item => $"<li>{WebUtility.HtmlEncode(item)}</li>"));
+        string remoteProgressHtml = !remoteProofPolling
+            ? string.Empty
+            : """
+              <div class="install-handoff" aria-labelledby="install-link-progress-title">
+                <div class="install-handoff__badge" id="install-link-badge">Protected handoff</div>
+                <h3 id="install-link-progress-title" class="install-handoff__title">Linking this copy</h3>
+                <ol class="install-handoff__steps">
+                  <li class="install-handoff__step" data-state="complete">
+                    <span class="install-handoff__marker" aria-hidden="true">1</span>
+                    <span class="install-handoff__content"><strong>Account approved</strong><small>Your identity and this exact install match.</small></span>
+                    <span class="install-handoff__state">Complete</span>
+                  </li>
+                  <li class="install-handoff__step" id="install-link-step-handoff" data-state="active">
+                    <span class="install-handoff__marker" aria-hidden="true">2</span>
+                    <span class="install-handoff__content"><strong>Secure handoff</strong><small>Chummer is collecting the approval over HTTPS.</small></span>
+                    <span class="install-handoff__state" id="install-link-step-handoff-state">In progress</span>
+                  </li>
+                  <li class="install-handoff__step" id="install-link-step-linked" data-state="waiting">
+                    <span class="install-handoff__marker" aria-hidden="true">3</span>
+                    <span class="install-handoff__content"><strong>Ready in Chummer</strong><small>The running app confirms when linking is complete.</small></span>
+                    <span class="install-handoff__state" id="install-link-step-linked-state">Waiting</span>
+                  </li>
+                </ol>
+              </div>
+              """;
+        string initialStatus = remoteProofPolling
+            ? "Approval received. Waiting for the running Chummer app to confirm the device-key handoff…"
+            : appLocalCallback
+                ? "This page should claim the running Chummer app. If it does not finish, use the button again or copy the claim link below."
+                : "Chummer should open from this page. If the browser blocks it, use the button again or copy the claim link below.";
+        string manualFallbackHtml = remoteProofPolling
+            ? string.Empty
+            : $$"""
+              <div id="install-link-manual" class="field" hidden>
+                <label for="install-link-manual-field">Claim link</label>
+                <input id="install-link-manual-field" type="text" readonly value="{{WebUtility.HtmlEncode(primaryHref)}}">
+                <button id="install-link-copy" class="button-like button-like--ghost" type="button" hidden>Copy claim link</button>
+              </div>
+              """;
         string html = $$"""
             <!doctype html>
             <html lang="en">
@@ -512,34 +736,47 @@ public sealed class InstallLinkingController : ControllerBase
               <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
               <title>{{WebUtility.HtmlEncode(heading)}} · Chummer</title>
               <link rel="stylesheet" href="/css/site.css">
+              <style>
+                .install-handoff { display: grid; gap: .85rem; padding: 1rem; border: 1px solid color-mix(in srgb, currentColor 15%, transparent); border-radius: 1rem; background: color-mix(in srgb, currentColor 4%, transparent); }
+                .install-handoff__badge { justify-self: start; padding: .32rem .62rem; border-radius: 999px; background: color-mix(in srgb, #35d07f 18%, transparent); color: currentColor; font-size: .76rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+                .install-handoff__title { margin: 0; font-size: 1rem; }
+                .install-handoff__steps { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+                .install-handoff__step { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: .75rem; align-items: center; padding: .7rem .25rem; }
+                .install-handoff__marker { display: grid; place-items: center; inline-size: 1.8rem; block-size: 1.8rem; border-radius: 50%; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); font-size: .78rem; font-weight: 800; }
+                .install-handoff__content { display: grid; gap: .12rem; min-inline-size: 0; }
+                .install-handoff__content small { color: color-mix(in srgb, currentColor 64%, transparent); line-height: 1.35; }
+                .install-handoff__state { color: color-mix(in srgb, currentColor 62%, transparent); font-size: .78rem; font-weight: 700; white-space: nowrap; }
+                .install-handoff__step[data-state="complete"] .install-handoff__marker { border-color: #24a966; background: #24a966; color: #fff; }
+                .install-handoff__step[data-state="complete"] .install-handoff__state { color: currentColor; }
+                .install-handoff__step[data-state="active"] .install-handoff__marker { border-color: #7b61ff; box-shadow: 0 0 0 .25rem color-mix(in srgb, #7b61ff 15%, transparent); }
+                .install-handoff__step[data-state="attention"] .install-handoff__marker { border-color: #d97706; background: color-mix(in srgb, #d97706 12%, transparent); }
+                .install-handoff__step[data-state="attention"] .install-handoff__state { color: currentColor; }
+                @media (max-width: 36rem) { .install-handoff__step { grid-template-columns: 2rem minmax(0, 1fr); } .install-handoff__state { grid-column: 2; } }
+              </style>
             </head>
             <body class="surface-auth">
               <main class="auth-stage">
                 <section class="auth-shell auth-shell--message">
                   <div class="auth-shell__story auth-visual">
-                    <p class="auth-visual__eyebrow">{{WebUtility.HtmlEncode(stateLabel)}}</p>
+                    <p class="auth-visual__eyebrow" id="install-link-eyebrow">{{WebUtility.HtmlEncode(stateLabel)}}</p>
                     <h1 class="hero-brand">CHUMMER</h1>
-                    <h2 class="hero-headline">{{WebUtility.HtmlEncode(heading)}}</h2>
+                    <h2 class="hero-headline" id="install-link-heading">{{WebUtility.HtmlEncode(heading)}}</h2>
                     <p class="auth-visual__copy">{{WebUtility.HtmlEncode(supportLine)}}</p>
                   </div>
                   <div class="auth-panel auth-panel--message">
-                    <ul class="auth-benefits auth-benefits--message">{{highlightsHtml}}</ul>
+                    {{remoteProgressHtml}}
+                    <ul class="auth-benefits auth-benefits--message" aria-label="Installation details">{{highlightsHtml}}</ul>
                     <div class="stacked-actions">
                       <a class="button-like button-like--primary" id="install-link-open" href="{{WebUtility.HtmlEncode(primaryHref)}}">{{WebUtility.HtmlEncode(primaryLabel)}}</a>
                       <a class="button-like button-like--secondary" href="{{WebUtility.HtmlEncode(secondaryHref)}}">{{WebUtility.HtmlEncode(secondaryLabel)}}</a>
                     </div>
-                    <p id="install-link-status" class="muted-copy">{{WebUtility.HtmlEncode(appLocalCallback
-                        ? "This page should claim the running Chummer app. If it does not finish, use the button again or copy the claim link below."
-                        : "Chummer should open from this page. If the browser blocks it, use the button again or copy the claim link below.")}}</p>
-                    <div id="install-link-manual" class="field" hidden>
-                      <label for="install-link-manual-field">Claim link</label>
-                      <input id="install-link-manual-field" type="text" readonly value="{{WebUtility.HtmlEncode(primaryHref)}}">
-                      <button id="install-link-copy" class="button-like button-like--ghost" type="button" hidden>Copy claim link</button>
-                    </div>
+                    <p id="install-link-status" class="muted-copy" role="status" aria-live="polite" aria-atomic="true">{{WebUtility.HtmlEncode(initialStatus)}}</p>
+                    {{manualFallbackHtml}}
                   </div>
                 </section>
               </main>
               {{autoOpenScript}}
+              {{remoteStatusScript}}
             </body>
             </html>
             """;
