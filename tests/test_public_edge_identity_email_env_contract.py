@@ -31,3 +31,8 @@ def test_identity_docker_context_includes_the_identity_service() -> None:
 
     assert "!Chummer.Run.Identity/" in dockerignore
     assert "!Chummer.Run.Identity/**" in dockerignore
+
+    dockerfile = Path("Chummer.Run.Identity/Dockerfile").read_text(encoding="utf-8")
+    assert "COPY --from=run-services-source Directory.Build.props chummer.run-services/" in dockerfile
+    assert dockerfile.count("-p:ChummerUseLocalCompatibilityTree=true") >= 3
+    assert dockerfile.count("-p:ChummerWorkspaceRoot=/src") >= 3
