@@ -3335,6 +3335,83 @@ container_proof_sha256_by_id() {
   printf '%s' "$digest"
 }
 
+snapshot_container_proof_by_id() {
+  local container_id="$1"
+  local proof_path="$2"
+  local output_path="$3"
+  local expected_sha256="$4"
+  [[ "$expected_sha256" =~ ^[0-9a-f]{64}$ ]] || return 1
+  docker_cli container exec "$container_id" /usr/bin/cat -- "$proof_path" \
+    | trusted_source_python -c '
+# chummer_snapshot_container_proof_v1
+import hashlib, os, pathlib, re, stat, sys, tempfile
+
+output = pathlib.Path(sys.argv[1])
+expected_sha256 = sys.argv[2]
+maximum_bytes = 16 * 1024 * 1024
+if not output.is_absolute() or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None:
+    raise SystemExit(1)
+for candidate in (output.parent,):
+    current = pathlib.Path(candidate.anchor)
+    for component in candidate.parts[1:]:
+        current /= component
+        metadata = current.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise SystemExit(1)
+parent_metadata = output.parent.lstat()
+if (
+    not stat.S_ISDIR(parent_metadata.st_mode)
+    or parent_metadata.st_uid != os.getuid()
+    or stat.S_IMODE(parent_metadata.st_mode) != 0o700
+    or output.exists()
+    or output.is_symlink()
+):
+    raise SystemExit(1)
+payload = sys.stdin.buffer.read(maximum_bytes + 1)
+if len(payload) > maximum_bytes or hashlib.sha256(payload).hexdigest() != expected_sha256:
+    raise SystemExit(1)
+descriptor, temporary_name = tempfile.mkstemp(
+    prefix=f".{output.name}.",
+    suffix=".tmp",
+    dir=output.parent,
+)
+temporary = pathlib.Path(temporary_name)
+try:
+    os.fchmod(descriptor, 0o600)
+    view = memoryview(payload)
+    while view:
+        written = os.write(descriptor, view)
+        if written <= 0:
+            raise OSError("short proof snapshot write")
+        view = view[written:]
+    os.fsync(descriptor)
+    metadata = os.fstat(descriptor)
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or metadata.st_nlink != 1
+        or metadata.st_size != len(payload)
+    ):
+        raise SystemExit(1)
+finally:
+    os.close(descriptor)
+try:
+    os.link(temporary, output, follow_symlinks=False)
+finally:
+    temporary.unlink(missing_ok=True)
+installed = output.lstat()
+if (
+    not stat.S_ISREG(installed.st_mode)
+    or stat.S_IMODE(installed.st_mode) != 0o600
+    or installed.st_uid != os.getuid()
+    or installed.st_nlink != 1
+    or installed.st_size != len(payload)
+    or hashlib.sha256(output.read_bytes()).hexdigest() != expected_sha256
+):
+    raise SystemExit(1)
+' "$output_path" "$expected_sha256"
+}
+
 resolve_active_runtime_authority() {
   if [[ ! -e "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY" \
     && ! -L "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY" ]]; then
@@ -5212,14 +5289,20 @@ if [[ -n "$prior_portal_container_id" ]]; then
         echo "active runtime proof mounts conflict with their authority receipt" >&2
         exit 3
       fi
-      docker_cli container cp \
-        "$prior_portal_container_id:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-        "$PRIOR_PROOF_AUTHORITY_SNAPSHOT" || exit 3
-      docker_cli container cp \
-        "$prior_portal_container_id:/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-        "$PRIOR_PROOF_PUBLIC_SNAPSHOT" || exit 3
-      "$TRUSTED_CHMOD" 0600 -- \
-        "$PRIOR_PROOF_AUTHORITY_SNAPSHOT" "$PRIOR_PROOF_PUBLIC_SNAPSHOT"
+      # Docker's archive-based `container cp` tries to reopen every nested bind
+      # below the read-only /app mount and fails before it can copy either proof.
+      # Stream each already hash-verified file through container exec instead;
+      # the receiver is bounded, digest-gated, mode-0600, and no-clobber.
+      snapshot_container_proof_by_id \
+        "$prior_portal_container_id" \
+        /proofs/HUB_LOCAL_RELEASE_PROOF.generated.json \
+        "$PRIOR_PROOF_AUTHORITY_SNAPSHOT" \
+        "$prior_portal_proof_authority_mount_sha256" || exit 3
+      snapshot_container_proof_by_id \
+        "$prior_portal_container_id" \
+        /app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json \
+        "$PRIOR_PROOF_PUBLIC_SNAPSHOT" \
+        "$prior_portal_proof_public_mount_sha256" || exit 3
       prior_authority_snapshot_sha256="$(
         "$TRUSTED_SHA256SUM" -- "$PRIOR_PROOF_AUTHORITY_SNAPSHOT"
       )"
