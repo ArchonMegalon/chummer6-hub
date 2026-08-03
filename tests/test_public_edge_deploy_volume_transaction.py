@@ -191,6 +191,7 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "  *\"InstallLinking post-quiesce runtime authority identity parser\"*) printf '%s|%s' \"$FAKE_INSTALL_LINKING_AUTHORITY_IDENTITY_SHA256\" \"$FAKE_INSTALL_LINKING_RUNTIME_ROLE_SHA256\"; exit 0;;\n"
         "  *\"InstallLinking public acceptance evidence precommit verifier\"*) [ \"${FAKE_POSTDEPLOY_DIGEST_TAMPER:-0}\" != 1 ] || exit 82; shift 4; /usr/bin/sha256sum -- \"$1\" | /usr/bin/awk '{print $1}'; exit 0;;\n"
         "  *\"InstallLinking accepted boundary closure parser\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *chummer_snapshot_container_proof_v1*) exec /usr/bin/python3 \"$@\";;\n"
         "  *runtimeProofBindSource*) printf '%s\\n' \"$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256\"; exit 0;;\n"
         "esac\n"
         "if [ \"${1:-}\" = -I ] && [ \"${2:-}\" = -c ]; then\n"
@@ -1081,9 +1082,8 @@ case "$*" in
     fi;;
   "container exec $FAKE_PRIOR_PORTAL_CONTAINER_ID /usr/bin/sha256sum -- "*)
     printf '%s  %s\n' "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" "${*##* }";;
-  "container cp $FAKE_PRIOR_PORTAL_CONTAINER_ID:"*)
-    for target in "$@"; do :; done
-    /usr/bin/cp "$FAKE_RUNTIME_PROOF_FILE" "$target";;
+  "container exec $FAKE_PRIOR_PORTAL_CONTAINER_ID /usr/bin/cat -- "*)
+    /usr/bin/cat "$FAKE_RUNTIME_PROOF_FILE";;
   "container ls --all --quiet --no-trunc --filter name=^/chummer-public-edge-candidate-"*)
     ;;
   "container inspect --format {{.Id}} chummer-public-edge-candidate-"*)
