@@ -125,7 +125,11 @@ test('downloads and status stay concise and point to the right next steps', asyn
     await expect(downloadsPage.getByRole('heading', { name: 'No build is available right now' })).toBeVisible();
     await expect(downloadsMain.locator('[data-release-lane]')).toHaveCount(0);
   }
-  const sourceBuild = downloadsMain.locator('#source-build');
+  const otherDownloads = downloadsMain.locator('#other-downloads');
+  await expect(otherDownloads).toBeVisible();
+  await otherDownloads.locator('summary').click();
+  await expect(otherDownloads).toHaveAttribute('open', '');
+  const sourceBuild = otherDownloads.locator('#linux-source');
   await expect(sourceBuild).toBeVisible();
   await expect(sourceBuild).toContainText('Build from source');
   await expect(sourceBuild.locator('a[href="/downloads/build-chummer6-linux.sh"]')).toHaveAttribute(
