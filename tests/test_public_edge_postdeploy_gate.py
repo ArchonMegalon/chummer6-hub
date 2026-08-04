@@ -4850,6 +4850,13 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
     assert result["childReceipts"] == {}
     assert result["schemaContractName"] == schema_authority["contractName"]
     assert result["schemaSha256"] == schema_authority["sha256"]
+    assert result["pwaStaticFailures"] == []
+    assert result["pwaAssetInventoryExpectedSha256"] is None
+    assert result["pwaAssetInventorySealedExpectedSha256"] == "c" * 64
+    assert result["pwaAssetInventoryActualSha256"] is None
+    assert result["pwaAssetInventoryMatchesExpected"] is True
+    assert result["pwaAssetInventorySourceStable"] is True
+    assert result["pwaAssetMismatches"] == []
     assert result["skipPreflight"] is False
     assert result["skipReleaseVersionMatch"] is False
     assert result["strictPreflight"] is False

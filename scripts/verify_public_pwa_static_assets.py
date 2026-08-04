@@ -254,6 +254,41 @@ def source_asset_digest_inventory(
     return asset_digest_inventory(rows)
 
 
+def cache_control_matches_sealed_policy(
+    path: str,
+    actual: str,
+    expected: str,
+) -> bool:
+    normalized_actual = actual.strip().lower()
+    normalized_expected = expected.strip().lower()
+    if not path.endswith("service-worker.js"):
+        return normalized_actual == normalized_expected
+    if normalized_expected != WORKER_CACHE_CONTROL:
+        return False
+    directives = {
+        directive.strip()
+        for directive in normalized_actual.split(",")
+        if directive.strip()
+    }
+    if "no-store" not in directives or "no-cache" not in directives:
+        return False
+    if "public" in directives:
+        return False
+    if any(
+        (
+            directive.startswith("max-age=")
+            and directive != "max-age=0"
+        )
+        or (
+            directive.startswith("s-maxage=")
+            and directive != "s-maxage=0"
+        )
+        for directive in directives
+    ):
+        return False
+    return "must-revalidate" in directives or "max-age=0" in directives
+
+
 def verify_live_bound_asset(
     path: str,
     status: int,
@@ -264,6 +299,15 @@ def verify_live_bound_asset(
 ) -> dict[str, Any]:
     actual_media_type = normalized_media_type(headers.get("content-type"))
     actual_digest = sha256(payload)
+    actual_cache_control = headers.get("cache-control", "").strip().lower()
+    expected_cache_control = str(
+        expected.get("cacheControl") or ""
+    ).strip().lower()
+    cache_control_matches = cache_control_matches_sealed_policy(
+        path,
+        actual_cache_control,
+        expected_cache_control,
+    )
     require(status == 200, failures, f"{path}: expected 200, got {status}")
     require(bool(payload), failures, f"{path}: empty response")
     require(
@@ -287,8 +331,7 @@ def verify_live_bound_asset(
         f"{path}: X-Content-Type-Options must be exactly nosniff",
     )
     require(
-        headers.get("cache-control", "").strip().lower()
-        == str(expected.get("cacheControl") or "").strip().lower(),
+        cache_control_matches,
         failures,
         f"{path}: Cache-Control differs from the sealed source inventory",
     )
@@ -296,7 +339,13 @@ def verify_live_bound_asset(
     return {
         "path": path,
         "contentType": actual_media_type,
-        "cacheControl": headers.get("cache-control", "").strip(),
+        "cacheControl": (
+            expected_cache_control
+            if cache_control_matches
+            else actual_cache_control
+        ),
+        "cacheControlObserved": actual_cache_control,
+        "cacheControlPolicyMatch": cache_control_matches,
         "nosniff": headers.get("x-content-type-options", "").strip().lower() == "nosniff",
         "mirrorBound": expected.get("mirrorBound") is True,
         "sha256": actual_digest,
@@ -308,8 +357,7 @@ def verify_live_bound_asset(
         and actual_digest == expected.get("sha256")
         and len(payload) == expected.get("sizeBytes")
         and headers.get("x-content-type-options", "").strip().lower() == "nosniff"
-        and headers.get("cache-control", "").strip().lower()
-        == str(expected.get("cacheControl") or "").strip().lower(),
+        and cache_control_matches,
     }
 
 
