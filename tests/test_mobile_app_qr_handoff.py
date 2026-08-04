@@ -82,6 +82,7 @@ const listeners = {};
 const installStatus = { textContent: "" };
 let attempts = 0;
 let unregisters = 0;
+let currentReadyState = readyState;
 const serviceWorkerNavigator = {
   standalone: false,
   serviceWorker: {
@@ -104,20 +105,29 @@ Object.defineProperty(globalThis, "navigator", { value: serviceWorkerNavigator, 
 global.window = {
   navigator: serviceWorkerNavigator,
   matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
-  addEventListener: (name, callback) => { listeners[name] = callback; },
+  addEventListener: (name, callback) => {
+    listeners[name] = listeners[name] ?? [];
+    listeners[name].push(callback);
+  },
   removeEventListener: () => {},
   setTimeout: (callback) => { callback(); return 1; },
   clearTimeout: () => {}
 };
 global.document = {
-  readyState,
+  get readyState() { return currentReadyState; },
   getElementById: (id) => id === "turn-install-status" ? installStatus : null
 };
 eval(fs.readFileSync(process.argv[1], "utf8"));
 
 (async () => {
-  listeners.load?.();
   for (let tick = 0; tick < 8; tick += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  currentReadyState = "complete";
+  for (const callback of listeners.load ?? []) {
+    callback();
+  }
+  for (let tick = 0; tick < 16; tick += 1) {
     await new Promise((resolve) => setImmediate(resolve));
   }
   process.stdout.write(JSON.stringify({ attempts, unregisters, status: installStatus.textContent }));
@@ -186,17 +196,21 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
     assert "await waitForServiceWorkerActivation(registration);" in script
     assert "await registration?.unregister?.().catch(() => false);" in script
     assert "window.setTimeout(resolve, serviceWorkerRetryDelaysMs[attempt]);" in script
-    assert "void registerServiceWorker();" in script
-    assert "startServiceWorkerRegistration();" in script
-    assert 'window.addEventListener("load"' not in script
+    assert "await registerServiceWorker({ reportFailure: false })" in script
+    assert "void startServiceWorkerRegistration();" in script
+    assert 'window.addEventListener("load", resolve, { once: true });' in script
 
     recovered = _run_install_worker_registration(failures_before_success=2)
-    exhausted = _run_install_worker_registration(failures_before_success=5)
+    recovered_after_pending_deletion = _run_install_worker_registration(failures_before_success=3)
+    exhausted = _run_install_worker_registration(failures_before_success=6)
     assert recovered["attempts"] == 3
     assert recovered["unregisters"] == 0
     assert "not available" not in str(recovered["status"])
+    assert recovered_after_pending_deletion["attempts"] == 4
+    assert recovered_after_pending_deletion["unregisters"] == 0
+    assert "not available" not in str(recovered_after_pending_deletion["status"])
     assert exhausted == {
-        "attempts": 3,
+        "attempts": 6,
         "unregisters": 0,
         "status": "The install shell is available online. Service-worker installation is not available in this browser.",
     }
@@ -205,16 +219,23 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
         failures_before_success=0,
         activation_failures_before_success=2,
     )
+    activation_recovered_after_pending_deletion = _run_install_worker_registration(
+        failures_before_success=0,
+        activation_failures_before_success=3,
+    )
     activation_exhausted = _run_install_worker_registration(
         failures_before_success=0,
-        activation_failures_before_success=5,
+        activation_failures_before_success=6,
     )
     assert activation_recovered["attempts"] == 3
     assert activation_recovered["unregisters"] == 2
     assert "not available" not in str(activation_recovered["status"])
+    assert activation_recovered_after_pending_deletion["attempts"] == 4
+    assert activation_recovered_after_pending_deletion["unregisters"] == 3
+    assert "not available" not in str(activation_recovered_after_pending_deletion["status"])
     assert activation_exhausted == {
-        "attempts": 3,
-        "unregisters": 3,
+        "attempts": 6,
+        "unregisters": 6,
         "status": "The install shell is available online. Service-worker installation is not available in this browser.",
     }
 
