@@ -99,6 +99,11 @@
     });
   };
 
+  const hasPendingServiceWorkerActivation = (registration) => {
+    const worker = registration?.installing ?? registration?.waiting ?? registration?.active ?? null;
+    return worker != null && ["installing", "installed", "activating"].includes(worker.state);
+  };
+
   const registerServiceWorker = async ({ reportFailure = true } = {}) => {
     for (let attempt = 0; attempt < serviceWorkerRegistrationAttempts; attempt += 1) {
       let registration = null;
@@ -107,7 +112,13 @@
         await waitForServiceWorkerActivation(registration);
         return true;
       } catch {
-        await registration?.unregister?.().catch(() => false);
+        // Do not restart a slow but progressing installation. Chromium can keep
+        // an unregistered worker pending deletion until the page closes, so an
+        // eager unregister here can turn a transient delay into a permanent
+        // register/unregister loop for the current page.
+        if (!hasPendingServiceWorkerActivation(registration)) {
+          await registration?.unregister?.().catch(() => false);
+        }
         if (attempt + 1 >= serviceWorkerRegistrationAttempts) {
           if (reportFailure) {
             setStatus("The install shell is available online. Service-worker installation is not available in this browser.");
