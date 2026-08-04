@@ -180,6 +180,8 @@ def _assert_shared_privacy_semantics(script: str, expected_cache_version: str) -
     assert "PUBLIC_CACHEABLE_ASSETS = new Map" in script
     assert "isExpectedPublicAssetResponse" in script
     assert "CRITICAL_SHELL_ASSETS" in script
+    critical_shell = script.split("const CRITICAL_SHELL_ASSETS = [", 1)[1].split("];", 1)[0]
+    assert '"/mobile.css"' in critical_shell
     assert "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;" in script
     assert "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];" in script
     assert "const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;" in script
