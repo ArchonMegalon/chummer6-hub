@@ -114,11 +114,7 @@
     const startServiceWorkerRegistration = () => {
       void registerServiceWorker();
     };
-    if (document.readyState === "complete") {
-      startServiceWorkerRegistration();
-    } else {
-      window.addEventListener("load", startServiceWorkerRegistration, { once: true });
-    }
+    startServiceWorkerRegistration();
   }
 
   syncDisplayModeState();

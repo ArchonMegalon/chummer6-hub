@@ -187,7 +187,8 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
     assert "await registration?.unregister?.().catch(() => false);" in script
     assert "window.setTimeout(resolve, serviceWorkerRetryDelaysMs[attempt]);" in script
     assert "void registerServiceWorker();" in script
-    assert 'if (document.readyState === "complete")' in script
+    assert "startServiceWorkerRegistration();" in script
+    assert 'window.addEventListener("load"' not in script
 
     recovered = _run_install_worker_registration(failures_before_success=2)
     exhausted = _run_install_worker_registration(failures_before_success=5)
@@ -223,6 +224,13 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
     )
     assert already_loaded["attempts"] == 1
     assert "not available" not in str(already_loaded["status"])
+
+    interactive_without_load = _run_install_worker_registration(
+        failures_before_success=0,
+        ready_state="interactive",
+    )
+    assert interactive_without_load["attempts"] == 1
+    assert "not available" not in str(interactive_without_load["status"])
 
 
 def test_landing_build_entry_reuses_the_same_handoff_component_for_the_builder_pwa() -> None:
