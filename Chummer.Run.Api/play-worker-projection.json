@@ -1,9 +1,9 @@
 {
   "contract": "play-root-worker-public-edge-projection-v2",
   "source": "../chummer-play/src/Chummer.Play.Web/wwwroot/service-worker.js",
-  "sourceSha256": "f3cef86bbf454b1a93c8ff9ccfe84f4c83dc7b505901471d702493a37960b83c",
+  "sourceSha256": "eda74c87c1a2140049c671653c4f332682a1406b96262ba40b986226f6ccc86d",
   "template": "Chummer.Run.Api/service-worker.public-edge.template.js",
-  "templateSha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
+  "templateSha256": "0d58f6e99080bfbf8523b500f1af3f85eaefc892d6bb06dc93c2dc8f8148a839",
   "requiredInventory": "Chummer.Run.Api/play-pwa-required-inventory.json",
   "requiredInventorySha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a",
   "projection": "Chummer.Run.Api/wwwroot/service-worker.js",
@@ -14,7 +14,9 @@
     "\"/mobile-install-shell.js\"",
     "\"/manifest.webmanifest\"",
     "\"/manifest.observer.webmanifest\"",
-    "event.waitUntil(precacheCriticalShell());"
+    "event.waitUntil(precacheCriticalShell());",
+    "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;",
+    "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];"
   ],
   "forbiddenSourceMarkers": [
     "self.skipWaiting()",
@@ -27,7 +29,9 @@
     "const CRITICAL_SHELL_ASSETS = [",
     "\"/manifest.play.webmanifest\"",
     "play_public_route_network_unavailable",
-    "event.waitUntil(precacheCriticalShell());"
+    "event.waitUntil(precacheCriticalShell());",
+    "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;",
+    "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];"
   ],
   "forbiddenProjectionMarkers": [
     "self.skipWaiting()",

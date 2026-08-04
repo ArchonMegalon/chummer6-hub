@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
-import re
 from pathlib import Path
+import re
+import subprocess
 
 import pytest
 
@@ -35,6 +37,55 @@ def _constant(script: str, name: str) -> str:
     return match.group(1)
 
 
+def _run_critical_asset_fetch(worker: Path, failures_before_success: int) -> dict[str, object]:
+    probe = r"""
+const fs = require("fs");
+const failuresBeforeSuccess = Number(process.argv[2]);
+let attempts = 0;
+global.self = {
+  registration: { scope: "https://chummer.run/mobile/" },
+  location: { origin: "https://chummer.run" },
+  addEventListener: () => {}
+};
+global.Request = class Request {
+  constructor(path, options = {}) {
+    this.url = new URL(path, self.location.origin).toString();
+    this.method = options.method || "GET";
+    this.mode = "cors";
+  }
+};
+global.fetch = async (request) => {
+  attempts += 1;
+  if (attempts <= failuresBeforeSuccess) {
+    throw new TypeError("transient asset fetch failure");
+  }
+  const response = new Response("ok", {
+    status: 200,
+    headers: {
+      "Content-Type": "application/javascript",
+      "Cache-Control": "public, max-age=300, must-revalidate"
+    }
+  });
+  Object.defineProperty(response, "url", { value: request.url });
+  return response;
+};
+global.caches = {};
+global.setTimeout = (callback) => { callback(); return 1; };
+eval(fs.readFileSync(process.argv[1], "utf8"));
+fetchCriticalShellAsset("/mobile-install-shell.js")
+  .then(() => process.stdout.write(JSON.stringify({ attempts, recovered: true })))
+  .catch(() => process.stdout.write(JSON.stringify({ attempts, recovered: false })));
+"""
+    result = subprocess.run(
+        ["node", "-e", probe, str(worker), str(failures_before_success)],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
 def _assert_shared_privacy_semantics(script: str, expected_cache_version: str) -> None:
     assert f'const CACHE_VERSION = "{expected_cache_version}";' in script
     assert '`${CACHE_FAMILY}-static-${CACHE_CONTRACT}-${CACHE_VERSION}`' in script
@@ -48,6 +99,11 @@ def _assert_shared_privacy_semantics(script: str, expected_cache_version: str) -
     assert "PUBLIC_CACHEABLE_ASSETS = new Map" in script
     assert "isExpectedPublicAssetResponse" in script
     assert "CRITICAL_SHELL_ASSETS" in script
+    assert "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;" in script
+    assert "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];" in script
+    assert "CRITICAL_SHELL_ASSETS.map(fetchCriticalShellAsset)" in script
+    assert "attempt < CRITICAL_SHELL_FETCH_ATTEMPTS" in script
+    assert "attempt + 1 < CRITICAL_SHELL_FETCH_ATTEMPTS" in script
     assert "Promise.allSettled" not in script
     assert "caches.match(" not in script
     assert "caches.open(SHELL_CACHE).then((cache) => cache.match(request))" in script
@@ -121,3 +177,17 @@ def test_actual_play_source_and_served_projection_use_distinct_cache_contracts_w
     assert '"/manifest.play.webmanifest",' in served
     assert '["/manifest.webmanifest",' not in served
     assert '["/mobile-turn-companion.js",' not in served
+
+
+def test_source_and_projection_retry_transient_critical_asset_fetches_with_a_closed_budget() -> None:
+    source = _play_source_worker()
+
+    for worker in (source, SERVED_WORKER):
+        assert _run_critical_asset_fetch(worker, failures_before_success=2) == {
+            "attempts": 3,
+            "recovered": True,
+        }
+        assert _run_critical_asset_fetch(worker, failures_before_success=5) == {
+            "attempts": 3,
+            "recovered": False,
+        }

@@ -68,13 +68,20 @@ process.stdout.write(JSON.stringify({
     return json.loads(result.stdout)
 
 
-def _run_install_worker_registration(failures_before_success: int) -> dict[str, object]:
+def _run_install_worker_registration(
+    failures_before_success: int,
+    activation_failures_before_success: int = 0,
+    ready_state: str = "loading",
+) -> dict[str, object]:
     probe = r"""
 const fs = require("fs");
 const failuresBeforeSuccess = Number(process.argv[2]);
+const activationFailuresBeforeSuccess = Number(process.argv[3]);
+const readyState = process.argv[4];
 const listeners = {};
 const installStatus = { textContent: "" };
 let attempts = 0;
+let unregisters = 0;
 const serviceWorkerNavigator = {
   standalone: false,
   serviceWorker: {
@@ -83,7 +90,13 @@ const serviceWorkerNavigator = {
       if (attempts <= failuresBeforeSuccess) {
         throw new TypeError("transient registration failure");
       }
-      return {};
+      const activationAttempt = attempts - failuresBeforeSuccess;
+      return {
+        active: {
+          state: activationAttempt <= activationFailuresBeforeSuccess ? "redundant" : "activated"
+        },
+        unregister: async () => { unregisters += 1; return true; }
+      };
     }
   }
 };
@@ -93,26 +106,36 @@ global.window = {
   matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
   addEventListener: (name, callback) => { listeners[name] = callback; },
   removeEventListener: () => {},
-  setTimeout: (callback) => { callback(); return 1; }
+  setTimeout: (callback) => { callback(); return 1; },
+  clearTimeout: () => {}
 };
 global.document = {
+  readyState,
   getElementById: (id) => id === "turn-install-status" ? installStatus : null
 };
 eval(fs.readFileSync(process.argv[1], "utf8"));
 
 (async () => {
-  listeners.load();
+  listeners.load?.();
   for (let tick = 0; tick < 8; tick += 1) {
     await new Promise((resolve) => setImmediate(resolve));
   }
-  process.stdout.write(JSON.stringify({ attempts, status: installStatus.textContent }));
+  process.stdout.write(JSON.stringify({ attempts, unregisters, status: installStatus.textContent }));
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
 """
     result = subprocess.run(
-        ["node", "-e", probe, str(INSTALL_SCRIPT), str(failures_before_success)],
+        [
+            "node",
+            "-e",
+            probe,
+            str(INSTALL_SCRIPT),
+            str(failures_before_success),
+            str(activation_failures_before_success),
+            ready_state,
+        ],
         cwd=REPO_ROOT,
         check=True,
         capture_output=True,
@@ -156,20 +179,50 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
 
     assert "const serviceWorkerRegistrationAttempts = 3;" in script
     assert "const serviceWorkerRetryDelaysMs = [500, 1500];" in script
+    assert "const serviceWorkerActivationTimeoutMs = 8000;" in script
     assert "attempt < serviceWorkerRegistrationAttempts" in script
     assert "attempt + 1 >= serviceWorkerRegistrationAttempts" in script
     assert script.count('navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" })') == 1
+    assert "await waitForServiceWorkerActivation(registration);" in script
+    assert "await registration?.unregister?.().catch(() => false);" in script
     assert "window.setTimeout(resolve, serviceWorkerRetryDelaysMs[attempt]);" in script
     assert "void registerServiceWorker();" in script
+    assert 'if (document.readyState === "complete")' in script
 
     recovered = _run_install_worker_registration(failures_before_success=2)
     exhausted = _run_install_worker_registration(failures_before_success=5)
     assert recovered["attempts"] == 3
+    assert recovered["unregisters"] == 0
     assert "not available" not in str(recovered["status"])
     assert exhausted == {
         "attempts": 3,
+        "unregisters": 0,
         "status": "The install shell is available online. Service-worker installation is not available in this browser.",
     }
+
+    activation_recovered = _run_install_worker_registration(
+        failures_before_success=0,
+        activation_failures_before_success=2,
+    )
+    activation_exhausted = _run_install_worker_registration(
+        failures_before_success=0,
+        activation_failures_before_success=5,
+    )
+    assert activation_recovered["attempts"] == 3
+    assert activation_recovered["unregisters"] == 2
+    assert "not available" not in str(activation_recovered["status"])
+    assert activation_exhausted == {
+        "attempts": 3,
+        "unregisters": 3,
+        "status": "The install shell is available online. Service-worker installation is not available in this browser.",
+    }
+
+    already_loaded = _run_install_worker_registration(
+        failures_before_success=0,
+        ready_state="complete",
+    )
+    assert already_loaded["attempts"] == 1
+    assert "not available" not in str(already_loaded["status"])
 
 
 def test_landing_build_entry_reuses_the_same_handoff_component_for_the_builder_pwa() -> None:

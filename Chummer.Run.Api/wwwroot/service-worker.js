@@ -107,22 +107,37 @@ const CRITICAL_SHELL_ASSETS = [
   "/icons/icon-192.svg",
   "/icons/icon-512.svg"
 ];
+const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;
+const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(precacheCriticalShell());
 });
 
 async function precacheCriticalShell() {
-  const verified = await Promise.all(CRITICAL_SHELL_ASSETS.map(async (asset) => {
-    const request = new Request(asset, { method: "GET", cache: "reload", credentials: "omit" });
-    const response = await fetch(request);
-    if (!isExpectedPublicAssetResponse(request, response)) {
-      throw new Error(`critical public shell asset failed validation: ${asset}`);
-    }
-    return { request, response };
-  }));
+  const verified = await Promise.all(CRITICAL_SHELL_ASSETS.map(fetchCriticalShellAsset));
   const cache = await caches.open(SHELL_CACHE);
   await Promise.all(verified.map(({ request, response }) => cache.put(request, response)));
+}
+
+async function fetchCriticalShellAsset(asset) {
+  for (let attempt = 0; attempt < CRITICAL_SHELL_FETCH_ATTEMPTS; attempt += 1) {
+    const request = new Request(asset, { method: "GET", cache: "reload", credentials: "omit" });
+    try {
+      const response = await fetch(request);
+      if (isExpectedPublicAssetResponse(request, response)) {
+        return { request, response };
+      }
+    } catch {
+      // The closed retry budget below covers transient cutover/network failures.
+    }
+    if (attempt + 1 < CRITICAL_SHELL_FETCH_ATTEMPTS) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS[attempt]);
+      });
+    }
+  }
+  throw new Error(`critical public shell asset failed validation: ${asset}`);
 }
 
 self.addEventListener("activate", (event) => {
