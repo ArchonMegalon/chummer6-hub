@@ -3,7 +3,12 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const stableChannels = new Set(['public_stable', 'stable']);
-const recognizedStatusHeadings = new Set(['Preview downloads', 'Stable downloads', 'Downloads paused']);
+const recognizedStatusHeadings = new Set([
+  'Preview downloads',
+  'Stable downloads',
+  'Downloads under review',
+  'Downloads paused',
+]);
 
 function normalizedText(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -39,6 +44,9 @@ function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): s
   const version = typeof manifest.version === 'string' ? manifest.version.trim() : '';
   const channel = normalizedText(manifest.channel ?? manifest.channelId ?? manifest.channel_id);
   const supportabilityState = normalizedText(manifest.supportabilityState ?? manifest.supportability_state);
+  const releaseDecisionStatus = normalizedText(
+    manifest.releaseDecisionStatus ?? manifest.release_decision_status,
+  );
   const rolloutState = normalizedText(manifest.rolloutState ?? manifest.rollout_state);
   const statusAllowsStableRelease = !status || status === 'published';
   const publicInstallCount = Number(
@@ -51,6 +59,9 @@ function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): s
       && publicInstallCount === 0
       && !publicInstallerAvailableFromManifest(manifest)) {
     return 'Downloads paused';
+  }
+  if (supportabilityState === 'review_required' || releaseDecisionStatus === 'review_required') {
+    return 'Downloads under review';
   }
   const isPublishedStableRelease = (
     statusAllowsStableRelease
@@ -151,7 +162,9 @@ test('downloads and status stay concise and point to the right next steps', asyn
   expect(statusHeadingUsesGenericUpdatedCopy).toBeFalsy();
   expect(statusHeadingText).toBe(expectedStatusHeading);
   await expect(statusPage.locator('body')).toContainText('Now');
-  await expect(statusPage.locator('body')).toContainText(/downloads are live|download is live|Downloads are paused|No public installer right now/);
+  await expect(statusPage.locator('body')).toContainText(
+    /downloads are live|download is live|Downloads are paused|No public installer right now|availability is not asserted/,
+  );
   const statusVersionMarker = statusPage.locator('[data-downloads-release-version]');
   await expect(statusVersionMarker).toHaveAttribute('data-downloads-release-version', /^Version \S+/);
   const statusVersionText = (await statusVersionMarker.getAttribute('data-downloads-release-version'))?.trim() || '';
@@ -186,6 +199,9 @@ test('downloads and status stay concise and point to the right next steps', asyn
     release_manifest_status: normalizedText(releaseManifest.status),
     release_manifest_channel: normalizedText(releaseManifest.channel ?? releaseManifest.channelId ?? releaseManifest.channel_id),
     release_manifest_supportability_state: normalizedText(releaseManifest.supportabilityState ?? releaseManifest.supportability_state),
+    release_manifest_release_decision_status: normalizedText(
+      releaseManifest.releaseDecisionStatus ?? releaseManifest.release_decision_status,
+    ),
     release_manifest_rollout_state: normalizedText(releaseManifest.rolloutState ?? releaseManifest.rollout_state),
     release_manifest_public_install_count: Number.isFinite(publicInstallCount) ? publicInstallCount : null,
     public_installer_available: publicInstallerAvailable,
