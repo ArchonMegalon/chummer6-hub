@@ -6117,3 +6117,18 @@ def test_root_install_frontdoor_is_excluded_from_clickrank_eligibility() -> None
     assert 'routeKey is "landing"' not in eligibility
     assert 'routeKey is "what-is-chummer"' in eligibility
     assert 'routeKey.StartsWith("artifacts-"' in eligibility
+
+
+def test_mobile_pwa_viewport_smoke_proves_real_build_layout_switching() -> None:
+    spec_path = REPO_ROOT / "tests" / "public" / "mobile-pwa-viewport-smoke.spec.ts"
+    spec = spec_path.read_text(encoding="utf-8")
+
+    assert "const buildCompactMediaQuery = '(max-width: 920px)'" in spec
+    assert "window.matchMedia(mediaQuery).matches" in spec
+    assert "getComputedStyle(grid).gridTemplateColumns" in spec
+    assert "await page.setViewportSize(overrideViewport)" in spec
+    assert "await page.setViewportSize({ width: viewport.width, height: viewport.height })" in spec
+    assert "build_layout_source: 'browser-media-query'" in spec
+    assert "build_layout_preference: 'auto'" in spec
+    assert "build_layout_effective: effectiveLayout" in spec
+    assert "build_layout_override_checked: overrideLayout" in spec
