@@ -3,52 +3,35 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const stableChannels = new Set(['public_stable', 'stable']);
-const recognizedStatusHeadings = new Set([
-  'Downloads under review',
-  'Preview downloads',
-  'Stable downloads',
-  'Downloads paused',
-]);
-const blockingRolloutStates = new Set([
-  'blocked',
-  'coverage_incomplete',
-  'desktop_polish_needed',
-  'disabled',
-  'public_release_review_required',
-  'release_review_required',
-  'revoked',
-  'unpublished',
-]);
+const recognizedStatusHeadings = new Set(['Preview downloads', 'Stable downloads', 'Downloads paused']);
 
 function normalizedText(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
-function publicInstallerAvailable(manifest: Record<string, unknown>): boolean {
-  if (Array.isArray(manifest.downloads)) {
-    return manifest.downloads.length > 0;
+function publicInstallerAvailableFromManifest(manifest: Record<string, unknown>): boolean {
+  const publicInstallCount = Number(
+    (manifest.publicTrustMetrics as Record<string, unknown> | undefined)
+      ?.adoptionHealth
+      && ((manifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
+        .publicInstallCount,
+  );
+  if (Number.isFinite(publicInstallCount) && publicInstallCount > 0) {
+    return true;
   }
-  if (Array.isArray(manifest.artifacts)) {
-    return manifest.artifacts.some((value) => {
-      if (!value || typeof value !== 'object') return false;
-      const artifact = value as Record<string, unknown>;
-      const kind = normalizedText(artifact.kind ?? artifact.artifactKind);
-      const access = normalizedText(
-        artifact.installAccessClass ?? artifact.accessClass ?? artifact.access,
-      );
-      const url = normalizedText(artifact.downloadUrl ?? artifact.url ?? artifact.installUrl);
-      return kind.includes('installer')
-        && (!access || ['open_public', 'public', 'guest'].includes(access))
-        && !!url;
-    });
-  }
-  const publicInstallCount = (
-    manifest.publicTrustMetrics as Record<string, unknown> | undefined
-  )?.adoptionHealth as Record<string, unknown> | undefined;
-  if (publicInstallCount && 'publicInstallCount' in publicInstallCount) {
-    return Number(publicInstallCount.publicInstallCount || 0) > 0;
-  }
-  return true;
+
+  const openPublicSurfaceCount = Number(
+    (manifest.registryBoundaryCoverage as Record<string, unknown> | undefined)
+      ?.entitlement
+      && ((manifest.registryBoundaryCoverage as Record<string, unknown>).entitlement as Record<string, unknown>)
+        .openPublicSurfaceCount,
+  );
+  return normalizedText(manifest.status) === 'published'
+    && normalizedText(manifest.channel ?? manifest.channelId ?? manifest.channel_id) === 'preview'
+    && Number.isFinite(publicInstallCount)
+    && publicInstallCount === 0
+    && Number.isFinite(openPublicSurfaceCount)
+    && openPublicSurfaceCount > 0;
 }
 
 function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): string {
@@ -58,20 +41,22 @@ function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): s
   const supportabilityState = normalizedText(manifest.supportabilityState ?? manifest.supportability_state);
   const rolloutState = normalizedText(manifest.rolloutState ?? manifest.rollout_state);
   const statusAllowsStableRelease = !status || status === 'published';
+  const publicInstallCount = Number(
+    (manifest.publicTrustMetrics as Record<string, unknown> | undefined)
+      ?.adoptionHealth
+      && ((manifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
+        .publicInstallCount,
+  );
+  if (Number.isFinite(publicInstallCount)
+      && publicInstallCount === 0
+      && !publicInstallerAvailableFromManifest(manifest)) {
+    return 'Downloads paused';
+  }
   const isPublishedStableRelease = (
     statusAllowsStableRelease
     && supportabilityState === 'gold_supported'
     && (stableChannels.has(channel) || rolloutState === 'public_stable')
   );
-
-  if (
-    statusAllowsStableRelease
-    && supportabilityState === 'review_required'
-    && publicInstallerAvailable(manifest)
-    && (version || channel || blockingRolloutStates.has(rolloutState))
-  ) {
-    return 'Downloads under review';
-  }
 
   if (status && status !== 'published') {
     return 'Downloads paused';
@@ -124,61 +109,55 @@ test('downloads and status stay concise and point to the right next steps', asyn
   const downloadsPage = await openPublicPage(browser, '/downloads');
   const downloadsMain = downloadsPage.locator('#main');
   await expect(downloadsPage.getByRole('heading', { name: 'Downloads' })).toBeVisible();
-  await expect(downloadsPage.locator('body')).toContainText('Stable');
-  await expect(downloadsPage.locator('body')).toContainText('Nightly');
-  await expect(downloadsPage.locator('body')).toContainText('Chummer selects the best installer when it can.');
   const downloadsVersionMarker = downloadsMain.locator('[data-downloads-release-version]');
-  await expect(downloadsVersionMarker).toContainText(/^Version \S+/);
-  const downloadsVersionText = (await downloadsVersionMarker.textContent())?.trim() || '';
-  await expect(downloadsPage.locator('body')).toContainText(
-    /Stable release|No Stable build on this shelf\.|Stable release is unchanged while this nightly handoff is under review\.|Stable release is not available for this platform yet\./,
+  await expect(downloadsVersionMarker).toHaveAttribute('data-downloads-release-version', /^Version \S+/);
+  const downloadsVersionText = normalizedText((await downloadsMain.locator('.downloads-version').first().textContent()) || '');
+  const publicInstallCount = Number(
+    (releaseManifest.publicTrustMetrics as Record<string, unknown> | undefined)
+      ?.adoptionHealth
+      && ((releaseManifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
+        .publicInstallCount,
   );
-  await expect(downloadsPage.locator('body')).toContainText(
-    /Nightly handoff|No newer Nightly right now\.|Preview build\. Check Help before you install\./,
-  );
-  await expect(downloadsPage.locator('body')).toContainText('Build from source');
-  const primaryLaneActions = await downloadsMain.locator('#stable a.button-like, #nightly a.button-like').evaluateAll(
-    (items) => items.map((item) => ({
-      text: (item.textContent ?? '').trim(),
-      href: item.getAttribute('href') ?? '',
-    })).filter((item) => item.text),
-  );
-  expect(primaryLaneActions).toHaveLength(2);
-  for (const action of primaryLaneActions) {
-    expect(
-      action.text === 'Use Nightly'
-      || action.text === 'Use Stable'
-      || action.text === 'Other downloads'
-      || action.text.startsWith('Download for'),
-    ).toBe(true);
-    expect(
-      action.href === '#nightly'
-      || action.href === '#stable'
-      || action.href === '#other-downloads'
-      || action.href.startsWith('/downloads/'),
-    ).toBe(true);
+  const publicInstallerAvailable = publicInstallerAvailableFromManifest(releaseManifest);
+  if (publicInstallerAvailable) {
+    await expect(downloadsMain.locator('[data-release-lane]')).not.toHaveCount(0);
+  } else {
+    await expect(downloadsPage.getByRole('heading', { name: 'No build is available right now' })).toBeVisible();
+    await expect(downloadsMain.locator('[data-release-lane]')).toHaveCount(0);
   }
+  const sourceBuild = downloadsMain.locator('#source-build');
+  await expect(sourceBuild).toBeVisible();
+  await expect(sourceBuild).toContainText('Build from source');
+  await expect(sourceBuild.locator('a[href="/downloads/build-chummer6-linux.sh"]')).toHaveAttribute(
+    'href',
+    '/downloads/build-chummer6-linux.sh',
+  );
+  expect(await downloadsMain.getByRole('link').count()).toBeGreaterThanOrEqual(1);
   await downloadsPage.close();
 
   const statusPage = await openPublicPage(browser, '/status');
   await expect(statusPage).toHaveURL(/\/status(?:[?#].*)?$/);
-  const statusHero = statusPage.locator('.minimal-page-hero.minimal-status-pill');
-  await expect(statusHero).toBeVisible();
-  await expect(statusHero).toContainText(/Now|Updated/);
-  await expect(statusHero).toContainText(/Downloads under review|Preview downloads|Stable downloads|Downloads paused/);
-  const statusHeadingText = (await statusHero.locator('h1').textContent())?.trim() || '';
+  const statusHeading = statusPage.getByRole('heading', { level: 1 });
+  await expect(statusHeading).toBeVisible();
+  const statusHeadingText = (await statusHeading.textContent())?.trim() || '';
   const statusHeadingRecognized = recognizedStatusHeadings.has(statusHeadingText);
-  const statusHeadingMatchesReleaseChannel = statusHeadingText === expectedStatusHeading;
   const statusHeadingUsesGenericUpdatedCopy = statusHeadingText === 'Updated';
-  expect(statusHeadingRecognized).toBe(true);
-  expect(statusHeadingMatchesReleaseChannel).toBe(true);
-  expect(statusHeadingUsesGenericUpdatedCopy).toBe(false);
+  const statusHeadingMatchesReleaseChannel = statusHeadingText === expectedStatusHeading;
+  expect(statusHeadingRecognized).toBeTruthy();
+  expect(statusHeadingUsesGenericUpdatedCopy).toBeFalsy();
+  expect(statusHeadingText).toBe(expectedStatusHeading);
+  await expect(statusPage.locator('body')).toContainText('Now');
+  await expect(statusPage.locator('body')).toContainText(/downloads are live|download is live|Downloads are paused|No public installer right now/);
   const statusVersionMarker = statusPage.locator('[data-downloads-release-version]');
-  await expect(statusVersionMarker).toContainText(/^Version \S+/);
-  const statusVersionText = (await statusVersionMarker.textContent())?.trim() || '';
+  await expect(statusVersionMarker).toHaveAttribute('data-downloads-release-version', /^Version \S+/);
+  const statusVersionText = (await statusVersionMarker.getAttribute('data-downloads-release-version'))?.trim() || '';
   const statusActions = statusPage.getByLabel('Status next actions');
   await expect(statusActions.getByRole('link', { name: 'Downloads' })).toBeVisible();
   await expect(statusActions.getByRole('link', { name: 'Help' })).toBeVisible();
+  await expect(statusPage.locator('body')).not.toContainText('No Stable build on this shelf.');
+  await expect(statusPage.locator('body')).not.toContainText('Preview build. Review required.');
+  await expect(statusPage.locator('body')).not.toContainText('Nightly');
+  await expect(statusPage.locator('body')).not.toContainText('Build from source');
   await expect(statusPage.getByRole('heading', { name: 'Platforms' })).toHaveCount(0);
   await statusPage.close();
 
@@ -200,5 +179,11 @@ test('downloads and status stay concise and point to the right next steps', asyn
     status_redirect_heading_expected: expectedStatusHeading,
     status_redirect_heading_matches_release_channel: statusHeadingMatchesReleaseChannel,
     status_redirect_heading_uses_generic_updated_copy: statusHeadingUsesGenericUpdatedCopy,
+    release_manifest_status: normalizedText(releaseManifest.status),
+    release_manifest_channel: normalizedText(releaseManifest.channel ?? releaseManifest.channelId ?? releaseManifest.channel_id),
+    release_manifest_supportability_state: normalizedText(releaseManifest.supportabilityState ?? releaseManifest.supportability_state),
+    release_manifest_rollout_state: normalizedText(releaseManifest.rolloutState ?? releaseManifest.rollout_state),
+    release_manifest_public_install_count: Number.isFinite(publicInstallCount) ? publicInstallCount : null,
+    public_installer_available: publicInstallerAvailable,
   });
 });

@@ -71,6 +71,13 @@ PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_FIELDS = frozenset(
 PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}"
 )
+PUBLIC_EDGE_DOWNLOADS_AUTHORITY_SCHEMA_PATTERN = re.compile(
+    r"(?:"
+    r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}"
+    r"|"
+    r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}/[A-Za-z0-9][A-Za-z0-9._+-]{0,63}"
+    r")"
+)
 PUBLIC_EDGE_OFFLINE_STATIC_PATHS = {
     "/manifest.player.webmanifest",
     "/manifest.gm.webmanifest",
@@ -567,12 +574,14 @@ def _required_binding_text(
     field: str,
 ) -> str:
     value = str(payload.get(field) or "").strip()
+    pattern = (
+        PUBLIC_EDGE_DOWNLOADS_AUTHORITY_SCHEMA_PATTERN
+        if field == "release_manifest_schema"
+        else PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN
+    )
     if (
         not value
-        or PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN.fullmatch(
-            value
-        )
-        is None
+        or pattern.fullmatch(value) is None
     ):
         raise ValueError(
             f"downloads authority binding {field} is not a safe release identity"
@@ -830,10 +839,13 @@ def public_edge_authorizing_binding_failures(
         "releaseManifestVersion",
         "releaseVersion",
     ):
+        pattern = (
+            PUBLIC_EDGE_DOWNLOADS_AUTHORITY_SCHEMA_PATTERN
+            if field == "releaseManifestSchema"
+            else PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN
+        )
         if (
-            PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN.fullmatch(
-                str(binding.get(field) or "").strip()
-            )
+            pattern.fullmatch(str(binding.get(field) or "").strip())
             is None
         ):
             failures.append(

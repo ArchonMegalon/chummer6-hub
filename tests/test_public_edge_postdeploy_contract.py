@@ -238,3 +238,43 @@ def test_normalizer_redacts_raw_v1_identity_without_hydrating_v2_proof_fields() 
     assert normalized["frontdoorNavigationAnchorArtifactContract"] == "chummer.frontdoor_mobile_anchor_redirect.v1"
     assert "frontdoorNavigationAnchorPrivateIdentityRedacted" not in normalized
     assert "frontdoorNavigationAnchorSessionContextPresent" not in normalized
+
+
+@pytest.mark.parametrize(
+    "schema_identity",
+    (
+        "chummer.release-channel/v1",
+        "vendor.schema/v2-preview",
+        "chummer.release-channel.v1",
+    ),
+)
+def test_downloads_authority_schema_identity_accepts_legacy_or_one_bounded_contract_separator(
+    schema_identity: str,
+) -> None:
+    module = load_module()
+
+    assert module.PUBLIC_EDGE_DOWNLOADS_AUTHORITY_SCHEMA_PATTERN.fullmatch(
+        schema_identity
+    )
+
+
+@pytest.mark.parametrize(
+    "schema_identity",
+    (
+        "chummer.release-channel/v1/extra",
+        "../release/v1",
+        "chummer.release-channel/v1?token=private",
+        "chummer.release-channel/v1#fragment",
+    ),
+)
+def test_downloads_authority_schema_identity_rejects_path_and_url_syntax(
+    schema_identity: str,
+) -> None:
+    module = load_module()
+
+    assert (
+        module.PUBLIC_EDGE_DOWNLOADS_AUTHORITY_SCHEMA_PATTERN.fullmatch(
+            schema_identity
+        )
+        is None
+    )

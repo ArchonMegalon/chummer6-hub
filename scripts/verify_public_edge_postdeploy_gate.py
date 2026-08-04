@@ -2763,6 +2763,68 @@ def run_playwright_command(command: list[str], env: dict[str, str], timeout_seco
     return completed.returncode, coerce_output(completed.stdout), coerce_output(completed.stderr), False
 
 
+def prepare_pinned_playwright_execution(
+    env: dict[str, str],
+    playwright_runtime: dict[str, Any] | None,
+    playwright_browsers_root: Path | None,
+) -> list[str]:
+    runtime = playwright_runtime if isinstance(playwright_runtime, dict) else {}
+    command_prefix = runtime.get("commandPrefix")
+    node_modules_root = str(runtime.get("nodeModulesRoot") or "").strip()
+    if (
+        runtime.get("status") != "pass"
+        or not isinstance(command_prefix, list)
+        or len(command_prefix) != 2
+        or not all(isinstance(item, str) and item for item in command_prefix)
+        or not node_modules_root
+    ):
+        raise RuntimeError("validated pinned Playwright runtime is required")
+
+    for untrusted_code_loading_name in (
+        "CHUMMER_PLAYWRIGHT_BIN",
+        "CHUMMER_PLAYWRIGHT_EXECUTION_ROOT",
+        "CHUMMER_PLAYWRIGHT_NODE_MODULES_ROOT",
+        "CHUMMER_PLAYWRIGHT_PACKAGE_SPEC",
+        "NODE_OPTIONS",
+        "NODE_PATH",
+        "PW_TEST_REPORTER",
+        "PW_TEST_SOURCE_TRANSFORM",
+        "PW_TEST_SOURCE_TRANSFORM_SCOPE",
+    ):
+        env.pop(untrusted_code_loading_name, None)
+    env["NODE_PATH"] = node_modules_root
+    if playwright_browsers_root is not None:
+        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
+    return list(command_prefix)
+
+
+def unavailable_pinned_playwright_result(
+    *,
+    artifact_dir: Path,
+    artifact_path: Path,
+    expected_contract: str,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    return {
+        "status": "fail",
+        "reason": "pinned_playwright_runtime_unavailable",
+        "exitCode": None,
+        "timedOut": False,
+        "timeoutSeconds": timeout_seconds,
+        "artifactDir": str(artifact_dir),
+        "artifactPath": str(artifact_path),
+        "artifactLoadStatus": "missing",
+        "artifactContract": "",
+        "expectedArtifactContract": expected_contract,
+        "artifact": {},
+        "artifactBaseUrlMatchesRequested": False,
+        "artifactReused": False,
+        "playwrightExecuted": False,
+        "stdoutTail": "",
+        "stderrTail": "validated pinned Playwright runtime is required",
+    }
+
+
 CHILD_RAW_DIAGNOSTIC_FIELDS = {
     "argv",
     "childargv",
@@ -4414,6 +4476,7 @@ def run_downloads_status_playwright(
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
     playwright_browsers_root: Path | None = None,
+    playwright_runtime: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / "DOWNLOADS_STATUS_E2E.generated.json"
@@ -4431,16 +4494,32 @@ def run_downloads_status_playwright(
             reused["artifactDir"] = str(artifact_dir)
             return reused
 
+    try:
+        artifact_path.unlink()
+    except FileNotFoundError:
+        pass
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
-    if playwright_browsers_root is not None:
-        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
+    try:
+        command_prefix = prepare_pinned_playwright_execution(
+            env,
+            playwright_runtime,
+            playwright_browsers_root,
+        )
+    except RuntimeError:
+        return unavailable_pinned_playwright_result(
+            artifact_dir=artifact_dir,
+            artifact_path=artifact_path,
+            expected_contract=expected_contract,
+            timeout_seconds=playwright_timeout_seconds,
+        )
     command = [
-        "npx",
-        "playwright",
+        *command_prefix,
         "test",
         "tests/public/downloads-status.spec.ts",
+        "--config=playwright.config.ts",
+        f"--output={artifact_dir / '.playwright-output'}",
         "--workers=1",
         "--reporter=line",
     ]
@@ -4474,6 +4553,7 @@ def run_mobile_pwa_viewport_playwright(
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
     playwright_browsers_root: Path | None = None,
+    playwright_runtime: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / "MOBILE_PWA_VIEWPORT_SMOKE.generated.json"
@@ -4499,17 +4579,35 @@ def run_mobile_pwa_viewport_playwright(
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
-    if playwright_browsers_root is not None:
-        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
+    try:
+        command_prefix = prepare_pinned_playwright_execution(
+            env,
+            playwright_runtime,
+            playwright_browsers_root,
+        )
+    except RuntimeError:
+        return {
+            **unavailable_pinned_playwright_result(
+                artifact_dir=artifact_dir,
+                artifact_path=artifact_path,
+                expected_contract=expected_contract,
+                timeout_seconds=playwright_timeout_seconds,
+            ),
+            "artifactCurrentContractSatisfied": False,
+            "artifactContractFailures": [
+                "validated pinned Playwright runtime is required"
+            ],
+        }
     try:
         artifact_path.unlink()
     except FileNotFoundError:
         pass
     command = [
-        "npx",
-        "playwright",
+        *command_prefix,
         "test",
         "tests/public/mobile-pwa-viewport-smoke.spec.ts",
+        "--config=playwright.config.ts",
+        f"--output={artifact_dir / '.playwright-output'}",
         "--workers=1",
         "--reporter=line",
     ]
@@ -4553,6 +4651,7 @@ def run_pwa_offline_cache_playwright(
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
     playwright_browsers_root: Path | None = None,
+    playwright_runtime: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / "PWA_OFFLINE_CACHE.generated.json"
@@ -4572,16 +4671,32 @@ def run_pwa_offline_cache_playwright(
             reused["artifactDir"] = str(artifact_dir)
             return reused
 
+    try:
+        artifact_path.unlink()
+    except FileNotFoundError:
+        pass
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
-    if playwright_browsers_root is not None:
-        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
+    try:
+        command_prefix = prepare_pinned_playwright_execution(
+            env,
+            playwright_runtime,
+            playwright_browsers_root,
+        )
+    except RuntimeError:
+        return unavailable_pinned_playwright_result(
+            artifact_dir=artifact_dir,
+            artifact_path=artifact_path,
+            expected_contract=expected_contract,
+            timeout_seconds=playwright_timeout_seconds,
+        )
     command = [
-        "npx",
-        "playwright",
+        *command_prefix,
         "test",
         "tests/public/pwa-offline-cache.spec.ts",
+        "--config=playwright.config.ts",
+        f"--output={artifact_dir / '.playwright-output'}",
         "--workers=1",
         "--reporter=line",
     ]
@@ -4617,6 +4732,7 @@ def run_blazor_new_runner_menu_playwright(
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
     playwright_browsers_root: Path | None = None,
+    playwright_runtime: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / "BLAZOR_NEW_RUNNER_MENU.generated.json"
@@ -4634,16 +4750,32 @@ def run_blazor_new_runner_menu_playwright(
             reused["artifactDir"] = str(artifact_dir)
             return reused
 
+    try:
+        artifact_path.unlink()
+    except FileNotFoundError:
+        pass
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
-    if playwright_browsers_root is not None:
-        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
+    try:
+        command_prefix = prepare_pinned_playwright_execution(
+            env,
+            playwright_runtime,
+            playwright_browsers_root,
+        )
+    except RuntimeError:
+        return unavailable_pinned_playwright_result(
+            artifact_dir=artifact_dir,
+            artifact_path=artifact_path,
+            expected_contract=expected_contract,
+            timeout_seconds=playwright_timeout_seconds,
+        )
     command = [
-        "npx",
-        "playwright",
+        *command_prefix,
         "test",
         "tests/public/blazor-new-runner-menu.spec.ts",
+        "--config=playwright.config.ts",
+        f"--output={artifact_dir / '.playwright-output'}",
         "--workers=1",
         "--reporter=line",
     ]
@@ -5326,7 +5458,17 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
                     )
 
         expected_frontdoor_playwright_proof_closure: dict[str, Any] = {}
-        if args.require_frontdoor_navigation_playwright:
+        pinned_playwright_runtime: dict[str, Any] = {}
+        browser_proof_required = any(
+            (
+                args.require_downloads_status_playwright,
+                args.require_mobile_pwa_viewport_playwright,
+                args.require_pwa_offline_cache_playwright,
+                args.require_blazor_new_runner_menu_playwright,
+                args.require_frontdoor_navigation_playwright,
+            )
+        )
+        if browser_proof_required:
             trusted_build_info_path = (
                 Path(args.expected_build_info)
                 if args.expected_build_info
@@ -5350,6 +5492,17 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             expected_frontdoor_playwright_proof_closure = dict(
                 trusted_deployment_identity["frontdoorPlaywrightProofClosure"]
             )
+            try:
+                pinned_playwright_runtime = resolve_pinned_playwright_runtime(
+                    str(
+                        expected_frontdoor_playwright_proof_closure.get(
+                            "playwrightPackageVersion"
+                        )
+                        or ""
+                    ).strip()
+                )
+            except RuntimeError as exc:
+                parser.error(str(exc))
 
         downloads_command = [
             sys.executable,
@@ -5477,6 +5630,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
             playwright_browsers_root=playwright_browsers_root,
+            playwright_runtime=pinned_playwright_runtime,
         )
     mobile_pwa_viewport = None
     if args.require_mobile_pwa_viewport_playwright:
@@ -5488,6 +5642,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
             playwright_browsers_root=playwright_browsers_root,
+            playwright_runtime=pinned_playwright_runtime,
         )
     pwa_offline_cache = None
     if args.require_pwa_offline_cache_playwright:
@@ -5499,6 +5654,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
             playwright_browsers_root=playwright_browsers_root,
+            playwright_runtime=pinned_playwright_runtime,
         )
     blazor_new_runner_menu = None
     if args.require_blazor_new_runner_menu_playwright:
@@ -5510,6 +5666,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
             playwright_browsers_root=playwright_browsers_root,
+            playwright_runtime=pinned_playwright_runtime,
         )
     frontdoor_navigation = None
     if args.require_frontdoor_navigation_playwright:
