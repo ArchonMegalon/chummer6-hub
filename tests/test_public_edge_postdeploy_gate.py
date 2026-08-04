@@ -1914,7 +1914,7 @@ def passing_pwa_offline_browser_proof() -> dict[str, object]:
         "artifact": {
             "contractName": "chummer.pwa_offline_cache.v2",
             "status": "pass",
-            "cache_version": "v17",
+            "cache_version": "v19",
             "navigation_policy": "network_only",
             "private_state_scope": "open_tab_only",
             "query_bearing_requests_cached": False,
@@ -1931,7 +1931,7 @@ def passing_pwa_offline_browser_proof() -> dict[str, object]:
                 "/manifest.player.webmanifest",
                 "/manifest.gm.webmanifest",
                 "/mobile.css",
-                "/mobile-turn-companion.js",
+                "/mobile-install-shell.js",
             ],
             "offline_role_fallbacks": [
                 {
@@ -3917,7 +3917,7 @@ def test_postdeploy_gate_can_require_pwa_offline_cache_browser_proof() -> None:
     assert result["status"] == "pass"
     assert result["pwaOfflineCacheStatus"] == "pass"
     assert result["pwaOfflineCacheArtifactContract"] == "chummer.pwa_offline_cache.v2"
-    assert result["pwaOfflineCacheCacheVersion"] == "v17"
+    assert result["pwaOfflineCacheCacheVersion"] == "v19"
     assert result["pwaOfflineCacheNavigationPolicy"] == "network_only"
     assert result["pwaOfflineCachePrivateStateScope"] == "open_tab_only"
     assert "/mobile.css" in result["pwaOfflineCacheStaticPaths"]
@@ -3927,6 +3927,24 @@ def test_postdeploy_gate_can_require_pwa_offline_cache_browser_proof() -> None:
     assert result["pwaOfflineCacheQueryBearingRequestsCached"] is False
     assert result["pwaOfflineCachePersonalizedLedgerCached"] is False
     assert {item["role"] for item in result["pwaOfflineCacheOfflineRoleFallbacks"]} == {"Player", "GameMaster"}
+
+    no_private_fallback = passing_pwa_offline_browser_proof()
+    no_private_fallback["artifact"]["offline_role_fallbacks"][0]["cache_control"] = "no-store"
+    privacy_failure = module.compose_status(
+        preflight,
+        downloads,
+        pwa_static,
+        mobile_ledger,
+        ready_mobile_handoff,
+        participate_iframe_shell,
+        None,
+        None,
+        None,
+        no_private_fallback,
+    )
+
+    assert privacy_failure["status"] == "fail"
+    assert "PWA offline cache proof Player fallback is not private, no-store" in privacy_failure["failures"]
 
     failing = module.compose_status(
         preflight,
