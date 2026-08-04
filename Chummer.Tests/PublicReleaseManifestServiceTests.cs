@@ -2116,7 +2116,7 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
-    public void LoadManifestSuppressesDisabledArtifactsAndRebuildsCoverage()
+    public void LoadManifestSuppressesOutOfScopeMacArtifactAndKeepsLinuxWindowsCoverageComplete()
     {
         using var fixture = new PublicReleaseManifestFixture();
         fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
@@ -2216,16 +2216,15 @@ public sealed class PublicReleaseManifestServiceTests
 
         var manifest = fixture.CreateService(additionalSettings: new Dictionary<string, string?>
         {
-            ["CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS"] = "avalonia-win-x64-installer"
+            ["CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS"] = "avalonia-osx-arm64-installer"
         }).LoadManifest();
 
-        Assert.DoesNotContain(manifest.Downloads, item => string.Equals(item.Id, "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(manifest.ProofRoutes ?? [], route => route.Contains("avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(manifest.Downloads, item => string.Equals(item.Id, "avalonia-osx-arm64-installer", StringComparison.OrdinalIgnoreCase));
 
         JsonElement coverage = Assert.IsType<JsonElement>(manifest.DesktopTupleCoverage);
-        Assert.False(coverage.GetProperty("complete").GetBoolean());
+        Assert.True(coverage.GetProperty("complete").GetBoolean());
         Assert.Equal(
-            ["linux", "windows", "macos"],
+            ["linux", "windows"],
             coverage.GetProperty("requiredDesktopPlatforms")
                 .EnumerateArray()
                 .Select(static value => value.GetString()!)
@@ -2237,33 +2236,19 @@ public sealed class PublicReleaseManifestServiceTests
                 .Select(static value => value.GetString()!)
                 .ToArray());
         Assert.Equal(
-            ["avalonia:linux-x64:linux", "avalonia:osx-arm64:macos", "avalonia:osx-x64:macos", "avalonia:win-x64:windows"],
+            ["avalonia:linux-x64:linux", "avalonia:win-x64:windows"],
             coverage.GetProperty("requiredDesktopPlatformHeadRidTuples")
                 .EnumerateArray()
                 .Select(static value => value.GetString()!)
                 .ToArray());
-        Assert.Equal(
-            ["windows"],
-            coverage.GetProperty("missingRequiredPlatforms")
-                .EnumerateArray()
-                .Select(static value => value.GetString()!)
-                .ToArray());
-        Assert.Contains(
-            "avalonia:win-x64:windows",
-            coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
-                .EnumerateArray()
-                .Select(static value => value.GetString()));
-        Assert.Contains(
-            "avalonia:osx-x64:macos",
-            coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
-                .EnumerateArray()
-                .Select(static value => value.GetString()));
+        Assert.Empty(coverage.GetProperty("missingRequiredPlatforms").EnumerateArray());
+        Assert.Empty(coverage.GetProperty("missingRequiredPlatformHeadRidTuples").EnumerateArray());
         Assert.DoesNotContain(
             coverage.GetProperty("promotedPlatformHeadRidTuples")
                 .EnumerateArray()
                 .Select(static value => value.GetString()),
-            tupleId => tupleId is not null && tupleId.Contains("win-x64", StringComparison.OrdinalIgnoreCase));
-        Assert.Equal("coverage_incomplete", manifest.RolloutState);
+            tupleId => tupleId is not null && tupleId.Contains("osx-", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("public_release_review_required", manifest.RolloutState);
         Assert.Equal("review_required", manifest.SupportabilityState);
     }
 

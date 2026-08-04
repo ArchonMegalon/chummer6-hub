@@ -13,7 +13,13 @@ internal static class PrivateResponseCacheHeaders
 
     internal static void Apply(IHeaderDictionary headers)
     {
-        headers["Cache-Control"] = "private, no-store, max-age=0";
+        bool preserveNoCache = headers["Cache-Control"]
+            .ToString()
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(static token => string.Equals(token, "no-cache", StringComparison.OrdinalIgnoreCase));
+        headers["Cache-Control"] = preserveNoCache
+            ? "private, no-store, no-cache, max-age=0"
+            : "private, no-store, max-age=0";
         headers["CDN-Cache-Control"] = "no-store, max-age=0";
         headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
         headers["Surrogate-Control"] = "no-store";
