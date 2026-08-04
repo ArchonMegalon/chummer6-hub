@@ -6929,107 +6929,68 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 string startupPath =
                     $"startup-smoke/startup-smoke-{head}-{WindowsRid}.receipt.json";
                 JsonElement startup = documents[startupPath].Root;
-                if (allowUnsigned
-                    && !ExactPropertySet(
-                        startup,
-                        new HashSet<string>(
-                            [
-                                "artifactDigest",
-                                "artifactFileName",
-                                "bootstrapPayloadAcquisitionMode",
-                                "bootstrapPayloadFileName",
-                                "bootstrapPayloadSha256",
-                                "bootstrapPayloadSizeBytes",
-                                "channelId",
-                                "executionEnvironment",
-                                "headId",
-                                "nativeHostEvidence",
-                                "platform",
-                                "readyCheckpoint",
-                                "releaseVersion",
-                                "rid",
-                                "status"
-                            ],
-                            StringComparer.Ordinal)))
-                {
-                    throw new InvalidDataException(
-                        "unsigned startup receipt property set drifted");
-                }
-                RequireExactString(startup, "status", "pass");
-                RequireExactString(startup, "readyCheckpoint", "pre_ui_event_loop");
-                RequireExactString(startup, "executionEnvironment", "native_windows");
-                RequireExactString(startup, "headId", head);
-                RequireExactString(startup, "platform", "windows");
-                RequireExactString(startup, "rid", WindowsRid);
-                RequireExactString(startup, "releaseVersion", scope.Version);
-                RequireExactString(startup, "channelId", scope.Channel);
-                RequireExactString(
-                    startup,
-                    "artifactFileName",
-                    headArtifacts.Installer.FileName);
-                RequireExactString(
-                    startup,
-                    "artifactDigest",
-                    $"sha256:{headArtifacts.Installer.Sha256}");
-                RequireExactString(startup, "bootstrapPayloadAcquisitionMode", "download");
-                RequireExactString(
-                    startup,
-                    "bootstrapPayloadFileName",
-                    headArtifacts.Payload.FileName);
-                RequireExactString(
-                    startup,
-                    "bootstrapPayloadSha256",
-                    headArtifacts.Payload.Sha256);
-                if (RequireNonNegativeInt64(startup, "bootstrapPayloadSizeBytes")
-                    != headArtifacts.Payload.SizeBytes)
-                {
-                    throw new InvalidDataException("candidate startup payload size drifted");
-                }
-                JsonElement nativeHost = RequireObject(startup, "nativeHostEvidence");
-                if (allowUnsigned
-                    && !ExactPropertySet(
-                        nativeHost,
-                        new HashSet<string>(
-                            [
-                                "contractName",
-                                "evidenceSource",
-                                "hostKernel",
-                                "hostPlatform",
-                                "isNativeWindows",
-                                "runner",
-                                "status"
-                            ],
-                            StringComparer.Ordinal)))
-                {
-                    throw new InvalidDataException(
-                        "unsigned startup native host property set drifted");
-                }
-                RequireExactString(
-                    nativeHost,
-                    "contractName",
-                    "chummer6-ui.native_windows_host_evidence");
-                RequireExactString(nativeHost, "status", "verified");
-                RequireBoolean(nativeHost, "isNativeWindows", expected: true);
-                RequireExactString(nativeHost, "hostPlatform", "windows");
                 if (allowUnsigned)
                 {
+                    ValidateUnsignedStartupReceipt(
+                        startup,
+                        head,
+                        scope.Version,
+                        scope.Channel,
+                        headArtifacts.Installer.FileName,
+                        headArtifacts.Installer.Sha256,
+                        headArtifacts.Payload.FileName,
+                        headArtifacts.Payload.Sha256,
+                        headArtifacts.Payload.SizeBytes,
+                        now);
+                }
+                else
+                {
+                    RequireExactString(startup, "status", "pass");
+                    RequireExactString(startup, "readyCheckpoint", "pre_ui_event_loop");
+                    RequireExactString(startup, "executionEnvironment", "native_windows");
+                    RequireExactString(startup, "headId", head);
+                    RequireExactString(startup, "platform", "windows");
+                    RequireExactString(startup, "rid", WindowsRid);
+                    RequireExactString(startup, "releaseVersion", scope.Version);
+                    RequireExactString(startup, "channelId", scope.Channel);
                     RequireExactString(
-                        nativeHost,
-                        "evidenceSource",
-                        "GitHub-hosted windows-latest");
-                    RequireExactString(nativeHost, "runner", "powershell.exe");
-                    if (string.IsNullOrWhiteSpace(
-                            RequireString(nativeHost, "hostKernel")))
+                        startup,
+                        "artifactFileName",
+                        headArtifacts.Installer.FileName);
+                    RequireExactString(
+                        startup,
+                        "artifactDigest",
+                        $"sha256:{headArtifacts.Installer.Sha256}");
+                    RequireExactString(startup, "bootstrapPayloadAcquisitionMode", "download");
+                    RequireExactString(
+                        startup,
+                        "bootstrapPayloadFileName",
+                        headArtifacts.Payload.FileName);
+                    RequireExactString(
+                        startup,
+                        "bootstrapPayloadSha256",
+                        headArtifacts.Payload.Sha256);
+                    if (RequireNonNegativeInt64(startup, "bootstrapPayloadSizeBytes")
+                        != headArtifacts.Payload.SizeBytes)
                     {
                         throw new InvalidDataException(
-                            "unsigned startup native host kernel drifted");
+                            "candidate startup payload size drifted");
                     }
-                }
-                string runner = RequireString(nativeHost, "runner");
-                if (string.IsNullOrWhiteSpace(runner)
-                    || runner.Contains("wine", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidDataException("candidate startup runner is not native Windows");
+                    JsonElement nativeHost = RequireObject(startup, "nativeHostEvidence");
+                    RequireExactString(
+                        nativeHost,
+                        "contractName",
+                        "chummer6-ui.native_windows_host_evidence");
+                    RequireExactString(nativeHost, "status", "verified");
+                    RequireBoolean(nativeHost, "isNativeWindows", expected: true);
+                    RequireExactString(nativeHost, "hostPlatform", "windows");
+                    string runner = RequireString(nativeHost, "runner");
+                    if (string.IsNullOrWhiteSpace(runner)
+                        || runner.Contains("wine", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidDataException(
+                            "candidate startup runner is not native Windows");
+                    }
                 }
 
                 JsonElement proof = proofsByHead[head].Root;
@@ -7293,6 +7254,267 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             {
                 document.Dispose();
             }
+        }
+    }
+
+    internal static void ValidateUnsignedStartupReceipt(
+        JsonElement startup,
+        string head,
+        string version,
+        string channel,
+        string installerFileName,
+        string installerSha256,
+        string payloadFileName,
+        string payloadSha256,
+        long payloadSizeBytes,
+        DateTimeOffset now)
+    {
+        var legacyKeys = new HashSet<string>(
+            [
+                "artifactDigest",
+                "artifactFileName",
+                "bootstrapPayloadAcquisitionMode",
+                "bootstrapPayloadFileName",
+                "bootstrapPayloadSha256",
+                "bootstrapPayloadSizeBytes",
+                "channelId",
+                "executionEnvironment",
+                "headId",
+                "nativeHostEvidence",
+                "platform",
+                "readyCheckpoint",
+                "releaseVersion",
+                "rid",
+                "status"
+            ],
+            StringComparer.Ordinal);
+        var currentKeys = new HashSet<string>(legacyKeys, StringComparer.Ordinal)
+        {
+            "arch",
+            "artifactDigestSource",
+            "artifactId",
+            "artifactInstallMode",
+            "artifactPath",
+            "artifactPathDisclosure",
+            "artifactRelativePath",
+            "artifactSha256",
+            "bootstrapPayloadDownloadUrl",
+            "completedAtUtc",
+            "fileName",
+            "framework",
+            "hostClass",
+            "installLinkingInstallationId",
+            "installLinkingLaunchCount",
+            "installLinkingPromptReason",
+            "installLinkingPromptRequired",
+            "installLinkingStatus",
+            "operatingSystem",
+            "processPath",
+            "processPathDisclosure",
+            "recordedAtUtc",
+            "startedAtUtc",
+            "verificationScope",
+            "version"
+        };
+        bool current = ExactPropertySet(startup, currentKeys);
+        if (!current && !ExactPropertySet(startup, legacyKeys))
+        {
+            throw new InvalidDataException(
+                "unsigned startup receipt property set drifted");
+        }
+
+        RequireExactString(startup, "status", "pass");
+        RequireExactString(startup, "readyCheckpoint", "pre_ui_event_loop");
+        RequireExactString(startup, "executionEnvironment", "native_windows");
+        RequireExactString(startup, "headId", head);
+        RequireExactString(startup, "platform", "windows");
+        RequireExactString(startup, "rid", WindowsRid);
+        RequireExactString(startup, "releaseVersion", version);
+        RequireExactString(startup, "channelId", channel);
+        RequireExactString(startup, "artifactFileName", installerFileName);
+        RequireExactString(
+            startup,
+            "artifactDigest",
+            $"sha256:{installerSha256}");
+        RequireExactString(startup, "bootstrapPayloadAcquisitionMode", "download");
+        RequireExactString(startup, "bootstrapPayloadFileName", payloadFileName);
+        RequireExactString(startup, "bootstrapPayloadSha256", payloadSha256);
+        if (RequireNonNegativeInt64(startup, "bootstrapPayloadSizeBytes")
+            != payloadSizeBytes)
+        {
+            throw new InvalidDataException("candidate startup payload size drifted");
+        }
+
+        JsonElement nativeHost = RequireObject(startup, "nativeHostEvidence");
+        if (!ExactPropertySet(
+                nativeHost,
+                new HashSet<string>(
+                    [
+                        "contractName",
+                        "evidenceSource",
+                        "hostKernel",
+                        "hostPlatform",
+                        "isNativeWindows",
+                        "runner",
+                        "status"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned startup native host property set drifted");
+        }
+        RequireExactString(
+            nativeHost,
+            "contractName",
+            "chummer6-ui.native_windows_host_evidence");
+        RequireExactString(nativeHost, "status", "verified");
+        RequireBoolean(nativeHost, "isNativeWindows", expected: true);
+        RequireExactString(nativeHost, "hostPlatform", "windows");
+        string hostKernel = RequireString(nativeHost, "hostKernel");
+        string runner = RequireString(nativeHost, "runner");
+        if (current)
+        {
+            RequireExactString(
+                nativeHost,
+                "evidenceSource",
+                "host_kernel_and_runner_selection");
+            RequireExactString(nativeHost, "runner", "pwsh");
+            if (!Regex.IsMatch(
+                    hostKernel,
+                    @"\A(?:MINGW64|MSYS|CYGWIN)_NT-[0-9]+\.[0-9]+(?:-[0-9]+)?\z",
+                    RegexOptions.CultureInvariant))
+            {
+                throw new InvalidDataException(
+                    "unsigned startup native host kernel drifted");
+            }
+        }
+        else
+        {
+            RequireExactString(
+                nativeHost,
+                "evidenceSource",
+                "GitHub-hosted windows-latest");
+            RequireExactString(nativeHost, "runner", "powershell.exe");
+            if (string.IsNullOrWhiteSpace(hostKernel))
+            {
+                throw new InvalidDataException(
+                    "unsigned startup native host kernel drifted");
+            }
+        }
+        if (string.IsNullOrWhiteSpace(runner)
+            || runner.Contains("wine", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "candidate startup runner is not native Windows");
+        }
+
+        if (!current)
+        {
+            return;
+        }
+
+        string installerPath = $"files/{installerFileName}";
+        RequireExactString(startup, "arch", "x64");
+        RequireExactString(startup, "version", version);
+        RequireExactString(
+            startup,
+            "hostClass",
+            "github-hosted-windows-latest-native");
+        RequireExactString(
+            startup,
+            "verificationScope",
+            "native_windows_startup");
+        RequireExactString(startup, "artifactDigestSource", "environment");
+        RequireExactString(
+            startup,
+            "artifactInstallMode",
+            "nsis_bootstrap_installer");
+        RequireExactString(startup, "artifactPath", installerPath);
+        RequireExactString(
+            startup,
+            "artifactPathDisclosure",
+            "artifact_shelf_relative_path");
+        RequireExactString(startup, "artifactRelativePath", installerPath);
+        RequireExactString(startup, "artifactSha256", installerSha256);
+        RequireExactString(startup, "fileName", installerFileName);
+        RequireExactString(startup, "artifactId", $"{head}-{WindowsRid}-installer");
+
+        string payloadUrlText = RequireString(
+            startup,
+            "bootstrapPayloadDownloadUrl");
+        if (!Uri.TryCreate(payloadUrlText, UriKind.Absolute, out Uri? payloadUrl)
+            || !string.Equals(payloadUrl.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal)
+            || !string.Equals(payloadUrl.Host, "127.0.0.1", StringComparison.Ordinal)
+            || payloadUrl.Port is < 1 or > 65535
+            || !string.Equals(
+                payloadUrl.AbsolutePath,
+                $"/{payloadFileName}",
+                StringComparison.Ordinal)
+            || payloadUrl.Query.Length != 0
+            || payloadUrl.Fragment.Length != 0
+            || payloadUrl.UserInfo.Length != 0)
+        {
+            throw new InvalidDataException(
+                "unsigned startup payload download URL drifted");
+        }
+
+        RequireExactString(startup, "processPathDisclosure", "file_name_only");
+        RequireExactString(startup, "processPath", "Chummer.Avalonia.exe");
+        string framework = RequireString(startup, "framework");
+        if (!Regex.IsMatch(
+                framework,
+                @"\A\.NET [0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?\z",
+                RegexOptions.CultureInvariant))
+        {
+            throw new InvalidDataException(
+                "unsigned startup framework identity drifted");
+        }
+        string operatingSystem = RequireString(startup, "operatingSystem");
+        if (!Regex.IsMatch(
+                operatingSystem,
+                @"\AMicrosoft Windows [0-9]+(?:\.[0-9]+){1,3}\z",
+                RegexOptions.CultureInvariant))
+        {
+            throw new InvalidDataException(
+                "unsigned startup operating-system identity drifted");
+        }
+        RequireExactString(startup, "installLinkingStatus", "guest");
+        RequireBoolean(startup, "installLinkingPromptRequired", expected: true);
+        RequireExactString(
+            startup,
+            "installLinkingPromptReason",
+            "claim_required");
+        RequireExactInt32(startup, "installLinkingLaunchCount", 1);
+        string installationId = RequireString(
+            startup,
+            "installLinkingInstallationId");
+        if (!Regex.IsMatch(
+                installationId,
+                @"\Ains-[0-9a-f]{32}\z",
+                RegexOptions.CultureInvariant))
+        {
+            throw new InvalidDataException(
+                "unsigned startup installation identity drifted");
+        }
+
+        DateTimeOffset started = RequireFreshUtcTimestamp(
+            startup,
+            "startedAtUtc",
+            now);
+        DateTimeOffset recorded = RequireFreshUtcTimestamp(
+            startup,
+            "recordedAtUtc",
+            now);
+        DateTimeOffset completed = RequireFreshUtcTimestamp(
+            startup,
+            "completedAtUtc",
+            now);
+        if (started > recorded
+            || recorded > completed
+            || completed - started > TimeSpan.FromMinutes(10))
+        {
+            throw new InvalidDataException(
+                "unsigned startup timestamp sequence drifted");
         }
     }
 
