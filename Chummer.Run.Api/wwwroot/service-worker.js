@@ -274,7 +274,7 @@ self.addEventListener("fetch", (event) => {
             status: 503,
             headers: {
               "content-type": "application/problem+json",
-              "cache-control": "no-store"
+              "cache-control": "private, no-store"
             }
           }
         ))
@@ -296,7 +296,7 @@ self.addEventListener("fetch", (event) => {
               status: 503,
               headers: {
                 "content-type": "application/problem+json",
-                "cache-control": "no-store"
+                "cache-control": "private, no-store"
               }
             }
           ))
@@ -394,7 +394,7 @@ function offlineNavigationResponse(pathname) {
     statusText: "Service Unavailable",
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
+      "cache-control": "private, no-store",
       "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       "x-content-type-options": "nosniff"
     }

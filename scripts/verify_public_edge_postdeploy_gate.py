@@ -1790,7 +1790,7 @@ REQUIRED_PWA_OFFLINE_STATIC_PATHS = {
     "/manifest.player.webmanifest",
     "/manifest.gm.webmanifest",
     "/mobile.css",
-    "/mobile-turn-companion.js",
+    "/mobile-install-shell.js",
 }
 REQUIRED_PWA_OFFLINE_LEGACY_PRIVATE_CACHE_PREFIXES = {
     "chummer-shell-play-shell-",
@@ -3302,14 +3302,20 @@ def pwa_offline_artifact_matches_privacy_contract(artifact: dict[str, Any]) -> b
         (result := role_results_by_role.get(role)) is not None
         and result.get("path") == path
         and int_value(result.get("status")) == 503
-        and "no-store" in str(result.get("cache_control") or "").lower()
+        and {"private", "no-store"}.issubset(
+            {
+                token.strip()
+                for token in str(result.get("cache_control") or "").lower().split(",")
+                if token.strip()
+            }
+        )
         and result.get("private_projection_restored") is False
         for role, path in REQUIRED_PWA_OFFLINE_ROLE_FALLBACKS.items()
     )
     return (
         receipt_contract(artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["pwaOfflineCache"]
         and str(artifact.get("status") or "").strip().lower() == "pass"
-        and artifact.get("cache_version") == "v17"
+        and artifact.get("cache_version") == "v19"
         and artifact.get("navigation_policy") == "network_only"
         and artifact.get("private_state_scope") == "open_tab_only"
         and artifact.get("query_bearing_requests_cached") is False
@@ -3892,8 +3898,8 @@ def compose_status(
         for expected_path in sorted(REQUIRED_PWA_OFFLINE_STATIC_PATHS):
             if expected_path not in static_paths:
                 failures.append(f"PWA offline cache proof did not cache {expected_path}")
-        if artifact.get("cache_version") != "v17":
-            failures.append("PWA offline cache proof cache version is not v17")
+        if artifact.get("cache_version") != "v19":
+            failures.append("PWA offline cache proof cache version is not v19")
         if artifact.get("navigation_policy") != "network_only":
             failures.append("PWA offline cache proof navigation policy is not network_only")
         if artifact.get("private_state_scope") != "open_tab_only":
@@ -3930,8 +3936,13 @@ def compose_status(
                 failures.append(f"PWA offline cache proof {role} fallback path is not {path}")
             if int_value(result.get("status")) != 503:
                 failures.append(f"PWA offline cache proof {role} fallback did not return HTTP 503")
-            if "no-store" not in str(result.get("cache_control") or "").lower():
-                failures.append(f"PWA offline cache proof {role} fallback is not no-store")
+            cache_control_tokens = {
+                token.strip()
+                for token in str(result.get("cache_control") or "").lower().split(",")
+                if token.strip()
+            }
+            if not {"private", "no-store"}.issubset(cache_control_tokens):
+                failures.append(f"PWA offline cache proof {role} fallback is not private, no-store")
             if result.get("private_projection_restored") is not False:
                 failures.append(f"PWA offline cache proof {role} fallback restored private projection state")
     if blazor_new_runner_menu:
