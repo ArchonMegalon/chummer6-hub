@@ -160,6 +160,7 @@ FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_FILES = (
     Path("tests") / "public" / "frontdoor-mobile-launch.spec.ts",
     Path("tests") / "public" / "black-ledger-frontdoor.spec.ts",
     Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Landing.cshtml",
+    Path("Chummer.Run.Api") / "wwwroot" / "js" / "mobile-app-handoff.js",
 )
 RETIRED_PUBLIC_PLAY_PROXY_ENV_NAMES = frozenset(
     {

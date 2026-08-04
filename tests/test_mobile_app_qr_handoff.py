@@ -200,6 +200,9 @@ def test_qr_handoff_is_first_party_deterministic_and_offline_safe() -> None:
     assert "window.location.origin" not in script
     assert 'target.search = "";' not in script
     assert 'target.hash = "";' not in script
+    assert 'const targetPath = new URL(targetUrl).pathname;' in script
+    assert 'opener.setAttribute("href", targetPath);' in script
+    assert "opener.href = targetUrl;" not in script
     assert 'window.matchMedia("(pointer: coarse)").matches' in script
     assert 'window.matchMedia("(max-width:' not in script
     assert "userAgentData" in script
@@ -238,6 +241,17 @@ def test_qr_handoff_is_first_party_deterministic_and_offline_safe() -> None:
     assert "fetch(" not in script
     assert "XMLHttpRequest" not in script
     assert "api.qrserver" not in script
+
+
+def test_frontdoor_playwright_closure_binds_the_handoff_runtime() -> None:
+    publisher = (REPO_ROOT / "scripts" / "publish_public_edge_portal_overlay.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        'Path("Chummer.Run.Api") / "wwwroot" / "js" / "mobile-app-handoff.js"'
+        in publisher
+    )
 
 
 def test_exported_device_helper_honors_the_persisted_browser_override() -> None:
