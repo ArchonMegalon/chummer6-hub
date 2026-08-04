@@ -95,6 +95,40 @@ def test_private_response_headers_require_cloudflare_control_header_off_edge() -
     assert any("cloudflare-cdn-cache-control" in failure for failure in failures)
 
 
+@pytest.mark.parametrize(
+    ("cache_control", "expected_match"),
+    [
+        ("private, no-store, max-age=0", True),
+        ("private, no-store, no-cache, max-age=0", True),
+        ("private, no-store, no-cache, max-age=0, must-revalidate", True),
+        ("public, no-store, no-cache, max-age=0", False),
+        ("private, no-store, no-cache, max-age=60", False),
+        ("private, no-store, no-cache, max-age=0, s-maxage=0", False),
+        ("no-store, no-cache, max-age=0", False),
+        ("private, no-store, max-age=0, immutable", False),
+    ],
+)
+def test_private_cache_control_policy_accepts_only_fail_closed_variants(
+    cache_control: str,
+    expected_match: bool,
+) -> None:
+    module = load_module()
+    headers = private_response_headers()
+    headers["cache-control"] = cache_control
+    failures: list[str] = []
+
+    module.require_private_response_headers("/mobile/player", headers, failures)
+
+    assert (
+        module.private_cache_control_matches_policy(cache_control)
+        is expected_match
+    )
+    if expected_match:
+        assert failures == []
+    else:
+        assert any("sealed private no-store policy" in failure for failure in failures)
+
+
 def test_live_identity_requires_exact_full_deployment_digest(monkeypatch) -> None:
     module = load_module()
     expected = "b" * 64
@@ -577,6 +611,7 @@ def test_verify_live_complete_contract_passes_with_bound_assets_and_stable_ident
 
     document_headers = {
         **private_response_headers(),
+        "cache-control": "private, no-store, no-cache, max-age=0",
         "content-type": "text/html; charset=utf-8",
         "content-security-policy": "default-src 'none'; connect-src 'none'",
         "referrer-policy": "no-referrer",

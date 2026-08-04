@@ -1162,16 +1162,28 @@ def private_identity_key_findings(markup: str) -> list[str]:
     return sorted(findings)
 
 
+def private_cache_control_matches_policy(value: str) -> bool:
+    directives = {
+        directive.strip()
+        for directive in value.strip().lower().split(",")
+        if directive.strip()
+    }
+    required = {"private", "no-store", "max-age=0"}
+    allowed = required | {"no-cache", "must-revalidate"}
+    return required.issubset(directives) and directives.issubset(allowed)
+
+
 def require_private_response_headers(
     path: str,
     headers: dict[str, str],
     failures: list[str],
 ) -> None:
     require(
-        headers.get("cache-control", "").strip().lower()
-        == PRIVATE_CACHE_CONTROL,
+        private_cache_control_matches_policy(
+            headers.get("cache-control", "")
+        ),
         failures,
-        f"{path}: Cache-Control must be exactly {PRIVATE_CACHE_CONTROL}",
+        f"{path}: Cache-Control must satisfy the sealed private no-store policy",
     )
     require(
         headers.get("cdn-cache-control", "").strip().lower() == CDN_NO_STORE,
