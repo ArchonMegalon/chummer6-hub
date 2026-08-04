@@ -604,7 +604,11 @@ def test_verify_live_complete_contract_passes_with_bound_assets_and_stable_ident
                 200,
                 {
                     "content-type": expected["contentType"],
-                    "cache-control": expected["cacheControl"],
+                    "cache-control": (
+                        "private, no-store, no-cache, max-age=0"
+                        if path.endswith("service-worker.js")
+                        else expected["cacheControl"]
+                    ),
                     "x-content-type-options": "nosniff",
                 },
                 payload,
@@ -633,6 +637,57 @@ def test_verify_live_complete_contract_passes_with_bound_assets_and_stable_ident
     assert call_counts["/api/ready"] == 2
     assert call_counts["/mobile/player"] == 2
     assert call_counts["/service-worker.js"] == 2
+
+
+@pytest.mark.parametrize(
+    ("cache_control", "expected_match"),
+    [
+        ("no-cache, no-store, must-revalidate", True),
+        ("private, no-store, no-cache, max-age=0", True),
+        ("public, no-store, no-cache, max-age=0", False),
+        ("private, no-store, no-cache, max-age=300", False),
+        ("private, no-store, no-cache, max-age=0, s-maxage=60", False),
+        ("private, no-store, max-age=0", False),
+    ],
+)
+def test_live_bound_worker_cache_policy_is_semantic_and_fail_closed(
+    cache_control: str,
+    expected_match: bool,
+) -> None:
+    module = load_module()
+    payload = b"self.addEventListener('fetch', () => {});\n"
+    expected = {
+        "path": "/service-worker.js",
+        "contentType": "application/javascript",
+        "cacheControl": module.WORKER_CACHE_CONTROL,
+        "mirrorBound": True,
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "sizeBytes": len(payload),
+    }
+    failures: list[str] = []
+
+    row = module.verify_live_bound_asset(
+        expected["path"],
+        200,
+        {
+            "content-type": "application/javascript",
+            "cache-control": cache_control,
+            "x-content-type-options": "nosniff",
+        },
+        payload,
+        expected,
+        failures,
+    )
+
+    assert row["cacheControlObserved"] == cache_control
+    assert row["cacheControlPolicyMatch"] is expected_match
+    assert row["matchesExpected"] is expected_match
+    if expected_match:
+        assert failures == []
+        assert row["cacheControl"] == module.WORKER_CACHE_CONTROL
+    else:
+        assert any("Cache-Control differs" in failure for failure in failures)
+        assert row["cacheControl"] == cache_control
 
 
 def test_live_asset_cannot_match_without_inventory_binding() -> None:

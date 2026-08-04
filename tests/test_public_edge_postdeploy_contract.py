@@ -31,11 +31,18 @@ def test_checked_in_postdeploy_schema_is_canonical_closed_and_versioned() -> Non
         "chummer.public_edge_postdeploy_gate.v1"
     )
     assert authority["path"] == module.PUBLIC_EDGE_POSTDEPLOY_SCHEMA_PATH
-    assert len(authority["fields"]) == 180
+    assert len(authority["fields"]) == 187
     assert {
         "contractName",
         "failures",
         "generatedAtUtc",
+        "pwaAssetInventoryActualSha256",
+        "pwaAssetInventoryExpectedSha256",
+        "pwaAssetInventoryMatchesExpected",
+        "pwaAssetInventorySealedExpectedSha256",
+        "pwaAssetInventorySourceStable",
+        "pwaAssetMismatches",
+        "pwaStaticFailures",
         "schemaContractName",
         "schemaSha256",
         "status",
