@@ -109,6 +109,7 @@ const CRITICAL_SHELL_ASSETS = [
 ];
 const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;
 const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];
+const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(precacheCriticalShell());
@@ -123,13 +124,17 @@ async function precacheCriticalShell() {
 async function fetchCriticalShellAsset(asset) {
   for (let attempt = 0; attempt < CRITICAL_SHELL_FETCH_ATTEMPTS; attempt += 1) {
     const request = new Request(asset, { method: "GET", cache: "reload", credentials: "omit" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CRITICAL_SHELL_FETCH_TIMEOUT_MS);
     try {
-      const response = await fetch(request);
+      const response = await fetch(request, { signal: controller.signal });
       if (isExpectedPublicAssetResponse(request, response)) {
         return { request, response };
       }
     } catch {
       // The closed retry budget below covers transient cutover/network failures.
+    } finally {
+      clearTimeout(timeoutId);
     }
     if (attempt + 1 < CRITICAL_SHELL_FETCH_ATTEMPTS) {
       await new Promise((resolve) => {

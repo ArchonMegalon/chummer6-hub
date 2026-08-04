@@ -37,10 +37,15 @@ def _constant(script: str, name: str) -> str:
     return match.group(1)
 
 
-def _run_critical_asset_fetch(worker: Path, failures_before_success: int) -> dict[str, object]:
+def _run_critical_asset_fetch(
+    worker: Path,
+    failures_before_success: int,
+    hangs_before_success: int = 0,
+) -> dict[str, object]:
     probe = r"""
 const fs = require("fs");
 const failuresBeforeSuccess = Number(process.argv[2]);
+const hangsBeforeSuccess = Number(process.argv[3]);
 let attempts = 0;
 global.self = {
   registration: { scope: "https://chummer.run/mobile/" },
@@ -54,10 +59,20 @@ global.Request = class Request {
     this.mode = "cors";
   }
 };
-global.fetch = async (request) => {
+global.fetch = async (request, options = {}) => {
   attempts += 1;
   if (attempts <= failuresBeforeSuccess) {
     throw new TypeError("transient asset fetch failure");
+  }
+  if (attempts <= failuresBeforeSuccess + hangsBeforeSuccess) {
+    await new Promise((resolve, reject) => {
+      const rejectAborted = () => reject(new Error("bounded asset fetch aborted"));
+      if (options.signal?.aborted) {
+        rejectAborted();
+        return;
+      }
+      options.signal?.addEventListener("abort", rejectAborted, { once: true });
+    });
   }
   const response = new Response("ok", {
     status: 200,
@@ -71,13 +86,21 @@ global.fetch = async (request) => {
 };
 global.caches = {};
 global.setTimeout = (callback) => { callback(); return 1; };
+global.clearTimeout = () => {};
 eval(fs.readFileSync(process.argv[1], "utf8"));
 fetchCriticalShellAsset("/mobile-install-shell.js")
   .then(() => process.stdout.write(JSON.stringify({ attempts, recovered: true })))
   .catch(() => process.stdout.write(JSON.stringify({ attempts, recovered: false })));
 """
     result = subprocess.run(
-        ["node", "-e", probe, str(worker), str(failures_before_success)],
+        [
+            "node",
+            "-e",
+            probe,
+            str(worker),
+            str(failures_before_success),
+            str(hangs_before_success),
+        ],
         cwd=REPO_ROOT,
         check=True,
         capture_output=True,
@@ -101,6 +124,11 @@ def _assert_shared_privacy_semantics(script: str, expected_cache_version: str) -
     assert "CRITICAL_SHELL_ASSETS" in script
     assert "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;" in script
     assert "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];" in script
+    assert "const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;" in script
+    assert "const controller = new AbortController();" in script
+    assert "setTimeout(() => controller.abort(), CRITICAL_SHELL_FETCH_TIMEOUT_MS)" in script
+    assert "fetch(request, { signal: controller.signal })" in script
+    assert "clearTimeout(timeoutId);" in script
     assert "CRITICAL_SHELL_ASSETS.map(fetchCriticalShellAsset)" in script
     assert "attempt < CRITICAL_SHELL_FETCH_ATTEMPTS" in script
     assert "attempt + 1 < CRITICAL_SHELL_FETCH_ATTEMPTS" in script
@@ -179,7 +207,7 @@ def test_actual_play_source_and_served_projection_use_distinct_cache_contracts_w
     assert '["/mobile-turn-companion.js",' not in served
 
 
-def test_source_and_projection_retry_transient_critical_asset_fetches_with_a_closed_budget() -> None:
+def test_source_and_projection_retry_failed_or_hung_critical_asset_fetches_with_a_closed_budget() -> None:
     source = _play_source_worker()
 
     for worker in (source, SERVED_WORKER):
@@ -188,6 +216,14 @@ def test_source_and_projection_retry_transient_critical_asset_fetches_with_a_clo
             "recovered": True,
         }
         assert _run_critical_asset_fetch(worker, failures_before_success=5) == {
+            "attempts": 3,
+            "recovered": False,
+        }
+        assert _run_critical_asset_fetch(worker, failures_before_success=0, hangs_before_success=2) == {
+            "attempts": 3,
+            "recovered": True,
+        }
+        assert _run_critical_asset_fetch(worker, failures_before_success=0, hangs_before_success=5) == {
             "attempts": 3,
             "recovered": False,
         }
