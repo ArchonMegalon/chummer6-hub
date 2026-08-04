@@ -6071,3 +6071,16 @@ def test_root_install_frontdoor_is_excluded_from_rybbit_eligibility() -> None:
     assert 'routeKey is "landing"' not in eligibility
     assert 'routeKey is "what-is-chummer"' in eligibility
     assert 'routeKey.StartsWith("artifacts-"' in eligibility
+
+
+def test_root_install_frontdoor_is_excluded_from_clickrank_eligibility() -> None:
+    layout_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_Layout.cshtml"
+    layout = layout_path.read_text(encoding="utf-8")
+    eligibility = layout.split("var clickRankEligible =", maxsplit=1)[1].split(
+        "var requestPathIsRoot =",
+        maxsplit=1,
+    )[0]
+
+    assert 'routeKey is "landing"' not in eligibility
+    assert 'routeKey is "what-is-chummer"' in eligibility
+    assert 'routeKey.StartsWith("artifacts-"' in eligibility
