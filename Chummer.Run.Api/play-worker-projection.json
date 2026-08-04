@@ -1,9 +1,9 @@
 {
   "contract": "play-root-worker-public-edge-projection-v2",
   "source": "../chummer-play/src/Chummer.Play.Web/wwwroot/service-worker.js",
-  "sourceSha256": "2bc4bc075c238a72cd396f39f0d93bc8510a2e58296a165953ab78af2836bbc6",
+  "sourceSha256": "a01c2b747efad10a055cf7390bb6a5f84399da10f4a8f47a945cbd6b660e9594",
   "template": "Chummer.Run.Api/service-worker.public-edge.template.js",
-  "templateSha256": "008e2ca4d477281ac695e48f4771009c636d489d653f74b52141b2d4e1e93af7",
+  "templateSha256": "bb026900aea249b35f19c062f60202fd46e3a00770c88718c3016e48d27db89a",
   "requiredInventory": "Chummer.Run.Api/play-pwa-required-inventory.json",
   "requiredInventorySha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a",
   "projection": "Chummer.Run.Api/wwwroot/service-worker.js",
@@ -11,6 +11,7 @@
   "requiredSourceMarkers": [
     "const CACHE_VERSION = \"v21\";",
     "const CACHE_CONTRACT = \"play-source-v2\";",
+    "\"/mobile.css\"",
     "\"/mobile-install-shell.js\"",
     "\"/manifest.webmanifest\"",
     "\"/manifest.observer.webmanifest\"",
@@ -34,6 +35,7 @@
     "const CACHE_VERSION = \"v19\";",
     "const CACHE_CONTRACT = \"run-api-projection-v2\";",
     "const CRITICAL_SHELL_ASSETS = [",
+    "\"/mobile.css\"",
     "\"/manifest.play.webmanifest\"",
     "play_public_route_network_unavailable",
     "event.waitUntil(precacheCriticalShell());",

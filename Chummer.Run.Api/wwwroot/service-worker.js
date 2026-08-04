@@ -99,6 +99,7 @@ const PUBLIC_CACHEABLE_ASSETS = new Map([
   ["/icons/icon-512.svg", new Set(["image/svg+xml"])]
 ]);
 const CRITICAL_SHELL_ASSETS = [
+  "/mobile.css",
   "/mobile-install-shell.js",
   "/manifest.play.webmanifest",
   "/manifest.player.webmanifest",
