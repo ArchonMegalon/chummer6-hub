@@ -65,6 +65,10 @@ def test_edge_public_handoff_scripts_share_an_exact_nosniff_javascript_contract(
     assert 'requestPath.Value?.EndsWith(".js", StringComparison.OrdinalIgnoreCase)' in edge
     assert '"application/javascript; charset=utf-8"' in edge
     assert '"X-Content-Type-Options"] = "nosniff"' in edge
+    assert 'Headers.CacheControl = "public, max-age=300, must-revalidate"' in edge
+    assert '"CDN-Cache-Control"] = "public, max-age=300, must-revalidate"' in edge
+    assert '"Cloudflare-CDN-Cache-Control"] = "public, max-age=300, must-revalidate"' in edge
+    assert '"Surrogate-Control"] = "max-age=300"' in edge
     assert '"CDN-Cache-Control"] = "no-store, max-age=0"' in edge
     assert '"Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0"' in edge
     assert '"Surrogate-Control"] = "no-store"' in edge

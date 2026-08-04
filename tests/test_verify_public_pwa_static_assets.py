@@ -168,11 +168,21 @@ def copy_contract_fixture(tmp_path: Path) -> Path:
                 'const CACHE_VERSION = "v21";\n'
                 'const CACHE_CONTRACT = "play-source-v2";\n'
                 "const CRITICAL_SHELL_ASSETS = [\n"
+                '  "/mobile.css",\n'
                 '  "/mobile-install-shell.js",\n'
                 '  "/manifest.webmanifest",\n'
                 '  "/manifest.observer.webmanifest"\n'
                 "];\n"
+                "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;\n"
+                "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];\n"
+                "const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;\n"
+                "const CRITICAL_SHELL_RESPONSE_MAX_BYTES = 1024 * 1024;\n"
+                "const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 5000;\n"
                 "async function precacheCriticalShell() { return true; }\n"
+                "// fetch(request, { signal: controller.signal })\n"
+                "// const body = await response.arrayBuffer();\n"
+                "// cacheCriticalShellAsset(cache, asset)\n"
+                "// clearTimeout(timeoutId);\n"
                 'self.addEventListener("install", (event) => {\n'
                 "  event.waitUntil(precacheCriticalShell());\n"
                 "});\n",
@@ -236,6 +246,7 @@ def test_current_source_satisfies_local_install_only_digest_closed_contract(
     tmp_path: Path,
 ) -> None:
     module = load_module()
+    assert module.PUBLIC_ASSET_CACHE_CONTROL == "public, max-age=300, must-revalidate"
     fixture = copy_contract_fixture(tmp_path)
 
     current_config = json.loads(

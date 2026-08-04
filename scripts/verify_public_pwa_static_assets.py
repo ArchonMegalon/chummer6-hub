@@ -47,7 +47,7 @@ MAX_LIVE_MANIFEST_BYTES = 256 * 1024
 MAX_LIVE_DOCUMENT_BYTES = 2 * 1024 * 1024
 MAX_LIVE_TEXT_ASSET_BYTES = 8 * 1024 * 1024
 MAX_LIVE_BINARY_ASSET_BYTES = 8 * 1024 * 1024
-PUBLIC_ASSET_CACHE_CONTROL = "no-cache, no-store, must-revalidate"
+PUBLIC_ASSET_CACHE_CONTROL = "public, max-age=300, must-revalidate"
 WORKER_CACHE_CONTROL = "no-cache, no-store, must-revalidate"
 PRIVATE_CACHE_CONTROL = "private, no-store, max-age=0"
 CDN_NO_STORE = "no-store, max-age=0"
