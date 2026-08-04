@@ -34,8 +34,10 @@ def test_validator_source_markers_match_install_only_projection_contract() -> No
     required_markers = tuple(projection["requiredSourceMarkers"])
 
     assert required_markers == module.EXPECTED_SOURCE_MARKERS
+    assert '"/mobile.css"' in required_markers
     assert '"/mobile-install-shell.js"' in required_markers
     assert '"/manifest.observer.webmanifest"' in required_markers
+    assert "const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 5000;" in required_markers
     assert '"/mobile-turn-companion.js"' not in required_markers
 
 
