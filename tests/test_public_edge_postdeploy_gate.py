@@ -6058,3 +6058,16 @@ def test_mobile_rybbit_smoke_asset_exists_for_local_frontdoor_probe() -> None:
     assert "window.rybbit" in script
     assert "track: function () {}" in script
     assert "event: function () {}" in script
+
+
+def test_root_install_frontdoor_is_excluded_from_rybbit_eligibility() -> None:
+    layout_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_Layout.cshtml"
+    layout = layout_path.read_text(encoding="utf-8")
+    eligibility = layout.split("var rybbitEligible =", maxsplit=1)[1].split(
+        "var robotsPolicy =",
+        maxsplit=1,
+    )[0]
+
+    assert 'routeKey is "landing"' not in eligibility
+    assert 'routeKey is "what-is-chummer"' in eligibility
+    assert 'routeKey.StartsWith("artifacts-"' in eligibility
