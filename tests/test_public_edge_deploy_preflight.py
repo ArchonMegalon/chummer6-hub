@@ -411,11 +411,24 @@ def copy_current_public_pwa_proof_fixture(module, tmp_path: Path) -> Path:
     source_worker.write_text(
         'const CACHE_VERSION = "v21";\n'
         'const CACHE_CONTRACT = "play-source-v2";\n'
+        "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;\n"
+        "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];\n"
+        "const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;\n"
+        "const CRITICAL_SHELL_RESPONSE_MAX_BYTES = 1024 * 1024;\n"
+        "const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 5000;\n"
         "const CRITICAL_SHELL_ASSETS = [\n"
+        '  "/mobile.css",\n'
         '  "/mobile-install-shell.js",\n'
         '  "/manifest.webmanifest",\n'
         '  "/manifest.observer.webmanifest"\n'
         "];\n"
+        "async function fetchCriticalShellAsset(request, controller, timeoutId) {\n"
+        "  const response = await fetch(request, { signal: controller.signal });\n"
+        "  const body = await response.arrayBuffer();\n"
+        "  clearTimeout(timeoutId);\n"
+        "  return body;\n"
+        "}\n"
+        "async function cacheCriticalShellAsset(cache, asset) { return true; }\n"
         "async function precacheCriticalShell() { return true; }\n"
         'self.addEventListener("install", (event) => {\n'
         "  event.waitUntil(precacheCriticalShell());\n"
