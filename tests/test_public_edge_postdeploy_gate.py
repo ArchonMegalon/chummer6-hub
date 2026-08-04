@@ -3190,11 +3190,46 @@ def test_postdeploy_gate_fails_when_pwa_static_fails() -> None:
     module = load_module()
     preflight, downloads, pwa_static, mobile_ledger, ready_mobile_handoff, participate_iframe_shell = passing_receipts()
     pwa_static["status"] = "fail"
+    pwa_static["failures"] = ["/mobile.css: Cache-Control differs from the sealed source inventory"]
+    pwa_static["assetDigestInventory"] = {
+        "expectedSha256": "a" * 64,
+        "sealedExpectedSha256": "a" * 64,
+        "actualSha256": "b" * 64,
+        "matchesExpected": False,
+        "sourceStable": True,
+        "assets": [
+            {
+                "path": "/mobile.css",
+                "contentType": "text/css",
+                "cacheControl": "public, max-age=14400, must-revalidate",
+                "sha256": "c" * 64,
+                "sizeBytes": 11304,
+                "matchesExpected": False,
+            }
+        ],
+    }
 
     result = module.compose_status(preflight, downloads, pwa_static, mobile_ledger, ready_mobile_handoff, participate_iframe_shell)
 
     assert result["status"] == "fail"
     assert "public PWA static asset proof is not pass" in result["failures"]
+    assert result["pwaStaticFailures"] == [
+        "/mobile.css: Cache-Control differs from the sealed source inventory"
+    ]
+    assert result["pwaAssetInventoryExpectedSha256"] == "a" * 64
+    assert result["pwaAssetInventorySealedExpectedSha256"] == "a" * 64
+    assert result["pwaAssetInventoryActualSha256"] == "b" * 64
+    assert result["pwaAssetInventoryMatchesExpected"] is False
+    assert result["pwaAssetInventorySourceStable"] is True
+    assert result["pwaAssetMismatches"] == [
+        {
+            "path": "/mobile.css",
+            "contentType": "text/css",
+            "cacheControl": "public, max-age=14400, must-revalidate",
+            "sha256": "c" * 64,
+            "sizeBytes": 11304,
+        }
+    ]
 
 
 def test_postdeploy_gate_fails_when_pwa_static_semantics_contradict_pass() -> None:
