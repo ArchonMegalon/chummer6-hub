@@ -124,18 +124,33 @@
 
   if ("serviceWorker" in navigator) {
     const startServiceWorkerRegistration = async () => {
-      if (await registerServiceWorker({ reportFailure: false })) {
-        return;
-      }
+      const immediateRegistrationSucceeded = await registerServiceWorker({ reportFailure: false });
 
       // Chromium can keep an unregistered worker pending deletion until its
-      // last controlled page closes. Preserve the immediate fresh-cutover
-      // attempt, then retry once after the replacement page has fully loaded.
+      // last controlled page closes and briefly return that worker from a new
+      // register() call. Preserve the immediate fresh-cutover attempt, then
+      // always register again after the replacement page has fully loaded so
+      // the surviving registration is confirmed after the deletion boundary.
       await waitForWindowLoad();
       await new Promise((resolve) => {
         window.setTimeout(resolve, 1000);
       });
-      await registerServiceWorker();
+      if (await registerServiceWorker({ reportFailure: false })) {
+        return;
+      }
+
+      if (immediateRegistrationSucceeded) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration("/mobile/");
+          if (registration) {
+            await waitForServiceWorkerActivation(registration);
+            return;
+          }
+        } catch {
+          // The final status below is the fail-closed browser-facing result.
+        }
+      }
+      setStatus("The install shell is available online. Service-worker installation is not available in this browser.");
     };
     void startServiceWorkerRegistration();
   }

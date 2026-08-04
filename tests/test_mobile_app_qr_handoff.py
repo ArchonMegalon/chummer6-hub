@@ -123,6 +123,7 @@ eval(fs.readFileSync(process.argv[1], "utf8"));
   for (let tick = 0; tick < 8; tick += 1) {
     await new Promise((resolve) => setImmediate(resolve));
   }
+  const attemptsBeforeLoad = attempts;
   currentReadyState = "complete";
   for (const callback of listeners.load ?? []) {
     callback();
@@ -130,7 +131,7 @@ eval(fs.readFileSync(process.argv[1], "utf8"));
   for (let tick = 0; tick < 16; tick += 1) {
     await new Promise((resolve) => setImmediate(resolve));
   }
-  process.stdout.write(JSON.stringify({ attempts, unregisters, status: installStatus.textContent }));
+  process.stdout.write(JSON.stringify({ attempts, attemptsBeforeLoad, unregisters, status: installStatus.textContent }));
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
@@ -196,21 +197,24 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
     assert "await waitForServiceWorkerActivation(registration);" in script
     assert "await registration?.unregister?.().catch(() => false);" in script
     assert "window.setTimeout(resolve, serviceWorkerRetryDelaysMs[attempt]);" in script
-    assert "await registerServiceWorker({ reportFailure: false })" in script
+    assert script.count("await registerServiceWorker({ reportFailure: false })") == 2
     assert "void startServiceWorkerRegistration();" in script
     assert 'window.addEventListener("load", resolve, { once: true });' in script
 
     recovered = _run_install_worker_registration(failures_before_success=2)
     recovered_after_pending_deletion = _run_install_worker_registration(failures_before_success=3)
     exhausted = _run_install_worker_registration(failures_before_success=6)
-    assert recovered["attempts"] == 3
+    assert recovered["attemptsBeforeLoad"] == 3
+    assert recovered["attempts"] == 4
     assert recovered["unregisters"] == 0
     assert "not available" not in str(recovered["status"])
     assert recovered_after_pending_deletion["attempts"] == 4
+    assert recovered_after_pending_deletion["attemptsBeforeLoad"] == 3
     assert recovered_after_pending_deletion["unregisters"] == 0
     assert "not available" not in str(recovered_after_pending_deletion["status"])
     assert exhausted == {
         "attempts": 6,
+        "attemptsBeforeLoad": 3,
         "unregisters": 0,
         "status": "The install shell is available online. Service-worker installation is not available in this browser.",
     }
@@ -227,14 +231,17 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
         failures_before_success=0,
         activation_failures_before_success=6,
     )
-    assert activation_recovered["attempts"] == 3
+    assert activation_recovered["attemptsBeforeLoad"] == 3
+    assert activation_recovered["attempts"] == 4
     assert activation_recovered["unregisters"] == 2
     assert "not available" not in str(activation_recovered["status"])
     assert activation_recovered_after_pending_deletion["attempts"] == 4
+    assert activation_recovered_after_pending_deletion["attemptsBeforeLoad"] == 3
     assert activation_recovered_after_pending_deletion["unregisters"] == 3
     assert "not available" not in str(activation_recovered_after_pending_deletion["status"])
     assert activation_exhausted == {
         "attempts": 6,
+        "attemptsBeforeLoad": 3,
         "unregisters": 6,
         "status": "The install shell is available online. Service-worker installation is not available in this browser.",
     }
@@ -243,14 +250,15 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
         failures_before_success=0,
         ready_state="complete",
     )
-    assert already_loaded["attempts"] == 1
+    assert already_loaded["attempts"] == 2
     assert "not available" not in str(already_loaded["status"])
 
     interactive_without_load = _run_install_worker_registration(
         failures_before_success=0,
         ready_state="interactive",
     )
-    assert interactive_without_load["attempts"] == 1
+    assert interactive_without_load["attemptsBeforeLoad"] == 1
+    assert interactive_without_load["attempts"] == 2
     assert "not available" not in str(interactive_without_load["status"])
 
 
