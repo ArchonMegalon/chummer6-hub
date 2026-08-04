@@ -24,7 +24,7 @@ class ReleaseBundlePromotionShelfReplacementTests(unittest.TestCase):
         self.assertNotIn("MergeCompatibilityManifest(", promotion_body)
         self.assertNotIn("MergeCanonicalManifest(", promotion_body)
 
-        stage_start = text.index("private static void PrepareStagedShelf(")
+        stage_start = text.index("internal static void PrepareStagedShelf(")
         stage_end = text.index("\n    private static void RewritePayloadSidecarsForGeneration(", stage_start)
         stage_body = text[stage_start:stage_end]
         self.assertEqual(2, stage_body.count("ProjectRegistryManifestForGeneration("))
@@ -40,10 +40,12 @@ class ReleaseBundlePromotionShelfReplacementTests(unittest.TestCase):
         self.assertIn('private const string RegistryContractName = "Chummer.Hub.Registry.Contracts";', text)
         self.assertIn('private const string ActivationCandidateName = "activation-candidate.json";', text)
         self.assertIn('private const string CurrentPointerName = "current.json";', text)
-        self.assertIn('private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];', text)
+        self.assertIn('private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows"];', text)
         self.assertIn('"avalonia:linux-x64:linux"', text)
-        self.assertIn('"avalonia:osx-arm64:macos"', text)
         self.assertIn('"avalonia:win-x64:windows"', text)
+        required_tuples_start = text.index("private static readonly string[] RequiredDesktopPlatformHeadRidTuples")
+        required_tuples_end = text.index(";", required_tuples_start)
+        self.assertNotIn('"avalonia:osx-arm64:macos"', text[required_tuples_start:required_tuples_end])
         self.assertIn("FixedTimeDigestEquals(Sha256For(liveCompatibilityManifestPath), expectedCompatibilitySha256)", text)
         self.assertIn("FixedTimeDigestEquals(Sha256For(liveCanonicalManifestPath), expectedCanonicalSha256)", text)
         self.assertIn('CanonicalManifestSha256: $"sha256:{canonicalManifestSha256}"', text)

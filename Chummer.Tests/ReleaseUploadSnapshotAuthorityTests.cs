@@ -375,11 +375,11 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             ReleaseUploadSnapshotAuthorityService.ValidateUnsignedWindowsFreshDeltaManifestPair(
                 JsonSerializer.SerializeToElement(canonical),
                 JsonSerializer.SerializeToElement(compatibility),
-                "run-20260722-165800");
+                "run-20260803-204603");
 
         Assert.True(profile);
         Assert.Equal(
-            "ed65dc0fb6103815c849fe4cf4391c40eecd3819",
+            "25ff1437a1f1bb6b04c823fa3cb47c0976d0e141",
             canonical["registryCommit"]!.GetValue<string>());
     }
 
@@ -396,7 +396,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             ReleaseUploadSnapshotAuthorityService.ValidateUnsignedWindowsFreshDeltaManifestPair(
                 JsonSerializer.SerializeToElement(canonical),
                 JsonSerializer.SerializeToElement(compatibility),
-                "run-20260722-165800");
+                "run-20260803-204603");
 
         Assert.True(profile);
         Assert.Single(canonical["artifacts"]!.AsArray());
@@ -424,7 +424,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             ReleaseUploadSnapshotAuthorityService.ValidateUnsignedWindowsFreshDeltaManifestPair(
                 JsonSerializer.SerializeToElement(canonical),
                 JsonSerializer.SerializeToElement(compatibility),
-                "run-20260722-165800"));
+                "run-20260803-204603"));
     }
 
     [Fact]
@@ -488,7 +488,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     .Select(static node => node!.AsObject())
                     .Single(static row => string.Equals(
                         row["id"]?.GetValue<string>(),
-                        "avalonia-osx-arm64-installer",
+                        "avalonia-linux-x64-installer",
                         StringComparison.Ordinal))["sha256"] = new string('f', 64);
                 break;
             case "recursive_authority_true":
@@ -575,7 +575,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             ReleaseUploadSnapshotAuthorityService.ValidateUnsignedWindowsFreshDeltaManifestPair(
                 JsonSerializer.SerializeToElement(canonical),
                 JsonSerializer.SerializeToElement(compatibility),
-                "run-20260722-165800"));
+                "run-20260803-204603"));
     }
 
     [Theory]

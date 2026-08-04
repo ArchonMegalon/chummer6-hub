@@ -3548,6 +3548,39 @@ def test_downloads_status_browser_stale_artifact_reruns_playwright(monkeypatch, 
     assert invoked["timeout_seconds"] == 120
 
 
+def test_downloads_status_browser_uses_validated_operation_browser_root(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    artifact_path = tmp_path / "DOWNLOADS_STATUS_E2E.generated.json"
+    browser_root = tmp_path / "host-build" / "playwright-browsers"
+    browser_root.mkdir(parents=True)
+
+    def fake_run(command, env, timeout_seconds):  # noqa: ANN001
+        assert env["PLAYWRIGHT_BROWSERS_PATH"] == str(browser_root)
+        artifact_path.write_text(
+            json.dumps(
+                {
+                    "contractName": "chummer.downloads_status_e2e.v1",
+                    "status": "pass",
+                    "base_url": "https://chummer.run",
+                    "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                }
+            ),
+            encoding="utf-8",
+        )
+        return 0, "", "", False
+
+    monkeypatch.setattr(module, "run_playwright_command", fake_run)
+
+    result = module.run_downloads_status_playwright(
+        "https://chummer.run",
+        tmp_path,
+        20,
+        playwright_browsers_root=browser_root,
+    )
+
+    assert result["status"] == "pass"
+
+
 def test_downloads_status_browser_malformed_reuse_artifact_reruns_playwright(monkeypatch, tmp_path) -> None:
     module = load_module()
     artifact_path = tmp_path / "DOWNLOADS_STATUS_E2E.generated.json"

@@ -216,6 +216,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         StringComparer.Ordinal);
     private static readonly string[] UnsignedRetainedArtifactIds =
     [
+        "avalonia-linux-x64-installer"
+    ];
+    private static readonly string[] LegacyUnsignedRetainedArtifactIds =
+    [
         "avalonia-osx-arm64-installer",
         "blazor-desktop-osx-arm64-installer",
         "avalonia-osx-arm64-archive",
@@ -2388,7 +2392,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string sourceCanonicalPath,
         string sourceCompatibilityPath)
     {
-        bool profileRetainsMacos = false;
+        bool profileRetainsIncumbent = false;
         using JsonDocument projectedCompatibilityDocument = ParseStrictObject(
             compatibilityBytes,
             "unsigned projected compatibility manifest");
@@ -2929,7 +2933,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 review,
                 "incumbentSnapshotSha256",
                 RequireSha256(incumbent, "snapshotSha256"));
-            profileRetainsMacos = ValidateUnsignedRetainedIncumbentProvenance(
+            profileRetainsIncumbent = ValidateUnsignedRetainedIncumbentProvenance(
                 RequireObject(canonical, "retainedIncumbentProvenance"),
                 canonical,
                 projectedCompatibilityDocument.RootElement,
@@ -3158,11 +3162,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             registryCandidate,
             "shelfPlatforms",
             shelfPlatforms.ToArray());
-        string[] expectedProfileShelfPlatforms = profileRetainsMacos
-            ? ["macos", "windows"]
+        string retainedProfilePlatform = shelfPlatforms
+            .SingleOrDefault(static platform => platform != "windows")
+            ?? string.Empty;
+        string[] expectedProfileShelfPlatforms = profileRetainsIncumbent
+            ? [retainedProfilePlatform, "windows"]
             : ["windows"];
-        string[] expectedProfileRetainedPlatforms = profileRetainsMacos
-            ? ["macos"]
+        string[] expectedProfileRetainedPlatforms = profileRetainsIncumbent
+            ? [retainedProfilePlatform]
             : [];
         if (unsignedWindowsFreshDeltaProfile
             && (!shelfPlatforms.SetEquals(expectedProfileShelfPlatforms)
@@ -3658,21 +3665,29 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             .Select(RequireUnsignedArtifactIdentity)
             .ToArray();
         string[] windowsOnlyArtifactIds = ["avalonia-win-x64-installer"];
-        string[] retainedMacosArtifactIds =
+        string[] retainedLinuxArtifactIds =
             [.. UnsignedRetainedArtifactIds, "avalonia-win-x64-installer"];
+        string[] legacyRetainedMacosArtifactIds =
+            [.. LegacyUnsignedRetainedArtifactIds, "avalonia-win-x64-installer"];
         bool exactWindowsOnly = canonicalArtifactIds.SequenceEqual(
                 windowsOnlyArtifactIds,
                 StringComparer.Ordinal)
             && compatibilityArtifactIds.SequenceEqual(
                 windowsOnlyArtifactIds,
                 StringComparer.Ordinal);
-        bool exactRetainedMacos = canonicalArtifactIds.SequenceEqual(
-                retainedMacosArtifactIds,
+        bool exactRetainedLinux = canonicalArtifactIds.SequenceEqual(
+                retainedLinuxArtifactIds,
                 StringComparer.Ordinal)
             && compatibilityArtifactIds.SequenceEqual(
-                retainedMacosArtifactIds,
+                retainedLinuxArtifactIds,
                 StringComparer.Ordinal);
-        if (!exactWindowsOnly && !exactRetainedMacos)
+        bool exactLegacyRetainedMacos = canonicalArtifactIds.SequenceEqual(
+                legacyRetainedMacosArtifactIds,
+                StringComparer.Ordinal)
+            && compatibilityArtifactIds.SequenceEqual(
+                legacyRetainedMacosArtifactIds,
+                StringComparer.Ordinal);
+        if (!exactWindowsOnly && !exactRetainedLinux && !exactLegacyRetainedMacos)
         {
             throw new InvalidDataException(
                 "unsigned projected manifest artifact identities or order drifted");
@@ -3686,11 +3701,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             .ToArray();
         if (canonicalRows.Any(row => !string.Equals(
                 RequireString(row, "platform"),
-                "macos",
+                exactLegacyRetainedMacos ? "macos" : "linux",
                 StringComparison.Ordinal)))
         {
             throw new InvalidDataException(
-                "unsigned retained canonical platform is not exact macOS");
+                "unsigned retained canonical platform differs from its exact profile");
         }
         JsonElement canonicalBindings = RequireArray(
             provenance,
@@ -3862,24 +3877,27 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "windows",
                 StringComparison.Ordinal))
             .ToArray();
-        if (canonicalRows.Any(row => !string.Equals(
-                RequireString(row, "platform"),
-                "macos",
-                StringComparison.Ordinal)))
-        {
-            throw new InvalidDataException(
-                "unsigned retained canonical platform is not exact macOS");
-        }
         string[] retainedIdsInOrder = canonicalRows
             .Select(RequireUnsignedArtifactIdentity)
             .ToArray();
-        bool retainsMacos = retainedIdsInOrder.SequenceEqual(
+        bool retainsLinux = retainedIdsInOrder.SequenceEqual(
             UnsignedRetainedArtifactIds,
             StringComparer.Ordinal);
-        if (retainedIdsInOrder.Length != 0 && !retainsMacos)
+        bool retainsLegacyMacos = retainedIdsInOrder.SequenceEqual(
+            LegacyUnsignedRetainedArtifactIds,
+            StringComparer.Ordinal);
+        if (retainedIdsInOrder.Length != 0 && !retainsLinux && !retainsLegacyMacos)
         {
             throw new InvalidDataException(
                 "unsigned retained canonical identities or order drifted");
+        }
+        if (canonicalRows.Any(row => !string.Equals(
+                RequireString(row, "platform"),
+                retainsLegacyMacos ? "macos" : "linux",
+                StringComparison.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned retained canonical platform differs from its exact profile");
         }
         JsonElement canonicalBindings = RequireArray(
             provenance,
@@ -3965,7 +3983,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             compatibilityRows,
             retainedIds,
             "compatibility");
-        return retainsMacos;
+        return retainsLinux || retainsLegacyMacos;
     }
 
     private static void ValidateUnsignedRetainedBindingDigest(

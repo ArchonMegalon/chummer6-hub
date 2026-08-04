@@ -3546,13 +3546,10 @@ def test_unsigned_fresh_delta_manifest_pair_accepts_registry_pushed_commit(
 
     assert (
         result["registryCommit"]
-        == "ed65dc0fb6103815c849fe4cf4391c40eecd3819"
+        == "25ff1437a1f1bb6b04c823fa3cb47c0976d0e141"
     )
     assert result["retainedArtifactIds"] == [
-        "avalonia-osx-arm64-installer",
-        "blazor-desktop-osx-arm64-installer",
-        "avalonia-osx-arm64-archive",
-        "blazor-desktop-osx-arm64-archive",
+        "avalonia-linux-x64-installer",
     ]
 
 
@@ -3643,41 +3640,30 @@ def test_unsigned_retained_provenance_accepts_exact_windows_only_empty_sets(
 
 
 @pytest.mark.parametrize("layer", ["materializer", "projection"])
-@pytest.mark.parametrize("drift", ["partial", "reordered", "other"])
-def test_unsigned_retained_provenance_rejects_nonfrozen_nonempty_id_sets(
+@pytest.mark.parametrize("drift", ["missing", "duplicate", "other"])
+def test_unsigned_retained_provenance_rejects_artifact_binding_identity_drift(
     layer: str,
     drift: str,
 ) -> None:
     pair = load_unsigned_fresh_delta_manifest_pair()
     canonical = pair["canonical"]
     compatibility = pair["compatibility"]
-    retained = [
-        artifact
-        for artifact in canonical["artifacts"]
-        if artifact.get("platform") == "macos"
-    ]
-    windows = [
-        artifact
-        for artifact in canonical["artifacts"]
-        if artifact.get("platform") == "windows"
-    ]
-    if drift == "partial":
-        retained = retained[:-1]
-    elif drift == "reordered":
-        retained = [retained[1], retained[0], *retained[2:]]
+    provenance = canonical["retainedIncumbentProvenance"]
+    bindings = provenance["retainedArtifactBindings"]
+    if drift == "missing":
+        bindings.pop()
+    elif drift == "duplicate":
+        bindings.append(json.loads(json.dumps(bindings[0])))
     elif drift == "other":
-        retained[0]["artifactId"] = "other-osx-arm64-installer"
-        retained[0]["id"] = "other-osx-arm64-installer"
+        bindings[0]["artifactId"] = "other-linux-x64-installer"
     else:
         raise AssertionError(f"unknown drift: {drift}")
-    canonical["artifacts"] = [*retained, *windows]
-    provenance = canonical["retainedIncumbentProvenance"]
-    bind_retained_artifacts(provenance, retained)
+    provenance["retainedArtifactBindingsSha256"] = canonical_sha256(bindings)
     validate, error = unsigned_retained_provenance_validator(layer)
 
     with pytest.raises(
         error,
-        match="retained artifact identities or order drifted",
+        match="retained artifact binding",
     ):
         validate(
             canonical,
@@ -3688,7 +3674,7 @@ def test_unsigned_retained_provenance_rejects_nonfrozen_nonempty_id_sets(
 
 
 @pytest.mark.parametrize("layer", ["materializer", "projection"])
-@pytest.mark.parametrize("drift", ["partial", "reordered", "other"])
+@pytest.mark.parametrize("drift", ["missing", "duplicate", "other"])
 def test_unsigned_retained_provenance_rejects_compatibility_binding_drift(
     layer: str,
     drift: str,
@@ -3698,12 +3684,12 @@ def test_unsigned_retained_provenance_rejects_compatibility_binding_drift(
     compatibility = pair["compatibility"]
     provenance = canonical["retainedIncumbentProvenance"]
     bindings = provenance["retainedCompatibilityBindings"]
-    if drift == "partial":
+    if drift == "missing":
         bindings.pop()
-    elif drift == "reordered":
-        bindings[0], bindings[1] = bindings[1], bindings[0]
+    elif drift == "duplicate":
+        bindings.append(json.loads(json.dumps(bindings[0])))
     elif drift == "other":
-        bindings[0]["artifactId"] = "other-osx-arm64-installer"
+        bindings[0]["artifactId"] = "other-linux-x64-installer"
     else:
         raise AssertionError(f"unknown drift: {drift}")
     provenance["retainedCompatibilityBindingsSha256"] = canonical_sha256(
@@ -3749,7 +3735,7 @@ def test_unsigned_fresh_delta_manifest_pair_rejects_rehashed_policy_drift(
             row
             for row in compatibility["downloads"]
             if (row.get("artifactId") or row.get("id"))
-            == "avalonia-osx-arm64-installer"
+            == "avalonia-linux-x64-installer"
         )
         retained["sha256"] = "f" * 64
     elif tamper == "recursive_authority_true":

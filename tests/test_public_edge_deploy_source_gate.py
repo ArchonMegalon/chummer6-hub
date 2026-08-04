@@ -638,12 +638,13 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "scripts/prepare_operation_playwright_authority.py" in script
     assert script.count('--host-build-root "$PUBLIC_EDGE_HOST_BUILD_ROOT"') == 3
     assert script.count('--downloads-source-root "$CANONICAL_RELEASE_SHELF_ROOT"') == 2
-    assert script.count('--playwright-authority "$PLAYWRIGHT_AUTHORITY"') == 2
+    assert script.count('--playwright-authority "$PLAYWRIGHT_AUTHORITY"') == 3
     assert script.count(
         '--playwright-authority-sha256 "$PLAYWRIGHT_AUTHORITY_SHA256"'
-    ) == 2
-    assert script.count("--surface-profile flagship") == 2
-    assert script.count("--delivery-phase flagship") == 2
+    ) == 3
+    assert '--playwright-host-build-root "$PUBLIC_EDGE_HOST_BUILD_ROOT"' in script
+    assert script.count("--surface-profile public-download") == 2
+    assert script.count("--delivery-phase windows-preview") == 2
     assert "--overlay-root \"$OVERLAY_ROOT\"" in script
     assert "--expected-build-info \"$OVERLAY_ROOT/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json\"" in script
     assert "verify_candidate_runtime_identity" in script
