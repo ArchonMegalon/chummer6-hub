@@ -14,6 +14,7 @@ public sealed class PublicPlaySessionAccessPolicyTests
     [InlineData("/mobile/player")]
     [InlineData("/mobile/gm")]
     [InlineData("/mobile/observer")]
+    [InlineData("/mobile/pwa/ledger.json")]
     [InlineData("/mobile/service-worker.js")]
     public void QueryFreeGetInstallRoutesRemainPublic(string path)
     {
@@ -27,6 +28,7 @@ public sealed class PublicPlaySessionAccessPolicyTests
     [InlineData("/mobile?sessionId=forged")]
     [InlineData("/mobile/gm?role=GameMaster")]
     [InlineData("/mobile/player?deviceId=forged")]
+    [InlineData("/mobile/pwa/ledger.json?scope=forged")]
     [InlineData("/_blazor")]
     [InlineData("/_blazor/negotiate")]
     [InlineData("/api/play")]

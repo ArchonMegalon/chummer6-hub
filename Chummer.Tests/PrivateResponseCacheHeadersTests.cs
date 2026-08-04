@@ -68,6 +68,23 @@ public sealed class PrivateResponseCacheHeadersTests
     }
 
     [Fact]
+    public void ApplyDoesNotWeakenAnExistingPrivateNoCacheBoundary()
+    {
+        HeaderDictionary headers = new()
+        {
+            ["Cache-Control"] = "private, no-store, no-cache, max-age=0"
+        };
+
+        PrivateResponseCacheHeaders.Apply(headers);
+
+        Assert.Equal(
+            "private, no-store, no-cache, max-age=0",
+            headers["Cache-Control"].ToString());
+        Assert.Equal("no-cache", headers["Pragma"].ToString());
+        Assert.Equal("0", headers["Expires"].ToString());
+    }
+
+    [Fact]
     public void PrivateHeaderMiddlewareRunsBeforeHttpsRedirection()
     {
         string program = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs"));

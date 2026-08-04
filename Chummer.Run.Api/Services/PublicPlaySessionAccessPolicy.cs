@@ -73,6 +73,7 @@ public sealed class PublicPlaySessionAccessPolicy(
         "/mobile/player",
         "/mobile/gm",
         "/mobile/observer",
+        "/mobile/pwa/ledger.json",
         "/mobile/service-worker.js"
     };
 

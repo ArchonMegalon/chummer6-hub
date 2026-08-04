@@ -76,7 +76,8 @@ def test_api_ready_is_private_no_store_at_origin_and_cdn_boundaries() -> None:
 
     assert "PrivateResponseCacheHeaders.Apply(context.Response.Headers);" in ready_block
     assert 'context.Response.Headers["X-Content-Type-Options"] = "nosniff";' in ready_block
-    assert 'headers["Cache-Control"] = "private, no-store, max-age=0";' in headers
+    assert '? "private, no-store, no-cache, max-age=0"' in headers
+    assert ': "private, no-store, max-age=0";' in headers
     assert 'headers["CDN-Cache-Control"] = "no-store, max-age=0";' in headers
     assert 'headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";' in headers
     assert 'headers["Surrogate-Control"] = "no-store";' in headers

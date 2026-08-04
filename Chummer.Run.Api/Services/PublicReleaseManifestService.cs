@@ -19,7 +19,7 @@ public sealed class PublicReleaseManifestService
     private const string PublicDisabledArtifactIdsKey = "CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS";
     private const string ReleaseDisabledArtifactIdsKey = "CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS";
     private const string ForceAccountRequiredDownloadsKey = "CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS";
-    private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];
+    private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows"];
     private static readonly string[] RequiredDesktopHeads = ["avalonia"];
     private static readonly TimeSpan ManifestCacheFreshTtl = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ManifestCacheStaleTtl = TimeSpan.FromMinutes(2);
@@ -27,8 +27,7 @@ public sealed class PublicReleaseManifestService
     private static readonly IReadOnlyDictionary<string, string[]> DefaultRequiredDesktopPlatformRids = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
     {
         ["linux"] = ["linux-x64"],
-        ["windows"] = ["win-x64"],
-        ["macos"] = ["osx-arm64"]
+        ["windows"] = ["win-x64"]
     };
     private static readonly IReadOnlyDictionary<string, (string Platform, string Arch)> RidToPlatformArch = new Dictionary<string, (string Platform, string Arch)>(StringComparer.OrdinalIgnoreCase)
     {
