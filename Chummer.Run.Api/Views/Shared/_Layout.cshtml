@@ -208,7 +208,10 @@
         && !chrome.Authenticated
         && !string.IsNullOrWhiteSpace(clickRankSiteId)
         && (
-            routeKey is "landing" or "what-is-chummer" or "now" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
+            // The root page immediately hands the browser to Build or Play. Loading a
+            // third-party optimizer there can outlive navigation and make the install
+            // boundary non-deterministic, so keep it on content routes only.
+            routeKey is "what-is-chummer" or "now" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
             || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
             || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
     var requestPathIsRoot = string.Equals(normalizedRequestPath, "/", StringComparison.Ordinal);
