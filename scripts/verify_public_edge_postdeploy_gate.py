@@ -3554,6 +3554,36 @@ def compose_status(
         if isinstance(pwa_static.get("deploymentIdentity"), dict)
         else {}
     )
+    pwa_asset_inventory = (
+        pwa_static.get("assetDigestInventory")
+        if isinstance(pwa_static.get("assetDigestInventory"), dict)
+        else {}
+    )
+    pwa_inventory_assets = (
+        pwa_asset_inventory.get("assets")
+        if isinstance(pwa_asset_inventory.get("assets"), list)
+        else []
+    )
+    raw_pwa_static_failures = (
+        pwa_static.get("failures")
+        if isinstance(pwa_static.get("failures"), list)
+        else []
+    )
+    pwa_static_failures = [
+        sanitize_child_diagnostic_text(str(item))[:500]
+        for item in raw_pwa_static_failures[:32]
+    ]
+    pwa_asset_mismatches = [
+        {
+            "path": str(item.get("path") or "")[:256],
+            "contentType": str(item.get("contentType") or "")[:128],
+            "cacheControl": str(item.get("cacheControl") or "")[:256],
+            "sha256": str(item.get("sha256") or "")[:64],
+            "sizeBytes": item.get("sizeBytes"),
+        }
+        for item in pwa_inventory_assets[:32]
+        if isinstance(item, dict) and item.get("matchesExpected") is not True
+    ]
     pwa_full_deployment_digest_sha256 = str(
         pwa_deployment_identity.get("fullDeploymentDigestSha256") or ""
     ).strip()
@@ -4299,6 +4329,13 @@ def compose_status(
         "ledgerStreamPrecached": service_worker.get("ledger_stream_precached"),
         "pwaRootWorkerKind": service_worker.get("worker_kind"),
         "pwaRootWorkerCacheVersion": service_worker.get("cache_version"),
+        "pwaStaticFailures": pwa_static_failures,
+        "pwaAssetInventoryExpectedSha256": pwa_asset_inventory.get("expectedSha256"),
+        "pwaAssetInventorySealedExpectedSha256": pwa_asset_inventory.get("sealedExpectedSha256"),
+        "pwaAssetInventoryActualSha256": pwa_asset_inventory.get("actualSha256"),
+        "pwaAssetInventoryMatchesExpected": pwa_asset_inventory.get("matchesExpected"),
+        "pwaAssetInventorySourceStable": pwa_asset_inventory.get("sourceStable"),
+        "pwaAssetMismatches": pwa_asset_mismatches,
         "pwaDeploymentIdentity": pwa_deployment_identity,
         "expectedPwaFullDeploymentDigestSha256": normalized_expected_full_deployment_digest,
         "pwaFullDeploymentDigestSha256": pwa_full_deployment_digest_sha256,
