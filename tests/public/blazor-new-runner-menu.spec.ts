@@ -19,6 +19,8 @@ async function expectInteractiveNewRunnerRouteState(page: import('playwright/tes
   const startupDialog = page.getByRole('dialog', { name: 'Select Build Method' });
   await expect(startupDialog).toBeVisible({ timeout: 20000 });
   await expect(startupDialog.locator('label[data-field-id="newCharacterBuildMethod"] select')).toHaveValue('Priority');
+  await expect(page.locator('button.menu-btn.classic-menu-button').filter({ hasText: 'File' })).toBeDisabled({ timeout: 20000 });
+  await expect(page.locator('button.tool-btn.classic-tool-button').filter({ hasText: 'New' }).first()).toBeDisabled({ timeout: 20000 });
   await expect(page.locator('body')).not.toContainText('Your runners will appear here.');
 }
 
@@ -41,6 +43,8 @@ async function reopenNewRunnerDialogFromFileMenu(page: import('playwright/test')
   await newRunnerMenuItem.click();
   await expect(page.locator('#dialogBackdrop[data-dialog-id="dialog.new_character"]')).toHaveCount(1);
   await expect(page.getByRole('dialog', { name: 'Select Build Method' })).toBeVisible();
+  await expect(page.locator('button.menu-btn.classic-menu-button').filter({ hasText: 'File' })).toBeDisabled();
+  await expect(page.locator('button.tool-btn.classic-tool-button').filter({ hasText: 'New' }).first()).toBeDisabled();
 }
 
 async function expectBuildLabContinuationRoute(page: import('playwright/test').Page) {

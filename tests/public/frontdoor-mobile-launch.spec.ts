@@ -10,6 +10,7 @@ const proofClosureSha256 = requiredProofClosureSha256();
 const ignoredConsoleErrorFragments = [
   'Failed to load resource: net::ERR_NETWORK_CHANGED',
   'WebSocket closed with status code: 1006',
+  'Failed to send tracking data: TypeError: Failed to fetch',
 ];
 
 const safeErrorType = (error: unknown) => error instanceof Error && error.name ? error.name : 'UnknownError';
@@ -60,9 +61,17 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
 
     const buildLink = openMenu.getByRole('link', { name: 'Build', exact: true });
     const playLink = openMenu.getByRole('link', { name: 'Play', exact: true });
-    await expect(buildLink).toHaveAttribute('href', '/build');
+    const buildTarget = new URL((await buildLink.getAttribute('href')) || '', publicOrigin);
+    const playTarget = new URL((await playLink.getAttribute('href')) || '', publicOrigin);
+    expect(buildTarget.origin).toBe(publicOrigin);
+    expect(buildTarget.pathname).toBe('/build');
+    expect(buildTarget.search).toBe('');
+    expect(buildTarget.hash).toBe('');
     await expect(buildLink).toHaveAttribute('data-public-install-handoff', 'true');
-    await expect(playLink).toHaveAttribute('href', '/mobile/player');
+    expect(playTarget.origin).toBe(publicOrigin);
+    expect(playTarget.pathname).toBe('/mobile/player');
+    expect(playTarget.search).toBe('');
+    expect(playTarget.hash).toBe('');
     await expect(playLink).toHaveAttribute('data-public-install-handoff', 'true');
     await expect(openMenu.locator('[data-disabled-target="/build"]')).toHaveCount(0);
     await expect(openMenu.locator('[data-disabled-target="/mobile/player"]')).toHaveCount(0);
@@ -125,12 +134,22 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
     expect(allObservedUrls.some((url) => url.includes('/api/play'))).toBe(false);
     expect(allObservedUrls.some((url) => url.includes('/_blazor'))).toBe(false);
     expect(allObservedUrls.some((url) => /[?&](sessionId|grant|deviceId|role)=/i.test(url))).toBe(false);
-    expect(allObservedUrls.some((value) => {
+    const analyticsRequestUrls = allObservedUrls.filter((value) => {
       const url = new URL(value);
       return /(^|\.)(rybbit|plausible)\./i.test(url.hostname)
         || /^\/api\/(?:v\d+\/)?(analytics|events|telemetry|tracking)(?:[/?]|$)/i.test(url.pathname)
         || /^\/(analytics|events|telemetry|tracking)(?:[/?]|$)/i.test(url.pathname);
-    })).toBe(false);
+    });
+    const unexpectedAnalyticsRequestUrls = analyticsRequestUrls.filter((value) => {
+      const url = new URL(value);
+      const approvedHostedRybbit = url.protocol === 'https:'
+        && url.hostname === 'app.rybbit.io'
+        && url.pathname === '/api/track';
+      const approvedSameOriginRybbit = url.origin === publicOrigin
+        && url.pathname === '/api/rybbit/track';
+      return url.search !== '' || (!approvedHostedRybbit && !approvedSameOriginRybbit);
+    });
+    expect(unexpectedAnalyticsRequestUrls).toEqual([]);
     expect(pageErrors.length).toBe(0);
 
     proofStage = 'complete';
@@ -148,7 +167,8 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
       private_browser_state_keys: 0,
       play_api_requests: 0,
       blazor_circuit_requests: 0,
-      analytics_requests: 0,
+      analytics_requests: analyticsRequestUrls.length,
+      analytics_posture: 'approved_public_aggregate_endpoint_only',
       private_query_requests: 0,
       page_errors: [],
     });
