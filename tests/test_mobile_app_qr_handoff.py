@@ -71,13 +71,15 @@ process.stdout.write(JSON.stringify({
 def _run_install_worker_registration(
     failures_before_success: int,
     activation_failures_before_success: int = 0,
+    activation_timeouts_before_success: int = 0,
     ready_state: str = "loading",
 ) -> dict[str, object]:
     probe = r"""
 const fs = require("fs");
 const failuresBeforeSuccess = Number(process.argv[2]);
 const activationFailuresBeforeSuccess = Number(process.argv[3]);
-const readyState = process.argv[4];
+const activationTimeoutsBeforeSuccess = Number(process.argv[4]);
+const readyState = process.argv[5];
 const listeners = {};
 const installStatus = { textContent: "" };
 let attempts = 0;
@@ -92,9 +94,21 @@ const serviceWorkerNavigator = {
         throw new TypeError("transient registration failure");
       }
       const activationAttempt = attempts - failuresBeforeSuccess;
+      if (activationAttempt <= activationTimeoutsBeforeSuccess) {
+        return {
+          installing: {
+            state: "installing",
+            addEventListener: () => {},
+            removeEventListener: () => {}
+          },
+          unregister: async () => { unregisters += 1; return true; }
+        };
+      }
       return {
         active: {
-          state: activationAttempt <= activationFailuresBeforeSuccess ? "redundant" : "activated"
+          state: activationAttempt <= activationTimeoutsBeforeSuccess + activationFailuresBeforeSuccess
+            ? "redundant"
+            : "activated"
         },
         unregister: async () => { unregisters += 1; return true; }
       };
@@ -145,6 +159,7 @@ eval(fs.readFileSync(process.argv[1], "utf8"));
             str(INSTALL_SCRIPT),
             str(failures_before_success),
             str(activation_failures_before_success),
+            str(activation_timeouts_before_success),
             ready_state,
         ],
         cwd=REPO_ROOT,
@@ -195,6 +210,9 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
     assert "attempt + 1 >= serviceWorkerRegistrationAttempts" in script
     assert script.count('navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" })') == 1
     assert "await waitForServiceWorkerActivation(registration);" in script
+    assert "const hasPendingServiceWorkerActivation = (registration) =>" in script
+    assert 'return worker != null && ["installing", "installed", "activating"].includes(worker.state);' in script
+    assert "if (!hasPendingServiceWorkerActivation(registration)) {" in script
     assert "await registration?.unregister?.().catch(() => false);" in script
     assert "window.setTimeout(resolve, serviceWorkerRetryDelaysMs[attempt]);" in script
     assert script.count("await registerServiceWorker({ reportFailure: false })") == 2
@@ -245,6 +263,15 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
         "unregisters": 6,
         "status": "The install shell is available online. Service-worker installation is not available in this browser.",
     }
+
+    slow_activation_recovered = _run_install_worker_registration(
+        failures_before_success=0,
+        activation_timeouts_before_success=2,
+    )
+    assert slow_activation_recovered["attemptsBeforeLoad"] == 3
+    assert slow_activation_recovered["attempts"] == 4
+    assert slow_activation_recovered["unregisters"] == 0
+    assert "not available" not in str(slow_activation_recovered["status"])
 
     already_loaded = _run_install_worker_registration(
         failures_before_success=0,
