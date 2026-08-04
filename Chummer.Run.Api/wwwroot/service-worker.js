@@ -110,6 +110,8 @@ const CRITICAL_SHELL_ASSETS = [
 const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;
 const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];
 const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;
+const CRITICAL_SHELL_RESPONSE_MAX_BYTES = 1024 * 1024;
+const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 5000;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(precacheCriticalShell());
@@ -118,7 +120,23 @@ self.addEventListener("install", (event) => {
 async function precacheCriticalShell() {
   const verified = await Promise.all(CRITICAL_SHELL_ASSETS.map(fetchCriticalShellAsset));
   const cache = await caches.open(SHELL_CACHE);
-  await Promise.all(verified.map(({ request, response }) => cache.put(request, response)));
+  await Promise.all(verified.map((asset) => cacheCriticalShellAsset(cache, asset)));
+}
+
+async function cacheCriticalShellAsset(cache, { request, response }) {
+  let timeoutId = 0;
+  try {
+    await Promise.race([
+      cache.put(request, response),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`critical public shell cache write timed out: ${request.url}`));
+        }, CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function fetchCriticalShellAsset(asset) {
@@ -129,7 +147,17 @@ async function fetchCriticalShellAsset(asset) {
     try {
       const response = await fetch(request, { signal: controller.signal });
       if (isExpectedPublicAssetResponse(request, response)) {
-        return { request, response };
+        const body = await response.arrayBuffer();
+        if (body.byteLength <= CRITICAL_SHELL_RESPONSE_MAX_BYTES) {
+          return {
+            request,
+            response: new Response(body, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers
+            })
+          };
+        }
       }
     } catch {
       // The closed retry budget below covers transient cutover/network failures.

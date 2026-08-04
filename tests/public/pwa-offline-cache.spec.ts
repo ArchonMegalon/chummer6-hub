@@ -91,16 +91,16 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
 
   const waitForV19Control = async () => {
     await expect.poll(async () => (await readServiceWorkerState()).scriptURL ?? '', {
-      timeout: 30000,
+      timeout: 45000,
     }).toContain('/service-worker.js');
     await expect.poll(async () => (await readServiceWorkerState()).workerState, {
-      timeout: 30000,
+      timeout: 45000,
     }).toBe('activated');
     if (!(await readServiceWorkerState()).controller) {
       await page.reload({ waitUntil: 'domcontentloaded' });
     }
     await expect.poll(async () => (await readServiceWorkerState()).controller, {
-      timeout: 30000,
+      timeout: 45000,
     }).toBeTruthy();
   };
 

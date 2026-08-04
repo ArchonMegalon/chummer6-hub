@@ -9,7 +9,7 @@
     : null;
   const serviceWorkerRegistrationAttempts = 3;
   const serviceWorkerRetryDelaysMs = [500, 1500];
-  const serviceWorkerActivationTimeoutMs = 8000;
+  const serviceWorkerActivationTimeoutMs = 20000;
   let installPrompt = null;
 
   const setStatus = (message) => {
