@@ -72,7 +72,11 @@ PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}"
 )
 PUBLIC_EDGE_DOWNLOADS_AUTHORITY_SCHEMA_PATTERN = re.compile(
+    r"(?:"
+    r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}"
+    r"|"
     r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}/[A-Za-z0-9][A-Za-z0-9._+-]{0,63}"
+    r")"
 )
 PUBLIC_EDGE_OFFLINE_STATIC_PATHS = {
     "/manifest.player.webmanifest",
