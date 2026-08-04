@@ -1335,8 +1335,8 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
     }
 
-    [HttpGet("/mobile/{role}")]
-    [HttpHead("/mobile/{role}")]
+    [HttpGet("/mobile/{role:alpha}")]
+    [HttpHead("/mobile/{role:alpha}")]
     [Produces("text/html")]
     public async Task<IActionResult> MobileRoleProjectionPage(string role, CancellationToken cancellationToken)
     {
