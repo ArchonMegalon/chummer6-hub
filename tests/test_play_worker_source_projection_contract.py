@@ -83,7 +83,10 @@ def _assert_shared_privacy_semantics(script: str, expected_cache_version: str) -
     )
     assert "play_api_network_unavailable" in script
     assert "status: 503" in script
-    assert '"cache-control": "no-store"' in script
+    assert (
+        '"cache-control": "no-store"' in script
+        or '"cache-control": "private, no-store"' in script
+    )
     assert '"content-security-policy": "default-src \'none\'' in script
     assert '"x-content-type-options": "nosniff"' in script
 
@@ -94,6 +97,7 @@ def test_actual_play_source_and_served_projection_use_distinct_cache_contracts_w
 
     _assert_shared_privacy_semantics(source, "v21")
     _assert_shared_privacy_semantics(served, "v19")
+    assert served.count('"cache-control": "private, no-store"') == 3
 
     source_contract = _constant(source, "CACHE_CONTRACT")
     served_contract = _constant(served, "CACHE_CONTRACT")
