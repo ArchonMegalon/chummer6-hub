@@ -224,7 +224,9 @@
         && !string.IsNullOrWhiteSpace(rybbitSiteId)
         && !string.IsNullOrWhiteSpace(rybbitScriptUrl)
         && (
-            routeKey is "landing" or "what-is-chummer" or "now" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
+            // The root page is an install frontdoor. An idle analytics load can otherwise
+            // cross the privacy boundary while the browser enters Build or Play.
+            routeKey is "what-is-chummer" or "now" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
             || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
             || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
     var robotsPolicy = indexablePublicRoute
