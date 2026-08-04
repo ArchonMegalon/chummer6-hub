@@ -92,6 +92,8 @@ class RuntimeAuthority(Protocol):
 
     def container_file_sha256(self, container_id: str, path: str) -> str: ...
 
+    def container_bind_source(self, container_id: str, path: str) -> Path: ...
+
 
 class DockerRuntime:
     def __init__(
@@ -398,6 +400,38 @@ class DockerRuntime:
         ):
             raise RuntimeError("recovered runtime proof digest output is invalid")
         return digest
+
+    def container_bind_source(self, container_id: str, path: str) -> Path:
+        rendered = self._run(
+            [
+                *self.docker_base,
+                "container",
+                "inspect",
+                "--format",
+                "{{json .Mounts}}",
+                container_id,
+            ],
+            label="inspect recovered runtime proof bind source",
+        )
+        try:
+            mounts = json.loads(rendered)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise RuntimeError("recovered runtime proof mounts are invalid") from exc
+        matching = [
+            mount
+            for mount in mounts
+            if isinstance(mount, dict)
+            and mount.get("Type") == "bind"
+            and mount.get("Destination") == path
+            and mount.get("RW") is False
+            and mount.get("Mode") == "ro"
+        ]
+        if len(matching) != 1 or not isinstance(matching[0].get("Source"), str):
+            raise RuntimeError("recovered runtime proof bind source is ambiguous")
+        source = Path(matching[0]["Source"])
+        if not source.is_absolute():
+            raise RuntimeError("recovered runtime proof bind source is not absolute")
+        return transaction.overlay.normalized_absolute_path(source)
 
 
 def _component(
@@ -1030,6 +1064,16 @@ def main(argv: list[str] | None = None) -> int:
         candidate_proof_snapshot = Path(
             deploy_authority["candidateProofBindSourceSnapshot"]
         )
+        prior_authority_snapshot = Path(
+            deploy_authority["priorPortalProofAuthoritySnapshot"]
+        )
+        prior_public_snapshot = Path(
+            deploy_authority["priorPortalProofPublicSnapshot"]
+        )
+        legacy_proof_bind_source = (
+            projection_snapshot_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        )
+        legacy_proof_bind_prepared = False
         if proof_bind_source != authenticated_runtime_proof:
             raise RuntimeError(
                 "durable recovery journal does not bind its authenticated generation"
@@ -1045,17 +1089,63 @@ def main(argv: list[str] | None = None) -> int:
                 return False
 
         def restore_candidate_proof_bind() -> None:
+            nonlocal legacy_proof_bind_prepared
             if not candidate_proof_snapshot.is_file():
                 raise RuntimeError("candidate proof evidence snapshot is unavailable")
+            if legacy_proof_bind_prepared:
+                atomic_replace_from_snapshot(
+                    snapshot=candidate_proof_snapshot,
+                    destination=legacy_proof_bind_source,
+                    expected_sha256=prior[
+                        "expectedRuntimeProofBindSourceSha256"
+                    ],
+                )
+                legacy_proof_bind_prepared = False
+            if stable_file_sha256(
+                legacy_proof_bind_source,
+                label="restored legacy runtime proof bind source",
+            ) != prior["expectedRuntimeProofBindSourceSha256"]:
+                raise RuntimeError(
+                    "legacy runtime proof bind source did not restore candidate authority"
+                )
             if not proof_bind_source_matches_candidate():
                 raise RuntimeError(
                     "immutable authenticated generation proof cannot be repaired in place"
                 )
 
         def prepare_prior_proof_bind() -> None:
-            # A prior container retains its own immutable bind source identity.
-            # Recovery never rewrites CURRENT output bytes to impersonate it.
-            return None
+            nonlocal legacy_proof_bind_prepared
+            portal_id = prior["priorPortalContainerId"]
+            authority_source = runtime.container_bind_source(
+                portal_id,
+                PROOF_AUTHORITY_PATH,
+            )
+            public_source = runtime.container_bind_source(
+                portal_id,
+                PROOF_PUBLIC_PATH,
+            )
+            if (
+                authority_source != legacy_proof_bind_source
+                or public_source != legacy_proof_bind_source
+            ):
+                raise RuntimeError(
+                    "prior runtime proof mounts do not share the exact legacy bind source"
+                )
+            authority_digest = prior["priorPortalProofAuthorityMountSha256"]
+            public_digest = prior["priorPortalProofPublicMountSha256"]
+            if authority_digest != public_digest:
+                raise RuntimeError("journaled prior runtime proof mounts disagree")
+            if stable_file_sha256(
+                prior_public_snapshot,
+                label="prior public runtime proof snapshot",
+            ) != public_digest:
+                raise RuntimeError("prior public runtime proof snapshot changed")
+            atomic_replace_from_snapshot(
+                snapshot=prior_authority_snapshot,
+                destination=legacy_proof_bind_source,
+                expected_sha256=authority_digest,
+            )
+            legacy_proof_bind_prepared = True
 
         def overlay_matches() -> bool:
             return transaction.prior_overlay_matches_snapshot(
