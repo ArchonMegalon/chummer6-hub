@@ -68,6 +68,59 @@ process.stdout.write(JSON.stringify({
     return json.loads(result.stdout)
 
 
+def _run_install_worker_registration(failures_before_success: int) -> dict[str, object]:
+    probe = r"""
+const fs = require("fs");
+const failuresBeforeSuccess = Number(process.argv[2]);
+const listeners = {};
+const installStatus = { textContent: "" };
+let attempts = 0;
+const serviceWorkerNavigator = {
+  standalone: false,
+  serviceWorker: {
+    register: async () => {
+      attempts += 1;
+      if (attempts <= failuresBeforeSuccess) {
+        throw new TypeError("transient registration failure");
+      }
+      return {};
+    }
+  }
+};
+Object.defineProperty(globalThis, "navigator", { value: serviceWorkerNavigator, configurable: true });
+global.window = {
+  navigator: serviceWorkerNavigator,
+  matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
+  addEventListener: (name, callback) => { listeners[name] = callback; },
+  removeEventListener: () => {},
+  setTimeout: (callback) => { callback(); return 1; }
+};
+global.document = {
+  getElementById: (id) => id === "turn-install-status" ? installStatus : null
+};
+eval(fs.readFileSync(process.argv[1], "utf8"));
+
+(async () => {
+  listeners.load();
+  for (let tick = 0; tick < 8; tick += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  process.stdout.write(JSON.stringify({ attempts, status: installStatus.textContent }));
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    result = subprocess.run(
+        ["node", "-e", probe, str(INSTALL_SCRIPT), str(failures_before_success)],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
 def test_landing_play_entry_uses_a_progressive_desktop_to_mobile_handoff() -> None:
     landing = LANDING.read_text(encoding="utf-8")
     partial = HANDOFF_PARTIAL.read_text(encoding="utf-8")
@@ -96,6 +149,27 @@ def test_landing_play_entry_uses_a_progressive_desktop_to_mobile_handoff() -> No
     assert "The link opens an installable PWA." in partial
     assert "Your phone browser decides whether and how to offer installation" in partial
     assert "installs automatically" not in partial.lower()
+
+
+def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_budget() -> None:
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+    assert "const serviceWorkerRegistrationAttempts = 3;" in script
+    assert "const serviceWorkerRetryDelaysMs = [500, 1500];" in script
+    assert "attempt < serviceWorkerRegistrationAttempts" in script
+    assert "attempt + 1 >= serviceWorkerRegistrationAttempts" in script
+    assert script.count('navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" })') == 1
+    assert "window.setTimeout(resolve, serviceWorkerRetryDelaysMs[attempt]);" in script
+    assert "void registerServiceWorker();" in script
+
+    recovered = _run_install_worker_registration(failures_before_success=2)
+    exhausted = _run_install_worker_registration(failures_before_success=5)
+    assert recovered["attempts"] == 3
+    assert "not available" not in str(recovered["status"])
+    assert exhausted == {
+        "attempts": 3,
+        "status": "The install shell is available online. Service-worker installation is not available in this browser.",
+    }
 
 
 def test_landing_build_entry_reuses_the_same_handoff_component_for_the_builder_pwa() -> None:

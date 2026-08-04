@@ -7,6 +7,8 @@
   const displayModeQuery = typeof window.matchMedia === "function"
     ? window.matchMedia("(display-mode: standalone)")
     : null;
+  const serviceWorkerRegistrationAttempts = 3;
+  const serviceWorkerRetryDelaysMs = [500, 1500];
   let installPrompt = null;
 
   const setStatus = (message) => {
@@ -48,10 +50,26 @@
     restoreBrowserInstallState();
   };
 
+  const registerServiceWorker = async () => {
+    for (let attempt = 0; attempt < serviceWorkerRegistrationAttempts; attempt += 1) {
+      try {
+        await navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" });
+        return;
+      } catch {
+        if (attempt + 1 >= serviceWorkerRegistrationAttempts) {
+          setStatus("The install shell is available online. Service-worker installation is not available in this browser.");
+          return;
+        }
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, serviceWorkerRetryDelaysMs[attempt]);
+        });
+      }
+    }
+  };
+
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" })
-        .catch(() => setStatus("The install shell is available online. Service-worker installation is not available in this browser."));
+      void registerServiceWorker();
     }, { once: true });
   }
 
