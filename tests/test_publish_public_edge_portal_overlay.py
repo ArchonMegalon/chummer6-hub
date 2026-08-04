@@ -69,6 +69,11 @@ def write_fake_runtime_payload(staging_root: Path) -> None:
         "{}\n",
         encoding="utf-8",
     )
+    (staging_root / "wwwroot" / "js").mkdir(parents=True, exist_ok=True)
+    (staging_root / "wwwroot" / "js" / "mobile-app-handoff.js").write_text(
+        "// published mobile app handoff\n",
+        encoding="utf-8",
+    )
 
 
 def make_source_tree(root: Path) -> None:
@@ -185,6 +190,11 @@ def make_source_tree(root: Path) -> None:
     (root / "Chummer.Run.Api" / "ViewModels").mkdir(parents=True, exist_ok=True)
     (root / "Chummer.Run.Api" / "ViewModels" / "SiteViewModels.cs").write_text("site view models\n", encoding="utf-8")
     (root / "Chummer.Run.Api" / "wwwroot").mkdir(parents=True, exist_ok=True)
+    (root / "Chummer.Run.Api" / "wwwroot" / "js").mkdir(parents=True, exist_ok=True)
+    (root / "Chummer.Run.Api" / "wwwroot" / "js" / "mobile-app-handoff.js").write_text(
+        "// mobile app handoff\n",
+        encoding="utf-8",
+    )
     (root / "Chummer.Run.Api" / "wwwroot" / "pwa-icon.svg").write_text("<svg />\n", encoding="utf-8")
     (root / "Chummer.Run.Api" / "wwwroot" / "site.webmanifest").write_text("{}\n", encoding="utf-8")
     (root / "Chummer.Run.Api" / "wwwroot" / "media" / "product").mkdir(parents=True, exist_ok=True)
@@ -2244,7 +2254,7 @@ def test_frontdoor_playwright_proof_closure_is_exact_digest_bound_and_mutation_f
     )
 
     assert receipt["status"] == "pass"
-    assert receipt["fileCount"] == 7
+    assert receipt["fileCount"] == 8
     assert receipt["playwrightPackageVersion"] == "1.60.0"
     assert len(receipt["aggregateSha256"]) == 64
     assert {row["relativePath"] for row in receipt["files"]} == {
@@ -2255,6 +2265,7 @@ def test_frontdoor_playwright_proof_closure_is_exact_digest_bound_and_mutation_f
         "tests/public/frontdoor-mobile-launch.spec.ts",
         "tests/public/black-ledger-frontdoor.spec.ts",
         "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+        "Chummer.Run.Api/wwwroot/js/mobile-app-handoff.js",
     }
     assert module.validate_frontdoor_playwright_proof_closure(closure_root) == receipt
 

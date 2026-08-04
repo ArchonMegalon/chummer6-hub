@@ -381,8 +381,9 @@
     }
     targetInput.value = targetUrl;
     openLink.href = targetUrl;
+    const targetPath = new URL(targetUrl).pathname;
     openers.forEach((opener) => {
-      opener.href = targetUrl;
+      opener.setAttribute("href", targetPath);
     });
     if (qrSvg instanceof SVGElement) {
       try {
