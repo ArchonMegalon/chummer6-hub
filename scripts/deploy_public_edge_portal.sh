@@ -768,6 +768,12 @@ fi
 lock_acquire_mode=acquire
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
   lock_acquire_mode=adopt
+elif [[ "$DEPLOY_OPERATION" == recover ]]; then
+  # A normal deploy can retain the authenticated lock together with the
+  # overlay transaction when post-quiesce authority is unknown.  Recovery
+  # must adopt that exact lock instead of competing with it.  Keep the
+  # acquire path for older interrupted journals that no longer have a lock.
+  lock_acquire_mode=acquire-or-adopt
 elif [[ "$DEPLOY_OPERATION" \
     == initial-release-shelf-public-download-cutover ]]; then
   lock_acquire_mode=acquire-or-prestart-adopt
@@ -796,6 +802,8 @@ controller_sha256 = sys.argv[11]
 cutover_operation = "initial-release-shelf-public-download-cutover"
 recovery_operation = "initial-release-shelf-public-download-cutover-recover"
 retire_operation = "initial-release-shelf-public-download-cutover-retire"
+deploy_operation = "deploy"
+deploy_recovery_operation = "recover"
 epoch_operation = "release-upload-ticket-epoch-rotate"
 epoch_resume_operation = "release-upload-ticket-epoch-rotate-resume"
 binding_contract = "chummer.public-edge-retained-lock-binding/v1"
@@ -1068,6 +1076,18 @@ if mode in {"adopt", "adopt-prestart"}:
         )
         + "\n"
     ).encode("utf-8")
+    normal_recovery_other_operation = (
+        requested_operation == deploy_recovery_operation
+        and (
+            binding.get("initialOperation"),
+            binding.get("allowedResumeOperation"),
+        )
+        in {
+            (cutover_operation, recovery_operation),
+            (retire_operation, retire_operation),
+            (epoch_operation, epoch_resume_operation),
+        }
+    )
     if (
         not isinstance(binding, dict)
         or not exact_binding_keys(binding)
@@ -1077,7 +1097,10 @@ if mode in {"adopt", "adopt-prestart"}:
         or binding.get("tokenSha256") != token_digest
         or binding.get("sourceHead") != source_head
         or binding.get("wrapperSha256") != wrapper_sha256
-        or binding.get("controllerSha256") != controller_sha256
+        or (
+            binding.get("controllerSha256") != controller_sha256
+            and not normal_recovery_other_operation
+        )
         or binding["identities"].get("lock") != binding_identity(lock_stat)
         or binding["identities"].get("token") != binding_identity(token_stat)
         or binding["identities"].get("authorization")
@@ -1086,6 +1109,10 @@ if mode in {"adopt", "adopt-prestart"}:
         or binding["identities"].get("binding") != binding_identity(binding_stat)
     ):
         fail()
+    if normal_recovery_other_operation:
+        # Its own authenticated identity is intact, but a generic recovery is
+        # not authorized to adopt this different governed operation.
+        fail(75)
     expected_pair = (
         (cutover_operation, recovery_operation)
         if (
@@ -1093,6 +1120,10 @@ if mode in {"adopt", "adopt-prestart"}:
             and requested_operation == cutover_operation
         )
         else {
+            deploy_recovery_operation: (
+                deploy_operation,
+                deploy_recovery_operation,
+            ),
             recovery_operation: (cutover_operation, recovery_operation),
             retire_operation: (retire_operation, retire_operation),
             epoch_resume_operation: (
@@ -1192,9 +1223,13 @@ elif requested_operation == retire_operation:
 else:
     initial_operation = requested_operation
     allowed_resume_operation = (
-        epoch_resume_operation
-        if requested_operation == epoch_operation
-        else ""
+        deploy_recovery_operation
+        if requested_operation == deploy_operation
+        else (
+            epoch_resume_operation
+            if requested_operation == epoch_operation
+            else ""
+        )
     )
     operation_id = ""
     operation_root = ""

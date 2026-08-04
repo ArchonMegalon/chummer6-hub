@@ -3957,6 +3957,20 @@ class GovernedCutoverRunner:
                 raise CutoverError(
                     "post-quiesce state-volume inventory binding drifted"
                 )
+            (
+                bound_build_info_path,
+                self.candidate_build_info_sha256,
+                build_info,
+            ) = bind_active_build_info(
+                self.candidate_build_info_path,
+                cutover_id=self.inputs.cutover_id,
+                candidate_image_id=self.candidate_image_id,
+                candidate_tool_image_id=self.candidate_tool_image_id,
+            )
+            if bound_build_info_path != self.candidate_build_info_path:
+                raise CutoverError(
+                    "post-quiesce candidate build-info path drifted"
+                )
             self._validate_source()
             observed_source_provenance = (
                 self._capture_build_source_provenance()
@@ -3976,19 +3990,13 @@ class GovernedCutoverRunner:
                 env_file=self.inputs.env_file,
                 expected_phase="validate_completed",
             )
-            self.candidate_build_info_path = Path(
+            verified_build_info_path = Path(
                 str(verification["activeBuildInfoPath"])
             )
-            (
-                _,
-                self.candidate_build_info_sha256,
-                build_info,
-            ) = bind_active_build_info(
-                self.candidate_build_info_path,
-                cutover_id=self.inputs.cutover_id,
-                candidate_image_id=self.candidate_image_id,
-                candidate_tool_image_id=self.candidate_tool_image_id,
-            )
+            if verified_build_info_path != self.candidate_build_info_path:
+                raise CutoverError(
+                    "post-quiesce boundary build-info path drifted"
+                )
             self._bind_existing_build_override()
             self._validate_rendered_compose()
             if (

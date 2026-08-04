@@ -1374,6 +1374,78 @@ def test_postquiesce_reproof_reopens_exact_retained_build_override(
         runner._bind_existing_build_override()
 
 
+def test_postquiesce_early_image_failure_retains_bound_build_info_for_safe_fail(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    runner = make_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    build_sha256 = "9" * 64
+    inventory_sha256 = "a" * 64
+    inventory = tmp_path / (
+        "INSTALL_LINKING_STATE_VOLUME_INVENTORY."
+        "post-incumbent-quiesce.attempt01.json"
+    )
+    output = tmp_path / "INSTALL_LINKING_POSTGRES_POSTQUIESCE_REPROOF.attempt01.json"
+
+    monkeypatch.setattr(
+        module,
+        "validate_inherited_mutation_lock",
+        lambda *_args, **_kwargs: (1, 2, 3),
+    )
+    monkeypatch.setattr(
+        module,
+        "bind_state_volume_inventory",
+        lambda *_args, **_kwargs: (inventory, inventory_sha256, {}),
+    )
+    monkeypatch.setattr(
+        module,
+        "bind_active_build_info",
+        lambda *_args, **_kwargs: (
+            runner.candidate_build_info_path,
+            build_sha256,
+            {},
+        ),
+    )
+    monkeypatch.setattr(runner, "_validate_source", lambda: None)
+    monkeypatch.setattr(
+        runner,
+        "_capture_build_source_provenance",
+        lambda: {},
+    )
+
+    def missing_image(_tag: str, *, allow_absent: bool = False) -> str:
+        del allow_absent
+        raise module.CutoverError("required image tag is unavailable")
+
+    monkeypatch.setattr(runner, "_resolve_image", missing_image)
+
+    with pytest.raises(module.CutoverError, match="required image tag"):
+        runner.run_postquiesce_reproof(
+            attempt_id="attempt01",
+            expected_boundary_sha256="b" * 64,
+            expected_candidate_image_id=IMAGE,
+            expected_candidate_tool_image_id=TOOL_IMAGE,
+            shared_mutation_lock_token="c" * 64,
+            volume_inventory_receipt=inventory,
+            expected_volume_inventory_sha256=inventory_sha256,
+            output=output,
+        )
+
+    receipt = json.loads(output.read_text(encoding="utf-8"))
+    assert receipt["status"] == "fail"
+    assert receipt["startIntentWritten"] is False
+    assert receipt["containerStartMayHaveBeenInvoked"] is False
+    assert receipt["activeBuildInfoPath"] == str(
+        runner.candidate_build_info_path
+    )
+    assert receipt["activeBuildInfoSha256"] == build_sha256
+
+
 @pytest.mark.parametrize("mutation", ["wrong_source", "wrong_service"])
 def test_stopped_container_inspection_rejects_topology_drift(
     tmp_path: Path,

@@ -2881,6 +2881,36 @@ def test_guarded_deploy_sigkill_leaves_external_authenticated_recovery_token(
     assert retained_artifacts["lease"].is_file()
     assert retained_artifacts["binding"].stat().st_mode & 0o777 == 0o600
     assert retained_artifacts["lease"].stat().st_mode & 0o777 == 0o600
+    binding = json.loads(
+        retained_artifacts["binding"].read_text(encoding="utf-8")
+    )
+    assert binding["initialOperation"] == "deploy"
+    assert binding["allowedResumeOperation"] == "recover"
+
+    monkeypatch.delenv("FAKE_DOCKER_CONTEXT_PAUSE_READY")
+    recovery = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "recover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert recovery.returncode == 0, recovery.stderr
+    assert recovery.stdout.strip().splitlines()[-1] == (
+        "public_edge_deploy_recovery_complete"
+    )
+    assert not retained_artifacts["lock"].exists()
+    assert not retained_artifacts["authorization"].exists()
+    assert not retained_artifacts["binding"].exists()
+    assert not retained_artifacts["lease"].exists()
 
 
 def test_retirement_controller_failure_forces_status_76_and_retains_lock(
