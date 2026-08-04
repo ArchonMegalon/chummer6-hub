@@ -550,6 +550,7 @@ def test_frontdoor_browser_gate_measures_targets_and_keyboard_focus_at_runtime()
 def test_public_root_and_mobile_play_workers_use_exact_atomic_cache_contracts() -> None:
     worker = ROOT_WORKER.read_text(encoding="utf-8")
     mobile_wrapper = MOBILE_WORKER.read_text(encoding="utf-8")
+    controller = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
 
     assert 'const CACHE_VERSION = "v19";' in worker
     assert 'const CACHE_CONTRACT = "run-api-projection-v2";' in worker
@@ -572,6 +573,9 @@ def test_public_root_and_mobile_play_workers_use_exact_atomic_cache_contracts() 
     assert 'url.pathname === "/blazor" || url.pathname.startsWith("/blazor/")' in worker
     assert "if (isBuildOwnedRequest(url))" in worker
     assert 'importScripts("/service-worker.js")' in mobile_wrapper
+    assert '[HttpGet("/mobile/{role:alpha}")]' in controller
+    assert '[HttpHead("/mobile/{role:alpha}")]' in controller
+    assert '[HttpGet("/mobile/{role}")]' not in controller
     assert '"/mobile-install-shell.js"' in worker
     assert '"/manifest.observer.webmanifest"' in worker
     assert '"/mobile-turn-companion.js"' not in worker
