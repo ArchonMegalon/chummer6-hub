@@ -205,7 +205,7 @@ def test_mobile_install_shell_retries_service_worker_registration_with_a_closed_
 
     assert "const serviceWorkerRegistrationAttempts = 3;" in script
     assert "const serviceWorkerRetryDelaysMs = [500, 1500];" in script
-    assert "const serviceWorkerActivationTimeoutMs = 8000;" in script
+    assert "const serviceWorkerActivationTimeoutMs = 20000;" in script
     assert "attempt < serviceWorkerRegistrationAttempts" in script
     assert "attempt + 1 >= serviceWorkerRegistrationAttempts" in script
     assert script.count('navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" })') == 1

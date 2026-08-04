@@ -41,11 +41,13 @@ def _run_critical_asset_fetch(
     worker: Path,
     failures_before_success: int,
     hangs_before_success: int = 0,
+    body_hangs_before_success: int = 0,
 ) -> dict[str, object]:
     probe = r"""
 const fs = require("fs");
 const failuresBeforeSuccess = Number(process.argv[2]);
 const hangsBeforeSuccess = Number(process.argv[3]);
+const bodyHangsBeforeSuccess = Number(process.argv[4]);
 let attempts = 0;
 global.self = {
   registration: { scope: "https://chummer.run/mobile/" },
@@ -74,7 +76,20 @@ global.fetch = async (request, options = {}) => {
       options.signal?.addEventListener("abort", rejectAborted, { once: true });
     });
   }
-  const response = new Response("ok", {
+  let body = "ok";
+  if (attempts <= failuresBeforeSuccess + hangsBeforeSuccess + bodyHangsBeforeSuccess) {
+    body = new ReadableStream({
+      start: (streamController) => {
+        const rejectAborted = () => streamController.error(new Error("bounded asset body aborted"));
+        if (options.signal?.aborted) {
+          rejectAborted();
+          return;
+        }
+        options.signal?.addEventListener("abort", rejectAborted, { once: true });
+      }
+    });
+  }
+  const response = new Response(body, {
     status: 200,
     headers: {
       "Content-Type": "application/javascript",
@@ -100,11 +115,54 @@ fetchCriticalShellAsset("/mobile-install-shell.js")
             str(worker),
             str(failures_before_success),
             str(hangs_before_success),
+            str(body_hangs_before_success),
         ],
         cwd=REPO_ROOT,
         check=True,
         capture_output=True,
         text=True,
+    )
+    return json.loads(result.stdout)
+
+
+def _run_critical_cache_write(worker: Path, *, hang: bool) -> dict[str, object]:
+    probe = r"""
+const fs = require("fs");
+const hang = process.argv[2] === "true";
+let puts = 0;
+global.self = {
+  registration: { scope: "https://chummer.run/mobile/" },
+  location: { origin: "https://chummer.run" },
+  addEventListener: () => {}
+};
+global.caches = {};
+const script = fs.readFileSync(process.argv[1], "utf8").replace(
+  "const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 5000;",
+  "const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 1;"
+);
+eval(script);
+const request = new Request("https://chummer.run/mobile-install-shell.js");
+const response = new Response("ok", {
+  status: 200,
+  headers: { "Content-Type": "application/javascript" }
+});
+const cache = {
+  put: async () => {
+    puts += 1;
+    if (hang) await new Promise(() => {});
+  }
+};
+cacheCriticalShellAsset(cache, { request, response })
+  .then(() => process.stdout.write(JSON.stringify({ puts, completed: true })))
+  .catch(() => process.stdout.write(JSON.stringify({ puts, completed: false })));
+"""
+    result = subprocess.run(
+        ["node", "-e", probe, str(worker), str(hang).lower()],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=5,
     )
     return json.loads(result.stdout)
 
@@ -125,11 +183,18 @@ def _assert_shared_privacy_semantics(script: str, expected_cache_version: str) -
     assert "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;" in script
     assert "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];" in script
     assert "const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;" in script
+    assert "const CRITICAL_SHELL_RESPONSE_MAX_BYTES = 1024 * 1024;" in script
+    assert "const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 5000;" in script
     assert "const controller = new AbortController();" in script
     assert "setTimeout(() => controller.abort(), CRITICAL_SHELL_FETCH_TIMEOUT_MS)" in script
     assert "fetch(request, { signal: controller.signal })" in script
+    assert "const body = await response.arrayBuffer();" in script
+    assert "body.byteLength <= CRITICAL_SHELL_RESPONSE_MAX_BYTES" in script
+    assert "response: new Response(body" in script
     assert "clearTimeout(timeoutId);" in script
     assert "CRITICAL_SHELL_ASSETS.map(fetchCriticalShellAsset)" in script
+    assert "cacheCriticalShellAsset(cache, asset)" in script
+    assert "Promise.race([" in script
     assert "attempt < CRITICAL_SHELL_FETCH_ATTEMPTS" in script
     assert "attempt + 1 < CRITICAL_SHELL_FETCH_ATTEMPTS" in script
     assert "Promise.allSettled" not in script
@@ -226,4 +291,26 @@ def test_source_and_projection_retry_failed_or_hung_critical_asset_fetches_with_
         assert _run_critical_asset_fetch(worker, failures_before_success=0, hangs_before_success=5) == {
             "attempts": 3,
             "recovered": False,
+        }
+        assert _run_critical_asset_fetch(worker, failures_before_success=0, body_hangs_before_success=2) == {
+            "attempts": 3,
+            "recovered": True,
+        }
+        assert _run_critical_asset_fetch(worker, failures_before_success=0, body_hangs_before_success=5) == {
+            "attempts": 3,
+            "recovered": False,
+        }
+
+
+def test_source_and_projection_bound_critical_asset_cache_writes() -> None:
+    source = _play_source_worker()
+
+    for worker in (source, SERVED_WORKER):
+        assert _run_critical_cache_write(worker, hang=False) == {
+            "puts": 1,
+            "completed": True,
+        }
+        assert _run_critical_cache_write(worker, hang=True) == {
+            "puts": 1,
+            "completed": False,
         }

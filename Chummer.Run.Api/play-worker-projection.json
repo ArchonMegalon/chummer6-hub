@@ -1,9 +1,9 @@
 {
   "contract": "play-root-worker-public-edge-projection-v2",
   "source": "../chummer-play/src/Chummer.Play.Web/wwwroot/service-worker.js",
-  "sourceSha256": "f963450b45c4336d65b2f56a5c9e619916ca3f35f14abcf2e729cee7522c3a8e",
+  "sourceSha256": "2bc4bc075c238a72cd396f39f0d93bc8510a2e58296a165953ab78af2836bbc6",
   "template": "Chummer.Run.Api/service-worker.public-edge.template.js",
-  "templateSha256": "99240e42e5dcb2aef0812e8199ec7bcc78dc92b6401b87af7ab82c127db26e89",
+  "templateSha256": "008e2ca4d477281ac695e48f4771009c636d489d653f74b52141b2d4e1e93af7",
   "requiredInventory": "Chummer.Run.Api/play-pwa-required-inventory.json",
   "requiredInventorySha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a",
   "projection": "Chummer.Run.Api/wwwroot/service-worker.js",
@@ -18,7 +18,11 @@
     "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;",
     "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];",
     "const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;",
+    "const CRITICAL_SHELL_RESPONSE_MAX_BYTES = 1024 * 1024;",
+    "const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 5000;",
     "fetch(request, { signal: controller.signal })",
+    "const body = await response.arrayBuffer();",
+    "cacheCriticalShellAsset(cache, asset)",
     "clearTimeout(timeoutId);"
   ],
   "forbiddenSourceMarkers": [
@@ -36,7 +40,11 @@
     "const CRITICAL_SHELL_FETCH_ATTEMPTS = 3;",
     "const CRITICAL_SHELL_FETCH_RETRY_DELAYS_MS = [250, 750];",
     "const CRITICAL_SHELL_FETCH_TIMEOUT_MS = 5000;",
+    "const CRITICAL_SHELL_RESPONSE_MAX_BYTES = 1024 * 1024;",
+    "const CRITICAL_SHELL_CACHE_WRITE_TIMEOUT_MS = 5000;",
     "fetch(request, { signal: controller.signal })",
+    "const body = await response.arrayBuffer();",
+    "cacheCriticalShellAsset(cache, asset)",
     "clearTimeout(timeoutId);"
   ],
   "forbiddenProjectionMarkers": [
