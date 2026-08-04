@@ -34,6 +34,7 @@ try:
         full_deployment_digest,
         source_fingerprint,
         staged_payload_fingerprint,
+        validate_playwright_authority,
         validate_frontdoor_playwright_proof_closure,
         validate_payload_modes_against_receipt,
     )
@@ -45,6 +46,7 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
         full_deployment_digest,
         source_fingerprint,
         staged_payload_fingerprint,
+        validate_playwright_authority,
         validate_frontdoor_playwright_proof_closure,
         validate_payload_modes_against_receipt,
     )
@@ -4411,6 +4413,7 @@ def run_downloads_status_playwright(
     timeout_seconds: float,
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+    playwright_browsers_root: Path | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / "DOWNLOADS_STATUS_E2E.generated.json"
@@ -4431,6 +4434,8 @@ def run_downloads_status_playwright(
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    if playwright_browsers_root is not None:
+        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
     command = [
         "npx",
         "playwright",
@@ -4468,6 +4473,7 @@ def run_mobile_pwa_viewport_playwright(
     timeout_seconds: float,
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+    playwright_browsers_root: Path | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / "MOBILE_PWA_VIEWPORT_SMOKE.generated.json"
@@ -4493,6 +4499,8 @@ def run_mobile_pwa_viewport_playwright(
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    if playwright_browsers_root is not None:
+        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
     try:
         artifact_path.unlink()
     except FileNotFoundError:
@@ -4544,6 +4552,7 @@ def run_pwa_offline_cache_playwright(
     timeout_seconds: float,
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+    playwright_browsers_root: Path | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / "PWA_OFFLINE_CACHE.generated.json"
@@ -4566,6 +4575,8 @@ def run_pwa_offline_cache_playwright(
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    if playwright_browsers_root is not None:
+        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
     command = [
         "npx",
         "playwright",
@@ -4605,6 +4616,7 @@ def run_blazor_new_runner_menu_playwright(
     timeout_seconds: float,
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+    playwright_browsers_root: Path | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = artifact_dir / "BLAZOR_NEW_RUNNER_MENU.generated.json"
@@ -4625,6 +4637,8 @@ def run_blazor_new_runner_menu_playwright(
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    if playwright_browsers_root is not None:
+        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
     command = [
         "npx",
         "playwright",
@@ -4665,6 +4679,7 @@ def run_frontdoor_navigation_playwright(
     expected_homepage_lane_text: str = "",
     proof_closure_root: Path | None = None,
     expected_proof_closure: dict[str, Any] | None = None,
+    playwright_browsers_root: Path | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     mobile_artifact_path = artifact_dir / "FRONTDOOR_MOBILE_LAUNCH.generated.json"
@@ -4854,6 +4869,8 @@ def run_frontdoor_navigation_playwright(
         proof_closure_sha256
     )
     env["CHUMMER_PLAYWRIGHT_EXECUTION_ROOT"] = str(proof_closure_root)
+    if playwright_browsers_root is not None:
+        env["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers_root)
     node_modules_root = str(playwright_runtime["nodeModulesRoot"])
     # The proof subprocess may inherit operational browser settings, but not
     # Node's ambient preloading/module-resolution hooks.  Its executable specs
@@ -4985,6 +5002,21 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--blazor-new-runner-menu-artifact-dir", help="Artifact directory for the Blazor new-runner Playwright proof.")
     parser.add_argument("--require-frontdoor-navigation-playwright", action="store_true", help="Require the focused browser proof for front-door Build/Play navigation and Black Ledger de-emphasis.")
     parser.add_argument("--frontdoor-navigation-artifact-dir", help="Artifact directory for the front-door navigation Playwright proof.")
+    parser.add_argument(
+        "--playwright-authority",
+        default="",
+        help="Operation-private Playwright authority manifest for browser-backed proofs.",
+    )
+    parser.add_argument(
+        "--playwright-authority-sha256",
+        default="",
+        help="Independent SHA-256 of the operation-private Playwright authority manifest.",
+    )
+    parser.add_argument(
+        "--playwright-host-build-root",
+        default="",
+        help="Private host-build root containing the Playwright authority closure.",
+    )
     parser.add_argument("--reuse-existing-playwright-artifacts", action="store_true", help="Reuse existing Playwright-generated receipts from the supplied artifact directories instead of rerunning browser proofs.")
     parser.add_argument("--reuse-artifact-max-age-hours", type=float, default=DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS, help="Maximum age for reused Playwright receipts before the browser proof must rerun.")
     parser.add_argument("--release-channel-receipt", default=str(DEFAULT_RELEASE_CHANNEL_RECEIPT), help="Release-channel receipt used to require visible downloads version parity.")
@@ -5108,6 +5140,26 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
     expected_source_root = Path(
         os.environ.get("CHUMMER_RUN_SERVICES_SOURCE") or RUN_SERVICES_ROOT
     ).resolve()
+    playwright_browsers_root: Path | None = None
+    playwright_authority_arguments = (
+        args.playwright_authority,
+        args.playwright_authority_sha256,
+        args.playwright_host_build_root,
+    )
+    if any(playwright_authority_arguments):
+        if not all(playwright_authority_arguments):
+            parser.error(
+                "Playwright authority requires its manifest, independent SHA-256, and host-build root"
+            )
+        try:
+            playwright_authority = validate_playwright_authority(
+                Path(args.playwright_authority),
+                args.playwright_authority_sha256,
+                host_build_root=Path(args.playwright_host_build_root),
+            )
+        except (OSError, RuntimeError) as exc:
+            parser.error(str(exc))
+        playwright_browsers_root = Path(playwright_authority["browsersRoot"])
 
     with tempfile.TemporaryDirectory(prefix="chummer-public-edge-postdeploy-") as temp_dir:
         temp = Path(temp_dir)
@@ -5408,6 +5460,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             args.timeout_seconds,
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+            playwright_browsers_root=playwright_browsers_root,
         )
     mobile_pwa_viewport = None
     if args.require_mobile_pwa_viewport_playwright:
@@ -5418,6 +5471,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             args.timeout_seconds,
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+            playwright_browsers_root=playwright_browsers_root,
         )
     pwa_offline_cache = None
     if args.require_pwa_offline_cache_playwright:
@@ -5428,6 +5482,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             args.timeout_seconds,
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+            playwright_browsers_root=playwright_browsers_root,
         )
     blazor_new_runner_menu = None
     if args.require_blazor_new_runner_menu_playwright:
@@ -5438,6 +5493,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             args.timeout_seconds,
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+            playwright_browsers_root=playwright_browsers_root,
         )
     frontdoor_navigation = None
     if args.require_frontdoor_navigation_playwright:
@@ -5453,6 +5509,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
                 overlay_root / FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT
             ),
             expected_proof_closure=expected_frontdoor_playwright_proof_closure,
+            playwright_browsers_root=playwright_browsers_root,
         )
     role_alias_routes = probe_role_alias_routes(args.base_url.rstrip("/"), args.timeout_seconds)
 

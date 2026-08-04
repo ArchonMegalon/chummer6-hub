@@ -1576,6 +1576,10 @@ public sealed class PublicReleaseManifestService
             if (manifest["desktopTupleCoverage"] is JsonObject passthroughCoverage)
             {
                 List<ManifestArtifactShape> remainingArtifacts = CollectManifestArtifactShapes(manifest);
+                if (RequiresLegacyMacDesktopFloorRewrite(passthroughCoverage))
+                {
+                    RebuildDesktopTupleCoverage(passthroughCoverage, remainingArtifacts);
+                }
                 RebuildCoverageDerivedRegistries(manifest, passthroughCoverage, remainingArtifacts);
                 rewroteManifest = true;
             }
@@ -1597,6 +1601,10 @@ public sealed class PublicReleaseManifestService
         if (disabledArtifactIds.Count == 0 && manifest["desktopTupleCoverage"] is JsonObject coverage)
         {
             List<ManifestArtifactShape> remainingArtifacts = CollectManifestArtifactShapes(manifest);
+            if (RequiresLegacyMacDesktopFloorRewrite(coverage))
+            {
+                RebuildDesktopTupleCoverage(coverage, remainingArtifacts);
+            }
             RebuildCoverageDerivedRegistries(manifest, coverage, remainingArtifacts);
         }
 
@@ -1651,6 +1659,12 @@ public sealed class PublicReleaseManifestService
 
         string publicationStatus = NormalizeToken(GetJsonString(manifest["status"]));
         string existingRolloutState = NormalizeStateToken(GetJsonString(manifest["rolloutState"]));
+        if (existingRolloutState == "coverage_incomplete"
+            && manifest["desktopTupleCoverage"] is JsonObject desktopTupleCoverage
+            && CoverageIsComplete(desktopTupleCoverage))
+        {
+            existingRolloutState = string.Empty;
+        }
         string effectiveRolloutState = ResolveNonFreshRolloutState(
             publicationStatus,
             existingRolloutState,
@@ -1723,6 +1737,11 @@ public sealed class PublicReleaseManifestService
         string reviewSummary)
     {
         string existingRolloutState = NormalizeStateToken(GetJsonString(releaseChannel["rolloutState"]));
+        if (existingRolloutState == "coverage_incomplete"
+            && !string.Equals(topLevelRolloutState, "coverage_incomplete", StringComparison.Ordinal))
+        {
+            existingRolloutState = string.Empty;
+        }
         string effectiveRolloutState = ResolveNonFreshRolloutState(
             publicationStatus,
             existingRolloutState,
@@ -2505,6 +2524,12 @@ public sealed class PublicReleaseManifestService
 
         return disabledRouteTokens.Any(token => route.Contains(token, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static bool RequiresLegacyMacDesktopFloorRewrite(JsonObject coverage)
+        => ToJsonStringList(coverage["requiredDesktopPlatforms"])
+            .Concat(ToJsonStringList(coverage["requiredPlatformIds"]))
+            .Any(static platform =>
+                NormalizeToken(platform) is "macos" or "osx");
 
     private static void RebuildDesktopTupleCoverage(JsonObject coverage, IReadOnlyList<ManifestArtifactShape> artifacts)
     {

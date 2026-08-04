@@ -545,22 +545,6 @@ public sealed class ReleaseBundlePromotionServiceTests
                 "chummer-avalonia-linux-x64-installer.deb", "linux-retained"u8.ToArray(),
                 false, false, "not_applicable", "not_applicable"),
             new(
-                "blazor-desktop-osx-arm64-installer", "blazor-desktop", "macos", "arm64", "installer",
-                "chummer-blazor-desktop-osx-arm64-installer.dmg", "blazor-mac-retained"u8.ToArray(),
-                false, false, "skipped_preview", "skipped_preview"),
-            new(
-                "blazor-desktop-osx-arm64-archive", "blazor-desktop", "macos", "arm64", "archive",
-                "chummer-blazor-desktop-osx-arm64.zip", "blazor-mac-archive"u8.ToArray(),
-                false, false, "not_applicable", "not_applicable"),
-            new(
-                "avalonia-osx-arm64-installer", "avalonia", "macos", "arm64", "installer",
-                "chummer-avalonia-osx-arm64-installer.dmg", "avalonia-mac-retained"u8.ToArray(),
-                false, false, "skipped_preview", "skipped_preview"),
-            new(
-                "avalonia-osx-arm64-archive", "avalonia", "macos", "arm64", "archive",
-                "chummer-avalonia-osx-arm64.zip", "avalonia-mac-archive"u8.ToArray(),
-                false, false, "not_applicable", "not_applicable"),
-            new(
                 "avalonia-win-x64-installer", "avalonia", "windows", "x64", "installer",
                 "chummer-avalonia-win-x64-installer.exe", "windows-fresh"u8.ToArray(),
                 false, false, "unsigned", "not_applicable",
@@ -589,7 +573,7 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Equal(freshWindows.ToTransport(), staged.ExactIncomingDesktopScope);
         Assert.True(staged.ExactIncomingDesktopScopeIsFreshDelta);
         Assert.Contains(
-            "blazor-desktop-osx-arm64-archive",
+            "avalonia-linux-x64-installer",
             staged.CandidateArtifactIds,
             StringComparer.Ordinal);
         string candidatePath = Path.Combine(
@@ -3474,7 +3458,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             .ToArray();
         Assert.Equal(["avalonia:macos:osx-arm64"], promotedTupleIds);
         Assert.Equal(
-            ["linux", "windows", "macos"],
+            ["linux", "windows"],
             coverage.GetProperty("requiredDesktopPlatforms")
                 .EnumerateArray()
                 .Select(item => item.GetString()!)
@@ -3486,7 +3470,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                 .Select(item => item.GetString()!)
                 .ToArray());
         Assert.Equal(
-            ["avalonia:linux-x64:linux", "avalonia:osx-arm64:macos", "avalonia:win-x64:windows"],
+            ["avalonia:linux-x64:linux", "avalonia:win-x64:windows"],
             coverage.GetProperty("requiredDesktopPlatformHeadRidTuples")
                 .EnumerateArray()
                 .Select(item => item.GetString()!)
@@ -5912,12 +5896,11 @@ public sealed class ReleaseBundlePromotionServiceTests
         {
             string[] requiredHeads = exactDesktopScope?.RequiredHeads.ToArray() ?? ["avalonia"];
             string[] requiredPlatforms = exactDesktopScope?.RequiredPlatforms.ToArray()
-                ?? ["linux", "windows", "macos"];
+                ?? ["linux", "windows"];
             string[] requiredTuples = exactDesktopScope?.RequiredPlatformHeadRidTuples.ToArray()
                 ??
                 [
                     "avalonia:linux-x64:linux",
-                    "avalonia:osx-arm64:macos",
                     "avalonia:win-x64:windows"
                 ];
             RegistryArtifactProjection[] installers = artifacts
@@ -5995,7 +5978,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             {
                 return new RegistryPosture(
                     "coverage_incomplete",
-                    "Registry requires Linux, Windows, and macOS desktop installer coverage.",
+                    "Registry requires Linux and Windows desktop installer coverage.",
                     "review_required",
                     "Registry review is required until the desktop platform floor is complete.",
                     "The desktop platform floor is incomplete.",
@@ -6028,7 +6011,6 @@ public sealed class ReleaseBundlePromotionServiceTests
             }
 
             return tuples.Contains("avalonia:linux:linux-x64")
-                   && tuples.Contains("avalonia:macos:osx-arm64")
                    && tuples.Contains("avalonia:windows:win-x64");
         }
 

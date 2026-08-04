@@ -571,7 +571,7 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
-    public void LoadManifestFailsClosedWhenPassingReadinessStillCarriesBlockedJourneyEvidence()
+    public void LoadManifestFailsClosedWhenPassingReadinessCarriesBlockedJourneyEvidenceWithoutFreshProof()
     {
         using var fixture = new PublicReleaseManifestFixture();
         fixture.WriteRegistryManifest(includeProof: false);
@@ -581,11 +581,11 @@ public sealed class PublicReleaseManifestServiceTests
         var manifest = fixture.CreateService().LoadManifest();
 
         Assert.Equal("review_required", manifest.SupportabilityState);
-        Assert.Equal("readiness_review_required", manifest.RolloutState);
-        Assert.Contains("flagship journey blockers", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("broad ready claims", manifest.RolloutReason, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("broad ready claims", manifest.KnownIssueSummary, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("blocked flagship journeys", manifest.FixAvailabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("public_release_review_required", manifest.RolloutState);
+        Assert.Contains("stale or incomplete proof receipts", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("stale or incomplete proof receipts", manifest.RolloutReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("stale or incomplete proof receipts", manifest.KnownIssueSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Only send fixed notices after", manifest.FixAvailabilitySummary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("passed", manifest.ProofStatus);
     }
 
@@ -1281,6 +1281,55 @@ public sealed class PublicReleaseManifestServiceTests
         Assert.Equal("Wait for the Windows candidate.", root.GetProperty("fixAvailabilitySummary").GetString());
         Assert.Equal("Public channel coverage is incomplete.", root.GetProperty("publicTrustMetrics").GetProperty("releaseChannel").GetProperty("summary").GetString());
         Assert.Equal("Registry coverage is incomplete.", root.GetProperty("registryBoundaryCoverage").GetProperty("releaseChannel").GetProperty("summary").GetString());
+    }
+
+    [Fact]
+    public void ServedManifestFloorRetiresLegacyMacCoverageBlockerWhenLinuxAndWindowsAreComplete()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        Dictionary<string, object?> payload = BuildOptimisticProofFreshnessManifest("stale");
+        payload["rolloutState"] = "coverage_incomplete";
+        payload["desktopTupleCoverage"] = new Dictionary<string, object?>
+        {
+            ["requiredDesktopPlatforms"] = new[] { "linux", "windows", "macos" },
+            ["requiredDesktopHeads"] = new[] { "avalonia" },
+            ["missingRequiredPlatforms"] = new[] { "macos" },
+            ["missingRequiredHeads"] = Array.Empty<string>(),
+            ["missingRequiredPlatformHeadPairs"] = new[] { "avalonia:macos" },
+            ["missingRequiredPlatformHeadRidTuples"] = new[] { "avalonia:osx-x64:macos" }
+        };
+        payload["artifacts"] = new object[]
+        {
+            DesktopInstallerArtifact("linux", "linux-x64", "deb"),
+            DesktopInstallerArtifact("windows", "win-x64", "exe")
+        };
+        var publicTrustMetrics = Assert.IsType<Dictionary<string, object?>>(payload["publicTrustMetrics"]);
+        var publicReleaseChannel = Assert.IsType<Dictionary<string, object?>>(publicTrustMetrics["releaseChannel"]);
+        publicReleaseChannel["rolloutState"] = "coverage_incomplete";
+        var registryBoundaryCoverage = Assert.IsType<Dictionary<string, object?>>(payload["registryBoundaryCoverage"]);
+        var registryReleaseChannel = Assert.IsType<Dictionary<string, object?>>(registryBoundaryCoverage["releaseChannel"]);
+        registryReleaseChannel["rolloutState"] = "coverage_incomplete";
+        fixture.WriteRegistryManifestRaw(payload);
+        byte[] sourceBytes = fixture.ReadRegistryManifestBytes();
+
+        using JsonDocument canonical = JsonDocument.Parse(fixture.CreateService().LoadCanonicalManifestJson()!);
+        JsonElement root = canonical.RootElement;
+        JsonElement coverage = root.GetProperty("desktopTupleCoverage");
+
+        Assert.Equal("public_release_review_required", root.GetProperty("rolloutState").GetString());
+        Assert.Equal(
+            "public_release_review_required",
+            root.GetProperty("publicTrustMetrics").GetProperty("releaseChannel").GetProperty("rolloutState").GetString());
+        Assert.Equal(
+            "public_release_review_required",
+            root.GetProperty("registryBoundaryCoverage").GetProperty("releaseChannel").GetProperty("rolloutState").GetString());
+        Assert.Equal(
+            new[] { "linux", "windows" },
+            coverage.GetProperty("requiredDesktopPlatforms").EnumerateArray().Select(static item => item.GetString()).ToArray());
+        Assert.Empty(coverage.GetProperty("missingRequiredPlatforms").EnumerateArray());
+        Assert.Empty(coverage.GetProperty("missingRequiredPlatformHeadPairs").EnumerateArray());
+        Assert.Empty(coverage.GetProperty("missingRequiredPlatformHeadRidTuples").EnumerateArray());
+        Assert.Equal(sourceBytes, fixture.ReadRegistryManifestBytes());
     }
 
     [Fact]
@@ -2472,6 +2521,26 @@ public sealed class PublicReleaseManifestServiceTests
 
     private static JsonObject BuildFreshReleaseProof(string generatedAt)
         => ReleaseProofEvidenceTestData.CreateReleaseProof(DateTimeOffset.Parse(generatedAt));
+
+    private static Dictionary<string, object?> DesktopInstallerArtifact(
+        string platform,
+        string rid,
+        string extension)
+        => new()
+        {
+            ["artifactId"] = $"avalonia-{rid}-installer",
+            ["head"] = "avalonia",
+            ["platform"] = platform,
+            ["rid"] = rid,
+            ["arch"] = "x64",
+            ["kind"] = "installer",
+            ["platformLabel"] = $"Avalonia Desktop {platform} X64 Installer",
+            ["fileName"] = $"chummer-avalonia-{rid}-installer.{extension}",
+            ["downloadUrl"] = $"/downloads/files/chummer-avalonia-{rid}-installer.{extension}",
+            ["sha256"] = $"{platform}-sha",
+            ["sizeBytes"] = 42L,
+            ["installAccessClass"] = "account_required"
+        };
 
     private static Dictionary<string, object?> BuildOptimisticProofFreshnessManifest(string proofFreshnessStatus)
         => new()

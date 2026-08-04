@@ -6472,6 +6472,9 @@ postdeploy_command=(
   --playwright-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/downloads-status"
   --mobile-pwa-viewport-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/mobile-pwa-viewport"
   --frontdoor-navigation-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/frontdoor-navigation"
+  --playwright-authority "$PLAYWRIGHT_AUTHORITY"
+  --playwright-authority-sha256 "$PLAYWRIGHT_AUTHORITY_SHA256"
+  --playwright-host-build-root "$PUBLIC_EDGE_HOST_BUILD_ROOT"
   --output "$POSTDEPLOY_OUTPUT"
 )
 

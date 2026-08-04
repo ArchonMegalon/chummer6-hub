@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
@@ -3829,6 +3830,15 @@ def test_guarded_deploy_uses_orchestrated_postdeploy_closure_and_no_legacy_flags
 
     assert result.returncode == 1
     args = json.loads(postdeploy_log.read_text(encoding="utf-8"))
+    playwright_authority_index = args.index("--playwright-authority")
+    playwright_authority_path = Path(args[playwright_authority_index + 1])
+    assert args[playwright_authority_index + 2] == "--playwright-authority-sha256"
+    assert re.fullmatch(r"[0-9a-f]{64}", args[playwright_authority_index + 3])
+    assert args[playwright_authority_index + 4] == "--playwright-host-build-root"
+    playwright_host_build_root = Path(args[playwright_authority_index + 5])
+    assert playwright_authority_path == playwright_host_build_root / "playwright-authority.json"
+    assert playwright_host_build_root.name == "host-build"
+    del args[playwright_authority_index : playwright_authority_index + 6]
     assert args == [
         "--base-url",
         "https://chummer.run",

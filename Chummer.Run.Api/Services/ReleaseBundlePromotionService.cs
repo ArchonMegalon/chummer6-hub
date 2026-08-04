@@ -251,9 +251,15 @@ public sealed class ReleaseBundlePromotionService
     private static readonly TimeSpan MaximumStartupSmokeAge = TimeSpan.FromDays(7);
     private static readonly TimeSpan MaximumStartupSmokeClockSkew = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StageProbeLifetime = TimeSpan.FromMinutes(10);
-    private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];
+    private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows"];
+    private static readonly string[] LegacyRequiredDesktopPlatforms = ["linux", "windows", "macos"];
     private static readonly string[] RequiredDesktopHeads = ["avalonia"];
     private static readonly string[] RequiredDesktopPlatformHeadRidTuples =
+    [
+        "avalonia:linux-x64:linux",
+        "avalonia:win-x64:windows"
+    ];
+    private static readonly string[] LegacyRequiredDesktopPlatformHeadRidTuples =
     [
         "avalonia:linux-x64:linux",
         "avalonia:osx-arm64:macos",
@@ -7196,7 +7202,7 @@ public sealed class ReleaseBundlePromotionService
             string canonicalPlatform = NormalizePlatform(
                 GetJsonString(canonicalArtifact["platform"]));
             if (unsignedWindowsFreshDeltaProfile
-                && string.Equals(canonicalPlatform, "macos", StringComparison.Ordinal))
+                && string.Equals(canonicalPlatform, "linux", StringComparison.Ordinal))
             {
                 RequireArtifactAliasFieldEqual(
                     canonicalArtifact,
@@ -7208,17 +7214,19 @@ public sealed class ReleaseBundlePromotionService
                 string arch = NormalizeToken(GetJsonString(canonicalArtifact["arch"]));
                 if (!string.Equals(
                         NormalizeToken(GetJsonString(compatibilityArtifact["platformId"])),
-                        $"macos-{arch}",
+                        "linux",
                         StringComparison.Ordinal)
                     || !string.Equals(
                         NormalizeToken(GetJsonString(canonicalArtifact["rid"])),
-                        $"osx-{arch}",
+                        $"linux-{arch}",
                         StringComparison.Ordinal)
-                    || !string.IsNullOrWhiteSpace(
-                        GetJsonString(compatibilityArtifact["rid"])))
+                    || !string.Equals(
+                        NormalizeToken(GetJsonString(compatibilityArtifact["rid"])),
+                        $"linux-{arch}",
+                        StringComparison.Ordinal))
                 {
                     throw new InvalidDataException(
-                        $"Registry retained compatibility artifact {artifactId} macOS identity drifted.");
+                        $"Registry retained compatibility artifact {artifactId} Linux identity drifted.");
                 }
             }
             else
@@ -7341,16 +7349,32 @@ public sealed class ReleaseBundlePromotionService
         }
         ReleaseDesktopTupleScope? completeShelfScope =
             exactIncomingDesktopScopeIsFreshDelta ? null : exactIncomingDesktopScope;
+        JsonObject coverage = canonical["desktopTupleCoverage"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain Registry desktopTupleCoverage.");
+        IReadOnlyList<string> declaredRequiredDesktopPlatforms =
+            ReadSourceCoverageStringList(
+                coverage,
+                "requiredDesktopPlatforms");
+        bool legacyMacosCoverage = completeShelfScope is null
+            && declaredRequiredDesktopPlatforms.SequenceEqual(
+                LegacyRequiredDesktopPlatforms,
+                StringComparer.Ordinal);
         IReadOnlyList<string> requiredDesktopPlatforms =
-            completeShelfScope?.RequiredPlatforms ?? RequiredDesktopPlatforms;
+            completeShelfScope?.RequiredPlatforms
+            ?? (legacyMacosCoverage
+                ? LegacyRequiredDesktopPlatforms
+                : RequiredDesktopPlatforms);
         IReadOnlyList<string> requiredDesktopHeads =
             completeShelfScope?.RequiredHeads ?? RequiredDesktopHeads;
         IReadOnlyList<string> requiredDesktopPlatformHeadRidTuples =
             completeShelfScope?.RequiredPlatformHeadRidTuples
-            ?? RequiredDesktopPlatformHeadRidTuples;
+            ?? (legacyMacosCoverage
+                ? LegacyRequiredDesktopPlatformHeadRidTuples
+                : RequiredDesktopPlatformHeadRidTuples);
         IReadOnlyList<string> requiredDesktopPlatformHeadPairs =
             completeShelfScope is null
-                ? RequiredDesktopPlatforms
+                ? requiredDesktopPlatforms
                     .SelectMany(platform => RequiredDesktopHeads.Select(head => $"{head}:{platform}"))
                     .ToArray()
                 : completeShelfScope.TupleIds
@@ -7359,9 +7383,6 @@ public sealed class ReleaseBundlePromotionService
                     .Distinct(StringComparer.Ordinal)
                     .Order(StringComparer.Ordinal)
                     .ToArray();
-        JsonObject coverage = canonical["desktopTupleCoverage"] as JsonObject
-            ?? throw new InvalidDataException(
-                $"{CanonicalManifestName} must contain Registry desktopTupleCoverage.");
         RequireExactStringArray(
             coverage,
             "requiredDesktopPlatforms",
@@ -7394,8 +7415,7 @@ public sealed class ReleaseBundlePromotionService
                 rid = RidForPlatformAndArch(platform, NormalizeToken(artifact.Arch));
             }
 
-            if (!requiredDesktopPlatforms.Contains(platform, StringComparer.Ordinal)
-                || !IsPromotedDesktopInstaller(artifact, platform)
+            if (!IsPromotedDesktopInstaller(artifact, platform)
                 || head.Length == 0
                 || rid.Length == 0)
             {
@@ -7501,30 +7521,27 @@ public sealed class ReleaseBundlePromotionService
                 StringComparison.Ordinal))
             .Select(artifact => artifact.ArtifactId)
             .ToArray();
-        string[] frozenRetainedMacosArtifactIds =
+        string[] frozenRetainedLinuxArtifactIds =
         [
-            "avalonia-osx-arm64-installer",
-            "blazor-desktop-osx-arm64-installer",
-            "avalonia-osx-arm64-archive",
-            "blazor-desktop-osx-arm64-archive"
+            "avalonia-linux-x64-installer"
         ];
-        bool retainsMacos = retainedArtifactIds.SequenceEqual(
-            frozenRetainedMacosArtifactIds,
+        bool retainsLinux = retainedArtifactIds.SequenceEqual(
+            frozenRetainedLinuxArtifactIds,
             StringComparer.Ordinal);
-        if (retainedArtifactIds.Length != 0 && !retainsMacos)
+        if (retainedArtifactIds.Length != 0 && !retainsLinux)
         {
             throw new InvalidDataException(
                 "v3 unsigned Windows retained artifact identities or order drifted.");
         }
-        string[] expectedRequiredPlatforms = retainsMacos
-            ? ["macos", "windows"]
+        string[] expectedRequiredPlatforms = retainsLinux
+            ? ["linux", "windows"]
             : ["windows"];
-        string[] expectedRequiredTuples = retainsMacos
-            ? ["avalonia:osx-arm64:macos", "avalonia:win-x64:windows"]
+        string[] expectedRequiredTuples = retainsLinux
+            ? ["avalonia:linux-x64:linux", "avalonia:win-x64:windows"]
             : ["avalonia:win-x64:windows"];
-        string[] expectedMissingHeads = retainsMacos ? [] : ["avalonia"];
-        string[] expectedPromotedTuples = retainsMacos
-            ? ["avalonia:osx-arm64:macos", "blazor-desktop:osx-arm64:macos"]
+        string[] expectedMissingHeads = retainsLinux ? [] : ["avalonia"];
+        string[] expectedPromotedTuples = retainsLinux
+            ? ["avalonia:linux-x64:linux"]
             : [];
         JsonObject coverage = canonical["desktopTupleCoverage"] as JsonObject
             ?? throw new InvalidDataException(
@@ -7570,7 +7587,7 @@ public sealed class ReleaseBundlePromotionService
             expectedPromotedTuples,
             "v3 unsigned Windows retained promoted tuples");
         if (coverage["promotedPlatformHeads"] is not JsonObject promotedPlatformHeads
-            || promotedPlatformHeads.Count != (retainsMacos ? 2 : 1)
+            || promotedPlatformHeads.Count != (retainsLinux ? 2 : 1)
             || !promotedPlatformHeads.ContainsKey("windows"))
         {
             throw new InvalidDataException(
@@ -7581,13 +7598,13 @@ public sealed class ReleaseBundlePromotionService
             "windows",
             [],
             "v3 unsigned Windows promoted Windows heads");
-        if (retainsMacos)
+        if (retainsLinux)
         {
             RequireExactStringArray(
                 promotedPlatformHeads,
-                "macos",
-                ["avalonia", "blazor-desktop"],
-                "v3 unsigned Windows retained macOS heads");
+                "linux",
+                ["avalonia"],
+                "v3 unsigned Windows retained Linux heads");
         }
         if (!TryGetJsonBoolean(coverage["complete"], out bool complete)
             || complete
@@ -7620,11 +7637,11 @@ public sealed class ReleaseBundlePromotionService
             .ToDictionary(
                 row => GetJsonString(row["tupleId"]) ?? string.Empty,
                 StringComparer.Ordinal);
-        string[] expectedRouteTupleIds = retainsMacos
+        string[] expectedRouteTupleIds = retainsLinux
             ?
             [
-                "avalonia:macos:osx-arm64",
-                "blazor-desktop:macos:osx-arm64",
+                "avalonia:linux:linux-x64",
+                "blazor-desktop:linux:linux-x64",
                 "avalonia:windows:win-x64",
                 "blazor-desktop:windows:win-x64"
             ]
@@ -7657,11 +7674,10 @@ public sealed class ReleaseBundlePromotionService
                 "v3 unsigned Windows route must remain unpromoted and proof-required.");
         }
         foreach (string tupleId in (
-                     retainsMacos
+                     retainsLinux
                          ?
                          [
-                             "avalonia:macos:osx-arm64",
-                             "blazor-desktop:macos:osx-arm64"
+                             "avalonia:linux:linux-x64"
                          ]
                          : Array.Empty<string>()))
         {
@@ -7675,7 +7691,7 @@ public sealed class ReleaseBundlePromotionService
                 || retainedAuthority)
             {
                 throw new InvalidDataException(
-                    "v3 unsigned Windows retained macOS route truth drifted.");
+                    "v3 unsigned Windows retained Linux route truth drifted.");
             }
         }
         string[] platforms = canonicalArtifacts
@@ -7683,8 +7699,8 @@ public sealed class ReleaseBundlePromotionService
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        string[] expectedPlatforms = retainsMacos
-            ? ["macos", "windows"]
+        string[] expectedPlatforms = retainsLinux
+            ? ["linux", "windows"]
             : ["windows"];
         if (!platforms.SequenceEqual(expectedPlatforms, StringComparer.Ordinal)
             || canonicalArtifacts.Count(artifact =>
@@ -9000,6 +9016,9 @@ public sealed class ReleaseBundlePromotionService
                 !string.IsNullOrWhiteSpace(artifact.Head)
                 && !string.IsNullOrWhiteSpace(artifact.Platform)
                 && !string.IsNullOrWhiteSpace(artifact.Rid)
+                && RequiredDesktopPlatforms.Contains(
+                    NormalizePlatform(artifact.Platform),
+                    StringComparer.Ordinal)
                 && IsDesktopInstallMedia(artifact.Platform, artifact.Kind))
             .Select(static artifact => $"{artifact.Head}:{artifact.Platform}:{artifact.Rid}")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
