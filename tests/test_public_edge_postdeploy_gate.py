@@ -4694,6 +4694,12 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
     release_channel_sha256 = hashlib.sha256(
         release_channel.read_bytes()
     ).hexdigest()
+    public_release_manifest = tmp_path / "release-shelf" / "RELEASE_CHANNEL.generated.json"
+    public_release_manifest.parent.mkdir()
+    public_release_manifest.write_text(
+        '{"version":"run-20260630"}',
+        encoding="utf-8",
+    )
     output = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
     commands: list[list[str]] = []
 
@@ -4730,6 +4736,8 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
             "https://chummer.run",
             "--release-channel-receipt",
             str(release_channel),
+            "--public-release-manifest",
+            str(public_release_manifest),
             *authenticated_preflight_args(release_channel),
             "--output",
             str(output),
@@ -4753,6 +4761,8 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
     assert preflight_command[preflight_command.index("--overlay-root") + 1] == str(module.DEFAULT_PUBLIC_EDGE_OVERLAY_ROOT.resolve())
     assert "--release-channel-receipt" in downloads_command
     assert downloads_command[downloads_command.index("--release-channel-receipt") + 1] == str(release_channel)
+    assert "--public-release-manifest" in downloads_command
+    assert downloads_command[downloads_command.index("--public-release-manifest") + 1] == str(public_release_manifest)
     assert "--allow-non-launch-supported-release-channel" in downloads_command
     assert "--skip-release-version-match" not in downloads_command
     result = json.loads(output.read_text(encoding="utf-8"))

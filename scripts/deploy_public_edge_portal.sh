@@ -6495,6 +6495,7 @@ postdeploy_command=(
   --strict-preflight
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"
+  --public-release-manifest "$CANONICAL_RELEASE_SHELF_ROOT/RELEASE_CHANNEL.generated.json"
   --public-projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT"
   --public-projection-purpose code-deploy
   --expect-code-deploy-review-required
@@ -6641,7 +6642,7 @@ def has_secret_material(value):
         return any(has_secret_material(item) for item in value)
     return secret_like_value(value)
 if (
-    payload.get("contractName") != "chummer.public_edge_postdeploy_gate.v1"
+    payload.get("contractName") != "chummer.public_edge_postdeploy_gate.v2"
     or payload.get("status") != "pass"
     or payload.get("projectionPurpose") != "code-deploy"
     or payload.get("projectionStatus") != "review_required"

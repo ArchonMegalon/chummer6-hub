@@ -5026,6 +5026,15 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
         help="Independent lowercase SHA-256 for the exact release-channel receipt; required for authorizing verification.",
     )
     parser.add_argument(
+        "--public-release-manifest",
+        default="",
+        help=(
+            "Canonical release-shelf manifest checked by the downloads child. "
+            "Production deploys must select this explicitly because the audited "
+            "source checkout intentionally excludes generated shelf state."
+        ),
+    )
+    parser.add_argument(
         "--public-projection-snapshot-root",
         default="",
         help="Authenticated CURRENT public projection root used by strict preflight.",
@@ -5365,6 +5374,13 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
                     "--release-channel-receipt-sha256",
                     observed_release_channel_receipt_sha256,
                     "--allow-non-launch-supported-release-channel",
+                ]
+            )
+        if args.public_release_manifest:
+            downloads_command.extend(
+                [
+                    "--public-release-manifest",
+                    args.public_release_manifest,
                 ]
             )
         downloads_output_path = temp / "downloads.json"

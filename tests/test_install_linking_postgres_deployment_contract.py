@@ -361,6 +361,7 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
 
     def test_runbook_requires_governed_cutover_and_fail_closed_recovery(self) -> None:
         runbook = RUNBOOK_PATH.read_text(encoding="utf-8")
+        deploy = DEPLOY_PATH.read_text(encoding="utf-8")
         install_heading = "## Install-linking PostgreSQL authority cutover and recovery"
         mode_a_heading = (
             "## Mode A: Legacy/dev filesystem source candidate "
@@ -461,6 +462,16 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             (ROOT / "scripts" / "recover_public_edge_mutation_lock.py").read_text(
                 encoding="utf-8"
             ),
+        )
+        self.assertIn(
+            '--public-release-manifest "$CANONICAL_RELEASE_SHELF_ROOT/'
+            'RELEASE_CHANNEL.generated.json"',
+            deploy,
+        )
+        self.assertIn(
+            'payload.get("contractName") != '
+            '"chummer.public_edge_postdeploy_gate.v2"',
+            deploy,
         )
 
 
