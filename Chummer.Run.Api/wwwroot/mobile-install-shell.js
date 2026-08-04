@@ -90,31 +90,54 @@
     onStateChange();
   });
 
-  const registerServiceWorker = async () => {
+  const waitForWindowLoad = () => {
+    if (document.readyState === "complete") {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      window.addEventListener("load", resolve, { once: true });
+    });
+  };
+
+  const registerServiceWorker = async ({ reportFailure = true } = {}) => {
     for (let attempt = 0; attempt < serviceWorkerRegistrationAttempts; attempt += 1) {
       let registration = null;
       try {
         registration = await navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" });
         await waitForServiceWorkerActivation(registration);
-        return;
+        return true;
       } catch {
         await registration?.unregister?.().catch(() => false);
         if (attempt + 1 >= serviceWorkerRegistrationAttempts) {
-          setStatus("The install shell is available online. Service-worker installation is not available in this browser.");
-          return;
+          if (reportFailure) {
+            setStatus("The install shell is available online. Service-worker installation is not available in this browser.");
+          }
+          return false;
         }
         await new Promise((resolve) => {
           window.setTimeout(resolve, serviceWorkerRetryDelaysMs[attempt]);
         });
       }
     }
+    return false;
   };
 
   if ("serviceWorker" in navigator) {
-    const startServiceWorkerRegistration = () => {
-      void registerServiceWorker();
+    const startServiceWorkerRegistration = async () => {
+      if (await registerServiceWorker({ reportFailure: false })) {
+        return;
+      }
+
+      // Chromium can keep an unregistered worker pending deletion until its
+      // last controlled page closes. Preserve the immediate fresh-cutover
+      // attempt, then retry once after the replacement page has fully loaded.
+      await waitForWindowLoad();
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 1000);
+      });
+      await registerServiceWorker();
     };
-    startServiceWorkerRegistration();
+    void startServiceWorkerRegistration();
   }
 
   syncDisplayModeState();

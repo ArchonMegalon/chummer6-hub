@@ -35,7 +35,7 @@
       "role": "install_shell",
       "contentType": "application/javascript",
       "cacheControl": "public, max-age=300, must-revalidate",
-      "sha256": "24c06cddfddffa79195542ccf84b16f406587d3af43175076da222ea34771cac"
+      "sha256": "9db3f034f49d94cf907c4fab56f35c8d27e8333b73b16401b34b1f6132abfa59"
     },
     {
       "source": "src/Chummer.Play.Web/wwwroot/mobile.css",
