@@ -9,6 +9,10 @@ type ViewportExpectation = {
   height: number;
 };
 
+type BuildLayout = 'compact' | 'workspace';
+
+const buildCompactMediaQuery = '(max-width: 920px)';
+
 type RouteExpectation = {
   path: string;
   expectedHeading: string | null;
@@ -73,6 +77,7 @@ const routes: RouteExpectation[] = [
 
 async function assertBuildRosterContract(
   page: Page,
+  viewport: ViewportExpectation,
 ): Promise<Record<string, string>> {
   const finalUrl = new URL(page.url());
 
@@ -85,11 +90,63 @@ async function assertBuildRosterContract(
   await expect(roster).toBeVisible({ timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Character Roster' })).toBeVisible();
 
+  const readEffectiveLayout = async (): Promise<BuildLayout | 'transitioning'> => {
+    const layout = await page.locator('.browser-app-roster-grid').evaluate((grid, mediaQuery) => {
+      const gridTemplateColumns = getComputedStyle(grid).gridTemplateColumns
+        .split(/\s+/u)
+        .filter(Boolean);
+      const compact = window.matchMedia(mediaQuery).matches;
+      return {
+        compact,
+        gridColumnCount: gridTemplateColumns.length,
+      };
+    }, buildCompactMediaQuery);
+
+    if (layout.compact && layout.gridColumnCount === 1) {
+      return 'compact';
+    }
+    if (!layout.compact && layout.gridColumnCount === 3) {
+      return 'workspace';
+    }
+    return 'transitioning';
+  };
+
+  const expectEffectiveLayout = async (expected: BuildLayout, message: string) => {
+    await expect.poll(readEffectiveLayout, { message }).toBe(expected);
+    return expected;
+  };
+
+  const expectedLayout: BuildLayout = viewport.width <= 920 ? 'compact' : 'workspace';
+  const effectiveLayout = await expectEffectiveLayout(
+    expectedLayout,
+    `Build layout must follow ${buildCompactMediaQuery}`,
+  );
+
+  const overrideLayout: BuildLayout = expectedLayout === 'compact' ? 'workspace' : 'compact';
+  const overrideViewport = overrideLayout === 'compact'
+    ? { width: 390, height: 844 }
+    : { width: 1366, height: 768 };
+  await page.setViewportSize(overrideViewport);
+  await expectEffectiveLayout(
+    overrideLayout,
+    `Build layout must switch to ${overrideLayout} when the browser viewport crosses ${buildCompactMediaQuery}`,
+  );
+
+  await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  await expectEffectiveLayout(
+    expectedLayout,
+    `Build layout must return to ${expectedLayout} after restoring the browser viewport`,
+  );
+
   return {
     final_url: finalUrl.toString(),
     build_surface: 'character-roster',
     build_route_surface: 'roster',
     build_command: 'character-roster',
+    build_layout_source: 'browser-media-query',
+    build_layout_preference: 'auto',
+    build_layout_effective: effectiveLayout,
+    build_layout_override_checked: overrideLayout,
   };
 }
 
@@ -152,7 +209,7 @@ test('core mobile PWA routes fit phone tablet and desktop viewports', async ({ b
         }
         status = response?.status() ?? recoveredStatus ?? 0;
         if (route.surface === 'build-roster') {
-          buildLayoutProof = await assertBuildRosterContract(page);
+          buildLayoutProof = await assertBuildRosterContract(page, viewport);
         } else if (route.expectedHeading) {
           await page.waitForFunction(
             (expectedHeading) => {
