@@ -348,6 +348,11 @@ app.UseWhen(
             if (IsLocalPlayInstallAssetPath(requestPath))
             {
                 fileContext.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                fileContext.Context.Response.Headers["CDN-Cache-Control"] = "no-store, max-age=0";
+                fileContext.Context.Response.Headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
+                fileContext.Context.Response.Headers["Surrogate-Control"] = "no-store";
+                fileContext.Context.Response.Headers.Pragma = "no-cache";
+                fileContext.Context.Response.Headers.Expires = "0";
                 if (requestPath.Equals("/service-worker.js", StringComparison.OrdinalIgnoreCase)
                     || requestPath.Equals("/mobile/service-worker.js", StringComparison.OrdinalIgnoreCase))
                 {
@@ -360,7 +365,7 @@ app.UseWhen(
                     {
                         fileContext.Context.Response.ContentType = "application/javascript; charset=utf-8";
                     }
-                    fileContext.Context.Response.Headers.CacheControl = "public, max-age=300, must-revalidate";
+                    fileContext.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
                 }
             }
         }

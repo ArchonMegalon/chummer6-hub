@@ -58,7 +58,7 @@ def bound_downloads_receipt(
             "release_channel_receipt_sha256_matches": True,
             "release_channel_receipt_binding_status": "pass",
             "release_channel_version": "run-20260630",
-            "release_manifest_schema": "chummer.release-channel.v1",
+            "release_manifest_schema": "chummer.release-channel/v1",
             "release_manifest_generation": "generation-20260630",
             "downloads_generation_matches_served_manifest": True,
             "status_redirect_generation_matches_served_manifest": True,
@@ -84,6 +84,16 @@ def load_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def pinned_playwright_runtime(tmp_path: Path) -> dict[str, object]:
+    node_modules_root = tmp_path / "pinned-node-modules"
+    node_modules_root.mkdir(parents=True, exist_ok=True)
+    return {
+        "status": "pass",
+        "nodeModulesRoot": str(node_modules_root),
+        "commandPrefix": ["/usr/bin/node", "/proof/playwright/cli.js"],
+    }
 
 
 def load_bridge_module():
@@ -3427,7 +3437,12 @@ def test_downloads_status_browser_timeout_returns_failed_receipt(monkeypatch, tm
 
     monkeypatch.setattr(module.subprocess, "run", timeout_run)
 
-    result = module.run_downloads_status_playwright("https://chummer.run", tmp_path, 20)
+    result = module.run_downloads_status_playwright(
+        "https://chummer.run",
+        tmp_path,
+        20,
+        playwright_runtime=pinned_playwright_runtime(tmp_path),
+    )
 
     assert result["status"] == "fail"
     assert result["exitCode"] == 124
@@ -3463,6 +3478,7 @@ def test_downloads_status_browser_can_reuse_existing_artifact(monkeypatch, tmp_p
         tmp_path,
         20,
         reuse_existing_artifact=True,
+        playwright_runtime=pinned_playwright_runtime(tmp_path),
     )
 
     assert result["status"] == "pass"
@@ -3540,6 +3556,7 @@ def test_downloads_status_browser_stale_artifact_reruns_playwright(monkeypatch, 
         tmp_path,
         20,
         reuse_existing_artifact=True,
+        playwright_runtime=pinned_playwright_runtime(tmp_path),
     )
 
     assert result["status"] == "pass"
@@ -3576,6 +3593,7 @@ def test_downloads_status_browser_uses_validated_operation_browser_root(monkeypa
         tmp_path,
         20,
         playwright_browsers_root=browser_root,
+        playwright_runtime=pinned_playwright_runtime(tmp_path),
     )
 
     assert result["status"] == "pass"
@@ -3611,6 +3629,7 @@ def test_downloads_status_browser_malformed_reuse_artifact_reruns_playwright(mon
         tmp_path,
         20,
         reuse_existing_artifact=True,
+        playwright_runtime=pinned_playwright_runtime(tmp_path),
     )
 
     assert result["status"] == "pass"
@@ -3825,6 +3844,7 @@ def test_mobile_pwa_incomplete_reuse_artifact_reruns_canonical_playwright_path(
         tmp_path,
         20.0,
         reuse_existing_artifact=True,
+        playwright_runtime=pinned_playwright_runtime(tmp_path),
     )
 
     assert result["status"] == "pass"
@@ -3836,10 +3856,12 @@ def test_mobile_pwa_incomplete_reuse_artifact_reruns_canonical_playwright_path(
     assert captured["stale_artifact_removed"] is True
     assert captured["timeout_seconds"] == 300
     assert captured["command"] == [
-        "npx",
-        "playwright",
+        "/usr/bin/node",
+        "/proof/playwright/cli.js",
         "test",
         "tests/public/mobile-pwa-viewport-smoke.spec.ts",
+        "--config=playwright.config.ts",
+        f"--output={tmp_path / '.playwright-output'}",
         "--workers=1",
         "--reporter=line",
     ]
@@ -3974,6 +3996,7 @@ def test_pwa_offline_cache_v1_private_navigation_receipt_is_not_reused(monkeypat
         tmp_path,
         20.0,
         reuse_existing_artifact=True,
+        playwright_runtime=pinned_playwright_runtime(tmp_path),
     )
 
     assert "command" in captured

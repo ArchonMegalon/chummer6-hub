@@ -71,6 +71,30 @@ def private_response_headers() -> dict[str, str]:
     }
 
 
+def test_private_response_headers_allow_cloudflare_to_consume_its_control_header() -> None:
+    module = load_module()
+    headers = private_response_headers()
+    del headers["cloudflare-cdn-cache-control"]
+    headers["server"] = "cloudflare"
+    failures: list[str] = []
+
+    module.require_private_response_headers("/api/ready", headers, failures)
+
+    assert failures == []
+
+
+def test_private_response_headers_require_cloudflare_control_header_off_edge() -> None:
+    module = load_module()
+    headers = private_response_headers()
+    del headers["cloudflare-cdn-cache-control"]
+    headers["server"] = "Kestrel"
+    failures: list[str] = []
+
+    module.require_private_response_headers("/api/ready", headers, failures)
+
+    assert any("cloudflare-cdn-cache-control" in failure for failure in failures)
+
+
 def test_live_identity_requires_exact_full_deployment_digest(monkeypatch) -> None:
     module = load_module()
     expected = "b" * 64

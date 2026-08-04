@@ -159,6 +159,7 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
       failure_stage: proofStage,
       failure_type: safeErrorType(error),
       live_turn_companion_shell: false,
+      page_errors: pageErrors.slice(0, 20),
     });
     throw error;
   } finally {

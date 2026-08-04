@@ -26,6 +26,9 @@ def test_source_contract_passes_for_iframe_only_participate_shell() -> None:
     assert result["status"] == "pass"
     assert result["required"]["view_has_real_iframe"] is True
     assert result["required"]["view_uses_existing_embed_href"] is True
+    assert result["required"]["view_uses_same_origin_referrer_policy"] is True
+    assert result["required"]["public_builder_uses_first_party_proxy_iframe"] is True
+    assert result["required"]["legacy_builder_uses_hosted_upstream_iframe"] is True
     assert result["required"]["view_removes_visible_header"] is True
     assert result["required"]["public_builder_summary_is_minimal"] is True
     assert result["required"]["legacy_builder_summary_is_minimal"] is True
@@ -54,6 +57,32 @@ def test_live_route_accepts_iframe_shell(monkeypatch) -> None:
     assert result["status"] == "pass"
     assert result["has_iframe"] is True
     assert result["has_offline_fallback"] is False
+    assert result["iframe_uses_first_party_proxy"] is True
+
+
+def test_live_route_rejects_direct_provider_iframe(monkeypatch) -> None:
+    module = load_module()
+
+    def fake_fetch(base_url: str, path: str, timeout_seconds: float):
+        return (
+            200,
+            {"content-type": "text/html; charset=utf-8"},
+            """
+            <main>
+              <h1 id="partizipate-title" class="sr-only">Participate</h1>
+              <iframe src="https://feedback.productlift.dev/" data-chummer-participate-frame></iframe>
+            </main>
+            """,
+            "https://chummer.run/participate",
+        )
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_live_route("https://chummer.run", "/participate", 1)
+
+    assert result["status"] == "fail"
+    assert "/participate iframe does not use the first-party board proxy" in result["failures"]
+    assert "/participate iframe leaks the hosted provider origin" in result["failures"]
 
 
 def test_live_route_accepts_existing_offline_fallback(monkeypatch) -> None:

@@ -47,7 +47,7 @@ MAX_LIVE_MANIFEST_BYTES = 256 * 1024
 MAX_LIVE_DOCUMENT_BYTES = 2 * 1024 * 1024
 MAX_LIVE_TEXT_ASSET_BYTES = 8 * 1024 * 1024
 MAX_LIVE_BINARY_ASSET_BYTES = 8 * 1024 * 1024
-PUBLIC_ASSET_CACHE_CONTROL = "public, max-age=300, must-revalidate"
+PUBLIC_ASSET_CACHE_CONTROL = "no-cache, no-store, must-revalidate"
 WORKER_CACHE_CONTROL = "no-cache, no-store, must-revalidate"
 PRIVATE_CACHE_CONTROL = "private, no-store, max-age=0"
 CDN_NO_STORE = "no-store, max-age=0"
@@ -1125,12 +1125,26 @@ def require_private_response_headers(
         failures,
         f"{path}: Cache-Control must be exactly {PRIVATE_CACHE_CONTROL}",
     )
-    for name in ("cdn-cache-control", "cloudflare-cdn-cache-control"):
-        require(
-            headers.get(name, "").strip().lower() == CDN_NO_STORE,
-            failures,
-            f"{path}: {name} must be exactly {CDN_NO_STORE}",
-        )
+    require(
+        headers.get("cdn-cache-control", "").strip().lower() == CDN_NO_STORE,
+        failures,
+        f"{path}: cdn-cache-control must be exactly {CDN_NO_STORE}",
+    )
+    cloudflare_cache_control = (
+        headers.get("cloudflare-cdn-cache-control", "").strip().lower()
+    )
+    require(
+        cloudflare_cache_control == CDN_NO_STORE
+        or (
+            not cloudflare_cache_control
+            and "cloudflare" in headers.get("server", "").strip().lower()
+        ),
+        failures,
+        (
+            f"{path}: cloudflare-cdn-cache-control must be exactly {CDN_NO_STORE} "
+            "unless the Cloudflare edge consumed it"
+        ),
+    )
     require(
         headers.get("surrogate-control", "").strip().lower() == "no-store",
         failures,
