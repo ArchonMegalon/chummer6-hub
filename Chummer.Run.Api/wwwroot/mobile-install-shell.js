@@ -9,6 +9,7 @@
     : null;
   const serviceWorkerRegistrationAttempts = 3;
   const serviceWorkerRetryDelaysMs = [500, 1500];
+  const serviceWorkerActivationTimeoutMs = 8000;
   let installPrompt = null;
 
   const setStatus = (message) => {
@@ -50,12 +51,54 @@
     restoreBrowserInstallState();
   };
 
+  const waitForServiceWorkerActivation = (registration) => new Promise((resolve, reject) => {
+    const worker = registration.active ?? registration.waiting ?? registration.installing ?? null;
+    if (!worker) {
+      reject(new Error("service worker registration has no worker"));
+      return;
+    }
+    if (worker.state === "activated") {
+      resolve();
+      return;
+    }
+    if (worker.state === "redundant") {
+      reject(new Error("service worker installation became redundant"));
+      return;
+    }
+
+    let settled = false;
+    let timeoutId = 0;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      worker.removeEventListener?.("statechange", onStateChange);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onStateChange = () => {
+      if (worker.state === "activated") {
+        finish();
+      } else if (worker.state === "redundant") {
+        finish(new Error("service worker installation became redundant"));
+      }
+    };
+    timeoutId = window.setTimeout(() => {
+      finish(new Error("service worker activation timed out"));
+    }, serviceWorkerActivationTimeoutMs);
+    worker.addEventListener?.("statechange", onStateChange);
+    onStateChange();
+  });
+
   const registerServiceWorker = async () => {
     for (let attempt = 0; attempt < serviceWorkerRegistrationAttempts; attempt += 1) {
+      let registration = null;
       try {
-        await navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" });
+        registration = await navigator.serviceWorker.register("/mobile/service-worker.js", { scope: "/mobile/" });
+        await waitForServiceWorkerActivation(registration);
         return;
       } catch {
+        await registration?.unregister?.().catch(() => false);
         if (attempt + 1 >= serviceWorkerRegistrationAttempts) {
           setStatus("The install shell is available online. Service-worker installation is not available in this browser.");
           return;
@@ -68,9 +111,14 @@
   };
 
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
+    const startServiceWorkerRegistration = () => {
       void registerServiceWorker();
-    }, { once: true });
+    };
+    if (document.readyState === "complete") {
+      startServiceWorkerRegistration();
+    } else {
+      window.addEventListener("load", startServiceWorkerRegistration, { once: true });
+    }
   }
 
   syncDisplayModeState();
