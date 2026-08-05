@@ -2902,22 +2902,36 @@ def test_projection_rejects_v4_bridge_posture_broadened_to_route_authority() -> 
 
 
 @pytest.mark.parametrize(
-    ("native_bridge", "contract_name", "contract_version"),
+    (
+        "native_bridge",
+        "generation_bridge",
+        "contract_name",
+        "contract_version",
+    ),
     [
         (
+            False,
             False,
             "chummer.release-upload.candidate-import-authority/v3",
             3,
         ),
         (
             True,
+            False,
             "chummer.release-upload.candidate-import-authority/v4",
             4,
         ),
+        (
+            True,
+            True,
+            "chummer.release-upload.candidate-import-authority/v5",
+            5,
+        ),
     ],
 )
-def test_unsigned_authority_shape_preserves_v3_and_adds_only_v4_bridge(
+def test_unsigned_authority_shape_preserves_v3_and_adds_bounded_bridges(
     native_bridge: bool,
+    generation_bridge: bool,
     contract_name: str,
     contract_version: int,
 ) -> None:
@@ -2928,11 +2942,14 @@ def test_unsigned_authority_shape_preserves_v3_and_adds_only_v4_bridge(
     custody: dict[str, object] = {"unsignedPublicationEvidence": {"status": "passed"}}
     if native_bridge:
         custody["nativeWindowsFinalizedEvidence"] = {"status": "passed"}
+    if generation_bridge:
+        custody["generationProjection"] = {"status": "passed"}
     now = datetime(2026, 7, 26, 22, 0, tzinfo=timezone.utc)
 
     authority = materializer._build_candidate_authority(
         unsigned_preview=True,
         unsigned_native_bridge=native_bridge,
+        unsigned_native_generation_bridge=generation_bridge,
         now=now,
         expires_at=now + timedelta(hours=2),
         candidate={"version": "run-test"},
@@ -2950,6 +2967,13 @@ def test_unsigned_authority_shape_preserves_v3_and_adds_only_v4_bridge(
     assert (
         "nativeWindowsFinalizedEvidence" in authority["custody"]
     ) is native_bridge
+    assert (
+        authority.get("ownerNativeStageAuthoritySeedBridgeAuthority")
+        is True
+        if generation_bridge
+        else "ownerNativeStageAuthoritySeedBridgeAuthority" not in authority
+    )
+    assert ("generationProjection" in authority["custody"]) is generation_bridge
 
 
 @pytest.mark.parametrize(

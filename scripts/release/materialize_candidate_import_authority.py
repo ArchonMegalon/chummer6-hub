@@ -6,7 +6,10 @@ candidate tree and the exact finalized UI evidence already in operator custody,
 then emits a bounded authority document whose embedded bytes can be placed in a
 digest-bound public-projection snapshot. Unsigned publication without a native
 root remains the stage-only v3 contract; an exact unsigned finalized native
-root emits the narrowly privileged owner-finalization v4 contract.
+root emits the narrowly privileged owner-finalization v4 contract. A v5 bridge
+additionally proves that the final upload manifests are the exact deterministic
+generation projection of the Registry-reviewed v4 source and binds the three
+review-required native-stage authority-seed files.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import base64
 import binascii
 from datetime import datetime, timedelta, timezone
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -31,6 +35,17 @@ AUTHORITY_CONTRACT = "chummer.release-upload.candidate-import-authority/v2"
 UNSIGNED_AUTHORITY_CONTRACT = "chummer.release-upload.candidate-import-authority/v3"
 UNSIGNED_NATIVE_AUTHORITY_CONTRACT = (
     "chummer.release-upload.candidate-import-authority/v4"
+)
+UNSIGNED_NATIVE_GENERATION_AUTHORITY_CONTRACT = (
+    "chummer.release-upload.candidate-import-authority/v5"
+)
+GENERATION_PROJECTION_CONTRACT = (
+    "chummer.release-upload.native-stage-generation-projection/v1"
+)
+NATIVE_STAGE_AUTHORITY_SEED_PATHS = (
+    "release-evidence/CURRENT.json",
+    "release-evidence/RELEASE_DECISION.json",
+    "release-evidence/SNAPSHOT.json",
 )
 INVENTORY_CONTRACT = "chummer.release-upload.candidate-inventory/v1"
 CAPTURE_CONTRACT = "chummer6-ui.preview-nightly-native-windows-capture"
@@ -8585,10 +8600,220 @@ def _atomic_write(path: Path, payload: bytes) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _generation_projector() -> Any:
+    path = Path(__file__).resolve().parents[1] / "release_shelf_generation.py"
+    spec = importlib.util.spec_from_file_location(
+        "chummer_candidate_authority_generation_projector",
+        path,
+    )
+    if spec is None or spec.loader is None:
+        _fail("generation projector cannot be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _authority_seed_reference(
+    bundle_root: Path,
+    candidate_rows: list[dict[str, Any]],
+    relative: str,
+) -> tuple[dict[str, Any], bytes]:
+    path = _plain_file(
+        bundle_root / relative,
+        label=f"native-stage authority seed {relative}",
+        maximum_bytes=MAX_JSON_BYTES,
+    )
+    raw = path.read_bytes()
+    expected = {
+        "path": relative,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "sizeBytes": len(raw),
+    }
+    indexed = {row["path"]: row for row in candidate_rows}
+    if indexed.get(relative) != expected:
+        _fail(f"native-stage authority seed {relative} differs from candidate inventory")
+    return expected, raw
+
+
+def _validate_generation_projection_bridge(
+    *,
+    preprojection_bundle_root: Path,
+    bundle_root: Path,
+    candidate_rows: list[dict[str, Any]],
+    candidate_file_modes: dict[str, int],
+    candidate_directory_modes: list[dict[str, Any]],
+    canonical: dict[str, Any],
+    canonical_bytes: bytes,
+    compatibility: dict[str, Any],
+    compatibility_bytes: bytes,
+    evaluated_at: str,
+) -> dict[str, Any]:
+    if (
+        not preprojection_bundle_root.is_dir()
+        or preprojection_bundle_root.is_symlink()
+        or preprojection_bundle_root == bundle_root
+    ):
+        _fail("preprojection bundle root must be one distinct physical directory")
+    (
+        source_rows,
+        source_file_modes,
+        source_directory_modes,
+        source_files,
+    ) = _scan_bundle_tree(preprojection_bundle_root)
+    source_canonical_bytes = source_files.get("RELEASE_CHANNEL.generated.json")
+    source_compatibility_bytes = source_files.get("releases.json")
+    if source_canonical_bytes is None or source_compatibility_bytes is None:
+        _fail("preprojection bundle omits its manifest pair")
+    source_canonical = _strict_json_bytes(
+        source_canonical_bytes,
+        label="preprojection canonical manifest",
+    )
+    source_compatibility = _strict_json_bytes(
+        source_compatibility_bytes,
+        label="preprojection compatibility manifest",
+    )
+    generation_id = canonical.get("generationId")
+    if (
+        not isinstance(generation_id, str)
+        or re.fullmatch(r"[A-Za-z0-9._-]+", generation_id) is None
+        or generation_id in {".", ".."}
+        or ".." in generation_id
+        or compatibility.get("generationId") != generation_id
+        or source_canonical.get("generationId") is not None
+        or source_compatibility.get("generationId") is not None
+    ):
+        _fail("generation projection identity is invalid or already consumed")
+    projection_time = _timestamp(
+        evaluated_at,
+        label="generation projection evaluation time",
+    )
+
+    source_by_path = {row["path"]: row for row in source_rows}
+    candidate_by_path = {row["path"]: row for row in candidate_rows}
+    if set(candidate_by_path) != {
+        *source_by_path,
+        *NATIVE_STAGE_AUTHORITY_SEED_PATHS,
+    }:
+        _fail("generation-projected candidate has extra or missing authority-seed files")
+    for relative, source_row in source_by_path.items():
+        if relative in {"RELEASE_CHANNEL.generated.json", "releases.json"}:
+            continue
+        if (
+            candidate_by_path.get(relative) != source_row
+            or candidate_file_modes.get(relative) != source_file_modes.get(relative)
+        ):
+            _fail("generation projection changed a non-manifest candidate byte")
+    expected_directories = [
+        *source_directory_modes,
+        {"mode": candidate_directory_modes_by_path(candidate_directory_modes).get(
+            "release-evidence"
+        ), "path": "release-evidence"},
+    ]
+    if (
+        expected_directories[-1]["mode"] is None
+        or sorted(expected_directories, key=lambda row: row["path"])
+        != candidate_directory_modes
+    ):
+        _fail("generation-projected candidate directory set drifted")
+
+    projector = _generation_projector()
+    with tempfile.TemporaryDirectory(prefix="candidate-generation-projection-") as name:
+        root = Path(name)
+        source_canonical_path = root / "RELEASE_CHANNEL.generated.json"
+        source_compatibility_path = root / "releases.json"
+        source_canonical_path.write_bytes(source_canonical_bytes)
+        source_compatibility_path.write_bytes(source_compatibility_bytes)
+        projector.project_manifest_pair(
+            source_canonical_path,
+            source_compatibility_path,
+            generation_id,
+            evaluated_at=projection_time,
+        )
+        if (
+            source_canonical_path.read_bytes() != canonical_bytes
+            or source_compatibility_path.read_bytes() != compatibility_bytes
+        ):
+            _fail("candidate manifests are not the exact deterministic generation projection")
+
+    seed_references: dict[str, dict[str, Any]] = {}
+    seed_payloads: dict[str, dict[str, Any]] = {}
+    seed_raws: dict[str, bytes] = {}
+    for relative in NATIVE_STAGE_AUTHORITY_SEED_PATHS:
+        reference, raw = _authority_seed_reference(
+            bundle_root,
+            candidate_rows,
+            relative,
+        )
+        seed_references[relative.rsplit("/", 1)[-1]] = reference
+        seed_raws[relative] = raw
+        seed_payloads[relative] = _strict_json_bytes(
+            raw,
+            label=f"native-stage authority seed {relative}",
+        )
+    current = seed_payloads["release-evidence/CURRENT.json"]
+    decision_raw = seed_raws["release-evidence/RELEASE_DECISION.json"]
+    snapshot_raw = seed_raws["release-evidence/SNAPSHOT.json"]
+    decision = seed_payloads["release-evidence/RELEASE_DECISION.json"]
+    snapshot = seed_payloads["release-evidence/SNAPSHOT.json"]
+    if (
+        current.get("status") != "review_required"
+        or snapshot.get("releaseDecisionStatus") != "review_required"
+        or decision.get("releaseDecisionStatus") != "review_required"
+        or snapshot.get("manifestSha256") != hashlib.sha256(canonical_bytes).hexdigest()
+        or decision.get("manifestSha256") != hashlib.sha256(canonical_bytes).hexdigest()
+        or current.get("snapshotSha256") != hashlib.sha256(snapshot_raw).hexdigest()
+        or current.get("decisionSha256") != hashlib.sha256(decision_raw).hexdigest()
+        or snapshot.get("releaseDecisionSha256")
+        != hashlib.sha256(decision_raw).hexdigest()
+        or re.fullmatch(
+            r"[0-9a-f]{64}",
+            str(decision.get("releaseScopeDecisionSha256") or ""),
+        ) is None
+    ):
+        _fail("native-stage authority seed does not bind the projected review posture")
+
+    return {
+        "contractName": GENERATION_PROJECTION_CONTRACT,
+        "contractVersion": 1,
+        "status": "passed",
+        "generationId": generation_id,
+        "evaluatedAtUtc": projection_time.isoformat().replace("+00:00", "Z"),
+        "sourceCanonicalManifestSha256": hashlib.sha256(
+            source_canonical_bytes
+        ).hexdigest(),
+        "sourceCompatibilityManifestSha256": hashlib.sha256(
+            source_compatibility_bytes
+        ).hexdigest(),
+        "projectedCanonicalManifestSha256": hashlib.sha256(
+            canonical_bytes
+        ).hexdigest(),
+        "projectedCompatibilityManifestSha256": hashlib.sha256(
+            compatibility_bytes
+        ).hexdigest(),
+        "authoritySeed": seed_references,
+        "source": {
+            "rows": source_rows,
+            "fileModes": source_file_modes,
+            "directoryModes": source_directory_modes,
+            "canonical": source_canonical,
+            "canonicalBytes": source_canonical_bytes,
+            "compatibility": source_compatibility,
+            "compatibilityBytes": source_compatibility_bytes,
+        },
+    }
+
+
+def candidate_directory_modes_by_path(
+    rows: list[dict[str, Any]],
+) -> dict[str, int]:
+    return {row["path"]: row["mode"] for row in rows}
+
+
 def _build_candidate_authority(
     *,
     unsigned_preview: bool,
     unsigned_native_bridge: bool,
+    unsigned_native_generation_bridge: bool,
     now: datetime,
     expires_at: datetime,
     candidate: dict[str, Any],
@@ -8596,16 +8821,26 @@ def _build_candidate_authority(
 ) -> dict[str, Any]:
     if unsigned_native_bridge and not unsigned_preview:
         _fail("owner native finalization bridge requires unsigned preview authority")
+    if unsigned_native_generation_bridge and not unsigned_native_bridge:
+        _fail("native generation bridge requires owner native finalization authority")
     authority: dict[str, Any] = {
         "contractName": (
-            UNSIGNED_NATIVE_AUTHORITY_CONTRACT
+            UNSIGNED_NATIVE_GENERATION_AUTHORITY_CONTRACT
+            if unsigned_native_generation_bridge
+            else UNSIGNED_NATIVE_AUTHORITY_CONTRACT
             if unsigned_native_bridge
             else UNSIGNED_AUTHORITY_CONTRACT
             if unsigned_preview
             else AUTHORITY_CONTRACT
         ),
         "contractVersion": (
-            4 if unsigned_native_bridge else 3 if unsigned_preview else 2
+            5
+            if unsigned_native_generation_bridge
+            else 4
+            if unsigned_native_bridge
+            else 3
+            if unsigned_preview
+            else 2
         ),
         "status": "candidate_import_ready",
         "candidateImportAuthority": True,
@@ -8636,6 +8871,8 @@ def _build_candidate_authority(
         )
         if unsigned_native_bridge:
             authority["ownerNativeFinalizationBridgeAuthority"] = True
+        if unsigned_native_generation_bridge:
+            authority["ownerNativeStageAuthoritySeedBridgeAuthority"] = True
     return authority
 
 
@@ -8733,6 +8970,49 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
     ):
         _fail("candidate compatibility release identity differs from canonical custody")
 
+    preprojection_value = str(args.preprojection_bundle_root).strip()
+    projection_time_value = str(args.generation_projection_evaluated_at).strip()
+    if bool(preprojection_value) != bool(projection_time_value):
+        _fail(
+            "generation projection requires both preprojection bundle root and evaluated-at"
+        )
+    generation_projection: dict[str, Any] | None = None
+    validation_rows = candidate_rows
+    validation_file_modes = candidate_file_modes
+    validation_directory_modes = candidate_directory_modes
+    validation_canonical = canonical
+    validation_canonical_bytes = canonical_bytes
+    validation_compatibility_bytes = compatibility_bytes
+    validation_scope = scope
+    if preprojection_value:
+        generation_projection = _validate_generation_projection_bridge(
+            preprojection_bundle_root=Path(preprojection_value).resolve(strict=True),
+            bundle_root=bundle_root,
+            candidate_rows=candidate_rows,
+            candidate_file_modes=candidate_file_modes,
+            candidate_directory_modes=candidate_directory_modes,
+            canonical=canonical,
+            canonical_bytes=canonical_bytes,
+            compatibility=compatibility,
+            compatibility_bytes=compatibility_bytes,
+            evaluated_at=projection_time_value,
+        )
+        source = generation_projection.pop("source")
+        validation_rows = source["rows"]
+        validation_file_modes = source["fileModes"]
+        validation_directory_modes = source["directoryModes"]
+        validation_canonical = source["canonical"]
+        validation_canonical_bytes = source["canonicalBytes"]
+        validation_compatibility_bytes = source["compatibilityBytes"]
+        validation_scope = _canonical_windows_scope(
+            validation_canonical,
+            validation_rows,
+            allow_ancillary_files=True,
+            expected_channel="preview",
+        )
+        if validation_scope["version"] != scope["version"]:
+            _fail("preprojection and projected release identities differ")
+
     now = (
         _timestamp(args.now, label="materialization time")
         if args.now
@@ -8754,6 +9034,9 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         unsigned_preview
         and bool(str(args.windows_finalized_root).strip())
     )
+    unsigned_native_generation_bridge = generation_projection is not None
+    if unsigned_native_generation_bridge and not unsigned_native_bridge:
+        _fail("generation projection authority requires native finalization custody")
     native_evidence: dict[str, Any] | None = None
     native_custody_files: list[tuple[str, bytes]] = []
     if unsigned_preview:
@@ -8761,14 +9044,14 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         publication_evidence, publication_files = (
             _validate_unsigned_publication_scope_v3(
                 stage_root,
-                candidate_file_modes,
+                validation_file_modes,
                 publication_scope,
                 publication_scope_bytes,
                 candidate=candidate,
-                candidate_rows=candidate_rows,
-                canonical_bytes=canonical_bytes,
-                compatibility_bytes=compatibility_bytes,
-                canonical_scope=scope,
+                candidate_rows=validation_rows,
+                canonical_bytes=validation_canonical_bytes,
+                compatibility_bytes=validation_compatibility_bytes,
+                canonical_scope=validation_scope,
             )
         )
     else:
@@ -8829,11 +9112,11 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
             registry_candidate,
             registry_candidate_bytes,
             stage_root=stage_root,
-            canonical=canonical,
-            canonical_raw=canonical_bytes,
-            compatibility_raw=compatibility_bytes,
+            canonical=validation_canonical,
+            canonical_raw=validation_canonical_bytes,
+            compatibility_raw=validation_compatibility_bytes,
             candidate_summary=candidate,
-            candidate_directory_modes=candidate_directory_modes,
+            candidate_directory_modes=validation_directory_modes,
             scope=publication_scope,
         )
         publication_files.extend(candidate_validation["sourceFiles"])
@@ -8982,9 +9265,9 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
             registry_candidate=registry_candidate,
             registry_candidate_raw=registry_candidate_bytes,
             candidate_validation=candidate_validation,
-            canonical=canonical,
-            canonical_raw=canonical_bytes,
-            compatibility_raw=compatibility_bytes,
+            canonical=validation_canonical,
+            canonical_raw=validation_canonical_bytes,
+            compatibility_raw=validation_compatibility_bytes,
             scope=publication_scope,
             scope_raw=publication_scope_bytes,
             stage_evidence_files=publication_files,
@@ -9045,6 +9328,8 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "registryFinalization": registry_finalization,
     }
+    if generation_projection is not None:
+        custody["generationProjection"] = generation_projection
     if unsigned_preview:
         custody["unsignedPublicationEvidence"] = {
             **publication_evidence,
@@ -9080,6 +9365,7 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
     authority = _build_candidate_authority(
         unsigned_preview=unsigned_preview,
         unsigned_native_bridge=unsigned_native_bridge,
+        unsigned_native_generation_bridge=unsigned_native_generation_bridge,
         now=now,
         expires_at=expires_at,
         candidate=candidate,
@@ -9110,6 +9396,19 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--publication-stage-root", required=True)
+    parser.add_argument(
+        "--preprojection-bundle-root",
+        default="",
+        help=(
+            "exact Registry-reviewed bundle before deterministic generation "
+            "projection; requires --generation-projection-evaluated-at"
+        ),
+    )
+    parser.add_argument(
+        "--generation-projection-evaluated-at",
+        default="",
+        help="exact UTC instant used by the deterministic generation projector",
+    )
     parser.add_argument("--publication-scope", required=True)
     parser.add_argument("--registry-candidate-receipt", required=True)
     parser.add_argument("--registry-finalize-authority", required=True)

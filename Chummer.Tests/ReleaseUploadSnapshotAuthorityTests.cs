@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -363,6 +364,64 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 StringComparison.Ordinal));
         Assert.Equal(candidateInstaller.Sha256, nativeInstaller.GetProperty("sha256").GetString());
         Assert.Equal(candidateInstaller.SizeBytes, nativeInstaller.GetProperty("sizeBytes").GetInt64());
+    }
+
+    [Fact]
+    public void RuntimeAcceptsExactGenerationProjectedUnsignedNativeV5Bridge()
+    {
+        byte[] authorityBytes = BuildGenerationProjectedUnsignedNativeV5();
+        using JsonDocument document = JsonDocument.Parse(authorityBytes);
+        DateTimeOffset evaluatedAt = document.RootElement
+            .GetProperty("generatedAtUtc")
+            .GetDateTimeOffset()
+            .AddMinutes(1);
+
+        ReleaseUploadCandidateAuthority authority =
+            ReleaseUploadSnapshotAuthorityService.ParseCandidateAuthority(
+                $"public-projection-{new string('a', 64)}",
+                new string('b', 64),
+                Convert.ToHexStringLower(SHA256.HashData(authorityBytes)),
+                authorityBytes,
+                evaluatedAt);
+
+        Assert.True(authority.Inventory.Count > 3);
+        Assert.Equal(
+            "gen-native-stage-authority-seed-test",
+            JsonNode.Parse(authority.CanonicalManifestBytes)!["generationId"]!
+                .GetValue<string>());
+        Assert.Contains(
+            authority.Inventory,
+            static row => string.Equals(
+                row.Path,
+                "release-evidence/CURRENT.json",
+                StringComparison.Ordinal));
+        Assert.NotNull(authority.NativeEvidenceBinding);
+    }
+
+    [Fact]
+    public void RuntimeRejectsGenerationProjectedUnsignedNativeV5DigestDrift()
+    {
+        JsonObject authority = JsonNode.Parse(
+                BuildGenerationProjectedUnsignedNativeV5())?.AsObject()
+            ?? throw new InvalidDataException("unsigned v5 authority fixture is invalid");
+        authority["custody"]!["generationProjection"]![
+            "projectedCanonicalManifestSha256"] = new string('f', 64);
+        byte[] authorityBytes = JsonSerializer.SerializeToUtf8Bytes(authority);
+        DateTimeOffset evaluatedAt = DateTimeOffset.Parse(
+            authority["generatedAtUtc"]!.GetValue<string>()).AddMinutes(1);
+
+        InvalidDataException drift = Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadSnapshotAuthorityService.ParseCandidateAuthority(
+                $"public-projection-{new string('a', 64)}",
+                new string('b', 64),
+                Convert.ToHexStringLower(SHA256.HashData(authorityBytes)),
+                authorityBytes,
+                evaluatedAt));
+
+        Assert.Contains(
+            "projectedCanonicalManifestSha256",
+            drift.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -997,6 +1056,148 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         using var output = new MemoryStream();
         gzip.CopyTo(output);
         return output.ToArray();
+    }
+
+    private static byte[] BuildGenerationProjectedUnsignedNativeV5()
+    {
+        JsonObject authority = JsonNode.Parse(
+                LoadUnsignedCandidateAuthorityV4DistinctSource())?.AsObject()
+            ?? throw new InvalidDataException("unsigned v4 authority fixture is invalid");
+        JsonObject custody = authority["custody"]!.AsObject();
+        JsonObject canonicalEntry = custody["canonicalManifest"]!.AsObject();
+        JsonObject compatibilityEntry = custody["compatibilityManifest"]!.AsObject();
+        byte[] sourceCanonicalBytes = Convert.FromBase64String(
+            canonicalEntry["base64"]!.GetValue<string>());
+        byte[] sourceCompatibilityBytes = Convert.FromBase64String(
+            compatibilityEntry["base64"]!.GetValue<string>());
+        JsonObject sourceCanonical = JsonNode.Parse(sourceCanonicalBytes)!.AsObject();
+        JsonObject sourceCompatibility =
+            JsonNode.Parse(sourceCompatibilityBytes)!.AsObject();
+        PublicReleaseManifestDto publicManifest =
+            JsonSerializer.Deserialize<PublicReleaseManifestDto>(
+                sourceCompatibilityBytes,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    PropertyNameCaseInsensitive = true
+                })
+            ?? throw new InvalidDataException(
+                "unsigned v4 compatibility fixture is invalid");
+        const string generationId = "gen-native-stage-authority-seed-test";
+        byte[] projectedCanonical =
+            ReleaseBundlePromotionService.ProjectRegistryManifestForGeneration(
+                sourceCanonical,
+                generationId,
+                publicManifest);
+        byte[] projectedCompatibility =
+            ReleaseBundlePromotionService.ProjectRegistryManifestForGeneration(
+                sourceCompatibility,
+                generationId,
+                publicManifest);
+        RewriteUnsignedEmbedded(canonicalEntry, projectedCanonical);
+        RewriteUnsignedEmbedded(compatibilityEntry, projectedCompatibility);
+
+        JsonObject inventoryEntry = custody["inventory"]!.AsObject();
+        JsonObject inventory = DecodeUnsignedEmbedded(inventoryEntry);
+        JsonArray rows = inventory["files"]!.AsArray();
+        JsonObject canonicalRow = rows
+            .Select(static node => node!.AsObject())
+            .Single(static row => string.Equals(
+                row["path"]!.GetValue<string>(),
+                "RELEASE_CHANNEL.generated.json",
+                StringComparison.Ordinal));
+        canonicalRow["sha256"] = Convert.ToHexStringLower(
+            SHA256.HashData(projectedCanonical));
+        canonicalRow["sizeBytes"] = projectedCanonical.LongLength;
+        JsonObject compatibilityRow = rows
+            .Select(static node => node!.AsObject())
+            .Single(static row => string.Equals(
+                row["path"]!.GetValue<string>(),
+                "releases.json",
+                StringComparison.Ordinal));
+        compatibilityRow["sha256"] = Convert.ToHexStringLower(
+            SHA256.HashData(projectedCompatibility));
+        compatibilityRow["sizeBytes"] = projectedCompatibility.LongLength;
+
+        var seedBytes = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            ["CURRENT.json"] = Encoding.UTF8.GetBytes("{\"status\":\"review_required\"}\n"),
+            ["RELEASE_DECISION.json"] = Encoding.UTF8.GetBytes("{\"releaseDecisionStatus\":\"review_required\"}\n"),
+            ["SNAPSHOT.json"] = Encoding.UTF8.GetBytes("{\"releaseDecisionStatus\":\"review_required\"}\n")
+        };
+        var authoritySeed = new JsonObject();
+        foreach ((string name, byte[] bytes) in seedBytes)
+        {
+            string path = $"release-evidence/{name}";
+            string sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes));
+            var row = new JsonObject
+            {
+                ["path"] = path,
+                ["sha256"] = sha256,
+                ["sizeBytes"] = bytes.LongLength
+            };
+            rows.Add(row);
+            authoritySeed[name] = row.DeepClone();
+        }
+        JsonNode[] sortedRows = rows
+            .OrderBy(
+                static node => node!["path"]!.GetValue<string>(),
+                StringComparer.Ordinal)
+            .Select(static node => node!.DeepClone())
+            .ToArray();
+        inventory["files"] = new JsonArray(sortedRows);
+        byte[] inventoryBytes = JsonSerializer.SerializeToUtf8Bytes(
+            inventory,
+            new JsonSerializerOptions { WriteIndented = false });
+        inventoryBytes = [.. inventoryBytes, (byte)'\n'];
+        RewriteUnsignedEmbedded(inventoryEntry, inventoryBytes);
+
+        ReleaseUploadCandidateInventoryRow[] typedRows = inventory["files"]!
+            .AsArray()
+            .Select(static node => node!.AsObject())
+            .Select(static row => new ReleaseUploadCandidateInventoryRow(
+                row["path"]!.GetValue<string>(),
+                row["sizeBytes"]!.GetValue<long>(),
+                row["sha256"]!.GetValue<string>()))
+            .ToArray();
+        JsonObject candidateNode = authority["candidate"]!.AsObject();
+        var candidate = new ReleaseUploadCandidateIdentity(
+            candidateNode["version"]!.GetValue<string>(),
+            Convert.ToHexStringLower(SHA256.HashData(projectedCanonical)),
+            ReleaseUploadSnapshotAuthorityService.ComputeInventoryDigest(typedRows),
+            typedRows.Length,
+            typedRows.Sum(static row => row.SizeBytes),
+            string.Empty);
+        candidate = candidate with
+        {
+            BundleIdentitySha256 =
+                ReleaseUploadSnapshotAuthorityService.ComputeBundleIdentity(candidate)
+        };
+        authority["candidate"] = JsonSerializer.SerializeToNode(
+            candidate,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        authority["contractName"] =
+            "chummer.release-upload.candidate-import-authority/v5";
+        authority["contractVersion"] = 5;
+        authority["ownerNativeStageAuthoritySeedBridgeAuthority"] = true;
+        custody["generationProjection"] = new JsonObject
+        {
+            ["contractName"] =
+                "chummer.release-upload.native-stage-generation-projection/v1",
+            ["contractVersion"] = 1,
+            ["status"] = "passed",
+            ["generationId"] = generationId,
+            ["evaluatedAtUtc"] = authority["generatedAtUtc"]!.DeepClone(),
+            ["sourceCanonicalManifestSha256"] = Convert.ToHexStringLower(
+                SHA256.HashData(sourceCanonicalBytes)),
+            ["sourceCompatibilityManifestSha256"] = Convert.ToHexStringLower(
+                SHA256.HashData(sourceCompatibilityBytes)),
+            ["projectedCanonicalManifestSha256"] = Convert.ToHexStringLower(
+                SHA256.HashData(projectedCanonical)),
+            ["projectedCompatibilityManifestSha256"] = Convert.ToHexStringLower(
+                SHA256.HashData(projectedCompatibility)),
+            ["authoritySeed"] = authoritySeed
+        };
+        return JsonSerializer.SerializeToUtf8Bytes(authority);
     }
 
     private static byte[] LoadUnsignedWindowsFreshDeltaCandidateAuthorityV3()

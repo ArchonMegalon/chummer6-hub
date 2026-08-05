@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Chummer.Run.Contracts.PublicSurface;
 
 namespace Chummer.Run.Api.Services;
 
@@ -116,6 +117,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         "chummer.release-upload.candidate-import-authority/v3";
     private const string UnsignedNativeCandidateContractName =
         "chummer.release-upload.candidate-import-authority/v4";
+    private const string UnsignedNativeGenerationCandidateContractName =
+        "chummer.release-upload.candidate-import-authority/v5";
+    private const string NativeStageGenerationProjectionContractName =
+        "chummer.release-upload.native-stage-generation-projection/v1";
     private const string CandidateInventoryContractName =
         "chummer.release-upload.candidate-inventory/v1";
     private const int MaximumPointerBytes = 256 * 1024;
@@ -471,7 +476,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             && contractName.ValueKind == JsonValueKind.String
             && contractName.GetString() is { } unsignedContract
             && unsignedContract is UnsignedCandidateContractName
-                or UnsignedNativeCandidateContractName)
+                or UnsignedNativeCandidateContractName
+                or UnsignedNativeGenerationCandidateContractName)
         {
             return ParseUnsignedCandidateAuthority(
                 snapshotId,
@@ -479,9 +485,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 authoritySha256,
                 root,
                 ownerNativeFinalizationBridge:
+                    unsignedContract is UnsignedNativeCandidateContractName
+                        or UnsignedNativeGenerationCandidateContractName,
+                ownerNativeStageAuthoritySeedBridge:
                     string.Equals(
                         unsignedContract,
-                        UnsignedNativeCandidateContractName,
+                        UnsignedNativeGenerationCandidateContractName,
                         StringComparison.Ordinal),
                 now: now);
         }
@@ -702,6 +711,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string authoritySha256,
         JsonElement root,
         bool ownerNativeFinalizationBridge,
+        bool ownerNativeStageAuthoritySeedBridge,
         DateTimeOffset now)
     {
         var rootProperties = new HashSet<string>(
@@ -731,6 +741,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             rootProperties.Add("ownerNativeFinalizationBridgeAuthority");
         }
+        if (ownerNativeStageAuthoritySeedBridge)
+        {
+            rootProperties.Add("ownerNativeStageAuthoritySeedBridgeAuthority");
+        }
         if (!ExactPropertySet(root, rootProperties))
         {
             throw new InvalidDataException(
@@ -739,18 +753,29 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         RequireExactString(
             root,
             "contractName",
-            ownerNativeFinalizationBridge
+            ownerNativeStageAuthoritySeedBridge
+                ? UnsignedNativeGenerationCandidateContractName
+                : ownerNativeFinalizationBridge
                 ? UnsignedNativeCandidateContractName
                 : UnsignedCandidateContractName);
         RequireExactInt32(
             root,
             "contractVersion",
-            ownerNativeFinalizationBridge ? 4 : 3);
+            ownerNativeStageAuthoritySeedBridge
+                ? 5
+                : ownerNativeFinalizationBridge ? 4 : 3);
         if (ownerNativeFinalizationBridge)
         {
             RequireBoolean(
                 root,
                 "ownerNativeFinalizationBridgeAuthority",
+                expected: true);
+        }
+        if (ownerNativeStageAuthoritySeedBridge)
+        {
+            RequireBoolean(
+                root,
+                "ownerNativeStageAuthoritySeedBridgeAuthority",
                 expected: true);
         }
         RequireExactString(root, "status", "candidate_import_ready");
@@ -836,6 +861,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             custodyProperties.Add("nativeWindowsFinalizedEvidence");
         }
+        if (ownerNativeStageAuthoritySeedBridge)
+        {
+            custodyProperties.Add("generationProjection");
+        }
         if (!ExactPropertySet(custody, custodyProperties))
         {
             throw new InvalidDataException("unsigned candidate custody property set drifted");
@@ -906,7 +935,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             ValidateUnsignedWindowsFreshDeltaManifestPair(
                 canonicalDocument.RootElement,
                 compatibilityDocument.RootElement,
-                candidate.Version);
+                candidate.Version,
+                allowGenerationProjection: ownerNativeStageAuthoritySeedBridge);
         ReleaseUploadCandidateIncumbentBinding incumbentBinding =
             ValidateUnsignedPublicationAndRegistry(
             custody,
@@ -916,7 +946,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 candidate,
                 inventory,
                 unsignedWindowsFreshDeltaProfile,
-                ownerNativeFinalizationBridge);
+                ownerNativeFinalizationBridge,
+                ownerNativeStageAuthoritySeedBridge);
         ReleaseUploadCandidateNativeEvidenceBinding? nativeEvidenceBinding = null;
         if (ownerNativeFinalizationBridge)
         {
@@ -1099,7 +1130,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         ReleaseUploadCandidateIdentity candidate,
         IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory,
         bool unsignedWindowsFreshDeltaProfile,
-        bool ownerNativeFinalizationBridge)
+        bool ownerNativeFinalizationBridge,
+        bool ownerNativeStageAuthoritySeedBridge)
     {
         JsonElement evidence = RequireObject(custody, "unsignedPublicationEvidence");
         var evidenceKeys = new HashSet<string>(
@@ -1208,26 +1240,49 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 expectedPaths.Add(nativeCompositionPath);
             }
             if (!expectedPaths.SetEquals(documents.Keys)
-                || !CryptographicOperations.FixedTimeEquals(
-                    documents["RELEASE_CHANNEL.generated.json"].Bytes,
-                    canonicalBytes)
-                || !CryptographicOperations.FixedTimeEquals(
-                    documents["releases.json"].Bytes,
-                    compatibilityBytes))
+                || !ownerNativeStageAuthoritySeedBridge
+                && (!CryptographicOperations.FixedTimeEquals(
+                        documents["RELEASE_CHANNEL.generated.json"].Bytes,
+                        canonicalBytes)
+                    || !CryptographicOperations.FixedTimeEquals(
+                        documents["releases.json"].Bytes,
+                        compatibilityBytes)))
             {
                 throw new InvalidDataException("unsigned publication evidence custody drifted");
             }
             CandidateEvidenceDocument scopeDocument = documents[scopePath];
             RequireExactString(evidence, "publicationScopeSha256", scopeDocument.Sha256);
             JsonElement scope = scopeDocument.Root;
+            JsonElement validationCanonical = canonical;
+            byte[] validationCanonicalBytes = canonicalBytes;
+            byte[] validationCompatibilityBytes = compatibilityBytes;
+            IReadOnlyList<ReleaseUploadCandidateInventoryRow> validationInventory = inventory;
+            if (ownerNativeStageAuthoritySeedBridge)
+            {
+                CandidateEvidenceDocument sourceCanonical =
+                    documents["RELEASE_CHANNEL.generated.json"];
+                CandidateEvidenceDocument sourceCompatibility =
+                    documents["releases.json"];
+                validationCanonical = sourceCanonical.Root;
+                validationCanonicalBytes = sourceCanonical.Bytes;
+                validationCompatibilityBytes = sourceCompatibility.Bytes;
+                validationInventory = ValidateNativeStageGenerationProjection(
+                    RequireObject(custody, "generationProjection"),
+                    sourceCanonical,
+                    sourceCompatibility,
+                    canonical,
+                    canonicalBytes,
+                    compatibilityBytes,
+                    inventory);
+            }
             ValidateUnsignedScope(
                 scope,
                 sourceSha,
                 candidate,
-                inventory,
-                canonical,
-                canonicalBytes,
-                compatibilityBytes,
+                validationInventory,
+                validationCanonical,
+                validationCanonicalBytes,
+                validationCompatibilityBytes,
                 documents,
                 packageLockPath,
                 packageReceiptPath,
@@ -1239,9 +1294,9 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 scope,
                 scopeDocument.Bytes,
                 evidence,
-                canonical,
-                canonicalBytes,
-                compatibilityBytes,
+                validationCanonical,
+                validationCanonicalBytes,
+                validationCompatibilityBytes,
                 candidate,
                 documents,
                 packageLockPath,
@@ -1259,6 +1314,172 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 document.Dispose();
             }
         }
+    }
+
+    private static IReadOnlyList<ReleaseUploadCandidateInventoryRow>
+        ValidateNativeStageGenerationProjection(
+            JsonElement projection,
+            CandidateEvidenceDocument sourceCanonical,
+            CandidateEvidenceDocument sourceCompatibility,
+            JsonElement projectedCanonical,
+            byte[] projectedCanonicalBytes,
+            byte[] projectedCompatibilityBytes,
+            IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory)
+    {
+        if (!ExactPropertySet(
+                projection,
+                new HashSet<string>(
+                    [
+                        "contractName",
+                        "contractVersion",
+                        "status",
+                        "generationId",
+                        "evaluatedAtUtc",
+                        "sourceCanonicalManifestSha256",
+                        "sourceCompatibilityManifestSha256",
+                        "projectedCanonicalManifestSha256",
+                        "projectedCompatibilityManifestSha256",
+                        "authoritySeed"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "native-stage generation projection property set drifted");
+        }
+        RequireExactString(
+            projection,
+            "contractName",
+            NativeStageGenerationProjectionContractName);
+        RequireExactInt32(projection, "contractVersion", 1);
+        RequireExactString(projection, "status", "passed");
+        string generationId = RequireString(projection, "generationId");
+        _ = RequireUtcTimestamp(projection, "evaluatedAtUtc");
+        RequireExactString(
+            projection,
+            "sourceCanonicalManifestSha256",
+            sourceCanonical.Sha256);
+        RequireExactString(
+            projection,
+            "sourceCompatibilityManifestSha256",
+            sourceCompatibility.Sha256);
+        RequireExactString(
+            projection,
+            "projectedCanonicalManifestSha256",
+            Sha256(projectedCanonicalBytes));
+        RequireExactString(
+            projection,
+            "projectedCompatibilityManifestSha256",
+            Sha256(projectedCompatibilityBytes));
+        RequireExactString(projectedCanonical, "generationId", generationId);
+
+        PublicReleaseManifestDto sourcePublicManifest =
+            JsonSerializer.Deserialize<PublicReleaseManifestDto>(
+                sourceCompatibility.Bytes,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    PropertyNameCaseInsensitive = true
+                })
+            ?? throw new InvalidDataException(
+                "native-stage source compatibility manifest is invalid");
+        JsonObject sourceCanonicalObject = JsonNode.Parse(sourceCanonical.Bytes)
+            as JsonObject
+            ?? throw new InvalidDataException(
+                "native-stage source canonical manifest is invalid");
+        JsonObject sourceCompatibilityObject =
+            JsonNode.Parse(sourceCompatibility.Bytes) as JsonObject
+            ?? throw new InvalidDataException(
+                "native-stage source compatibility manifest is invalid");
+        byte[] expectedCanonical =
+            ReleaseBundlePromotionService.ProjectRegistryManifestForGeneration(
+                sourceCanonicalObject,
+                generationId,
+                sourcePublicManifest);
+        byte[] expectedCompatibility =
+            ReleaseBundlePromotionService.ProjectRegistryManifestForGeneration(
+                sourceCompatibilityObject,
+                generationId,
+                sourcePublicManifest);
+        if (!CryptographicOperations.FixedTimeEquals(
+                expectedCanonical,
+                projectedCanonicalBytes)
+            || !CryptographicOperations.FixedTimeEquals(
+                expectedCompatibility,
+                projectedCompatibilityBytes))
+        {
+            throw new InvalidDataException(
+                "native-stage manifests are not the exact server generation projection");
+        }
+
+        var inventoryByPath = inventory.ToDictionary(
+            static row => row.Path,
+            StringComparer.Ordinal);
+        JsonElement authoritySeed = RequireObject(projection, "authoritySeed");
+        var seedPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["CURRENT.json"] = "release-evidence/CURRENT.json",
+            ["RELEASE_DECISION.json"] = "release-evidence/RELEASE_DECISION.json",
+            ["SNAPSHOT.json"] = "release-evidence/SNAPSHOT.json"
+        };
+        if (!ExactPropertySet(
+                authoritySeed,
+                new HashSet<string>(seedPaths.Keys, StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "native-stage authority seed property set drifted");
+        }
+        foreach ((string name, string path) in seedPaths)
+        {
+            JsonElement reference = RequireObject(authoritySeed, name);
+            if (!ExactPropertySet(
+                    reference,
+                    new HashSet<string>(
+                        ["path", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal))
+                || !inventoryByPath.TryGetValue(
+                    path,
+                    out ReleaseUploadCandidateInventoryRow? held))
+            {
+                throw new InvalidDataException(
+                    "native-stage authority seed inventory drifted");
+            }
+            RequireExactString(reference, "path", path);
+            RequireExactString(reference, "sha256", held.Sha256);
+            if (RequireNonNegativeInt64(reference, "sizeBytes") != held.SizeBytes)
+            {
+                throw new InvalidDataException(
+                    "native-stage authority seed size drifted");
+            }
+        }
+        string[] unexpectedEvidence = inventoryByPath.Keys
+            .Where(static path => path.StartsWith(
+                "release-evidence/",
+                StringComparison.Ordinal))
+            .Except(seedPaths.Values, StringComparer.Ordinal)
+            .ToArray();
+        if (unexpectedEvidence.Length != 0)
+        {
+            throw new InvalidDataException(
+                "native-stage candidate contains unbounded release evidence");
+        }
+
+        return inventory
+            .Where(row => !seedPaths.Values.Contains(row.Path, StringComparer.Ordinal))
+            .Select(row => row.Path switch
+            {
+                "RELEASE_CHANNEL.generated.json" => row with
+                {
+                    Sha256 = sourceCanonical.Sha256,
+                    SizeBytes = sourceCanonical.SizeBytes
+                },
+                "releases.json" => row with
+                {
+                    Sha256 = sourceCompatibility.Sha256,
+                    SizeBytes = sourceCompatibility.SizeBytes
+                },
+                _ => row
+            })
+            .OrderBy(static row => row.Path, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static void ValidateUnsignedScope(
@@ -1655,7 +1876,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     internal static bool ValidateUnsignedWindowsFreshDeltaManifestPair(
         JsonElement canonical,
         JsonElement compatibility,
-        string expectedVersion)
+        string expectedVersion,
+        bool allowGenerationProjection = false)
     {
         string canonicalProfile = string.Empty;
         if (canonical.TryGetProperty(
@@ -1844,14 +2066,22 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             sharedProvenance = provenance.Clone();
         }
 
+        string? generationId = null;
+        if (allowGenerationProjection)
+        {
+            generationId = RequireString(canonical, "generationId");
+            RequireExactString(compatibility, "generationId", generationId);
+        }
         JsonElement canonicalWindows = RequireSingleUnsignedWindowsArtifact(
             RequireArray(canonical, "artifacts"),
             compatibility: false,
-            expectedVersion);
+            expectedVersion,
+            generationId);
         JsonElement compatibilityWindows = RequireSingleUnsignedWindowsArtifact(
             RequireArray(compatibility, "downloads"),
             compatibility: true,
-            expectedVersion);
+            expectedVersion,
+            generationId);
         foreach (string field in new[]
                  {
                      "sha256", "sizeBytes", "payloadSha256", "payloadSizeBytes"
@@ -1875,10 +2105,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             throw new InvalidDataException(
                 "unsigned retained incumbent provenance is missing");
         }
-        _ = ValidateUnsignedRetainedProjectedBindings(
-            sharedProvenance.Value,
-            canonical,
-            compatibility);
+        if (!allowGenerationProjection)
+        {
+            _ = ValidateUnsignedRetainedProjectedBindings(
+                sharedProvenance.Value,
+                canonical,
+                compatibility);
+        }
         ValidateUnsignedProjectedArtifactInventory(canonical, sharedReview.Value);
         return true;
     }
@@ -1945,7 +2178,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private static JsonElement RequireSingleUnsignedWindowsArtifact(
         JsonElement artifacts,
         bool compatibility,
-        string expectedVersion)
+        string expectedVersion,
+        string? generationId)
     {
         JsonElement[] matches = artifacts.EnumerateArray()
             .Where(row =>
@@ -2012,21 +2246,24 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         RequireBoolean(artifact, "crossRunBitReproducible", expected: false);
         RequireExactString(artifact, "publicationDisposition", "delta");
         ValidateUnsignedManifestSignature(RequireObject(artifact, "signature"));
+        string routePrefix = generationId is null
+            ? "/downloads/files"
+            : $"/downloads/g/{generationId}/files";
         RequireExactString(
             artifact,
             "downloadUrl",
-            "/downloads/files/chummer-avalonia-win-x64-installer.exe");
+            $"{routePrefix}/chummer-avalonia-win-x64-installer.exe");
         RequireExactString(
             artifact,
             "payloadDownloadUrl",
-            "/downloads/files/chummer-avalonia-win-x64-payload.zip");
+            $"{routePrefix}/chummer-avalonia-win-x64-payload.zip");
         if (compatibility)
         {
             RequireExactString(artifact, "platformId", "windows-x64");
             RequireExactString(
                 artifact,
                 "url",
-                "/downloads/files/chummer-avalonia-win-x64-installer.exe");
+                $"{routePrefix}/chummer-avalonia-win-x64-installer.exe");
         }
         else
         {
