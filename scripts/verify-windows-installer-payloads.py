@@ -16,7 +16,7 @@ from dataclasses import dataclass, replace
 from io import BytesIO
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 
 APPENDED_PAYLOAD_MAGIC = b"CHUMMER6PAYLOAD1"
@@ -330,12 +330,25 @@ def sidecar_url_matches_manifest(
         authority.trusted_origin is None
         or authority.payload_path is None
         or sidecar_url.origin != authority.trusted_origin
-        or sidecar_url.path != authority.payload_path
     ):
         return False
+    if sidecar_url.path == authority.payload_path:
+        if authority.payload_url is not None:
+            return sidecar_url.value == manifest_row.payload_download_url
+        return True
+
+    # A bootstrap is built before the immutable generation identifier exists,
+    # so its embedded sidecar URL may use the canonical stable public alias.
+    # The release shelf validates that exact same-origin alias and rewrites the
+    # staged sidecar to the immutable generation route before activation.
+    stable_path = (
+        f"/downloads/files/{quote(manifest_row.payload_file_name, safe='+')}"
+    )
+    if sidecar_url.path == stable_path:
+        return True
     if authority.payload_url is not None:
         return sidecar_url.value == manifest_row.payload_download_url
-    return True
+    return False
 
 
 def is_windows_installer_name(name: str) -> bool:

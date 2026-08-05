@@ -1474,7 +1474,7 @@ def test_hub_http_publisher_also_streams_auth_config_without_a_temp_file() -> No
     )
 
     assert 'write_auth_curl_config "$UPLOAD_AUTH_VALUE" \\' in publisher
-    assert '| curl -q --config - "$@"' in publisher
+    assert '| curl -q "${curl_transport_args[@]}" --config - "$@"' in publisher
     assert "release_upload_curl_config=\"$(mktemp" not in publisher
     assert "Authorization: Bearer" in publisher
 
