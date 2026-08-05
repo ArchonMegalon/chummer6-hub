@@ -1442,7 +1442,7 @@ def bind_state_volume_inventory(
             )
             is None
             or re.fullmatch(r"sha256:[0-9a-f]{64}", image_id) is None
-            or consumer.get("composeOneoff") != "False"
+            or consumer.get("composeOneoff") not in {"False", "True"}
             or consumer.get("running") is not False
             or consumer.get("volumeDestination") != "/app/state"
         ):
@@ -1487,6 +1487,7 @@ def bind_state_volume_inventory(
             or consumer.get("containerName")
             != f"chummer-install-linking-cutover-{suffix}-{job_name}"
             or image_id != candidate_tool_image_id
+            or consumer.get("composeOneoff") != "False"
             or consumer.get("readWrite") is not False
         ):
             raise ValueError(

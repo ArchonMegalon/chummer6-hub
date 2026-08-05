@@ -4900,7 +4900,7 @@ if container_id == incumbent_id:
         or mount["RW"] is not True
         or project != "chummer6-hub"
         or service != "chummer-portal"
-        or oneoff != "False"
+        or oneoff not in {"False", "True"}
     ):
         raise SystemExit(1)
     classification = "incumbent_portal"
