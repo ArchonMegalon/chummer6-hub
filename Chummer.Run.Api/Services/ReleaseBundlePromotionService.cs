@@ -2943,14 +2943,17 @@ public sealed class ReleaseBundlePromotionService
         return retained;
     }
 
-    private static IReadOnlySet<string> ValidateAndCollectProfileAurFiles(
+    internal static IReadOnlySet<string> ValidateAndCollectProfileAurFiles(
         string? aurPackagesPath,
         string filesRoot)
     {
         if (string.IsNullOrWhiteSpace(aurPackagesPath) || !File.Exists(aurPackagesPath))
         {
-            throw new InvalidDataException(
-                "v3 unsigned Windows profile is missing authority-bound aur-packages.json.");
+            // The fresh-delta authority is scoped to Windows while the Registry
+            // manifest may retain an incumbent Linux installer. AUR metadata is
+            // ancillary Linux publication state, not an input to that exact
+            // Windows delta, so its absence must not block inert staging.
+            return new HashSet<string>(StringComparer.Ordinal);
         }
         EnsureRegularFile(aurPackagesPath, "v3 unsigned Windows aur-packages.json");
         JsonObject root = LoadStrictJsonObject(aurPackagesPath);

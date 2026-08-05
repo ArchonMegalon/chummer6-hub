@@ -8,6 +8,29 @@ namespace Chummer.Tests;
 
 public sealed class ReleaseBundlePromotionUnsignedPreviewTests
 {
+    [Fact]
+    public void UnsignedWindowsFreshDeltaDoesNotRequireAurAncillaryInputs()
+    {
+        string filesRoot = Path.Combine(
+            Path.GetTempPath(),
+            "unsigned-profile-no-aur-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(filesRoot);
+        try
+        {
+            IReadOnlySet<string> ancillaryFiles =
+                ReleaseBundlePromotionService.ValidateAndCollectProfileAurFiles(
+                    aurPackagesPath: null,
+                    filesRoot);
+
+            Assert.Empty(ancillaryFiles);
+        }
+        finally
+        {
+            Directory.Delete(filesRoot, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData("preview", "unsigned")]
     [InlineData("preview", "skipped_preview")]
