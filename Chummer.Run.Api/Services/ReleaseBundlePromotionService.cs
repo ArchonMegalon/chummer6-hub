@@ -2437,6 +2437,7 @@ public sealed class ReleaseBundlePromotionService
             promotionEvidencePath,
             _timeProvider.GetUtcNow(),
             unsignedWindowsFreshDeltaProfile,
+            exactIncomingDesktopScope,
             profileAncillaryFiles);
         if (!unsignedWindowsFreshDeltaProfile)
         {
@@ -7936,6 +7937,7 @@ public sealed class ReleaseBundlePromotionService
         string? promotionEvidencePath,
         DateTimeOffset evaluatedAtUtc,
         bool unsignedWindowsFreshDeltaProfile,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
         IReadOnlySet<string> profileAncillaryFiles)
     {
         if (compatibilityManifest.Downloads.Count == 0)
@@ -7960,10 +7962,19 @@ public sealed class ReleaseBundlePromotionService
         foreach ((string artifactId, CanonicalArtifactRecord artifact) in canonicalById)
         {
             PublicReleaseArtifactDto compatibility = compatibilityById[artifactId];
-            NormalizedArtifactContract canonicalContract = NormalizeCanonicalArtifactContract(artifact);
+            bool requireIncomingUrls = RequiresGovernedIncomingArtifactUrls(
+                exactIncomingDesktopScope,
+                unsignedWindowsFreshDeltaProfile,
+                artifact.Head,
+                artifact.Platform,
+                artifact.Rid);
+            NormalizedArtifactContract canonicalContract = NormalizeCanonicalArtifactContract(
+                artifact,
+                requireIncomingUrls);
             NormalizedArtifactContract compatibilityContract =
                 NormalizeCompatibilityArtifactContract(
                     compatibility,
+                    requireIncomingUrls,
                     retainedProfileCanonical: unsignedWindowsFreshDeltaProfile
                         ? artifact
                         : null);
@@ -8054,9 +8065,12 @@ public sealed class ReleaseBundlePromotionService
     {
         string artifactId = RequireArtifactToken(artifact.ArtifactId, "canonical artifact id");
         string fileName = RequirePortableArtifactFileName(artifact.FileName, artifactId, "canonical fileName");
-        string downloadUrl = requireIncomingUrls
-            ? RequireGovernedIncomingArtifactUrl(artifact.DownloadUrl, fileName, artifactId)
-            : RequireNonEmptyArtifactUrl(artifact.DownloadUrl, artifactId, "canonical downloadUrl");
+        string downloadUrl = NormalizeIncomingArtifactUrl(
+            artifact.DownloadUrl,
+            fileName,
+            artifactId,
+            requireIncomingUrls,
+            "canonical downloadUrl");
         string sha256 = RequireArtifactSha256(artifact.Sha256, artifactId, "canonical artifact");
         long sizeBytes = RequireArtifactSize(artifact.SizeBytes, artifactId, "canonical artifact");
         string platform = NormalizePlatform(RequireArtifactToken(artifact.Platform, "canonical platform"));
@@ -8100,9 +8114,12 @@ public sealed class ReleaseBundlePromotionService
     {
         string artifactId = RequireArtifactToken(artifact.Id, "compatibility artifact id");
         string fileName = RequirePortableArtifactFileName(artifact.FileName, artifactId, "compatibility fileName");
-        string downloadUrl = requireIncomingUrls
-            ? RequireGovernedIncomingArtifactUrl(artifact.Url, fileName, artifactId)
-            : RequireNonEmptyArtifactUrl(artifact.Url, artifactId, "compatibility downloadUrl");
+        string downloadUrl = NormalizeIncomingArtifactUrl(
+            artifact.Url,
+            fileName,
+            artifactId,
+            requireIncomingUrls,
+            "compatibility downloadUrl");
         string sha256 = RequireArtifactSha256(artifact.Sha256, artifactId, "compatibility artifact");
         long sizeBytes = RequireArtifactSize(artifact.SizeBytes, artifactId, "compatibility artifact");
         string platformId = RequireArtifactToken(artifact.PlatformId, "compatibility platformId");
@@ -8310,12 +8327,50 @@ public sealed class ReleaseBundlePromotionService
             $"{manifest} payloadFileName");
         return (
             normalizedFileName,
-            requireIncomingUrl
-                ? RequireGovernedIncomingArtifactUrl(url, normalizedFileName, artifactId)
-                : RequireNonEmptyArtifactUrl(url, artifactId, $"{manifest} payloadDownloadUrl"),
+            NormalizeIncomingArtifactUrl(
+                url,
+                normalizedFileName,
+                artifactId,
+                requireIncomingUrl,
+                $"{manifest} payloadDownloadUrl"),
             RequireArtifactSha256(sha256, artifactId, $"{manifest} payload"),
             RequireArtifactSize(sizeBytes, artifactId, $"{manifest} payload"));
     }
+
+    internal static bool RequiresGovernedIncomingArtifactUrls(
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
+        bool exactIncomingDesktopScopeIsFreshDelta,
+        string? head,
+        string? platform,
+        string? rid)
+    {
+        if (!exactIncomingDesktopScopeIsFreshDelta)
+        {
+            return true;
+        }
+
+        if (exactIncomingDesktopScope is null)
+        {
+            throw new InvalidDataException(
+                "fresh-delta artifact URL validation requires exact incoming desktop scope.");
+        }
+
+        exactIncomingDesktopScope.ValidateCanonical();
+        string tupleId = $"{RequireArtifactToken(head, "artifact head")}:" +
+                         $"{NormalizePlatform(RequireArtifactToken(platform, "artifact platform"))}:" +
+                         RequireArtifactToken(rid, "artifact rid");
+        return exactIncomingDesktopScope.TupleIds.Contains(tupleId, StringComparer.Ordinal);
+    }
+
+    internal static string NormalizeIncomingArtifactUrl(
+        string? value,
+        string fileName,
+        string artifactId,
+        bool requireGovernedIncomingUrl,
+        string nonIncomingField)
+        => requireGovernedIncomingUrl
+            ? RequireGovernedIncomingArtifactUrl(value, fileName, artifactId)
+            : RequireNonEmptyArtifactUrl(value, artifactId, nonIncomingField);
 
     private static string RequireNonEmptyArtifactUrl(
         string? value,
