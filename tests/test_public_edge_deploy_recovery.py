@@ -744,6 +744,60 @@ def test_recovery_rebinds_prior_proof_before_restarting_stopped_portal(
     assert not journal.exists()
 
 
+def test_recovery_restarts_stopped_portal_with_immutable_prior_proof_bind(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "public_edge_mutation_lock",
+        lambda **_kwargs: nullcontext(None),
+    )
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "overlay_publish_lock",
+        lambda *_args, **_kwargs: nullcontext(None),
+    )
+    source_root, active_root, journal = write_deploy_journal(module, tmp_path)
+    legacy_proof = (
+        tmp_path / "public-projection" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+    legacy_proof.write_bytes(CANDIDATE_PROOF_BYTES)
+    legacy_proof.chmod(0o644)
+    immutable_prior_proof = (
+        tmp_path
+        / "public-projection"
+        / ("public-projection-" + "9" * 64)
+        / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+    immutable_prior_proof.parent.mkdir()
+    immutable_prior_proof.write_bytes(PRIOR_PROOF_BYTES)
+    immutable_prior_proof.chmod(0o444)
+    runtime = FakeRuntime()
+    runtime.containers[PRIOR_PORTAL]["running"] = False
+    runtime.containers[PRIOR_TUNNEL]["running"] = False
+    runtime.proof_bind_source = immutable_prior_proof
+    monkeypatch.setattr(module, "DockerRuntime", lambda **_kwargs: runtime)
+
+    status = module.main(recovery_argv(tmp_path, source_root, active_root))
+    receipt = json.loads((tmp_path / "recovery.json").read_text(encoding="utf-8"))
+
+    assert status == 0
+    assert receipt["exactPriorStateRestored"] is True
+    assert runtime.container_running(PRIOR_PORTAL) is True
+    assert runtime.container_running(PRIOR_TUNNEL) is True
+    assert runtime.proof_digests[(PRIOR_PORTAL, PROOF_AUTHORITY_PATH)] == (
+        PRIOR_PROOF_SHA256
+    )
+    assert runtime.proof_digests[(PRIOR_PORTAL, PROOF_PUBLIC_PATH)] == (
+        PRIOR_PROOF_SHA256
+    )
+    assert immutable_prior_proof.read_bytes() == PRIOR_PROOF_BYTES
+    assert legacy_proof.read_bytes() == CANDIDATE_PROOF_BYTES
+    assert not journal.exists()
+
+
 def test_public_recovery_restores_exact_prior_authority_before_journal_retirement(
     tmp_path: Path,
     monkeypatch,

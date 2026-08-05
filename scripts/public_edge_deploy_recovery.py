@@ -1124,22 +1124,33 @@ def main(argv: list[str] | None = None) -> int:
                 portal_id,
                 PROOF_PUBLIC_PATH,
             )
-            if (
-                authority_source != legacy_proof_bind_source
-                or public_source != legacy_proof_bind_source
-            ):
+            if authority_source != public_source:
                 raise RuntimeError(
-                    "prior runtime proof mounts do not share the exact legacy bind source"
+                    "prior runtime proof mounts do not share one exact bind source"
                 )
             authority_digest = prior["priorPortalProofAuthorityMountSha256"]
             public_digest = prior["priorPortalProofPublicMountSha256"]
             if authority_digest != public_digest:
                 raise RuntimeError("journaled prior runtime proof mounts disagree")
             if stable_file_sha256(
+                prior_authority_snapshot,
+                label="prior authority runtime proof snapshot",
+            ) != authority_digest:
+                raise RuntimeError("prior authority runtime proof snapshot changed")
+            if stable_file_sha256(
                 prior_public_snapshot,
                 label="prior public runtime proof snapshot",
             ) != public_digest:
                 raise RuntimeError("prior public runtime proof snapshot changed")
+            if authority_source != legacy_proof_bind_source:
+                if stable_file_sha256(
+                    authority_source,
+                    label="immutable prior runtime proof bind source",
+                ) != authority_digest:
+                    raise RuntimeError(
+                        "immutable prior runtime proof bind source changed"
+                    )
+                return
             atomic_replace_from_snapshot(
                 snapshot=prior_authority_snapshot,
                 destination=legacy_proof_bind_source,
