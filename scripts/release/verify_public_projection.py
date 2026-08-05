@@ -100,6 +100,10 @@ CANDIDATE_RETAINED_POINTER_KEYS = {
 CANDIDATE_AUTHORITY_CONTRACT_V2 = "chummer.release-upload.candidate-import-authority/v2"
 CANDIDATE_AUTHORITY_CONTRACT_V3 = "chummer.release-upload.candidate-import-authority/v3"
 CANDIDATE_AUTHORITY_CONTRACT_V4 = "chummer.release-upload.candidate-import-authority/v4"
+CANDIDATE_AUTHORITY_CONTRACT_V5 = "chummer.release-upload.candidate-import-authority/v5"
+CANDIDATE_GENERATION_PROJECTION_CONTRACT = (
+    "chummer.release-upload.native-stage-generation-projection/v1"
+)
 CANDIDATE_PUBLICATION_SCOPE_FILE = "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json"
 CANDIDATE_UNSIGNED_SCOPE_FILE = "PREVIEW_NIGHTLY_UNSIGNED_SCOPE.proposed.json"
 CANDIDATE_UNSIGNED_COMPOSITION_FILE = (
@@ -7172,8 +7176,337 @@ def _validate_candidate_import_authority_v4(
     return authority
 
 
+def _candidate_embedded_value(path: str, raw: bytes) -> dict[str, object]:
+    return {
+        "path": path,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "sizeBytes": len(raw),
+        "base64": base64.b64encode(raw).decode("ascii"),
+    }
+
+
+def _candidate_inventory_digest(rows: list[dict[str, object]]) -> str:
+    digest = hashlib.sha256()
+    for row in rows:
+        encoded = str(row["path"]).encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+        digest.update(int(row["sizeBytes"]).to_bytes(8, "big"))
+        digest.update(bytes.fromhex(str(row["sha256"])))
+    return digest.hexdigest()
+
+
+def _validate_candidate_import_authority_v5(
+    authority: dict[str, object],
+    *,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    """Validate the exact generation-projected native-stage authority bridge."""
+
+    validation_now = now or datetime.now(timezone.utc)
+    custody = authority.get("custody")
+    if (
+        authority.get("contractName") != CANDIDATE_AUTHORITY_CONTRACT_V5
+        or type(authority.get("contractVersion")) is not int
+        or authority.get("contractVersion") != 5
+        or authority.get("ownerNativeFinalizationBridgeAuthority") is not True
+        or authority.get("ownerNativeStageAuthoritySeedBridgeAuthority") is not True
+        or not isinstance(custody, dict)
+        or "generationProjection" not in custody
+    ):
+        raise ProjectionBlocked(
+            "unsigned native-stage candidate authority contract drifted"
+        )
+    expected_root = {
+        "candidate",
+        "candidateImportAuthority",
+        "candidateReviewAuthority",
+        "codeDeploymentAuthority",
+        "contractName",
+        "contractVersion",
+        "crossRunBitReproducible",
+        "custody",
+        "deployAuthority",
+        "exactIncomingDesktopScope",
+        "expiresAtUtc",
+        "generatedAtUtc",
+        "ownerNativeFinalizationBridgeAuthority",
+        "ownerNativeStageAuthoritySeedBridgeAuthority",
+        "platformScope",
+        "publicationAuthorized",
+        "publicationEligible",
+        "releaseUploadAuthority",
+        "routeAuthority",
+        "signaturePolicy",
+        "status",
+    }
+    expected_custody = {
+        "canonicalManifest",
+        "compatibilityManifest",
+        "generationProjection",
+        "inventory",
+        "nativeWindowsFinalizedEvidence",
+        "registryFinalization",
+        "registryFinalizeAuthority",
+        "registryFinalizeReceipt",
+        "registryPrepareCandidateReceipt",
+        "unsignedPublicationEvidence",
+    }
+    if set(authority) != expected_root or set(custody) != expected_custody:
+        raise ProjectionBlocked(
+            "unsigned native-stage candidate authority property set drifted"
+        )
+
+    canonical_raw = _candidate_embedded_bytes(
+        custody.get("canonicalManifest"),
+        label="native-stage projected canonical manifest",
+        expected_path="RELEASE_CHANNEL.generated.json",
+    )
+    compatibility_raw = _candidate_embedded_bytes(
+        custody.get("compatibilityManifest"),
+        label="native-stage projected compatibility manifest",
+        expected_path="releases.json",
+    )
+    inventory_raw = _candidate_embedded_bytes(
+        custody.get("inventory"),
+        label="native-stage projected inventory",
+        expected_path="CANDIDATE_UPLOAD_INVENTORY.generated.json",
+    )
+    inventory = _strict_json_object(
+        inventory_raw,
+        label="native-stage projected inventory",
+    )
+    if (
+        set(inventory) != {"contractName", "contractVersion", "files"}
+        or inventory.get("contractName")
+        != "chummer.release-upload.candidate-inventory/v1"
+        or inventory.get("contractVersion") != 1
+    ):
+        raise ProjectionBlocked("native-stage projected inventory contract drifted")
+    candidate_rows = _candidate_inventory_rows(
+        inventory.get("files"),
+        label="native-stage projected inventory",
+    )
+    candidate = authority.get("candidate")
+    if not isinstance(candidate, dict):
+        raise ProjectionBlocked("native-stage projected candidate identity drifted")
+    candidate_identity = {
+        "version": candidate.get("version"),
+        "canonicalManifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "inventorySha256": _candidate_inventory_digest(candidate_rows),
+        "fileCount": len(candidate_rows),
+        "totalBytes": sum(int(row["sizeBytes"]) for row in candidate_rows),
+    }
+    expected_candidate = {
+        **candidate_identity,
+        "bundleIdentitySha256": hashlib.sha256(
+            json.dumps(
+                candidate_identity,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+    if candidate != expected_candidate:
+        raise ProjectionBlocked("native-stage projected candidate summary drifted")
+
+    evidence = custody.get("unsignedPublicationEvidence")
+    if not isinstance(evidence, dict) or not isinstance(evidence.get("files"), list):
+        raise ProjectionBlocked("native-stage source publication evidence is unavailable")
+    evidence_by_path = {
+        str(entry.get("path")): entry
+        for entry in evidence["files"]
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str)
+    }
+    source_canonical_raw = _candidate_embedded_bytes(
+        evidence_by_path.get("RELEASE_CHANNEL.generated.json"),
+        label="native-stage source canonical manifest",
+        expected_path="RELEASE_CHANNEL.generated.json",
+    )
+    source_compatibility_raw = _candidate_embedded_bytes(
+        evidence_by_path.get("releases.json"),
+        label="native-stage source compatibility manifest",
+        expected_path="releases.json",
+    )
+
+    projection = custody.get("generationProjection")
+    projection_keys = {
+        "contractName",
+        "contractVersion",
+        "status",
+        "generationId",
+        "evaluatedAtUtc",
+        "sourceCanonicalManifestSha256",
+        "sourceCompatibilityManifestSha256",
+        "projectedCanonicalManifestSha256",
+        "projectedCompatibilityManifestSha256",
+        "authoritySeed",
+    }
+    if (
+        not isinstance(projection, dict)
+        or set(projection) != projection_keys
+        or projection.get("contractName")
+        != CANDIDATE_GENERATION_PROJECTION_CONTRACT
+        or projection.get("contractVersion") != 1
+        or projection.get("status") != "passed"
+    ):
+        raise ProjectionBlocked("native-stage generation projection contract drifted")
+    generation_id = projection.get("generationId")
+    projected_canonical = _strict_json_object(
+        canonical_raw,
+        label="native-stage projected canonical manifest",
+    )
+    projected_compatibility = _strict_json_object(
+        compatibility_raw,
+        label="native-stage projected compatibility manifest",
+    )
+    if (
+        not isinstance(generation_id, str)
+        or projected_canonical.get("generationId") != generation_id
+        or projected_compatibility.get("generationId") != generation_id
+        or projection.get("sourceCanonicalManifestSha256")
+        != hashlib.sha256(source_canonical_raw).hexdigest()
+        or projection.get("sourceCompatibilityManifestSha256")
+        != hashlib.sha256(source_compatibility_raw).hexdigest()
+        or projection.get("projectedCanonicalManifestSha256")
+        != hashlib.sha256(canonical_raw).hexdigest()
+        or projection.get("projectedCompatibilityManifestSha256")
+        != hashlib.sha256(compatibility_raw).hexdigest()
+    ):
+        raise ProjectionBlocked("native-stage generation projection digest graph drifted")
+    evaluated_at = _candidate_timestamp(
+        projection.get("evaluatedAtUtc"),
+        label="native-stage generation projection evaluatedAtUtc",
+        now=validation_now,
+        require_fresh=False,
+    )
+    materializer = _load_candidate_authority_materializer()
+    projector = materializer._generation_projector()
+    with tempfile.TemporaryDirectory(prefix="verify-candidate-generation-") as name:
+        root = Path(name)
+        canonical_path = root / "RELEASE_CHANNEL.generated.json"
+        compatibility_path = root / "releases.json"
+        canonical_path.write_bytes(source_canonical_raw)
+        compatibility_path.write_bytes(source_compatibility_raw)
+        try:
+            projector.project_manifest_pair(
+                canonical_path,
+                compatibility_path,
+                generation_id,
+                evaluated_at=evaluated_at,
+            )
+        except Exception as exc:
+            raise ProjectionBlocked(
+                "native-stage generation projection replay failed"
+            ) from exc
+        if (
+            canonical_path.read_bytes() != canonical_raw
+            or compatibility_path.read_bytes() != compatibility_raw
+        ):
+            raise ProjectionBlocked(
+                "native-stage generation projection bytes drifted"
+            )
+
+    candidate_by_path = {str(row["path"]): row for row in candidate_rows}
+    seed_paths = {
+        "CURRENT.json": "release-evidence/CURRENT.json",
+        "RELEASE_DECISION.json": "release-evidence/RELEASE_DECISION.json",
+        "SNAPSHOT.json": "release-evidence/SNAPSHOT.json",
+    }
+    seed = projection.get("authoritySeed")
+    if not isinstance(seed, dict) or set(seed) != set(seed_paths):
+        raise ProjectionBlocked("native-stage authority seed property set drifted")
+    for name, path in seed_paths.items():
+        row = candidate_by_path.get(path)
+        if not isinstance(row, dict) or seed.get(name) != row:
+            raise ProjectionBlocked("native-stage authority seed inventory drifted")
+    if {
+        path
+        for path in candidate_by_path
+        if path.startswith("release-evidence/")
+    } != set(seed_paths.values()):
+        raise ProjectionBlocked("native-stage release evidence set drifted")
+
+    source_rows = []
+    for row in candidate_rows:
+        path = str(row["path"])
+        if path in seed_paths.values():
+            continue
+        if path == "RELEASE_CHANNEL.generated.json":
+            row = {
+                "path": path,
+                "sha256": hashlib.sha256(source_canonical_raw).hexdigest(),
+                "sizeBytes": len(source_canonical_raw),
+            }
+        elif path == "releases.json":
+            row = {
+                "path": path,
+                "sha256": hashlib.sha256(source_compatibility_raw).hexdigest(),
+                "sizeBytes": len(source_compatibility_raw),
+            }
+        source_rows.append(row)
+    source_inventory = {
+        "contractName": "chummer.release-upload.candidate-inventory/v1",
+        "contractVersion": 1,
+        "files": source_rows,
+    }
+    source_inventory_raw = (
+        json.dumps(
+            source_inventory,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
+    source_identity = {
+        "version": candidate["version"],
+        "canonicalManifestSha256": hashlib.sha256(source_canonical_raw).hexdigest(),
+        "inventorySha256": _candidate_inventory_digest(source_rows),
+        "fileCount": len(source_rows),
+        "totalBytes": sum(int(row["sizeBytes"]) for row in source_rows),
+    }
+    source_candidate = {
+        **source_identity,
+        "bundleIdentitySha256": hashlib.sha256(
+            json.dumps(
+                source_identity,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+    predecessor = dict(authority)
+    predecessor["contractName"] = CANDIDATE_AUTHORITY_CONTRACT_V4
+    predecessor["contractVersion"] = 4
+    predecessor.pop("ownerNativeStageAuthoritySeedBridgeAuthority")
+    predecessor["candidate"] = source_candidate
+    predecessor_custody = dict(custody)
+    predecessor_custody.pop("generationProjection")
+    predecessor_custody["canonicalManifest"] = _candidate_embedded_value(
+        "RELEASE_CHANNEL.generated.json",
+        source_canonical_raw,
+    )
+    predecessor_custody["compatibilityManifest"] = _candidate_embedded_value(
+        "releases.json",
+        source_compatibility_raw,
+    )
+    predecessor_custody["inventory"] = _candidate_embedded_value(
+        "CANDIDATE_UPLOAD_INVENTORY.generated.json",
+        source_inventory_raw,
+    )
+    predecessor["custody"] = predecessor_custody
+    _validate_candidate_import_authority_v4(
+        predecessor,
+        now=validation_now,
+    )
+    return authority
+
+
 def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     authority = _strict_json_object(payload, label="candidate import authority")
+    if authority.get("contractName") == CANDIDATE_AUTHORITY_CONTRACT_V5:
+        return _validate_candidate_import_authority_v5(authority)
     if authority.get("contractName") == CANDIDATE_AUTHORITY_CONTRACT_V4:
         return _validate_candidate_import_authority_v4(authority)
     if authority.get("contractName") == CANDIDATE_AUTHORITY_CONTRACT_V3:
