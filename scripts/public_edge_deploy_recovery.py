@@ -675,12 +675,12 @@ def reconcile(
             raise RuntimeError("candidate proof bind source was not restored")
 
     def verify_runtime_proof_mounts() -> str:
-        if not (
-            portal_passed
-            and overlay_passed
-            and portal_tag_passed
-            and tool_tag_passed
-        ):
+        # An existing prior container is pinned to its image ID, not to either
+        # mutable canonical build tag. Restore and verify that exact runtime
+        # even when a separately captured tag has become unavailable. Overall
+        # reconciliation still fails closed below until every tag is exact,
+        # but the unrelated tag loss must not prolong a public outage.
+        if not (portal_passed and overlay_passed):
             raise RuntimeError("prior portal recovery prerequisites are incomplete")
         if not prior["priorPortalExisted"]:
             ensure_candidate_proof_source()
@@ -767,6 +767,75 @@ def reconcile(
         "status": "pass" if passed else "fail",
         "exactPriorStateRestored": passed,
         "componentChecks": checks,
+    }
+
+
+def adopt_verified_prior_runtime_baseline(
+    *,
+    runtime: RuntimeAuthority,
+    runtime_prior_state: dict[str, Any],
+    reconciliation: dict[str, Any],
+    portal_image_tag: str,
+) -> dict[str, Any]:
+    """Adopt the exact live prior portal when only its old mutable tag was lost."""
+
+    checks = reconciliation.get("componentChecks")
+    if not isinstance(checks, dict):
+        raise RuntimeError("baseline adoption requires component recovery evidence")
+    failed = {
+        name
+        for name, check in checks.items()
+        if not isinstance(check, dict) or check.get("status") != "pass"
+    }
+    if failed != {"portalImageTag"}:
+        raise RuntimeError(
+            "baseline adoption is restricted to isolated portal image-tag loss"
+        )
+    tag_check = checks["portalImageTag"]
+    if (
+        tag_check.get("disposition") != "uncertain"
+        or tag_check.get("warning") != "exact prior image is unavailable"
+    ):
+        raise RuntimeError("portal image-tag failure is not eligible for adoption")
+
+    prior_tag_image = runtime_prior_state["priorImageTagId"]
+    prior_portal_image = runtime_prior_state["priorPortalImageId"]
+    prior_portal_id = runtime_prior_state["priorPortalContainerId"]
+    if (
+        not runtime_prior_state["priorPortalExisted"]
+        or not runtime_prior_state["priorPortalWasRunning"]
+        or not prior_tag_image
+        or not prior_portal_image
+        or not prior_portal_id
+    ):
+        raise RuntimeError("baseline adoption requires a running prior portal authority")
+    if runtime.image_exists(prior_tag_image):
+        raise RuntimeError("prior canonical tag image is still recoverable")
+    if (
+        not runtime.container_exists(prior_portal_id)
+        or not runtime.container_running(prior_portal_id)
+        or runtime.container_image(prior_portal_id) != prior_portal_image
+        or not runtime.image_exists(prior_portal_image)
+    ):
+        raise RuntimeError("verified prior portal runtime is unavailable")
+
+    runtime.tag_image(prior_portal_image, portal_image_tag)
+    if runtime.resolve_image_tag(portal_image_tag) != prior_portal_image:
+        raise RuntimeError("adopted portal image tag did not commit")
+    return {
+        "contractName": CONTRACT_NAME,
+        "operation": "adopt-verified-prior-runtime-baseline",
+        "status": "pass",
+        "exactPriorStateRestored": False,
+        "verifiedRuntimeBaselineAdopted": True,
+        "componentChecks": checks,
+        "baselineAdoption": {
+            "lostPriorCanonicalTagImageId": prior_tag_image,
+            "adoptedCanonicalTagImageId": prior_portal_image,
+            "portalContainerId": prior_portal_id,
+            "portalImageTag": portal_image_tag,
+            "reason": "isolated_prior_canonical_tag_image_unavailable",
+        },
     }
 
 
@@ -972,6 +1041,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--published-port", type=int, required=True)
     parser.add_argument("--portal-image-tag", required=True)
     parser.add_argument("--tool-image-tag", required=True)
+    parser.add_argument(
+        "--adopt-verified-prior-runtime-baseline",
+        action="store_true",
+        help=(
+            "retire an otherwise recovered journal only when an unavailable "
+            "prior mutable portal tag is the sole remaining mismatch"
+        ),
+    )
     parser.add_argument(
         "--runtime-profile",
         choices=(
@@ -1196,6 +1273,17 @@ def main(argv: list[str] | None = None) -> int:
                 project_name=args.project_name,
             )
             payload["journalPhase"] = snapshot["phase"]
+            if (
+                payload["status"] != "pass"
+                and args.adopt_verified_prior_runtime_baseline
+            ):
+                payload = adopt_verified_prior_runtime_baseline(
+                    runtime=runtime,
+                    runtime_prior_state=prior,
+                    reconciliation=payload,
+                    portal_image_tag=args.portal_image_tag,
+                )
+                payload["journalPhase"] = snapshot["phase"]
             if payload["status"] == "pass":
                 if (
                     args.runtime_profile

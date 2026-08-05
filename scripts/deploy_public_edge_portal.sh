@@ -15,18 +15,19 @@ fi
 
 DEPLOY_OPERATION="${1:-deploy}"
 if (($# > 1)); then
-  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume]" >&2
+  echo "usage: deploy_public_edge_portal.sh [deploy|recover|recover-adopt-verified-prior-runtime-baseline|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume]" >&2
   exit 2
 fi
 case "$DEPLOY_OPERATION" in
-  deploy|recover|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire) ;;
-  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume]" >&2; exit 2 ;;
+  deploy|recover|recover-adopt-verified-prior-runtime-baseline|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire) ;;
+  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|recover-adopt-verified-prior-runtime-baseline|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume]" >&2; exit 2 ;;
 esac
 INITIAL_RELEASE_SHELF_CUTOVER=0
 INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=0
 PUBLIC_DOWNLOAD_ONLY_OPERATION=0
 RELEASE_UPLOAD_TICKET_EPOCH_ROTATION=0
 RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME=0
+RECOVERY_BASELINE_ADOPTION=0
 if [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover ]]; then
   INITIAL_RELEASE_SHELF_CUTOVER=1
 elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover-recover ]]; then
@@ -35,6 +36,8 @@ elif [[ "$DEPLOY_OPERATION" == release-upload-ticket-epoch-rotate ]]; then
   RELEASE_UPLOAD_TICKET_EPOCH_ROTATION=1
 elif [[ "$DEPLOY_OPERATION" == release-upload-ticket-epoch-rotate-resume ]]; then
   RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME=1
+elif [[ "$DEPLOY_OPERATION" == recover-adopt-verified-prior-runtime-baseline ]]; then
+  RECOVERY_BASELINE_ADOPTION=1
 elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-retire ]]; then
@@ -293,6 +296,7 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
   fi
 fi
 if [[ "$DEPLOY_OPERATION" == recover \
+  || "$DEPLOY_OPERATION" == recover-adopt-verified-prior-runtime-baseline \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-retire \
   || -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
@@ -3686,6 +3690,10 @@ print(
 }
 
 run_deploy_recovery() {
+  local baseline_adoption_args=()
+  if ((RECOVERY_BASELINE_ADOPTION == 1)); then
+    baseline_adoption_args+=(--adopt-verified-prior-runtime-baseline)
+  fi
   # Recovery resolves existing containers by immutable Docker labels and never
   # interpolates the mutable environment file, so it remains available after an
   # environment-binding failure.
@@ -3709,7 +3717,8 @@ run_deploy_recovery() {
     --public-projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT" \
     --published-port "$PUBLIC_EDGE_PORT" \
     --portal-image-tag "$IMAGE_TAG" \
-    --tool-image-tag "$TOOL_IMAGE_TAG"
+    --tool-image-tag "$TOOL_IMAGE_TAG" \
+    "${baseline_adoption_args[@]}"
 }
 
 docker_context_identity="$(docker_cli context inspect "$CANONICAL_DOCKER_CONTEXT" \
@@ -4268,6 +4277,8 @@ mark_deploy_phase() {
     --phase "$1" \
     --shared-mutation-lock-token "$deploy_lock_owner_token"
 }
+
+candidate_portal_container_id=""
 
 abort_portal_recreate() {
   local failure_label="$1"
@@ -5600,6 +5611,22 @@ fi
 # The governed cutover runner already built both images from the exact clean
 # source under unique, retained tags. The durable transaction above captured
 # the incumbent canonical tag IDs before either tag can be repointed.
+# Keep those exact IDs reachable under content-addressed recovery tags as well.
+# Docker may discard an unreferenced image immediately after a canonical tag is
+# repointed, which would otherwise make the durable rollback journal truthful
+# but unusable.
+if [[ -n "$prior_image_tag_id" ]] \
+  && ! docker_cli image tag \
+    "$prior_image_tag_id" \
+    "chummer-run-api:recovery-${prior_image_tag_id#sha256:}"; then
+  abort_portal_recreate "prior portal image retention" 1
+fi
+if [[ -n "$prior_tool_image_tag_id" ]] \
+  && ! docker_cli image tag \
+    "$prior_tool_image_tag_id" \
+    "chummer-install-linking-postgres-tool:recovery-${prior_tool_image_tag_id#sha256:}"; then
+  abort_portal_recreate "prior PostgreSQL tool image retention" 1
+fi
 if ! docker_cli image tag \
   "$INSTALL_LINKING_CANDIDATE_PORTAL_TAG" "$IMAGE_TAG" \
   || ! docker_cli image tag \
@@ -5888,10 +5915,25 @@ start_candidate_portal() {
 }
 
 verify_candidate_publication_readiness() {
-  "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
-    "${docker_command[@]}" container exec "$candidate_portal_container_id" \
-      dotnet /app/loopback-probe/Chummer.Run.LoopbackProbe.dll \
-        /api/ready/publication >/dev/null
+  local attempt probe_status
+  for attempt in 1 2 3; do
+    probe_status=0
+    "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
+      "${docker_command[@]}" container exec "$candidate_portal_container_id" \
+        dotnet /app/loopback-probe/Chummer.Run.LoopbackProbe.dll \
+          /api/ready/publication >/dev/null || probe_status="$?"
+    if ((probe_status == 0)); then
+      return 0
+    fi
+    # The audited loopback probe returns one for a well-bounded negative
+    # readiness assessment. Retry only that transient result; invocation,
+    # timeout, and policy failures remain fail-closed without delay.
+    if ((probe_status != 1 || attempt == 3)); then
+      return 1
+    fi
+    "$TRUSTED_SLEEP" 2
+  done
+  return 1
 }
 
 capture_candidate_publication_readiness() {

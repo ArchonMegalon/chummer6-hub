@@ -541,6 +541,89 @@ def test_hard_crash_after_candidate_start_removes_only_candidate_and_restores_ol
     )
 
 
+def test_missing_prior_canonical_tag_does_not_prolong_runtime_outage() -> None:
+    module = load_module()
+    runtime = FakeRuntime()
+    unavailable_tag_image = "sha256:" + "7" * 64
+    state = prior_state()
+    state["priorImageTagId"] = unavailable_tag_image
+    runtime.tags[PORTAL_TAG] = CANDIDATE_PORTAL_IMAGE
+    runtime.containers[PRIOR_PORTAL]["running"] = False
+    runtime.containers[PRIOR_TUNNEL]["running"] = False
+
+    receipt = run_reconcile(module, runtime, state, [True])
+
+    assert receipt["status"] == "fail"
+    assert receipt["exactPriorStateRestored"] is False
+    assert receipt["componentChecks"]["portalImageTag"] == {
+        "status": "fail",
+        "disposition": "uncertain",
+        "warning": "exact prior image is unavailable",
+    }
+    assert receipt["componentChecks"]["runtimeProofMounts"] == {
+        "status": "pass",
+        "disposition": "both_prior_runtime_proof_mounts_match_journaled_digests",
+    }
+    assert runtime.container_running(PRIOR_PORTAL) is True
+    assert runtime.container_running(PRIOR_TUNNEL) is True
+
+
+def test_explicit_baseline_adoption_rebinds_only_verified_live_prior_image() -> None:
+    module = load_module()
+    runtime = FakeRuntime()
+    unavailable_tag_image = "sha256:" + "7" * 64
+    state = prior_state()
+    state["priorImageTagId"] = unavailable_tag_image
+    runtime.tags[PORTAL_TAG] = CANDIDATE_PORTAL_IMAGE
+    recovery = run_reconcile(module, runtime, state, [True])
+
+    receipt = module.adopt_verified_prior_runtime_baseline(
+        runtime=runtime,
+        runtime_prior_state=state,
+        reconciliation=recovery,
+        portal_image_tag=PORTAL_TAG,
+    )
+
+    assert receipt["status"] == "pass"
+    assert receipt["exactPriorStateRestored"] is False
+    assert receipt["verifiedRuntimeBaselineAdopted"] is True
+    assert receipt["baselineAdoption"] == {
+        "lostPriorCanonicalTagImageId": unavailable_tag_image,
+        "adoptedCanonicalTagImageId": PRIOR_PORTAL_IMAGE,
+        "portalContainerId": PRIOR_PORTAL,
+        "portalImageTag": PORTAL_TAG,
+        "reason": "isolated_prior_canonical_tag_image_unavailable",
+    }
+    assert runtime.tags[PORTAL_TAG] == PRIOR_PORTAL_IMAGE
+
+
+def test_baseline_adoption_rejects_any_second_failed_component() -> None:
+    module = load_module()
+    runtime = FakeRuntime()
+    unavailable_tag_image = "sha256:" + "7" * 64
+    state = prior_state()
+    state["priorImageTagId"] = unavailable_tag_image
+    runtime.tags[PORTAL_TAG] = CANDIDATE_PORTAL_IMAGE
+    recovery = run_reconcile(module, runtime, state, [True])
+    recovery["componentChecks"]["tunnel"] = {
+        "status": "fail",
+        "disposition": "uncertain",
+    }
+
+    with pytest.raises(
+        RuntimeError,
+        match="restricted to isolated portal image-tag loss",
+    ):
+        module.adopt_verified_prior_runtime_baseline(
+            runtime=runtime,
+            runtime_prior_state=state,
+            reconciliation=recovery,
+            portal_image_tag=PORTAL_TAG,
+        )
+
+    assert runtime.tags[PORTAL_TAG] == CANDIDATE_PORTAL_IMAGE
+
+
 def test_candidate_outside_compose_authority_fails_closed() -> None:
     module = load_module()
     runtime = FakeRuntime()
