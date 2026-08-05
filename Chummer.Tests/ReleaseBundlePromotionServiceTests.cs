@@ -628,14 +628,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             CanonicalManifestSha256: new string('4', 64),
             InventorySha256: new string('5', 64),
             ExactIncomingDesktopScopeIsFreshDelta: true,
-            IncumbentBinding: incumbentBinding,
-            NativeEvidenceBinding: new ReleaseUploadCandidateNativeEvidenceBinding(
-                EvidenceSha256: new string('b', 64),
-                CaptureInventorySha256: new string('c', 64),
-                SourceCommit: new string('d', 40),
-                BundleIdentitySha256: new string('3', 64),
-                CanonicalManifestSha256: new string('4', 64),
-                InventorySha256: new string('5', 64)));
+            IncumbentBinding: incumbentBinding);
         string candidateBundle = fixture.CreateBundle(
             "run-candidate-incumbent-bound",
             CandidateRetainedCrossPlatformArtifacts());
@@ -650,31 +643,11 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         Assert.Equal(incumbent.GenerationId, staged.PreviousGenerationId);
         Assert.Equal($"sha256:{incumbent.PointerDigest}", staged.PreviousPointerSha256);
-        Assert.Equal(
-            staged.GenerationId,
-            fixture.CaptureNativeBoundStagedSnapshot(
-                staged.StageReceiptId,
-                candidateBinding).GenerationId);
         JsonObject receipt = JsonNode.Parse(File.ReadAllBytes(Path.Combine(
             fixture.DownloadsRoot,
             ".release-shelf-stage-journal",
             $"{staged.StageReceiptId}.json")))!.AsObject();
-        Assert.Equal(
-            candidateBinding.NativeEvidenceBinding.EvidenceSha256,
-            receipt["candidateImportBinding"]!["nativeEvidenceBinding"]![
-                "evidenceSha256"]!.GetValue<string>());
-
-        ReleaseUploadCandidateSessionBinding changedNative = candidateBinding with
-        {
-            NativeEvidenceBinding = candidateBinding.NativeEvidenceBinding with
-            {
-                EvidenceSha256 = new string('e', 64)
-            }
-        };
-        Assert.Throws<ReleaseShelfMutationConcurrencyException>(() =>
-            fixture.CaptureNativeBoundStagedSnapshot(
-                staged.StageReceiptId,
-                changedNative));
+        Assert.Null(receipt["candidateImportBinding"]!["nativeEvidenceBinding"]);
 
         ReleaseUploadCandidateSessionBinding staleBinding = candidateBinding with
         {
@@ -691,6 +664,204 @@ public sealed class ReleaseBundlePromotionServiceTests
                     exactDesktopScope: freshWindows,
                     candidateImportBinding: staleBinding));
         Assert.Contains("still-active incumbent", stale.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CandidateNativeFinalizationBridgeRejectsMissingReviewAuthoritySeedBeforeDurableStage()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string incumbentBundle = fixture.CreateBundle(
+            "run-candidate-native-seed-incumbent",
+            RequiredPreviewArtifacts());
+        await fixture.PromoteAsync(incumbentBundle);
+        ReleaseShelfSnapshot incumbent = fixture.CaptureActiveShelf();
+        string generationsRoot = Path.Combine(fixture.DownloadsRoot, "generations");
+        string[] generationsBefore = Directory.GetDirectories(generationsRoot);
+
+        var candidateBinding = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64),
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: new ReleaseUploadCandidateIncumbentBinding(
+                SnapshotSha256: new string('6', 64),
+                FullShelfInventorySha256: new string('7', 64),
+                ActiveInventorySha256: Assert.IsType<string>(incumbent.InventoryDigest),
+                CanonicalManifestSha256: Assert.IsType<string>(incumbent.CanonicalManifestSha256),
+                CompatibilityManifestSha256: Assert.IsType<string>(incumbent.CompatibilityManifestSha256)),
+            NativeEvidenceBinding: new ReleaseUploadCandidateNativeEvidenceBinding(
+                EvidenceSha256: new string('b', 64),
+                CaptureInventorySha256: new string('c', 64),
+                SourceCommit: new string('d', 40),
+                BundleIdentitySha256: new string('3', 64),
+                CanonicalManifestSha256: new string('4', 64),
+                InventorySha256: new string('5', 64)));
+        string candidateBundle = fixture.CreateBundle(
+            "run-candidate-native-seed-missing",
+            CandidateRetainedCrossPlatformArtifacts());
+        ReleaseDesktopTupleScope freshWindows = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+
+        InvalidDataException rejected = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            fixture.StageAsync(
+                candidateBundle,
+                Guid.NewGuid().ToString("N"),
+                exactDesktopScope: freshWindows,
+                candidateImportBinding: candidateBinding));
+
+        Assert.Contains("review-required release authority seed", rejected.Message, StringComparison.Ordinal);
+        Assert.Equal(
+            generationsBefore.OrderBy(static path => path, StringComparer.Ordinal),
+            Directory.GetDirectories(generationsRoot).OrderBy(static path => path, StringComparer.Ordinal));
+        string stageJournalRoot = Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-stage-journal");
+        Assert.True(
+            !Directory.Exists(stageJournalRoot)
+            || !Directory.EnumerateFileSystemEntries(stageJournalRoot).Any());
+    }
+
+    [Fact]
+    public async Task CandidateNativeFinalizationBridgeStagesExactReviewAuthoritySeed()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string incumbentBundle = fixture.CreateBundle(
+            "run-candidate-native-seed-valid-incumbent",
+            RequiredPreviewArtifacts());
+        await fixture.PromoteAsync(incumbentBundle);
+        ReleaseShelfSnapshot incumbent = fixture.CaptureActiveShelf();
+        var candidateBinding = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64),
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: new ReleaseUploadCandidateIncumbentBinding(
+                SnapshotSha256: new string('6', 64),
+                FullShelfInventorySha256: new string('7', 64),
+                ActiveInventorySha256: Assert.IsType<string>(incumbent.InventoryDigest),
+                CanonicalManifestSha256: Assert.IsType<string>(incumbent.CanonicalManifestSha256),
+                CompatibilityManifestSha256: Assert.IsType<string>(incumbent.CompatibilityManifestSha256)),
+            NativeEvidenceBinding: new ReleaseUploadCandidateNativeEvidenceBinding(
+                EvidenceSha256: new string('b', 64),
+                CaptureInventorySha256: new string('c', 64),
+                SourceCommit: new string('d', 40),
+                BundleIdentitySha256: new string('3', 64),
+                CanonicalManifestSha256: new string('4', 64),
+                InventorySha256: new string('5', 64)));
+        string candidateBundle = fixture.CreateBundle(
+            "run-candidate-native-seed-valid",
+            CandidateRetainedCrossPlatformArtifacts());
+        const string generationId = "gen-native-authority-seed";
+        ReleaseDesktopTupleScope freshWindows = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+        fixture.RewriteBundleManifest(
+            candidateBundle,
+            "releases.json",
+            manifest =>
+            {
+                manifest["generationId"] = generationId;
+                foreach (JsonObject artifact in manifest["downloads"]!.AsArray().OfType<JsonObject>())
+                {
+                    artifact["compatibilityState"] = "compatible";
+                }
+            });
+        fixture.RewriteBundleManifest(
+            candidateBundle,
+            "RELEASE_CHANNEL.generated.json",
+            manifest =>
+            {
+                manifest["generationId"] = generationId;
+                foreach (JsonObject artifact in manifest["artifacts"]!.AsArray().OfType<JsonObject>())
+                {
+                    artifact["compatibilityState"] = "compatible";
+                }
+            });
+
+        using var authorityFixture = new ReleaseBundlePromotionFixture();
+        string authorityIncumbentBundle = authorityFixture.CreateBundle(
+            "run-candidate-native-seed-valid-incumbent",
+            RequiredPreviewArtifacts());
+        await authorityFixture.PromoteAsync(authorityIncumbentBundle);
+        string authorityCandidateBundle = authorityFixture.CreateBundle(
+            "run-candidate-native-seed-valid",
+            CandidateRetainedCrossPlatformArtifacts());
+        authorityFixture.RewriteBundleManifest(
+            authorityCandidateBundle,
+            "releases.json",
+            manifest =>
+            {
+                manifest["generationId"] = generationId;
+                foreach (JsonObject artifact in manifest["downloads"]!.AsArray().OfType<JsonObject>())
+                {
+                    artifact["compatibilityState"] = "compatible";
+                }
+            });
+        authorityFixture.RewriteBundleManifest(
+            authorityCandidateBundle,
+            "RELEASE_CHANNEL.generated.json",
+            manifest =>
+            {
+                manifest["generationId"] = generationId;
+                foreach (JsonObject artifact in manifest["artifacts"]!.AsArray().OfType<JsonObject>())
+                {
+                    artifact["compatibilityState"] = "compatible";
+                }
+            });
+        ReleaseBundleStageResult authorityStage = await authorityFixture.StageAsync(
+            authorityCandidateBundle,
+            Guid.NewGuid().ToString("N"),
+            exactDesktopScope: freshWindows,
+            exactDesktopScopeIsFreshDelta: true);
+        byte[] projectedCanonical = authorityFixture.ReadGenerationBytes(
+            authorityStage.GenerationId,
+            "RELEASE_CHANNEL.generated.json");
+        PublicReleaseManifestDto stagedManifest =
+            authorityFixture.ReadGenerationPublicManifest(authorityStage.GenerationId);
+        PublicReleaseTruthProjectionTests.AuthorityEnvelope authority =
+            PublicReleaseTruthProjectionTests.BuildAuthorityEnvelope(
+                stagedManifest,
+                "review_required",
+                manifestBytesOverride: projectedCanonical);
+        fixture.AddBundleEntry(
+            candidateBundle,
+            "release-evidence/CURRENT.json",
+            authority.CurrentBytes.ToArray());
+        fixture.AddBundleEntry(
+            candidateBundle,
+            "release-evidence/SNAPSHOT.json",
+            authority.SnapshotBytes.ToArray());
+        fixture.AddBundleEntry(
+            candidateBundle,
+            "release-evidence/RELEASE_DECISION.json",
+            authority.DecisionBytes.ToArray());
+
+        ReleaseBundleStageResult staged = await fixture.StageAsync(
+            candidateBundle,
+            Guid.NewGuid().ToString("N"),
+            exactDesktopScope: freshWindows,
+            candidateImportBinding: candidateBinding);
+
+        Assert.Equal(generationId, staged.GenerationId);
+        Assert.Equal(
+            generationId,
+            fixture.CaptureNativeBoundStagedSnapshot(
+                staged.StageReceiptId,
+                candidateBinding).GenerationId);
+        JsonObject receipt = JsonNode.Parse(File.ReadAllBytes(Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-stage-journal",
+            $"{staged.StageReceiptId}.json")))!.AsObject();
+        ReleaseUploadCandidateNativeEvidenceBinding nativeBinding =
+            Assert.IsType<ReleaseUploadCandidateNativeEvidenceBinding>(
+                candidateBinding.NativeEvidenceBinding);
+        Assert.Equal(
+            nativeBinding.EvidenceSha256,
+            receipt["candidateImportBinding"]!["nativeEvidenceBinding"]![
+                "evidenceSha256"]!.GetValue<string>());
     }
 
     [Fact]
@@ -4954,6 +5125,18 @@ public sealed class ReleaseBundlePromotionServiceTests
                 "generations",
                 generationId,
                 relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+        public PublicReleaseManifestDto ReadGenerationPublicManifest(string generationId)
+        {
+            byte[] bytes = ReadGenerationBytes(generationId, "releases.json");
+            PublicReleaseManifestDto manifest =
+                JsonSerializer.Deserialize<PublicReleaseManifestDto>(bytes, TestJsonOptions)
+                ?? throw new InvalidDataException(
+                    "projected compatibility manifest is invalid");
+            return new ReleaseSelectionService(
+                    new PublicCanonFileLoader(CreateConfiguration()))
+                .ApplyAccessPolicy(manifest);
+        }
 
         private static DateTimeOffset ReadBundlePublishedAt(string bundlePath)
         {
