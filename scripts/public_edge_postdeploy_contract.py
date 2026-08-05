@@ -129,6 +129,7 @@ PUBLIC_EDGE_SECRET_KEY_SHORT_WORDS = frozenset(
 PUBLIC_EDGE_SAFE_SECRET_BOOLEAN_SUFFIXES = frozenset(
     {
         "absent",
+        "capable",
         "configured",
         "exposed",
         "leaked",
