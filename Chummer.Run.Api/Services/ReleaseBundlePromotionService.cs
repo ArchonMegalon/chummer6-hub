@@ -1959,6 +1959,14 @@ public sealed class ReleaseBundlePromotionService
                 canonicalSha256,
                 exactIncomingDesktopScope,
                 exactIncomingDesktopScopeIsFreshDelta);
+            if (candidateImportBinding?.NativeEvidenceBinding is not null)
+            {
+                ValidateNativeFinalizerAuthoritySeed(
+                    stagedRoot,
+                    canonicalPath,
+                    canonicalSha256,
+                    publicManifest);
+            }
             IReadOnlyList<ActivationInventoryEntry> inventory = BuildActivationInventory(stagedRoot);
             string inventoryDigest = ComputeInventoryDigest(inventory);
             string candidatePath = Path.Combine(stagedRoot, ActivationCandidateName);
@@ -2100,6 +2108,58 @@ public sealed class ReleaseBundlePromotionService
         finally
         {
             TryDeletePromotionTransaction(transactionRoot);
+        }
+    }
+
+    private static void ValidateNativeFinalizerAuthoritySeed(
+        string stagedRoot,
+        string canonicalManifestPath,
+        string canonicalManifestSha256,
+        PublicReleaseManifestDto manifest)
+    {
+        string currentPath = Path.Combine(
+            stagedRoot,
+            PublicReleaseAuthorityEnvelopeProjection.CurrentInventoryPath);
+        string snapshotPath = Path.Combine(
+            stagedRoot,
+            PublicReleaseAuthorityEnvelopeProjection.SnapshotInventoryPath);
+        string decisionPath = Path.Combine(
+            stagedRoot,
+            "release-evidence",
+            PublicReleaseAuthorityEnvelopeProjection.ReleaseDecisionPath);
+        if (!File.Exists(currentPath)
+            || !File.Exists(snapshotPath)
+            || !File.Exists(decisionPath))
+        {
+            throw new InvalidDataException(
+                "owner-native staged candidates require a complete review-required release authority seed.");
+        }
+
+        byte[] currentBytes = ReadManifestBytes(currentPath, "release-evidence/CURRENT.json");
+        byte[] snapshotBytes = ReadManifestBytes(snapshotPath, "release-evidence/SNAPSHOT.json");
+        byte[] decisionBytes = ReadManifestBytes(
+            decisionPath,
+            "release-evidence/RELEASE_DECISION.json");
+        byte[] canonicalManifestBytes = ReadManifestBytes(
+            canonicalManifestPath,
+            CanonicalManifestName);
+        PublicReleaseTruthProjectionDto authority =
+            PublicReleaseAuthorityEnvelopeProjection.Project(
+                currentBytes,
+                snapshotBytes,
+                decisionBytes,
+                manifest,
+                canonicalManifestSha256,
+                canonicalManifestBytes);
+        if (!authority.AuthorityBound
+            || !string.Equals(
+                authority.ReleaseDecisionStatus,
+                "review_required",
+                StringComparison.Ordinal)
+            || !IsBareLowerSha256(authority.ReleaseScopeDecisionSha256))
+        {
+            throw new InvalidDataException(
+                "owner-native staged candidates require an exact review-required release authority seed.");
         }
     }
 
