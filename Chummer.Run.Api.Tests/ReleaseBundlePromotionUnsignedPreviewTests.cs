@@ -31,6 +31,59 @@ public sealed class ReleaseBundlePromotionUnsignedPreviewTests
         }
     }
 
+    [Fact]
+    public void ExactWindowsFreshDeltaPreservesRetainedLinuxUrlButKeepsWindowsIncomingUrlStrict()
+    {
+        ReleaseDesktopTupleScope scope = ReleaseDesktopTupleScope.Parse(
+            "avalonia:windows:win-x64");
+        const string retainedLinuxUrl =
+            "/downloads/g/gen-20260802T164413Z-bf6517fa73a94b2a/files/chummer-avalonia-linux-x64-installer.deb";
+        const string windowsFileName = "chummer-avalonia-win-x64-installer.exe";
+        const string governedWindowsUrl =
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe";
+
+        bool linuxRequiresIncomingUrl =
+            ReleaseBundlePromotionService.RequiresGovernedIncomingArtifactUrls(
+                scope,
+                exactIncomingDesktopScopeIsFreshDelta: true,
+                head: "avalonia",
+                platform: "linux",
+                rid: "linux-x64");
+        bool windowsRequiresIncomingUrl =
+            ReleaseBundlePromotionService.RequiresGovernedIncomingArtifactUrls(
+                scope,
+                exactIncomingDesktopScopeIsFreshDelta: true,
+                head: "avalonia",
+                platform: "windows",
+                rid: "win-x64");
+
+        Assert.False(linuxRequiresIncomingUrl);
+        Assert.Equal(
+            retainedLinuxUrl,
+            ReleaseBundlePromotionService.NormalizeIncomingArtifactUrl(
+                retainedLinuxUrl,
+                "chummer-avalonia-linux-x64-installer.deb",
+                "avalonia-linux-x64-installer",
+                linuxRequiresIncomingUrl,
+                "canonical downloadUrl"));
+        Assert.True(windowsRequiresIncomingUrl);
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.NormalizeIncomingArtifactUrl(
+                retainedLinuxUrl,
+                windowsFileName,
+                "avalonia-win-x64-installer",
+                windowsRequiresIncomingUrl,
+                "canonical downloadUrl"));
+        Assert.Equal(
+            governedWindowsUrl,
+            ReleaseBundlePromotionService.NormalizeIncomingArtifactUrl(
+                governedWindowsUrl,
+                windowsFileName,
+                "avalonia-win-x64-installer",
+                windowsRequiresIncomingUrl,
+                "canonical downloadUrl"));
+    }
+
     [Theory]
     [InlineData("preview", "unsigned")]
     [InlineData("preview", "skipped_preview")]
