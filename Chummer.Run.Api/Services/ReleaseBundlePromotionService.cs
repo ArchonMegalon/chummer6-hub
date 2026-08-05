@@ -7501,6 +7501,14 @@ public sealed class ReleaseBundlePromotionService
         ValidateCanonicalPostureFloors(canonical, expectedComplete);
     }
 
+    internal static void ValidateUnsignedWindowsFreshDeltaPlatformFloor(
+        JsonObject canonical,
+        ReleaseDesktopTupleScope exactIncomingDesktopScope)
+        => ValidateUnsignedWindowsFreshDeltaPlatformFloor(
+            canonical,
+            LoadCanonicalArtifacts(canonical),
+            exactIncomingDesktopScope);
+
     private static void ValidateUnsignedWindowsFreshDeltaPlatformFloor(
         JsonObject canonical,
         IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts,
@@ -7542,6 +7550,9 @@ public sealed class ReleaseBundlePromotionService
         string[] expectedMissingHeads = retainsLinux ? [] : ["avalonia"];
         string[] expectedPromotedTuples = retainsLinux
             ? ["avalonia:linux-x64:linux"]
+            : [];
+        string[] expectedPromotedInstallerTupleIds = retainsLinux
+            ? ["avalonia:linux:linux-x64"]
             : [];
         JsonObject coverage = canonical["desktopTupleCoverage"] as JsonObject
             ?? throw new InvalidDataException(
@@ -7621,7 +7632,7 @@ public sealed class ReleaseBundlePromotionService
                 "tupleId")
             .ToArray();
         if (!reportedPromoted.SequenceEqual(
-                expectedPromotedTuples,
+                expectedPromotedInstallerTupleIds,
                 StringComparer.Ordinal))
         {
             throw new InvalidDataException(
