@@ -471,12 +471,17 @@ def state_volume_inventory(
     *,
     attempt_id: str = "attempt01",
     mutation_lock_token_sha256: str = "f" * 64,
+    consumers: list[dict] | None = None,
+    incumbent_portal_container_id: str | None = None,
 ) -> tuple[Path, str]:
     path = root / (
         "INSTALL_LINKING_STATE_VOLUME_INVENTORY."
         f"post-incumbent-quiesce.{attempt_id}.json"
     )
-    consumers: list[dict] = []
+    consumers = sorted(
+        consumers or [],
+        key=lambda item: str(item.get("containerId") or ""),
+    )
     digest = write_canonical(
         module,
         path,
@@ -484,7 +489,7 @@ def state_volume_inventory(
             "attemptId": attempt_id,
             "candidateToolImageId": CANDIDATE_TOOL_IMAGE,
             "checkpoint": "post_incumbent_quiesce",
-            "consumerCount": 0,
+            "consumerCount": len(consumers),
             "consumerSetSha256": hashlib.sha256(
                 json.dumps(
                     consumers,
@@ -496,13 +501,93 @@ def state_volume_inventory(
             "consumers": consumers,
             "contractName": module.STATE_VOLUME_INVENTORY_CONTRACT,
             "cutoverId": "2026-07-17T12:00:00Z",
-            "incumbentPortalContainerId": None,
+            "incumbentPortalContainerId": incumbent_portal_container_id,
             "mutationLockTokenSha256": mutation_lock_token_sha256,
             "status": "pass",
             "volumeName": "chummer6-hub_chummer-run-api-state",
         },
     )
     return path, digest
+
+
+def test_state_volume_inventory_accepts_compose_oneoff_incumbent(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    incumbent_id = "d" * 64
+    consumer = {
+        "classification": "incumbent_portal",
+        "composeOneoff": "True",
+        "composeProject": "chummer6-hub",
+        "composeService": "chummer-portal",
+        "containerId": incumbent_id,
+        "containerName": "chummer6-hub-chummer-portal-1",
+        "imageId": "sha256:" + "b" * 64,
+        "jobName": None,
+        "readWrite": True,
+        "running": False,
+        "volumeDestination": "/app/state",
+    }
+    inventory_path, inventory_sha256 = state_volume_inventory(
+        module,
+        tmp_path,
+        consumers=[consumer],
+        incumbent_portal_container_id=incumbent_id,
+    )
+
+    _, bound_sha256, payload = module.bind_state_volume_inventory(
+        inventory_path,
+        expected_sha256=inventory_sha256,
+        attempt_id="attempt01",
+        cutover_id="2026-07-17T12:00:00Z",
+        candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+        mutation_lock_token_sha256="f" * 64,
+    )
+
+    assert bound_sha256 == inventory_sha256
+    assert payload["consumers"] == [consumer]
+
+
+def test_state_volume_inventory_rejects_compose_oneoff_proof(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    cutover_id = "2026-07-17T12:00:00Z"
+    suffix = hashlib.sha256(cutover_id.encode("utf-8")).hexdigest()[:24]
+    job_name = "prove-local-store-state"
+    job_hash = hashlib.sha256(job_name.encode("utf-8")).hexdigest()[:12]
+    consumer = {
+        "classification": "governed_local_store_proof",
+        "composeOneoff": "True",
+        "composeProject": f"chummer6-ilpg-{suffix[:16]}-{job_hash}",
+        "composeService": (
+            "chummer-install-linking-postgres-import-presence-proof"
+        ),
+        "containerId": "e" * 64,
+        "containerName": (
+            f"chummer-install-linking-cutover-{suffix}-{job_name}"
+        ),
+        "imageId": CANDIDATE_TOOL_IMAGE,
+        "jobName": job_name,
+        "readWrite": False,
+        "running": False,
+        "volumeDestination": "/app/state",
+    }
+    inventory_path, inventory_sha256 = state_volume_inventory(
+        module,
+        tmp_path,
+        consumers=[consumer],
+    )
+
+    with pytest.raises(ValueError, match="governed volume consumer"):
+        module.bind_state_volume_inventory(
+            inventory_path,
+            expected_sha256=inventory_sha256,
+            attempt_id="attempt01",
+            cutover_id=cutover_id,
+            candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+            mutation_lock_token_sha256="f" * 64,
+        )
 
 
 def phase_evidence(

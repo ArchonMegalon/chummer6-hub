@@ -1025,7 +1025,7 @@ case "$*" in
     fi
     ;;
   "container inspect --format {{json .Id}}"*" $FAKE_PRIOR_PORTAL_CONTAINER_ID")
-    printf '"%s" "/chummer6-hub-chummer-portal-1" "%s" false {"com.docker.compose.oneoff":"False","com.docker.compose.project":"chummer6-hub","com.docker.compose.service":"chummer-portal"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":true,"Type":"volume"}]\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID" "$FAKE_PRIOR_PORTAL_IMAGE_ID"
+    printf '"%s" "/chummer6-hub-chummer-portal-1" "%s" false {"com.docker.compose.oneoff":"%s","com.docker.compose.project":"chummer6-hub","com.docker.compose.service":"chummer-portal"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":true,"Type":"volume"}]\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID" "$FAKE_PRIOR_PORTAL_IMAGE_ID" "${FAKE_PRIOR_PORTAL_ONEOFF:-False}"
     ;;
   "container inspect --format {{json .Id}}"*" $FAKE_POSTQUIESCE_PROOF_CONTAINER_ID")
     attempt="$(/usr/bin/cat "$FAKE_POSTQUIESCE_COMPLETED_STATE")"
@@ -2208,8 +2208,10 @@ def test_guarded_deploy_rolls_back_only_verified_postquiesce_safe_fail(
     assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
 
 
+@pytest.mark.parametrize("prior_portal_oneoff", ["False", "True"])
 def test_guarded_deploy_accepts_verified_postquiesce_pass_despite_runner_exit(
     tmp_path: Path,
+    prior_portal_oneoff: str,
 ) -> None:
     source = make_fake_authority_source(tmp_path)
     fake_bin = tmp_path / "bin"
@@ -2226,6 +2228,7 @@ def test_guarded_deploy_accepts_verified_postquiesce_pass_despite_runner_exit(
             "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
             "FAKE_POSTQUIESCE_MODE": "pass",
             "FAKE_POSTQUIESCE_EXIT": "42",
+            "FAKE_PRIOR_PORTAL_ONEOFF": prior_portal_oneoff,
             "CHUMMER_RUN_SERVICES_SOURCE": str(source),
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
                 source / "docker-compose.public-edge.yml"
