@@ -92,6 +92,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(RegistryAuthorization.ControlPolicy, registryControlPolicy);
 });
+builder.Services.AddSingleton<IPublicationWorkflowService, PublicationWorkflowService>();
+builder.Services.AddSingleton<IHubArtifactStore, FileBackedHubArtifactStore>();
+builder.Services.AddSingleton<IReleaseChannelManifestStore, FileReleaseChannelManifestStore>();
 builder.Services
     .AddHubPublicGuideContext()
     .AddHubAccountsAndCommunityContext()
