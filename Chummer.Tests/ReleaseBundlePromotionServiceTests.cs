@@ -29,6 +29,16 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public void UnsignedWindowsFreshDeltaPlatformFloorAcceptsRouteOrderedInstallerTupleIds()
+    {
+        (JsonObject canonical, _) = LoadUnsignedWindowsFreshDeltaManifestPair();
+
+        ReleaseBundlePromotionService.ValidateUnsignedWindowsFreshDeltaPlatformFloor(
+            canonical,
+            ReleaseDesktopTupleScope.Parse("avalonia:windows:win-x64"));
+    }
+
+    [Fact]
     public void ProfileRegistryArtifactProjectionAcceptsExactWindowsOnlyRows()
     {
         (JsonObject canonical, JsonObject compatibility) =
