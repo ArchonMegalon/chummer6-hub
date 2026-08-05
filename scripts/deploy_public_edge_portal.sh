@@ -6588,7 +6588,7 @@ secret_key_stems = (
 )
 secret_key_short_words = {"connstr", "dsn", "dsns", "pwd", "pwds", "sas"}
 safe_boolean_suffixes = {
-    "absent", "configured", "exposed", "leaked", "matches", "performed",
+    "absent", "capable", "configured", "exposed", "leaked", "matches", "performed",
     "present", "redacted", "required", "stored", "valid",
 }
 safe_integer_suffixes = {"count", "device", "inode", "mtimens"}

@@ -3916,6 +3916,62 @@ def test_guarded_deploy_uses_orchestrated_postdeploy_closure_and_no_legacy_flags
     )
 
 
+def test_postdeploy_scanner_accepts_typed_authorization_capability_metadata(
+    tmp_path: Path,
+) -> None:
+    deploy_source = DEPLOY.read_text(encoding="utf-8")
+    marker = "# Public-edge postdeploy code-deploy receipt scanner."
+    command_prefix = "if ! trusted_source_python -c '\n"
+    scanner_start = deploy_source.rfind(
+        command_prefix,
+        0,
+        deploy_source.index(marker),
+    )
+    assert scanner_start >= 0
+    scanner_start += len(command_prefix)
+    command_suffix = "\n' \"$FINAL_POSTDEPLOY_ATTESTATION_OUTPUT\"; then"
+    scanner_end = deploy_source.index(command_suffix, scanner_start)
+    scanner_source = deploy_source[scanner_start:scanner_end]
+
+    receipt = tmp_path / "postdeploy.json"
+    payload = {
+        "contractName": "chummer.public_edge_postdeploy_gate.v2",
+        "status": "pass",
+        "projectionPurpose": "code-deploy",
+        "projectionStatus": "review_required",
+        "projectionStage": "code_deploy_review_required",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": False,
+        "releaseReady": False,
+        "codeDeployReviewRequiredAuthoritySatisfied": True,
+        "childReceipts": {},
+        "releaseChannelAuthorizationCapable": True,
+    }
+    receipt.write_text(json.dumps(payload), encoding="utf-8")
+
+    accepted = subprocess.run(
+        [sys.executable, "-c", scanner_source, str(receipt)],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert accepted.returncode == 0, accepted.stderr
+
+    payload["releaseChannelAuthorizationCapable"] = "true"
+    receipt.write_text(json.dumps(payload), encoding="utf-8")
+    rejected = subprocess.run(
+        [sys.executable, "-c", scanner_source, str(receipt)],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert rejected.returncode == 1
+
+
 def test_guarded_deploy_rejects_secret_key_in_postdeploy_child_receipt(
     tmp_path: Path,
 ) -> None:
