@@ -226,6 +226,33 @@ def test_registry_tool_argv_fails_closed_on_scope_or_partial_proof_drift() -> No
         )
 
 
+def test_release_scope_reverification_supports_retained_platform_union() -> None:
+    linux = {
+        "platform": "linux",
+        "rid": "linux-x64",
+        "primaryHead": "avalonia",
+        "fallbackHeads": [],
+    }
+    windows = {
+        "platform": "windows",
+        "rid": "win-x64",
+        "primaryHead": "avalonia",
+        "fallbackHeads": [],
+    }
+
+    assert MODULE._release_scope_constraint_arguments([linux, windows]) == []
+    assert MODULE._release_scope_constraint_arguments([windows]) == [
+        "--expected-platform",
+        "windows",
+        "--expected-rid",
+        "win-x64",
+        "--expected-heads",
+        "avalonia",
+    ]
+    with pytest.raises(MODULE.FinalizerError, match="bounded approved platform scope"):
+        MODULE._release_scope_constraint_arguments([])
+
+
 def test_scorecard_handoff_binding_rejects_scope_or_release_drift_before_registry() -> None:
     scorecard_raw = b'{"release_version":"run-test"}\n'
     ui_frame_raw = b'{"contract_name":"chummer.ui-frame-integrity/v2"}\n'

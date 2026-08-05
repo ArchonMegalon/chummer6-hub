@@ -538,6 +538,29 @@ def _registry_scope_arguments(
     ]
 
 
+def _release_scope_constraint_arguments(scope_platforms: Any) -> list[str]:
+    if not isinstance(scope_platforms, list) or not 1 <= len(scope_platforms) <= 16:
+        raise FinalizerError("owner finalizer requires a bounded approved platform scope")
+    for scope_platform in scope_platforms:
+        if not isinstance(scope_platform, dict):
+            raise FinalizerError("approved release platform scope is malformed")
+        fallback_heads = scope_platform.get("fallbackHeads")
+        if not isinstance(fallback_heads, list):
+            raise FinalizerError("approved release head scope is malformed")
+        scope_heads = [scope_platform.get("primaryHead"), *fallback_heads]
+        if any(not isinstance(head, str) or not head for head in scope_heads):
+            raise FinalizerError("approved release head scope is malformed")
+    if len(scope_platforms) != 1:
+        return []
+    scope_platform = scope_platforms[0]
+    scope_heads = [scope_platform["primaryHead"], *scope_platform["fallbackHeads"]]
+    return [
+        "--expected-platform", str(scope_platform.get("platform") or ""),
+        "--expected-rid", str(scope_platform.get("rid") or ""),
+        "--expected-heads", ",".join(scope_heads),
+    ]
+
+
 def _registry_authority_materializer_arguments(
     *,
     manifest: Path,
@@ -1282,15 +1305,9 @@ def _prepare_transaction(args: argparse.Namespace, root: Path) -> tuple[dict[str
         raise FinalizerError(
             "owner finalizer support owner disagrees with the approved release scope"
         )
-    scope_platforms = handoff.get("releaseScopePlatforms")
-    if not isinstance(scope_platforms, list) or len(scope_platforms) != 1:
-        raise FinalizerError("mac owner finalizer requires one exact approved platform scope")
-    scope_platform = scope_platforms[0]
-    if not isinstance(scope_platform, dict):
-        raise FinalizerError("approved release platform scope is malformed")
-    scope_heads = [scope_platform.get("primaryHead"), *(scope_platform.get("fallbackHeads") or [])]
-    if any(not isinstance(head, str) or not head for head in scope_heads):
-        raise FinalizerError("approved release head scope is malformed")
+    scope_constraint_arguments = _release_scope_constraint_arguments(
+        handoff.get("releaseScopePlatforms")
+    )
     scope_reverification = evidence / "RELEASE_SCOPE_REVERIFICATION.generated.json"
     _run_tool(
         files["releaseScopeVerifier"],
@@ -1302,9 +1319,7 @@ def _prepare_transaction(args: argparse.Namespace, root: Path) -> tuple[dict[str
             "--promotion-evidence", str(files["promotionEvidence"]),
             "--expected-release-version", handoff["releaseVersion"],
             "--expected-channel", handoff["channel"],
-            "--expected-platform", str(scope_platform.get("platform") or ""),
-            "--expected-rid", str(scope_platform.get("rid") or ""),
-            "--expected-heads", ",".join(scope_heads),
+            *scope_constraint_arguments,
             "--output", str(scope_reverification),
         ],
     )
