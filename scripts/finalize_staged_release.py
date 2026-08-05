@@ -483,7 +483,7 @@ def _load_handoff(
         or scope_verification.get("decisionSha256") != scope_sha
         or scope_verification.get("manifestSha256") != payload.get("manifestSha256")
         or scope_verification.get("exactIncomingDesktopScope")
-        != payload.get("exactIncomingDesktopScope")
+        != payload.get("releaseScopeApprovedDesktopScope")
         or scope_verification.get("supportOwner") != payload.get("supportOwner")
         or scope_verification.get("platforms") != payload.get("releaseScopePlatforms")
     ):

@@ -353,6 +353,7 @@ def test_materializes_secret_redacted_exact_staged_handoff(tmp_path: Path) -> No
         data["scope_decision_raw"]
     ).hexdigest()
     assert payload["exactIncomingDesktopScope"] == "avalonia:macos:osx-arm64"
+    assert payload["releaseScopeApprovedDesktopScope"] == "avalonia:macos:osx-arm64"
     assert payload["releaseScopePlatforms"][0]["primaryHead"] == "avalonia"
     assert payload["stagedConvergenceSha256"] == hashlib.sha256(data["convergence_raw"]).hexdigest()
     assert payload["uiFrameReceiptSha256"] == hashlib.sha256(
@@ -407,6 +408,41 @@ def test_rejects_stage_inventory_outside_approved_scope(tmp_path: Path) -> None:
     result = subprocess.run(command(tmp_path, data, output), capture_output=True, text=True)
     assert result.returncode == 1
     assert "approved release scope and inventory" in result.stderr
+    assert not output.exists()
+
+
+def test_accepts_fresh_scope_as_subset_of_retained_candidate_scope(tmp_path: Path) -> None:
+    data = fixture(tmp_path)
+    verification = Path(data["scope_verification"])
+    payload = json.loads(verification.read_text())
+    payload["exactIncomingDesktopScope"] = (
+        "avalonia:linux:linux-x64,avalonia:macos:osx-arm64"
+    )
+    write_json(verification, payload)
+    output = tmp_path / "evidence" / "retained-scope-handoff.json"
+
+    result = subprocess.run(command(tmp_path, data, output), capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    handoff = json.loads(output.read_text())
+    assert handoff["exactIncomingDesktopScope"] == "avalonia:macos:osx-arm64"
+    assert handoff["releaseScopeApprovedDesktopScope"] == (
+        "avalonia:linux:linux-x64,avalonia:macos:osx-arm64"
+    )
+
+
+def test_rejects_fresh_scope_outside_retained_candidate_scope(tmp_path: Path) -> None:
+    data = fixture(tmp_path)
+    response = Path(data["stage_response"])
+    payload = json.loads(response.read_text())
+    payload["exactIncomingDesktopScope"] = "avalonia:windows:win-x64"
+    write_json(response, payload)
+    output = tmp_path / "evidence" / "outside-scope-handoff.json"
+
+    result = subprocess.run(command(tmp_path, data, output), capture_output=True, text=True)
+
+    assert result.returncode == 1
+    assert "outside the approved candidate scope" in result.stderr
     assert not output.exists()
 
 
