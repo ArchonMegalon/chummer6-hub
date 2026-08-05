@@ -112,8 +112,8 @@ def test_v2_schema_is_exact_full_shared_consumer_union() -> None:
         | AUTHORIZING_SCHEMA_ADDITIONS
     )
 
-    assert len(legacy["fields"]) == 180
-    assert len(bound["fields"]) == 279
+    assert len(legacy["fields"]) == 187
+    assert len(bound["fields"]) == 286
     assert set(bound["fields"]) == expected
     assert not set(legacy["fields"]) - set(bound["fields"])
 

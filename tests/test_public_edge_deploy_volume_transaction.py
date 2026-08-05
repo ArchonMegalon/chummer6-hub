@@ -870,12 +870,14 @@ def make_fake_authority_source(
         "output = pathlib.Path(args[args.index('--output') + 1])\n"
         "output.parent.mkdir(parents=True, exist_ok=True)\n"
         "payload = {"
-        "'contractName':'chummer.public_edge_postdeploy_gate.v1',"
+        "'contractName':'chummer.public_edge_postdeploy_gate.v2',"
         "'status':'pass','projectionPurpose':'code-deploy',"
         "'projectionStatus':'review_required',"
         "'projectionStage':'code_deploy_review_required',"
         "'codeDeploymentAuthority':True,'releaseUploadAuthority':False,"
         "'releaseReady':False,"
+        "'releaseChannelAuthorizationCapable':True,"
+        "'releaseChannelReceiptBindingRequired':True,"
         "'codeDeployReviewRequiredAuthoritySatisfied':True,"
         "'childReceipts':{}"
         "}\n"
@@ -1062,7 +1064,11 @@ case "$*" in
   "image inspect chummer-install-linking-postgres-tool:local --format {{.Id}}")
     printf '%s\n' "$FAKE_CANDIDATE_TOOL_IMAGE_ID";;
   "image tag "*)
-    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = image_promotion ]; then exit 44; fi;;
+    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = image_promotion ]; then
+      case "$*" in
+        "image tag chummer-run-api:cutover-"*) exit 44;;
+      esac
+    fi;;
   *" ps --all -q chummer-portal")
     printf '%s\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID";;
   *" ps --all -q chummer-run-cloudflared")
@@ -3877,6 +3883,11 @@ def test_guarded_deploy_uses_orchestrated_postdeploy_closure_and_no_legacy_flags
         env["CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT"],
         "--release-channel-receipt-sha256",
         env["CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256"],
+        "--public-release-manifest",
+        (
+            "/docker/chummercomplete/chummer.run-services/Chummer.Portal/"
+            "downloads/RELEASE_CHANNEL.generated.json"
+        ),
         "--public-projection-snapshot-root",
         env["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"],
         "--public-projection-purpose",

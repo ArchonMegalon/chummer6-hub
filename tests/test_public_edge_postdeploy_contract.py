@@ -130,6 +130,7 @@ def test_secret_key_policy_rejects_plural_compound_and_dsn_aliases(
         ("mutationLockTokenSha256", "b" * 64),
         ("databaseCredentialsPresent", False),
         ("connectionStringCount", 0),
+        ("releaseChannelAuthorizationCapable", True),
     ),
 )
 def test_secret_key_policy_allows_only_typed_bounded_metadata(
@@ -149,6 +150,7 @@ def test_secret_key_policy_allows_only_typed_bounded_metadata(
         ("tokensPresent", "hunter2"),
         ("credentialsCount", -1),
         ("connectionStringStatus", "pass"),
+        ("releaseChannelAuthorizationCapable", "true"),
     ),
 )
 def test_secret_key_policy_rejects_untyped_or_unbounded_metadata(

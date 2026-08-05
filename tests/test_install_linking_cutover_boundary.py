@@ -513,6 +513,7 @@ def phase_evidence(
     *,
     boundary_output: Path | None = None,
     postquiesce_attempt_id: str = "attempt01",
+    bound_postdeploy: bool = False,
 ) -> Path:
     build_sha = hashlib.sha256(active_build_info.read_bytes()).hexdigest()
     build_payload = read_json(active_build_info)
@@ -580,16 +581,25 @@ def phase_evidence(
             },
         )
         postdeploy_path = root / "public-edge-postdeploy.json"
+        postdeploy_fields = (
+            module.PUBLIC_EDGE_CUTOVER_BOUND_POSTDEPLOY_FIELDS
+            if bound_postdeploy
+            else module.PUBLIC_EDGE_CUTOVER_POSTDEPLOY_FIELDS
+        )
         postdeploy = {
             field: None
-            for field in module.PUBLIC_EDGE_CUTOVER_POSTDEPLOY_FIELDS
+            for field in postdeploy_fields
         }
         postdeploy.update(
             {
                 "childReceipts": {},
                 "codeDeploymentAuthority": True,
                 "codeDeployReviewRequiredAuthoritySatisfied": True,
-                "contractName": "chummer.public_edge_postdeploy_gate.v1",
+                "contractName": (
+                    module.PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+                    if bound_postdeploy
+                    else module.PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME
+                ),
                 "downloadsStatusBrowserArtifactContract": (
                     "chummer.downloads_status_e2e.v1"
                 ),
@@ -632,10 +642,14 @@ def phase_evidence(
                 "releaseReady": False,
                 "releaseUploadAuthority": False,
                 "schemaContractName": (
-                    module.PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
+                    module.PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME
+                    if bound_postdeploy
+                    else module.PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
                 ),
                 "schemaSha256": (
-                    module.PUBLIC_EDGE_CUTOVER_POSTDEPLOY_SCHEMA_SHA256
+                    module.PUBLIC_EDGE_CUTOVER_BOUND_POSTDEPLOY_SCHEMA_SHA256
+                    if bound_postdeploy
+                    else module.PUBLIC_EDGE_CUTOVER_POSTDEPLOY_SCHEMA_SHA256
                 ),
                 "skipPreflight": False,
                 "skipReleaseVersionMatch": False,
@@ -645,6 +659,47 @@ def phase_evidence(
                 "strictPreflight": True,
             }
         )
+        if bound_postdeploy:
+            binding = {
+                "contractName": (
+                    "chummer.public_edge_downloads_authority_binding.v1"
+                ),
+                "downloadsReceiptContractName": (
+                    "chummer.downloads_version_marker.bound.v1"
+                ),
+                "downloadsReceiptSha256": "1" * 64,
+                "releaseChannel": "preview",
+                "releaseChannelReceiptSha256": "2" * 64,
+                "releaseManifestChannel": "preview",
+                "releaseManifestGeneration": "1",
+                "releaseManifestSchema": "chummer.release-manifest/v2",
+                "releaseManifestVersion": "run-20260804-220108",
+                "releaseVersion": "run-20260804-220108",
+            }
+            binding["bindingSha256"] = hashlib.sha256(
+                module.canonical_json_bytes(
+                    binding,
+                    label="public-edge downloads authority binding",
+                )
+            ).hexdigest()
+            postdeploy.update(
+                {
+                    "coreChildContracts": {
+                        "downloads": (
+                            "chummer.downloads_version_marker.bound.v1"
+                        )
+                    },
+                    "downloadsAuthorityBinding": binding,
+                    "expectedReleaseChannel": "preview",
+                    "expectedReleaseVersion": "run-20260804-220108",
+                    "releaseChannelAuthorizationCapable": True,
+                    "releaseChannelReceiptBindingRequired": True,
+                    "releaseManifestChannel": "preview",
+                    "releaseManifestGeneration": "1",
+                    "releaseManifestSchema": "chummer.release-manifest/v2",
+                    "releaseManifestVersion": "run-20260804-220108",
+                }
+            )
         postdeploy_sha = write_canonical(
             module,
             postdeploy_path,
@@ -1443,6 +1498,43 @@ def test_boundary_reopens_summary_and_append_only_phase_chain(
     write_canonical(module, phase_receipt, tampered)
     with pytest.raises(ValueError, match="append-only|posture"):
         advance(module, output, active_build_info, "prepare_completed")
+
+
+def test_public_acceptance_accepts_exact_bound_v2_postdeploy_receipt(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    active_build_info = build_info(tmp_path)
+    output = tmp_path / "boundary.json"
+    for phase in (
+        "prepare_starting",
+        "prepare_completed",
+        module.IMPORT_SKIPPED_PHASE,
+        "validate_completed",
+    ):
+        advance(module, output, active_build_info, phase)
+    evidence_path = phase_evidence(
+        module,
+        tmp_path,
+        active_build_info,
+        "public_acceptance_completed",
+        boundary_output=output,
+        bound_postdeploy=True,
+    )
+
+    receipt = module.materialize(
+        output=output,
+        phase="public_acceptance_completed",
+        cutover_id="2026-07-17T12:00:00Z",
+        candidate_image_id=CANDIDATE_IMAGE,
+        candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+        active_build_info=active_build_info,
+        evidence_receipt=evidence_path,
+    )
+
+    assert receipt["phase"] == "public_acceptance_completed"
+    assert receipt["publicAcceptanceCompleted"] is True
+    assert receipt["status"] == "pass"
 
 
 @pytest.mark.parametrize(

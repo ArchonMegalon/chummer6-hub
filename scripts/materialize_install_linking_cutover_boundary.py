@@ -24,17 +24,25 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
 try:
     from scripts.strict_json_contract import canonical_json_bytes, strict_json_object
     from scripts.public_edge_postdeploy_contract import (
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME,
         PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
         PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS,
         load_exact_public_edge_postdeploy_schema,
+        public_edge_authorizing_binding_failures,
         public_edge_forbidden_secret_key,
     )
 except ModuleNotFoundError:  # Direct ``python3 scripts/...`` execution.
     from strict_json_contract import canonical_json_bytes, strict_json_object
     from public_edge_postdeploy_contract import (
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME,
         PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
         PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS,
         load_exact_public_edge_postdeploy_schema,
+        public_edge_authorizing_binding_failures,
         public_edge_forbidden_secret_key,
     )
 
@@ -610,14 +618,25 @@ _LEGACY_PUBLIC_EDGE_CUTOVER_POSTDEPLOY_FIELDS = {
     "visibleVersion",
     "visibleVersionMatchesReleaseChannel",
 }
-_PUBLIC_EDGE_POSTDEPLOY_SCHEMA_AUTHORITY = (
-    load_exact_public_edge_postdeploy_schema()
+_PUBLIC_EDGE_POSTDEPLOY_SCHEMA_AUTHORITY = load_exact_public_edge_postdeploy_schema(
+    receipt_contract_name=PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME,
+)
+_PUBLIC_EDGE_BOUND_POSTDEPLOY_SCHEMA_AUTHORITY = (
+    load_exact_public_edge_postdeploy_schema(
+        receipt_contract_name=PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+    )
 )
 PUBLIC_EDGE_CUTOVER_POSTDEPLOY_FIELDS = frozenset(
     _PUBLIC_EDGE_POSTDEPLOY_SCHEMA_AUTHORITY["fields"]
 )
 PUBLIC_EDGE_CUTOVER_POSTDEPLOY_SCHEMA_SHA256 = str(
     _PUBLIC_EDGE_POSTDEPLOY_SCHEMA_AUTHORITY["sha256"]
+)
+PUBLIC_EDGE_CUTOVER_BOUND_POSTDEPLOY_FIELDS = frozenset(
+    _PUBLIC_EDGE_BOUND_POSTDEPLOY_SCHEMA_AUTHORITY["fields"]
+)
+PUBLIC_EDGE_CUTOVER_BOUND_POSTDEPLOY_SCHEMA_SHA256 = str(
+    _PUBLIC_EDGE_BOUND_POSTDEPLOY_SCHEMA_AUTHORITY["sha256"]
 )
 if (
     _LEGACY_PUBLIC_EDGE_CUTOVER_POSTDEPLOY_FIELDS
@@ -1544,6 +1563,33 @@ def bind_phase_evidence(
             postdeploy,
             label="public-edge postdeploy acceptance receipt",
         )
+        postdeploy_contract = str(postdeploy.get("contractName") or "")
+        if postdeploy_contract == PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME:
+            expected_postdeploy_fields = (
+                PUBLIC_EDGE_CUTOVER_BOUND_POSTDEPLOY_FIELDS
+            )
+            expected_postdeploy_schema_contract = (
+                PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME
+            )
+            expected_postdeploy_schema_sha256 = (
+                PUBLIC_EDGE_CUTOVER_BOUND_POSTDEPLOY_SCHEMA_SHA256
+            )
+            postdeploy_contract_failures = (
+                public_edge_authorizing_binding_failures(postdeploy)
+            )
+        elif postdeploy_contract == PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME:
+            expected_postdeploy_fields = PUBLIC_EDGE_CUTOVER_POSTDEPLOY_FIELDS
+            expected_postdeploy_schema_contract = (
+                PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
+            )
+            expected_postdeploy_schema_sha256 = (
+                PUBLIC_EDGE_CUTOVER_POSTDEPLOY_SCHEMA_SHA256
+            )
+            postdeploy_contract_failures = []
+        else:
+            raise ValueError(
+                "public-edge postdeploy acceptance receipt contract is unsupported"
+            )
         if postdeploy.get("childReceipts") != {}:
             raise ValueError(
                 "public-edge postdeploy acceptance receipt violates schema"
@@ -1554,13 +1600,12 @@ def bind_phase_evidence(
         )
         if (
             evidence.get("postdeployReceiptSha256") != postdeploy_sha256
-            or set(postdeploy) != PUBLIC_EDGE_CUTOVER_POSTDEPLOY_FIELDS
-            or postdeploy.get("contractName")
-            != "chummer.public_edge_postdeploy_gate.v1"
+            or set(postdeploy) != expected_postdeploy_fields
             or postdeploy.get("schemaContractName")
-            != PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
+            != expected_postdeploy_schema_contract
             or postdeploy.get("schemaSha256")
-            != PUBLIC_EDGE_CUTOVER_POSTDEPLOY_SCHEMA_SHA256
+            != expected_postdeploy_schema_sha256
+            or postdeploy_contract_failures
             or postdeploy.get("status") != "pass"
             or postdeploy.get("failures") != []
             or postdeploy.get("strictNoAllowanceInvocation") is not True
