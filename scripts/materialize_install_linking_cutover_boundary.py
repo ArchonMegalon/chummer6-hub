@@ -1478,15 +1478,30 @@ def bind_state_volume_inventory(
                 "InstallLinking governed volume consumer job is invalid"
             )
         job_hash = hashlib.sha256(job_name.encode("utf-8")).hexdigest()[:12]
+        proof_name = re.fullmatch(
+            r"chummer-install-linking-cutover-([0-9a-f]{24})-(.+)",
+            container_name,
+        )
+        if proof_name is None or proof_name.group(2) != job_name:
+            raise ValueError(
+                "InstallLinking governed volume consumer is invalid"
+            )
+        proof_suffix = proof_name.group(1)
+        expected_classification = (
+            "governed_local_store_proof"
+            if proof_suffix == suffix
+            else "retained_governed_local_store_proof"
+        )
         if (
-            consumer.get("classification") != "governed_local_store_proof"
+            consumer.get("classification") != expected_classification
             or consumer.get("composeProject")
-            != f"chummer6-ilpg-{suffix[:16]}-{job_hash}"
+            != f"chummer6-ilpg-{proof_suffix[:16]}-{job_hash}"
             or consumer.get("composeService")
             != "chummer-install-linking-postgres-import-presence-proof"
-            or consumer.get("containerName")
-            != f"chummer-install-linking-cutover-{suffix}-{job_name}"
-            or image_id != candidate_tool_image_id
+            or (
+                proof_suffix == suffix
+                and image_id != candidate_tool_image_id
+            )
             or consumer.get("composeOneoff") != "False"
             or consumer.get("readWrite") is not False
         ):
