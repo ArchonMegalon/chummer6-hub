@@ -25,7 +25,8 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         HttpContext context,
         IReleaseTruthProjection releaseTruth,
         ReleaseBundlePromotionService promotions,
-        ReleaseShelfGenerationStore shelfStore)
+        ReleaseShelfGenerationStore shelfStore,
+        ILogger<PublicReleaseTruthProjectionMiddleware> logger)
     {
         if (!IsReleaseFacingRoute(context.Request.Path))
         {
@@ -70,6 +71,13 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         }
         catch (Exception exception) when (exception is InvalidDataException or InvalidOperationException)
         {
+            if (stagedSnapshot is not null)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Authenticated staged release-truth projection failed for generation {GenerationId}.",
+                    stagedSnapshot.GenerationId);
+            }
             if (IsReleaseAuthorityRequiredHandoffRoute(context.Request.Path))
             {
                 context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;

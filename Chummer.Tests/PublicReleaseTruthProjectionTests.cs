@@ -1107,7 +1107,12 @@ public sealed class PublicReleaseTruthProjectionTests
             NullLogger<ReleaseBundlePromotionService>.Instance,
             promotionCheckpoint: null);
         var shelfStore = new ReleaseShelfGenerationStore(configuration);
-        return middleware.InvokeAsync(context, releaseTruth, promotions, shelfStore);
+        return middleware.InvokeAsync(
+            context,
+            releaseTruth,
+            promotions,
+            shelfStore,
+            NullLogger<PublicReleaseTruthProjectionMiddleware>.Instance);
     }
 
     private static AuthorityEnvelope MutateSnapshot(
