@@ -19,11 +19,17 @@ public interface IReleaseTruthProjection
         ReadOnlyMemory<byte>? immutableAuthorityManifestBytes);
 }
 
+internal interface IStagedReleaseTruthProjection
+{
+    PublicReleaseTruthCapture CaptureStagedWithAuthority(ReleaseShelfSnapshot snapshot);
+}
+
 public sealed record PublicReleaseTruthCapture(
     PublicReleaseTruthProjectionDto Projection,
     string AuthoritySnapshotSha256);
 
-public sealed class PublicReleaseTruthProjectionService : IReleaseTruthProjection
+public sealed class PublicReleaseTruthProjectionService
+    : IReleaseTruthProjection, IStagedReleaseTruthProjection
 {
     private const int MaximumTokenLength = 128;
     private const int MaximumPlatformCount = 16;
@@ -53,6 +59,9 @@ public sealed class PublicReleaseTruthProjectionService : IReleaseTruthProjectio
 
     public PublicReleaseTruthCapture CaptureGenerationWithAuthority(string generationId)
         => CaptureSnapshot(_releases.CaptureShelfGeneration(generationId));
+
+    public PublicReleaseTruthCapture CaptureStagedWithAuthority(ReleaseShelfSnapshot snapshot)
+        => CaptureSnapshot(snapshot ?? throw new ArgumentNullException(nameof(snapshot)));
 
     private PublicReleaseTruthCapture CaptureSnapshot(ReleaseShelfSnapshot snapshot)
     {

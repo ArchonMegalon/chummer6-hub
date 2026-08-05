@@ -35,13 +35,14 @@ public sealed class PublicReleaseTruthProjectionMiddleware
 
         string? stagedProbe = context.Request.Headers[StagedProbeHeaderName].FirstOrDefault();
         bool stagedRequest = stagedProbe is not null;
+        ReleaseShelfSnapshot? stagedSnapshot = null;
         if (stagedRequest)
         {
             _ = TryResolveGenerationId(context.Request.Path, out string? requestedGenerationId);
             if (!promotions.TryCaptureStageProbe(
                     stagedProbe,
                     requestedGenerationId,
-                    out ReleaseShelfSnapshot? stagedSnapshot)
+                    out stagedSnapshot)
                 || stagedSnapshot is null)
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -60,9 +61,12 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         PublicReleaseTruthCapture capture;
         try
         {
-            capture = TryResolveGenerationId(context.Request.Path, out string? generationId)
-                ? releaseTruth.CaptureGenerationWithAuthority(generationId!)
-                : releaseTruth.CaptureWithAuthority();
+            capture = stagedSnapshot is not null
+                      && releaseTruth is IStagedReleaseTruthProjection stagedReleaseTruth
+                ? stagedReleaseTruth.CaptureStagedWithAuthority(stagedSnapshot)
+                : TryResolveGenerationId(context.Request.Path, out string? generationId)
+                    ? releaseTruth.CaptureGenerationWithAuthority(generationId!)
+                    : releaseTruth.CaptureWithAuthority();
         }
         catch (Exception exception) when (exception is InvalidDataException or InvalidOperationException)
         {
