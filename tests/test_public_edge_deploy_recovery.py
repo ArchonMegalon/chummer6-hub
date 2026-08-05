@@ -846,7 +846,8 @@ def test_recovery_restarts_stopped_portal_with_immutable_prior_proof_bind(
     legacy_proof = (
         tmp_path / "public-projection" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
     )
-    legacy_proof.write_bytes(CANDIDATE_PROOF_BYTES)
+    stale_legacy_proof = b"stale-unmounted-legacy-proof\n"
+    legacy_proof.write_bytes(stale_legacy_proof)
     legacy_proof.chmod(0o644)
     immutable_prior_proof = (
         tmp_path
@@ -877,7 +878,7 @@ def test_recovery_restarts_stopped_portal_with_immutable_prior_proof_bind(
         PRIOR_PROOF_SHA256
     )
     assert immutable_prior_proof.read_bytes() == PRIOR_PROOF_BYTES
-    assert legacy_proof.read_bytes() == CANDIDATE_PROOF_BYTES
+    assert legacy_proof.read_bytes() == stale_legacy_proof
     assert not journal.exists()
 
 

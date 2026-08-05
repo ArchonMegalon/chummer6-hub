@@ -4905,11 +4905,16 @@ if container_id == incumbent_id:
         raise SystemExit(1)
     classification = "incumbent_portal"
 else:
-    suffix = hashlib.sha256(cutover_id.encode("utf-8")).hexdigest()[:24]
-    prefix = f"chummer-install-linking-cutover-{suffix}-"
-    if not container_name.startswith(prefix):
+    current_suffix = hashlib.sha256(
+        cutover_id.encode("utf-8")
+    ).hexdigest()[:24]
+    proof_name = re.fullmatch(
+        r"chummer-install-linking-cutover-([0-9a-f]{24})-(.+)",
+        container_name,
+    )
+    if proof_name is None:
         raise SystemExit(1)
-    job_name = container_name[len(prefix):]
+    proof_suffix, job_name = proof_name.groups()
     if (
         job_name != "prove-local-store-state"
         and re.fullmatch(
@@ -4921,10 +4926,9 @@ else:
     ):
         raise SystemExit(1)
     job_hash = hashlib.sha256(job_name.encode("utf-8")).hexdigest()[:12]
-    expected_project = f"chummer6-ilpg-{suffix[:16]}-{job_hash}"
+    expected_project = f"chummer6-ilpg-{proof_suffix[:16]}-{job_hash}"
     if (
-        image_id != candidate_tool_image_id
-        or running is not False
+        running is not False
         or mount["RW"] is not False
         or project != expected_project
         or service
@@ -4932,7 +4936,17 @@ else:
         or oneoff != "False"
     ):
         raise SystemExit(1)
-    classification = "governed_local_store_proof"
+    if proof_suffix == current_suffix:
+        if image_id != candidate_tool_image_id:
+            raise SystemExit(1)
+        classification = "governed_local_store_proof"
+    else:
+        # Successful local-store proof jobs are deliberately retained as
+        # audit evidence. They remain harmless consumers only while stopped,
+        # read-only, and bound to the exact governed Compose name/project
+        # derivation. Treat them as stable inventory instead of making every
+        # subsequent cutover delete predecessor evidence.
+        classification = "retained_governed_local_store_proof"
 record = {
     "classification": classification,
     "composeOneoff": oneoff,

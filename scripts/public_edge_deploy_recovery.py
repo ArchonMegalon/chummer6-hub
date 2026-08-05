@@ -1151,6 +1151,7 @@ def main(argv: list[str] | None = None) -> int:
             projection_snapshot_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
         )
         legacy_proof_bind_prepared = False
+        prior_proof_bind_is_legacy: bool | None = None
         if proof_bind_source != authenticated_runtime_proof:
             raise RuntimeError(
                 "durable recovery journal does not bind its authenticated generation"
@@ -1167,6 +1168,8 @@ def main(argv: list[str] | None = None) -> int:
 
         def restore_candidate_proof_bind() -> None:
             nonlocal legacy_proof_bind_prepared
+            if prior_proof_bind_is_legacy is None:
+                raise RuntimeError("prior runtime proof bind source was not classified")
             if not candidate_proof_snapshot.is_file():
                 raise RuntimeError("candidate proof evidence snapshot is unavailable")
             if legacy_proof_bind_prepared:
@@ -1178,20 +1181,21 @@ def main(argv: list[str] | None = None) -> int:
                     ],
                 )
                 legacy_proof_bind_prepared = False
-            if stable_file_sha256(
-                legacy_proof_bind_source,
-                label="restored legacy runtime proof bind source",
-            ) != prior["expectedRuntimeProofBindSourceSha256"]:
-                raise RuntimeError(
-                    "legacy runtime proof bind source did not restore candidate authority"
-                )
+            if prior_proof_bind_is_legacy:
+                if stable_file_sha256(
+                    legacy_proof_bind_source,
+                    label="restored legacy runtime proof bind source",
+                ) != prior["expectedRuntimeProofBindSourceSha256"]:
+                    raise RuntimeError(
+                        "legacy runtime proof bind source did not restore candidate authority"
+                    )
             if not proof_bind_source_matches_candidate():
                 raise RuntimeError(
                     "immutable authenticated generation proof cannot be repaired in place"
                 )
 
         def prepare_prior_proof_bind() -> None:
-            nonlocal legacy_proof_bind_prepared
+            nonlocal legacy_proof_bind_prepared, prior_proof_bind_is_legacy
             portal_id = prior["priorPortalContainerId"]
             authority_source = runtime.container_bind_source(
                 portal_id,
@@ -1227,6 +1231,7 @@ def main(argv: list[str] | None = None) -> int:
                     raise RuntimeError(
                         "immutable prior runtime proof bind source changed"
                     )
+                prior_proof_bind_is_legacy = False
                 return
             atomic_replace_from_snapshot(
                 snapshot=prior_authority_snapshot,
@@ -1234,6 +1239,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_sha256=authority_digest,
             )
             legacy_proof_bind_prepared = True
+            prior_proof_bind_is_legacy = True
 
         def overlay_matches() -> bool:
             return transaction.prior_overlay_matches_snapshot(
