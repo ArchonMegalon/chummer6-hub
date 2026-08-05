@@ -259,6 +259,31 @@ public sealed class PublicReleaseManifestService
         return manifest;
     }
 
+    internal PublicReleaseManifestDto LoadStagedAuthorityManifest(
+        ReleaseShelfSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.IsLegacy)
+        {
+            throw new InvalidOperationException(
+                "Staged authority manifests require an immutable release-shelf generation.");
+        }
+
+        byte[] canonicalBytes = snapshot.ReadVerifiedFileBytes(
+                ReleaseShelfGenerationStore.CanonicalManifestFileName,
+                ReleaseShelfGenerationStore.MaximumManifestBytes)
+            ?? throw new InvalidDataException(
+                "Captured staged release-shelf canonical manifest no longer matches its inventory binding.");
+        return BindGeneration(
+            LoadRegistryReleaseManifestPayload(
+                FilterManifestPayload(
+                    DecodeUtf8Manifest(
+                        canonicalBytes,
+                        ReleaseShelfGenerationStore.CanonicalManifestFileName)),
+                "registry"),
+            snapshot);
+    }
+
     /// <summary>
     /// Loads the immutable Registry artifact bindings without applying Hub display
     /// suppression. Delivery authorization must resolve the original binding first

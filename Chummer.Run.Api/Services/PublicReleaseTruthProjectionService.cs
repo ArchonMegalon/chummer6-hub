@@ -61,13 +61,20 @@ public sealed class PublicReleaseTruthProjectionService
         => CaptureSnapshot(_releases.CaptureShelfGeneration(generationId));
 
     public PublicReleaseTruthCapture CaptureStagedWithAuthority(ReleaseShelfSnapshot snapshot)
-        => CaptureSnapshot(snapshot ?? throw new ArgumentNullException(nameof(snapshot)));
+        => CaptureSnapshot(
+            snapshot ?? throw new ArgumentNullException(nameof(snapshot)),
+            stagedAuthority: true);
 
-    private PublicReleaseTruthCapture CaptureSnapshot(ReleaseShelfSnapshot snapshot)
+    private PublicReleaseTruthCapture CaptureSnapshot(
+        ReleaseShelfSnapshot snapshot,
+        bool stagedAuthority = false)
     {
         PublicReleaseManifestDto manifest = _artifactDelivery.FilterRevokedArtifacts(
             snapshot,
-            _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(snapshot)));
+            _releaseSelection.ApplyAccessPolicy(
+                stagedAuthority
+                    ? _releases.LoadStagedAuthorityManifest(snapshot)
+                    : _releases.LoadManifest(snapshot)));
         ReadOnlyMemory<byte>? authorityBytes = snapshot.IsLegacy
             ? null
             : _releases.LoadGenerationCanonicalManifestBytes(snapshot);
