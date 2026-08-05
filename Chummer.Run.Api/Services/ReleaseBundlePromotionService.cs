@@ -8943,7 +8943,7 @@ public sealed class ReleaseBundlePromotionService
         }
     }
 
-    private static void ValidateCandidateIncumbentBinding(
+    internal static void ValidateCandidateIncumbentBinding(
         ReleaseShelfSnapshot activeShelf,
         ReleaseUploadCandidateSessionBinding? candidateImportBinding)
     {
@@ -8965,16 +8965,21 @@ public sealed class ReleaseBundlePromotionService
             candidateImportBinding.IncumbentBinding
             ?? throw new InvalidDataException(
                 "unsigned-v3 candidate validation is missing its sealed incumbent binding.");
-        if (activeShelf.IsLegacy
-            || !FixedTimeHexEquals(
+        bool exactShelfBindingMatches =
+            FixedTimeHexEquals(
                 activeShelf.CanonicalManifestSha256,
                 incumbent.CanonicalManifestSha256)
-            || !FixedTimeHexEquals(
+            && FixedTimeHexEquals(
                 activeShelf.CompatibilityManifestSha256,
                 incumbent.CompatibilityManifestSha256)
-            || !FixedTimeHexEquals(
+            && FixedTimeHexEquals(
                 activeShelf.InventoryDigest,
-                incumbent.ActiveInventorySha256))
+                incumbent.ActiveInventorySha256);
+        if (activeShelf.IsLegacy
+            || (!exactShelfBindingMatches
+                && !ActivePublishedArtifactInventoryMatchesIncumbent(
+                    activeShelf,
+                    incumbent.ActiveInventorySha256)))
         {
             throw new ReleaseShelfMutationConcurrencyException(
                 "unsigned-v3 candidate was not composed from the still-active incumbent release shelf.");
@@ -8983,6 +8988,127 @@ public sealed class ReleaseBundlePromotionService
         // StagePreparedBundle holds the promotion lock. The stage receipt records
         // this exact active pointer as PreviousPointerSha256 before the lock is
         // released, and staged activation already rejects any predecessor drift.
+    }
+
+    private static bool ActivePublishedArtifactInventoryMatchesIncumbent(
+        ReleaseShelfSnapshot activeShelf,
+        string expectedInventorySha256)
+    {
+        if (!IsBareLowerSha256(expectedInventorySha256))
+        {
+            return false;
+        }
+
+        try
+        {
+            byte[]? canonicalBytes = activeShelf.ReadVerifiedFileBytes(
+                CanonicalManifestName,
+                ReleaseShelfGenerationStore.MaximumManifestBytes);
+            byte[]? compatibilityBytes = activeShelf.ReadVerifiedFileBytes(
+                CompatibilityManifestName,
+                ReleaseShelfGenerationStore.MaximumManifestBytes);
+            if (canonicalBytes is null || compatibilityBytes is null)
+            {
+                return false;
+            }
+
+            JsonObject canonicalManifest = LoadJsonObject(
+                canonicalBytes,
+                CanonicalManifestName);
+            PublicReleaseManifestDto compatibilityManifest = LoadCompatibilityManifest(
+                compatibilityBytes,
+                CompatibilityManifestName);
+            Dictionary<string, CanonicalArtifactRecord> canonicalById =
+                BuildUniqueCanonicalArtifacts(LoadCanonicalArtifacts(canonicalManifest));
+            Dictionary<string, PublicReleaseArtifactDto> compatibilityById =
+                BuildUniqueCompatibilityArtifacts(compatibilityManifest.Downloads);
+            if (canonicalById.Count == 0
+                || canonicalById.Count != compatibilityById.Count
+                || canonicalById.Keys.Any(
+                    artifactId => !compatibilityById.ContainsKey(artifactId)))
+            {
+                return false;
+            }
+
+            var publishedInventory = new Dictionary<string, ReleaseShelfInventoryEntry>(
+                StringComparer.Ordinal);
+            foreach ((string artifactId, CanonicalArtifactRecord canonicalArtifact) in canonicalById)
+            {
+                NormalizedArtifactContract canonicalContract =
+                    NormalizeCanonicalArtifactContract(
+                        canonicalArtifact,
+                        requireIncomingUrls: false);
+                NormalizedArtifactContract compatibilityContract =
+                    NormalizeCompatibilityArtifactContract(
+                        compatibilityById[artifactId],
+                        requireIncomingUrls: false);
+                if (canonicalContract != compatibilityContract
+                    || !TryBindPublishedArtifact(
+                        activeShelf,
+                        publishedInventory,
+                        canonicalContract.FileName,
+                        canonicalContract.Sha256,
+                        canonicalContract.SizeBytes))
+                {
+                    return false;
+                }
+
+                if (canonicalContract.PayloadFileName is not null
+                    && (!TryBindPublishedArtifact(
+                            activeShelf,
+                            publishedInventory,
+                            canonicalContract.PayloadFileName,
+                            canonicalContract.PayloadSha256,
+                            canonicalContract.PayloadSizeBytes)
+                        || canonicalContract.PayloadSha256 is null
+                        || canonicalContract.PayloadSizeBytes is null))
+                {
+                    return false;
+                }
+            }
+
+            string publishedInventorySha256 =
+                ReleaseShelfGenerationStore.ComputeInventoryDigest(
+                    publishedInventory.Values.OrderBy(
+                        static row => row.Path,
+                        StringComparer.Ordinal));
+            return FixedTimeHexEquals(
+                publishedInventorySha256,
+                expectedInventorySha256);
+        }
+        catch (Exception exception) when (
+            exception is InvalidDataException
+                or InvalidOperationException
+                or JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryBindPublishedArtifact(
+        ReleaseShelfSnapshot activeShelf,
+        IDictionary<string, ReleaseShelfInventoryEntry> publishedInventory,
+        string? fileName,
+        string? expectedSha256,
+        long? expectedSizeBytes)
+    {
+        if (fileName is null
+            || expectedSha256 is null
+            || expectedSizeBytes is null)
+        {
+            return false;
+        }
+
+        string path = $"files/{fileName}";
+        if (!activeShelf.Inventory.TryGetValue(path, out ReleaseShelfInventoryEntry? active)
+            || active.SizeBytes != expectedSizeBytes.Value
+            || !FixedTimeHexEquals(active.Sha256, expectedSha256)
+            || !publishedInventory.TryAdd(path, active))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private static PublicReleaseManifestDto MergeCompatibilityManifest(
