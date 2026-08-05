@@ -32,6 +32,7 @@ PRIOR_TUNNEL_CONTAINER_ID = "c" * 64
 PRIOR_TUNNEL_REPLICA_CONTAINER_ID = "f" * 64
 POSTQUIESCE_PROOF_CONTAINER_ID = "d" * 64
 ORPHAN_STATE_CONSUMER_CONTAINER_ID = "e" * 64
+RETAINED_PROOF_CONTAINER_ID = "8" * 64
 TOPOLOGY_B_GUARD_MESSAGE = (
     "canonical public edge mutation is blocked while topology-B downloads "
     "authority exists"
@@ -441,6 +442,10 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv(
         "FAKE_ORPHAN_STATE_CONSUMER_CONTAINER_ID",
         ORPHAN_STATE_CONSUMER_CONTAINER_ID,
+    )
+    monkeypatch.setenv(
+        "FAKE_RETAINED_PROOF_CONTAINER_ID",
+        RETAINED_PROOF_CONTAINER_ID,
     )
     monkeypatch.setenv(
         "FAKE_CUTOVER_NAME_SUFFIX",
@@ -1014,6 +1019,9 @@ case "$*" in
   *" config --format json") cat "$FAKE_COMPOSE_CONFIG_JSON"; exit 0;;
   "container ls --all --quiet --no-trunc --filter volume=chummer6-hub_chummer-run-api-state")
     printf '%s\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID"
+    if [ "${FAKE_RETAINED_STATE_VOLUME_PROOF:-0}" = 1 ]; then
+      printf '%s\n' "$FAKE_RETAINED_PROOF_CONTAINER_ID"
+    fi
     if [ "${FAKE_STATE_VOLUME_CONSUMER_RACE:-}" = orphan_before ]; then
       printf '%s\n' "$FAKE_ORPHAN_STATE_CONSUMER_CONTAINER_ID"
     fi
@@ -1035,6 +1043,14 @@ case "$*" in
     container_name="chummer-install-linking-cutover-${FAKE_CUTOVER_NAME_SUFFIX}-${job_name}"
     project="chummer6-ilpg-${project_prefix}-${job_hash}"
     printf '"%s" "/%s" "%s" false {"com.docker.compose.oneoff":"False","com.docker.compose.project":"%s","com.docker.compose.service":"chummer-install-linking-postgres-import-presence-proof"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":false,"Type":"volume"}]\n' "$FAKE_POSTQUIESCE_PROOF_CONTAINER_ID" "$container_name" "$FAKE_CANDIDATE_TOOL_IMAGE_ID" "$project"
+    ;;
+  "container inspect --format {{json .Id}}"*" $FAKE_RETAINED_PROOF_CONTAINER_ID")
+    retained_suffix=0123456789abcdef01234567
+    job_name=postquiesce-deploy-prior1-prove-local-store-state
+    job_hash="$(printf '%s' "$job_name" | /usr/bin/sha256sum | /usr/bin/awk '{print substr($1,1,12)}')"
+    project="chummer6-ilpg-$(printf '%s' "$retained_suffix" | /usr/bin/cut -c1-16)-${job_hash}"
+    container_name="chummer-install-linking-cutover-${retained_suffix}-${job_name}"
+    printf '"%s" "/%s" "%s" false {"com.docker.compose.oneoff":"False","com.docker.compose.project":"%s","com.docker.compose.service":"chummer-install-linking-postgres-import-presence-proof"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":false,"Type":"volume"}]\n' "$FAKE_RETAINED_PROOF_CONTAINER_ID" "$container_name" "$FAKE_PRIOR_TOOL_IMAGE_ID" "$project"
     ;;
   "container inspect --format {{json .Id}}"*" $FAKE_ORPHAN_STATE_CONSUMER_CONTAINER_ID")
     orphan_running=false
@@ -2252,6 +2268,62 @@ def test_guarded_deploy_accepts_verified_postquiesce_pass_despite_runner_exit(
     assert "journal:phase:overlay_activated" in events
     assert "journal:complete" in events
     assert "journal:recovered" not in events
+
+
+def test_guarded_deploy_accepts_retained_prior_readonly_local_store_proof(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "FAKE_RETAINED_STATE_VOLUME_PROOF": "1",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    cutover_root = Path(env["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"]).parent
+    inventories = sorted(
+        cutover_root.glob("INSTALL_LINKING_STATE_VOLUME_INVENTORY.*.json")
+    )
+    assert len(inventories) == 2
+    for inventory in inventories:
+        consumers = json.loads(inventory.read_text(encoding="utf-8"))["consumers"]
+        retained = [
+            consumer
+            for consumer in consumers
+            if consumer["containerId"] == RETAINED_PROOF_CONTAINER_ID
+        ]
+        assert len(retained) == 1
+        assert retained[0]["classification"] == (
+            "retained_governed_local_store_proof"
+        )
+        assert retained[0]["running"] is False
+        assert retained[0]["readWrite"] is False
 
 
 def test_guarded_deploy_rejects_orphan_state_volume_consumer_before_reproof(
