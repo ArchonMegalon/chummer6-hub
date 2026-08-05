@@ -590,6 +590,95 @@ def test_state_volume_inventory_rejects_compose_oneoff_proof(
         )
 
 
+def test_state_volume_inventory_accepts_retained_governed_proof(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    cutover_id = "2026-07-17T12:00:00Z"
+    prior_cutover_id = "2026-07-16T12:00:00Z"
+    prior_suffix = hashlib.sha256(
+        prior_cutover_id.encode("utf-8")
+    ).hexdigest()[:24]
+    job_name = "prove-local-store-state"
+    job_hash = hashlib.sha256(job_name.encode("utf-8")).hexdigest()[:12]
+    consumer = {
+        "classification": "retained_governed_local_store_proof",
+        "composeOneoff": "False",
+        "composeProject": f"chummer6-ilpg-{prior_suffix[:16]}-{job_hash}",
+        "composeService": (
+            "chummer-install-linking-postgres-import-presence-proof"
+        ),
+        "containerId": "e" * 64,
+        "containerName": (
+            f"chummer-install-linking-cutover-{prior_suffix}-{job_name}"
+        ),
+        "imageId": "sha256:" + "9" * 64,
+        "jobName": job_name,
+        "readWrite": False,
+        "running": False,
+        "volumeDestination": "/app/state",
+    }
+    inventory_path, inventory_sha256 = state_volume_inventory(
+        module,
+        tmp_path,
+        consumers=[consumer],
+    )
+
+    _, bound_sha256, payload = module.bind_state_volume_inventory(
+        inventory_path,
+        expected_sha256=inventory_sha256,
+        attempt_id="attempt01",
+        cutover_id=cutover_id,
+        candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+        mutation_lock_token_sha256="f" * 64,
+    )
+
+    assert bound_sha256 == inventory_sha256
+    assert payload["consumers"] == [consumer]
+
+
+def test_state_volume_inventory_rejects_retained_classification_for_current(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    cutover_id = "2026-07-17T12:00:00Z"
+    suffix = hashlib.sha256(cutover_id.encode("utf-8")).hexdigest()[:24]
+    job_name = "prove-local-store-state"
+    job_hash = hashlib.sha256(job_name.encode("utf-8")).hexdigest()[:12]
+    consumer = {
+        "classification": "retained_governed_local_store_proof",
+        "composeOneoff": "False",
+        "composeProject": f"chummer6-ilpg-{suffix[:16]}-{job_hash}",
+        "composeService": (
+            "chummer-install-linking-postgres-import-presence-proof"
+        ),
+        "containerId": "e" * 64,
+        "containerName": (
+            f"chummer-install-linking-cutover-{suffix}-{job_name}"
+        ),
+        "imageId": CANDIDATE_TOOL_IMAGE,
+        "jobName": job_name,
+        "readWrite": False,
+        "running": False,
+        "volumeDestination": "/app/state",
+    }
+    inventory_path, inventory_sha256 = state_volume_inventory(
+        module,
+        tmp_path,
+        consumers=[consumer],
+    )
+
+    with pytest.raises(ValueError, match="governed volume consumer"):
+        module.bind_state_volume_inventory(
+            inventory_path,
+            expected_sha256=inventory_sha256,
+            attempt_id="attempt01",
+            cutover_id=cutover_id,
+            candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+            mutation_lock_token_sha256="f" * 64,
+        )
+
+
 def phase_evidence(
     module,
     root: Path,
