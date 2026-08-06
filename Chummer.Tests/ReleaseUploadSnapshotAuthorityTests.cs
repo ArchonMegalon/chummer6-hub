@@ -507,6 +507,38 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     }
 
     [Fact]
+    public void RuntimeAcceptsProofBoundLinuxWindowsPreviewReadyManifestPair()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            BuildPreviewReadyManifestPair();
+
+        ReleaseUploadSnapshotAuthorityService.ValidatePreviewReadyManifestPair(
+            JsonSerializer.SerializeToElement(canonical),
+            JsonSerializer.SerializeToElement(compatibility),
+            "run-20260803-204603");
+    }
+
+    [Fact]
+    public void RuntimeRejectsPreviewReadyManifestWithUnpromotedWindowsRoute()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            BuildPreviewReadyManifestPair();
+        JsonObject windows = canonical["desktopTupleCoverage"]!
+            .AsObject()["desktopRouteTruth"]!
+            .AsArray()
+            .Select(static row => row!.AsObject())
+            .Single(static row =>
+                row["tupleId"]!.GetValue<string>() == "avalonia:windows:win-x64");
+        windows["promotionState"] = "proof_required";
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadSnapshotAuthorityService.ValidatePreviewReadyManifestPair(
+                JsonSerializer.SerializeToElement(canonical),
+                JsonSerializer.SerializeToElement(compatibility),
+                "run-20260803-204603"));
+    }
+
+    [Fact]
     public void RuntimeRejectsCoordinatedRehashedUnsignedWindowsFreshDeltaRegistryCommitDrift()
     {
         byte[] authorityBytes =
@@ -1300,6 +1332,58 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             pair["compatibility"]?.AsObject()
                 ?? throw new InvalidDataException(
                     "unsigned fresh-delta compatibility fixture is invalid"));
+    }
+
+    private static (JsonObject Canonical, JsonObject Compatibility)
+        BuildPreviewReadyManifestPair()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+        foreach (JsonObject manifest in new[] { canonical, compatibility })
+        {
+            manifest["projectionProfile"] = "v4_unsigned_windows_preview_ready";
+            manifest["status"] = "published";
+            manifest["rolloutState"] = "promoted_preview";
+            manifest["supportabilityState"] = "preview_supported";
+            manifest["publicationEligible"] = true;
+            manifest["routeAuthority"] = true;
+            manifest["releaseUploadAuthority"] = false;
+            manifest["deployAuthority"] = false;
+            manifest["releaseProof"]!.AsObject()["status"] = "passed";
+        }
+
+        JsonObject coverage = canonical["desktopTupleCoverage"]!.AsObject();
+        coverage["complete"] = true;
+        coverage["routeAuthority"] = true;
+        coverage["missingRequiredPlatforms"] = new JsonArray();
+        coverage["missingRequiredHeads"] = new JsonArray();
+        coverage["missingRequiredPlatformHeadPairs"] = new JsonArray();
+        coverage["missingRequiredPlatformHeadRidTuples"] = new JsonArray();
+        foreach (JsonObject route in coverage["desktopRouteTruth"]!
+                     .AsArray()
+                     .Select(static row => row!.AsObject())
+                     .Where(static route =>
+                         route["routeRole"]!.GetValue<string>() == "primary"))
+        {
+            route["promotionState"] = "promoted";
+            route["publicationState"] = "published";
+            route["updateEligibility"] = "eligible";
+            route["installPosture"] = "installer_first";
+            route["revokeState"] = "not_revoked";
+            route["routeAuthority"] = true;
+            route["publicInstallRoute"] =
+                $"/downloads/install/{route["artifactId"]!.GetValue<string>()}";
+        }
+        foreach (JsonObject binding in canonical["artifactPublicationBindings"]!
+                     .AsArray()
+                     .Select(static row => row!.AsObject()))
+        {
+            binding["publicationState"] = "published";
+        }
+        compatibility["desktopTupleCoverage"] = coverage.DeepClone();
+        compatibility["artifactPublicationBindings"] =
+            canonical["artifactPublicationBindings"]!.DeepClone();
+        return (canonical, compatibility);
     }
 
     private static void ConvertUnsignedFreshDeltaManifestPairToWindowsOnly(
