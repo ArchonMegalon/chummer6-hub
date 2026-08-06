@@ -1843,6 +1843,9 @@ def apply_current_release_supportability_floor(
     """Mirror the runtime proof/privacy floor before authority binds manifest bytes."""
 
     projected = copy.deepcopy(payload)
+    if _is_bounded_preview_ready_profile(projected):
+        return projected
+
     materialized_freshness_status = _evaluate_release_proof_freshness(
         projected,
         _projection_evaluated_at(evaluated_at),
@@ -1853,9 +1856,6 @@ def apply_current_release_supportability_floor(
     public_trust_metrics["privacyReadiness"] = copy.deepcopy(
         privacy_launch_gate
     )
-
-    if _is_bounded_preview_ready_profile(projected):
-        return projected
 
     privacy_blocks_supportability = bool(
         privacy_launch_gate["reviewRequired"]
@@ -2078,6 +2078,11 @@ def project_manifest_pair(
             "release-proof freshness evidence"
         )
 
+    bounded_preview_ready = (
+        _is_bounded_preview_ready_profile(canonical_source)
+        and _is_bounded_preview_ready_profile(compatibility_source)
+    )
+
     projection_evaluated_at = _projection_evaluated_at(evaluated_at)
     (
         privacy_launch_gate,
@@ -2176,7 +2181,7 @@ def project_manifest_pair(
             "supportabilityFloorEvaluatedAt": _format_utc_timestamp(
                 projection_evaluated_at
             ),
-            "supportabilityFloorApplied": True,
+            "supportabilityFloorApplied": not bounded_preview_ready,
         }
     finally:
         for temporary in temporary_paths:
