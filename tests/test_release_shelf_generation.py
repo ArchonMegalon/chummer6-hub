@@ -791,6 +791,10 @@ def test_generation_projection_preserves_exact_bounded_preview_ready_posture(
 ) -> None:
     paths = _write_supportability_projection_pair(tmp_path)
     _mark_pair_as_bounded_preview_ready(paths)
+    source_trust_metrics = [
+        copy.deepcopy(json.loads(path.read_text(encoding="utf-8"))["publicTrustMetrics"])
+        for path in paths
+    ]
 
     receipt = MODULE.project_manifest_pair(
         *paths,
@@ -798,7 +802,7 @@ def test_generation_projection_preserves_exact_bounded_preview_ready_posture(
         evaluated_at=FRESHNESS_EVALUATED_AT,
     )
 
-    for path in paths:
+    for path, expected_trust_metrics in zip(paths, source_trust_metrics, strict=True):
         manifest = json.loads(path.read_text(encoding="utf-8"))
         assert manifest["rolloutState"] == "promoted_preview"
         assert manifest["supportabilityState"] == "preview_supported"
@@ -806,9 +810,9 @@ def test_generation_projection_preserves_exact_bounded_preview_ready_posture(
         assert manifest["routeAuthority"] is True
         assert manifest["releaseUploadAuthority"] is False
         assert manifest["deployAuthority"] is False
-        assert manifest["publicTrustMetrics"]["proofFreshness"]["status"] == "missing"
-        assert manifest["publicTrustMetrics"]["privacyReadiness"]["reviewRequired"] is True
-    assert receipt["supportabilityFloorApplied"] is True
+        assert manifest["publicTrustMetrics"] == expected_trust_metrics
+        assert "privacyReadiness" not in manifest["publicTrustMetrics"]
+    assert receipt["supportabilityFloorApplied"] is False
 
 
 @pytest.mark.parametrize(
