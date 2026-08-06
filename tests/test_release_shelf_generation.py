@@ -697,6 +697,151 @@ def _write_supportability_projection_pair(
     return canonical_path, compatibility_path
 
 
+def _mark_pair_as_bounded_preview_ready(
+    paths: tuple[Path, Path],
+) -> None:
+    release_version = "run-supportability-floor"
+    registry_commit = "a" * 40
+    readiness = {
+        "contractName": "chummer.registry.preview-publication-readiness/v1",
+        "contractVersion": 1,
+        "generatedAtUtc": "2026-07-24T12:40:00Z",
+        "localizationGateSha256": "1" * 64,
+        "nativeWindowsEvidenceSha256": "2" * 64,
+        "platforms": ["linux", "windows"],
+        "registryCommit": registry_commit,
+        "releaseProofSha256": "3" * 64,
+        "releaseVersion": release_version,
+        "sourceCandidateAuthoritySha256": "4" * 64,
+        "sourceCanonicalManifestSha256": "5" * 64,
+        "sourceCompatibilityManifestSha256": "6" * 64,
+        "status": "preview_ready",
+    }
+    primary_rows = [
+        {
+            "head": "avalonia",
+            "platform": "linux",
+            "promotionState": "promoted",
+            "publicationState": "published",
+            "revokeState": "not_revoked",
+            "rid": "linux-x64",
+            "routeAuthority": True,
+            "routeRole": "primary",
+            "tupleId": "avalonia:linux:linux-x64",
+            "updateEligibility": "eligible",
+        },
+        {
+            "head": "avalonia",
+            "platform": "windows",
+            "promotionState": "promoted",
+            "publicationState": "published",
+            "revokeState": "not_revoked",
+            "rid": "win-x64",
+            "routeAuthority": True,
+            "routeRole": "primary",
+            "tupleId": "avalonia:windows:win-x64",
+            "updateEligibility": "eligible",
+        },
+    ]
+    promoted = [
+        {
+            "head": row["head"],
+            "kind": "installer",
+            "platform": row["platform"],
+            "tupleId": row["tupleId"],
+        }
+        for row in primary_rows
+    ]
+    for path in paths:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload.update(
+            {
+                "version": release_version,
+                "releaseVersion": release_version,
+                "channelId": "preview",
+                "projectionProfile": "v4_unsigned_windows_preview_ready",
+                "rolloutState": "promoted_preview",
+                "supportabilityState": "preview_supported",
+                "publicationEligible": True,
+                "routeAuthority": True,
+                "releaseUploadAuthority": False,
+                "deployAuthority": False,
+                "registryCommit": registry_commit,
+                "previewPublicationReadiness": copy.deepcopy(readiness),
+                "desktopTupleCoverage": {
+                    "complete": True,
+                    "desktopRouteTruth": copy.deepcopy(primary_rows),
+                    "externalProofRequests": [],
+                    "missingRequiredHeads": [],
+                    "missingRequiredPlatformHeadPairs": [],
+                    "missingRequiredPlatformHeadRidTuples": [],
+                    "missingRequiredPlatforms": [],
+                    "promotedInstallerTuples": copy.deepcopy(promoted),
+                    "requiredDesktopHeads": ["avalonia"],
+                    "requiredDesktopPlatforms": ["linux", "windows"],
+                    "routeAuthority": True,
+                },
+            }
+        )
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_generation_projection_preserves_exact_bounded_preview_ready_posture(
+    tmp_path: Path,
+) -> None:
+    paths = _write_supportability_projection_pair(tmp_path)
+    _mark_pair_as_bounded_preview_ready(paths)
+
+    receipt = MODULE.project_manifest_pair(
+        *paths,
+        "g-bounded-preview-ready",
+        evaluated_at=FRESHNESS_EVALUATED_AT,
+    )
+
+    for path in paths:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        assert manifest["rolloutState"] == "promoted_preview"
+        assert manifest["supportabilityState"] == "preview_supported"
+        assert manifest["publicationEligible"] is True
+        assert manifest["routeAuthority"] is True
+        assert manifest["releaseUploadAuthority"] is False
+        assert manifest["deployAuthority"] is False
+        assert manifest["publicTrustMetrics"]["proofFreshness"]["status"] == "missing"
+        assert manifest["publicTrustMetrics"]["privacyReadiness"]["reviewRequired"] is True
+    assert receipt["supportabilityFloorApplied"] is True
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("releaseUploadAuthority", True),
+        ("routeAuthority", False),
+    ),
+)
+def test_generation_projection_rejects_broadened_bounded_preview_profile(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    paths = _write_supportability_projection_pair(tmp_path)
+    _mark_pair_as_bounded_preview_ready(paths)
+    for path in paths:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload[field] = value
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+    MODULE.project_manifest_pair(
+        *paths,
+        "g-bounded-preview-broadened",
+        evaluated_at=FRESHNESS_EVALUATED_AT,
+    )
+
+    for path in paths:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        assert manifest["rolloutState"] == "public_release_review_required"
+        assert manifest["supportabilityState"] == "review_required"
+
+
 def test_project_manifest_pair_materializes_exact_runtime_privacy_floor(
     tmp_path: Path,
 ) -> None:

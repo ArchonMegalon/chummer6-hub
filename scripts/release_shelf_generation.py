@@ -96,6 +96,15 @@ PRIVACY_LAUNCH_GATE_CONTRACT = (
 PRIVACY_LAUNCH_GATE_CONTRACT_NAME = "chummer.privacy_launch_gate"
 PRIVACY_LAUNCH_GATE_CONTRACT_VERSION = 1
 PROOF_REVIEW_ROLLOUT_STATE = "public_release_review_required"
+BOUNDED_PREVIEW_READY_PROFILE = "v4_unsigned_windows_preview_ready"
+BOUNDED_PREVIEW_READINESS_CONTRACT = (
+    "chummer.registry.preview-publication-readiness/v1"
+)
+BOUNDED_PREVIEW_PLATFORMS = ["linux", "windows"]
+BOUNDED_PREVIEW_PRIMARY_TUPLES = {
+    "avalonia:linux:linux-x64": ("linux", "linux-x64"),
+    "avalonia:windows:win-x64": ("windows", "win-x64"),
+}
 SUPPORTABILITY_FLOOR_FIELDS = (
     "rolloutState",
     "rolloutReason",
@@ -1652,6 +1661,133 @@ def _manifest_object(payload: dict[str, Any], key: str) -> dict[str, Any]:
     return projected
 
 
+def _is_bounded_preview_ready_profile(payload: dict[str, Any]) -> bool:
+    """Recognize Registry's proof-bound Linux/Windows preview posture.
+
+    This does not grant upload, deployment, or publication authority. It only
+    prevents generation URL projection from broadening an unrelated global
+    flagship/privacy floor into the narrower Registry-approved desktop preview
+    posture. The v6 candidate authority independently verifies the receipt bytes.
+    """
+
+    release_version = payload.get("releaseVersion")
+    registry_commit = payload.get("registryCommit")
+    if (
+        payload.get("projectionProfile") != BOUNDED_PREVIEW_READY_PROFILE
+        or not isinstance(release_version, str)
+        or not release_version
+        or payload.get("version") != release_version
+        or payload.get("channel") != "preview"
+        or payload.get("channelId") != "preview"
+        or payload.get("status") != "published"
+        or payload.get("rolloutState") != "promoted_preview"
+        or payload.get("supportabilityState") != "preview_supported"
+        or payload.get("publicationEligible") is not True
+        or payload.get("routeAuthority") is not True
+        or payload.get("releaseUploadAuthority") is not False
+        or payload.get("deployAuthority") is not False
+        or not isinstance(registry_commit, str)
+        or re.fullmatch(r"[0-9a-f]{40}", registry_commit) is None
+    ):
+        return False
+
+    readiness = payload.get("previewPublicationReadiness")
+    readiness_keys = {
+        "contractName",
+        "contractVersion",
+        "generatedAtUtc",
+        "localizationGateSha256",
+        "nativeWindowsEvidenceSha256",
+        "platforms",
+        "registryCommit",
+        "releaseProofSha256",
+        "releaseVersion",
+        "sourceCandidateAuthoritySha256",
+        "sourceCanonicalManifestSha256",
+        "sourceCompatibilityManifestSha256",
+        "status",
+    }
+    if (
+        not isinstance(readiness, dict)
+        or set(readiness) != readiness_keys
+        or readiness.get("contractName") != BOUNDED_PREVIEW_READINESS_CONTRACT
+        or readiness.get("contractVersion") != 1
+        or readiness.get("status") != "preview_ready"
+        or readiness.get("releaseVersion") != release_version
+        or readiness.get("registryCommit") != registry_commit
+        or readiness.get("platforms") != BOUNDED_PREVIEW_PLATFORMS
+        or _canonical_utc_timestamp(readiness.get("generatedAtUtc")) is None
+        or any(
+            not isinstance(readiness.get(field), str)
+            or re.fullmatch(r"[0-9a-f]{64}", readiness[field]) is None
+            for field in (
+                "localizationGateSha256",
+                "nativeWindowsEvidenceSha256",
+                "releaseProofSha256",
+                "sourceCandidateAuthoritySha256",
+                "sourceCanonicalManifestSha256",
+                "sourceCompatibilityManifestSha256",
+            )
+        )
+    ):
+        return False
+
+    coverage = payload.get("desktopTupleCoverage")
+    if (
+        not isinstance(coverage, dict)
+        or coverage.get("complete") is not True
+        or coverage.get("routeAuthority") is not True
+        or coverage.get("requiredDesktopPlatforms") != BOUNDED_PREVIEW_PLATFORMS
+        or coverage.get("requiredDesktopHeads") != ["avalonia"]
+        or coverage.get("missingRequiredPlatforms") != []
+        or coverage.get("missingRequiredHeads") != []
+        or coverage.get("missingRequiredPlatformHeadPairs") != []
+        or coverage.get("missingRequiredPlatformHeadRidTuples") != []
+        or coverage.get("externalProofRequests") != []
+    ):
+        return False
+
+    route_rows = coverage.get("desktopRouteTruth")
+    if not isinstance(route_rows, list):
+        return False
+    primary_rows: dict[str, dict[str, Any]] = {}
+    for row in route_rows:
+        if not isinstance(row, dict) or row.get("routeRole") != "primary":
+            continue
+        tuple_id = row.get("tupleId")
+        if not isinstance(tuple_id, str) or tuple_id in primary_rows:
+            return False
+        primary_rows[tuple_id] = row
+    if set(primary_rows) != set(BOUNDED_PREVIEW_PRIMARY_TUPLES):
+        return False
+    for tuple_id, (platform, rid) in BOUNDED_PREVIEW_PRIMARY_TUPLES.items():
+        row = primary_rows[tuple_id]
+        if (
+            row.get("head") != "avalonia"
+            or row.get("platform") != platform
+            or row.get("rid") != rid
+            or row.get("promotionState") != "promoted"
+            or row.get("publicationState") != "published"
+            or row.get("routeAuthority") is not True
+            or row.get("updateEligibility") != "eligible"
+            or row.get("revokeState") != "not_revoked"
+        ):
+            return False
+
+    promoted = coverage.get("promotedInstallerTuples")
+    if not isinstance(promoted, list) or len(promoted) != 2:
+        return False
+    promoted_ids = {
+        row.get("tupleId")
+        for row in promoted
+        if isinstance(row, dict)
+        and row.get("head") == "avalonia"
+        and row.get("kind") == "installer"
+        and row.get("platform") in BOUNDED_PREVIEW_PLATFORMS
+    }
+    return promoted_ids == set(BOUNDED_PREVIEW_PRIMARY_TUPLES)
+
+
 def _apply_release_channel_supportability_floor(
     release_channel: dict[str, Any],
     publication_status: str,
@@ -1717,6 +1853,9 @@ def apply_current_release_supportability_floor(
     public_trust_metrics["privacyReadiness"] = copy.deepcopy(
         privacy_launch_gate
     )
+
+    if _is_bounded_preview_ready_profile(projected):
+        return projected
 
     privacy_blocks_supportability = bool(
         privacy_launch_gate["reviewRequired"]
