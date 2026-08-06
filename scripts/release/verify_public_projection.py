@@ -101,6 +101,19 @@ CANDIDATE_AUTHORITY_CONTRACT_V2 = "chummer.release-upload.candidate-import-autho
 CANDIDATE_AUTHORITY_CONTRACT_V3 = "chummer.release-upload.candidate-import-authority/v3"
 CANDIDATE_AUTHORITY_CONTRACT_V4 = "chummer.release-upload.candidate-import-authority/v4"
 CANDIDATE_AUTHORITY_CONTRACT_V5 = "chummer.release-upload.candidate-import-authority/v5"
+CANDIDATE_AUTHORITY_CONTRACT_V6 = "chummer.release-upload.candidate-import-authority/v6"
+CANDIDATE_PREVIEW_READY_PROFILE = "v4_unsigned_windows_preview_ready"
+CANDIDATE_PREVIEW_READINESS_CONTRACT = (
+    "chummer.registry.preview-publication-readiness/v1"
+)
+CANDIDATE_SOURCE_AUTHORITY_PATH = (
+    "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.source-v4.generated.json"
+)
+CANDIDATE_PREVIEW_READINESS_PATH = "PREVIEW_PUBLICATION_READINESS.generated.json"
+CANDIDATE_PREPROJECTION_CANONICAL_PATH = (
+    "preprojection/RELEASE_CHANNEL.generated.json"
+)
+CANDIDATE_PREPROJECTION_COMPATIBILITY_PATH = "preprojection/releases.json"
 CANDIDATE_GENERATION_PROJECTION_CONTRACT = (
     "chummer.release-upload.native-stage-generation-projection/v1"
 )
@@ -7503,8 +7516,478 @@ def _validate_candidate_import_authority_v5(
     return authority
 
 
+def _validate_candidate_preview_ready_pair(
+    canonical: dict[str, object],
+    compatibility: dict[str, object],
+    *,
+    release_version: object,
+) -> None:
+    for label, manifest in (
+        ("canonical", canonical),
+        ("compatibility", compatibility),
+    ):
+        if (
+            manifest.get("projectionProfile") != CANDIDATE_PREVIEW_READY_PROFILE
+            or manifest.get("version") != release_version
+            or manifest.get("releaseVersion") != release_version
+            or manifest.get("channel") != "preview"
+            or manifest.get("channelId") != "preview"
+            or manifest.get("status") != "published"
+            or manifest.get("rolloutState") != "promoted_preview"
+            or manifest.get("supportabilityState") != "preview_supported"
+            or manifest.get("publicationEligible") is not True
+            or manifest.get("routeAuthority") is not True
+            or manifest.get("releaseUploadAuthority") is not False
+            or manifest.get("deployAuthority") is not False
+        ):
+            raise ProjectionBlocked(
+                f"preview-ready {label} manifest posture drifted"
+            )
+    coverage = canonical.get("desktopTupleCoverage")
+    if (
+        not isinstance(coverage, dict)
+        or coverage.get("complete") is not True
+        or coverage.get("routeAuthority") is not True
+        or coverage.get("missingRequiredPlatforms") != []
+        or coverage.get("missingRequiredHeads") != []
+        or coverage.get("missingRequiredPlatformHeadRidTuples") != []
+    ):
+        raise ProjectionBlocked("preview-ready desktop coverage is incomplete")
+
+
+def _validate_candidate_import_authority_v6(
+    authority: dict[str, object],
+    *,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    """Validate the stage-only Registry-ready Linux and Windows bridge."""
+
+    validation_now = now or datetime.now(timezone.utc)
+    expected_root = {
+        "candidate",
+        "candidateImportAuthority",
+        "candidateReviewAuthority",
+        "codeDeploymentAuthority",
+        "contractName",
+        "contractVersion",
+        "crossRunBitReproducible",
+        "custody",
+        "deployAuthority",
+        "exactIncomingDesktopScope",
+        "expiresAtUtc",
+        "generatedAtUtc",
+        "ownerNativeFinalizationBridgeAuthority",
+        "ownerNativeStageAuthoritySeedBridgeAuthority",
+        "platformScope",
+        "previewPublicationReadinessBridgeAuthority",
+        "publicationAuthorized",
+        "publicationEligible",
+        "releaseUploadAuthority",
+        "routeAuthority",
+        "signaturePolicy",
+        "status",
+    }
+    expected_custody = {
+        "canonicalManifest",
+        "compatibilityManifest",
+        "generationProjection",
+        "inventory",
+        "nativeWindowsFinalizedEvidence",
+        "preprojectionCanonicalManifest",
+        "preprojectionCompatibilityManifest",
+        "publicationReadinessReceipt",
+        "sourceCandidateAuthority",
+    }
+    custody = authority.get("custody")
+    signature_policy = {
+        "signatureStatus": "unsigned",
+        "signingRequired": False,
+        "unsignedReason": "preview_policy",
+    }
+    if (
+        set(authority) != expected_root
+        or authority.get("contractName") != CANDIDATE_AUTHORITY_CONTRACT_V6
+        or type(authority.get("contractVersion")) is not int
+        or authority.get("contractVersion") != 6
+        or authority.get("status") != PROJECTION_STATUS_CANDIDATE_IMPORT_READY
+        or authority.get("candidateImportAuthority") is not True
+        or authority.get("candidateReviewAuthority") is not True
+        or authority.get("ownerNativeFinalizationBridgeAuthority") is not True
+        or authority.get("ownerNativeStageAuthoritySeedBridgeAuthority") is not True
+        or authority.get("previewPublicationReadinessBridgeAuthority") is not True
+        or authority.get("exactIncomingDesktopScope") != CANDIDATE_EXACT_SCOPE
+        or authority.get("platformScope") != "windows_only"
+        or authority.get("crossRunBitReproducible") is not False
+        or authority.get("signaturePolicy") != signature_policy
+        or any(
+            authority.get(key) is not False
+            for key in (
+                "publicationAuthorized",
+                "publicationEligible",
+                "releaseUploadAuthority",
+                "deployAuthority",
+                "routeAuthority",
+                "codeDeploymentAuthority",
+            )
+        )
+        or not isinstance(custody, dict)
+        or set(custody) != expected_custody
+    ):
+        raise ProjectionBlocked(
+            "preview-ready candidate import authority contract drifted"
+        )
+
+    generated_at = _candidate_timestamp(
+        authority.get("generatedAtUtc"),
+        label="preview-ready candidate authority generatedAtUtc",
+        now=validation_now,
+    )
+    expires_at = _candidate_timestamp(
+        authority.get("expiresAtUtc"),
+        label="preview-ready candidate authority expiresAtUtc",
+        now=validation_now,
+        require_fresh=False,
+    )
+    if (
+        expires_at <= validation_now
+        or expires_at <= generated_at
+        or expires_at > generated_at + timedelta(hours=6)
+    ):
+        raise ProjectionBlocked(
+            "preview-ready candidate authority is expired or outside its bounded lifetime"
+        )
+
+    canonical_raw = _candidate_embedded_bytes(
+        custody.get("canonicalManifest"),
+        label="preview-ready canonical manifest",
+        expected_path="RELEASE_CHANNEL.generated.json",
+    )
+    compatibility_raw = _candidate_embedded_bytes(
+        custody.get("compatibilityManifest"),
+        label="preview-ready compatibility manifest",
+        expected_path="releases.json",
+    )
+    inventory_raw = _candidate_embedded_bytes(
+        custody.get("inventory"),
+        label="preview-ready upload inventory",
+        expected_path="CANDIDATE_UPLOAD_INVENTORY.generated.json",
+    )
+    inventory = _strict_json_object(
+        inventory_raw,
+        label="preview-ready upload inventory",
+    )
+    if (
+        set(inventory) != {"contractName", "contractVersion", "files"}
+        or inventory.get("contractName")
+        != "chummer.release-upload.candidate-inventory/v1"
+        or type(inventory.get("contractVersion")) is not int
+        or inventory.get("contractVersion") != 1
+    ):
+        raise ProjectionBlocked("preview-ready upload inventory contract drifted")
+    candidate_rows = _candidate_inventory_rows(
+        inventory.get("files"),
+        label="preview-ready upload inventory",
+    )
+    candidate_by_path = {str(row["path"]): row for row in candidate_rows}
+    for path, raw in (
+        ("RELEASE_CHANNEL.generated.json", canonical_raw),
+        ("releases.json", compatibility_raw),
+    ):
+        if candidate_by_path.get(path) != {
+            "path": path,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "sizeBytes": len(raw),
+        }:
+            raise ProjectionBlocked(
+                "preview-ready manifest bytes differ from the upload inventory"
+            )
+
+    candidate = authority.get("candidate")
+    if not isinstance(candidate, dict):
+        raise ProjectionBlocked("preview-ready candidate identity drifted")
+    candidate_identity = {
+        "version": candidate.get("version"),
+        "canonicalManifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "inventorySha256": _candidate_inventory_digest(candidate_rows),
+        "fileCount": len(candidate_rows),
+        "totalBytes": sum(int(row["sizeBytes"]) for row in candidate_rows),
+    }
+    expected_candidate = {
+        **candidate_identity,
+        "bundleIdentitySha256": hashlib.sha256(
+            json.dumps(
+                candidate_identity,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+    if candidate != expected_candidate:
+        raise ProjectionBlocked("preview-ready candidate summary drifted")
+
+    canonical = _strict_json_object(
+        canonical_raw,
+        label="preview-ready canonical manifest",
+    )
+    compatibility = _strict_json_object(
+        compatibility_raw,
+        label="preview-ready compatibility manifest",
+    )
+    _validate_candidate_preview_ready_pair(
+        canonical,
+        compatibility,
+        release_version=candidate.get("version"),
+    )
+
+    source_authority_raw = _candidate_embedded_bytes(
+        custody.get("sourceCandidateAuthority"),
+        label="preview-ready source v4 candidate authority",
+        expected_path=CANDIDATE_SOURCE_AUTHORITY_PATH,
+    )
+    source_authority = _strict_json_object(
+        source_authority_raw,
+        label="preview-ready source v4 candidate authority",
+    )
+    _validate_candidate_import_authority_v4(
+        source_authority,
+        now=validation_now,
+    )
+    source_candidate = source_authority.get("candidate")
+    source_custody = source_authority.get("custody")
+    if (
+        not isinstance(source_candidate, dict)
+        or source_candidate.get("version") != candidate.get("version")
+        or not isinstance(source_custody, dict)
+    ):
+        raise ProjectionBlocked("preview-ready source v4 identity drifted")
+    source_expires_at = _candidate_timestamp(
+        source_authority.get("expiresAtUtc"),
+        label="preview-ready source v4 expiry",
+        now=validation_now,
+        require_fresh=False,
+    )
+    if expires_at > source_expires_at:
+        raise ProjectionBlocked("preview-ready authority outlives its source v4 authority")
+
+    native_raw = _candidate_embedded_bytes(
+        custody.get("nativeWindowsFinalizedEvidence"),
+        label="preview-ready native Windows finalized evidence",
+        expected_path=(
+            "proof/windows-native/"
+            "UNSIGNED_WINDOWS_PREVIEW_NATIVE_FINALIZED_EVIDENCE.generated.json"
+        ),
+    )
+    native = _strict_json_object(
+        native_raw,
+        label="preview-ready native Windows finalized evidence",
+    )
+    if (
+        native.get("status") != "passed"
+        or source_custody.get("nativeWindowsFinalizedEvidence") != native
+    ):
+        raise ProjectionBlocked("preview-ready native Windows custody drifted")
+
+    preprojection_canonical_raw = _candidate_embedded_bytes(
+        custody.get("preprojectionCanonicalManifest"),
+        label="preview-ready preprojection canonical manifest",
+        expected_path=CANDIDATE_PREPROJECTION_CANONICAL_PATH,
+    )
+    preprojection_compatibility_raw = _candidate_embedded_bytes(
+        custody.get("preprojectionCompatibilityManifest"),
+        label="preview-ready preprojection compatibility manifest",
+        expected_path=CANDIDATE_PREPROJECTION_COMPATIBILITY_PATH,
+    )
+    preprojection_canonical = _strict_json_object(
+        preprojection_canonical_raw,
+        label="preview-ready preprojection canonical manifest",
+    )
+    preprojection_compatibility = _strict_json_object(
+        preprojection_compatibility_raw,
+        label="preview-ready preprojection compatibility manifest",
+    )
+    _validate_candidate_preview_ready_pair(
+        preprojection_canonical,
+        preprojection_compatibility,
+        release_version=candidate.get("version"),
+    )
+
+    readiness_raw = _candidate_embedded_bytes(
+        custody.get("publicationReadinessReceipt"),
+        label="preview publication readiness receipt",
+        expected_path=CANDIDATE_PREVIEW_READINESS_PATH,
+    )
+    readiness = _strict_json_object(
+        readiness_raw,
+        label="preview publication readiness receipt",
+    )
+    expected_readiness_keys = {
+        "canonicalManifest",
+        "compatibilityManifest",
+        "contractName",
+        "contractVersion",
+        "deployAuthority",
+        "generatedAtUtc",
+        "localizationGateSha256",
+        "nativeWindowsEvidenceSha256",
+        "platforms",
+        "publicationEligible",
+        "registryCommit",
+        "releaseProofSha256",
+        "releaseUploadAuthority",
+        "releaseVersion",
+        "routeAuthority",
+        "sourceCandidateAuthoritySha256",
+        "sourceCanonicalManifestSha256",
+        "sourceCompatibilityManifestSha256",
+        "status",
+    }
+    if (
+        set(readiness) != expected_readiness_keys
+        or readiness.get("contractName") != CANDIDATE_PREVIEW_READINESS_CONTRACT
+        or type(readiness.get("contractVersion")) is not int
+        or readiness.get("contractVersion") != 1
+        or readiness.get("status") != "preview_ready"
+        or readiness.get("releaseVersion") != candidate.get("version")
+        or readiness.get("platforms") != ["linux", "windows"]
+        or readiness.get("publicationEligible") is not True
+        or readiness.get("routeAuthority") is not True
+        or readiness.get("releaseUploadAuthority") is not False
+        or readiness.get("deployAuthority") is not False
+        or readiness.get("sourceCandidateAuthoritySha256")
+        != hashlib.sha256(source_authority_raw).hexdigest()
+        or readiness.get("nativeWindowsEvidenceSha256")
+        != hashlib.sha256(native_raw).hexdigest()
+    ):
+        raise ProjectionBlocked("preview publication readiness receipt drifted")
+    _candidate_timestamp(
+        readiness.get("generatedAtUtc"),
+        label="preview publication readiness receipt generatedAtUtc",
+        now=validation_now,
+    )
+    _candidate_reference(
+        readiness.get("canonicalManifest"),
+        path="RELEASE_CHANNEL.generated.json",
+        raw=preprojection_canonical_raw,
+        label="preview publication readiness canonical manifest",
+    )
+    _candidate_reference(
+        readiness.get("compatibilityManifest"),
+        path="releases.json",
+        raw=preprojection_compatibility_raw,
+        label="preview publication readiness compatibility manifest",
+    )
+    source_canonical_raw = _candidate_embedded_bytes(
+        source_custody.get("canonicalManifest"),
+        label="preview-ready source v4 canonical manifest",
+        expected_path="RELEASE_CHANNEL.generated.json",
+    )
+    source_compatibility_raw = _candidate_embedded_bytes(
+        source_custody.get("compatibilityManifest"),
+        label="preview-ready source v4 compatibility manifest",
+        expected_path="releases.json",
+    )
+    for field, raw in (
+        ("sourceCanonicalManifestSha256", source_canonical_raw),
+        ("sourceCompatibilityManifestSha256", source_compatibility_raw),
+    ):
+        if readiness.get(field) != hashlib.sha256(raw).hexdigest():
+            raise ProjectionBlocked("preview publication source manifest drifted")
+    for field in ("releaseProofSha256", "localizationGateSha256"):
+        if SHA256_RE.fullmatch(str(readiness.get(field) or "")) is None:
+            raise ProjectionBlocked(f"preview publication readiness {field} is invalid")
+
+    projection = custody.get("generationProjection")
+    projection_keys = {
+        "contractName",
+        "contractVersion",
+        "status",
+        "generationId",
+        "evaluatedAtUtc",
+        "sourceCanonicalManifestSha256",
+        "sourceCompatibilityManifestSha256",
+        "projectedCanonicalManifestSha256",
+        "projectedCompatibilityManifestSha256",
+        "authoritySeed",
+    }
+    if (
+        not isinstance(projection, dict)
+        or set(projection) != projection_keys
+        or projection.get("contractName")
+        != CANDIDATE_GENERATION_PROJECTION_CONTRACT
+        or type(projection.get("contractVersion")) is not int
+        or projection.get("contractVersion") != 1
+        or projection.get("status") != "passed"
+    ):
+        raise ProjectionBlocked("preview-ready generation projection contract drifted")
+    generation_id = projection.get("generationId")
+    if (
+        not isinstance(generation_id, str)
+        or canonical.get("generationId") != generation_id
+        or compatibility.get("generationId") != generation_id
+        or projection.get("sourceCanonicalManifestSha256")
+        != hashlib.sha256(preprojection_canonical_raw).hexdigest()
+        or projection.get("sourceCompatibilityManifestSha256")
+        != hashlib.sha256(preprojection_compatibility_raw).hexdigest()
+        or projection.get("projectedCanonicalManifestSha256")
+        != hashlib.sha256(canonical_raw).hexdigest()
+        or projection.get("projectedCompatibilityManifestSha256")
+        != hashlib.sha256(compatibility_raw).hexdigest()
+    ):
+        raise ProjectionBlocked("preview-ready generation projection digest graph drifted")
+    evaluated_at = _candidate_timestamp(
+        projection.get("evaluatedAtUtc"),
+        label="preview-ready generation projection evaluatedAtUtc",
+        now=validation_now,
+        require_fresh=False,
+    )
+    materializer = _load_candidate_authority_materializer()
+    projector = materializer._generation_projector()
+    with tempfile.TemporaryDirectory(prefix="verify-preview-ready-generation-") as name:
+        root = Path(name)
+        canonical_path = root / "RELEASE_CHANNEL.generated.json"
+        compatibility_path = root / "releases.json"
+        canonical_path.write_bytes(preprojection_canonical_raw)
+        compatibility_path.write_bytes(preprojection_compatibility_raw)
+        try:
+            projector.project_manifest_pair(
+                canonical_path,
+                compatibility_path,
+                generation_id,
+                evaluated_at=evaluated_at,
+            )
+        except Exception as exc:
+            raise ProjectionBlocked(
+                "preview-ready generation projection replay failed"
+            ) from exc
+        if (
+            canonical_path.read_bytes() != canonical_raw
+            or compatibility_path.read_bytes() != compatibility_raw
+        ):
+            raise ProjectionBlocked("preview-ready generation projection bytes drifted")
+
+    seed_paths = {
+        "CURRENT.json": "release-evidence/CURRENT.json",
+        "RELEASE_DECISION.json": "release-evidence/RELEASE_DECISION.json",
+        "SNAPSHOT.json": "release-evidence/SNAPSHOT.json",
+    }
+    seed = projection.get("authoritySeed")
+    if not isinstance(seed, dict) or set(seed) != set(seed_paths):
+        raise ProjectionBlocked("preview-ready authority seed property set drifted")
+    for name, path in seed_paths.items():
+        row = candidate_by_path.get(path)
+        if not isinstance(row, dict) or seed.get(name) != row:
+            raise ProjectionBlocked("preview-ready authority seed inventory drifted")
+    if {
+        path for path in candidate_by_path if path.startswith("release-evidence/")
+    } != set(seed_paths.values()):
+        raise ProjectionBlocked("preview-ready release evidence set drifted")
+    return authority
+
+
 def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     authority = _strict_json_object(payload, label="candidate import authority")
+    if authority.get("contractName") == CANDIDATE_AUTHORITY_CONTRACT_V6:
+        return _validate_candidate_import_authority_v6(authority)
     if authority.get("contractName") == CANDIDATE_AUTHORITY_CONTRACT_V5:
         return _validate_candidate_import_authority_v5(authority)
     if authority.get("contractName") == CANDIDATE_AUTHORITY_CONTRACT_V4:
