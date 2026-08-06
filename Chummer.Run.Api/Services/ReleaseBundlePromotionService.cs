@@ -245,6 +245,8 @@ public sealed class ReleaseBundlePromotionService
     private const string PromotionEvidenceRelativePath = "release-evidence/public-promotion.json";
     private const string UnsignedWindowsFreshDeltaProjectionProfile =
         "v3_unsigned_windows_fresh_delta";
+    private const string UnsignedWindowsPreviewReadyProjectionProfile =
+        "v4_unsigned_windows_preview_ready";
     private const string PublicBaseUrlKey = "GOOGLE_OIDC_REDIRECT_URI";
     private static readonly TimeSpan MaximumReleaseProofPublicationLag = TimeSpan.FromHours(24);
     private static readonly TimeSpan MaximumReleaseProofPublicationClockSkew = TimeSpan.FromMinutes(5);
@@ -525,7 +527,8 @@ public sealed class ReleaseBundlePromotionService
             bundleRoot,
             exactIncomingDesktopScope,
             exactIncomingDesktopScopeIsFreshDelta,
-            allowAuthorityBoundGenerationUrls: false);
+            allowAuthorityBoundGenerationUrls: false,
+            allowProofBoundPreviewReadyProfile: false);
         return Task.CompletedTask;
     }
 
@@ -541,6 +544,8 @@ public sealed class ReleaseBundlePromotionService
             exactIncomingDesktopScope,
             candidateImportBinding.ExactIncomingDesktopScopeIsFreshDelta,
             allowAuthorityBoundGenerationUrls: true,
+            allowProofBoundPreviewReadyProfile:
+                candidateImportBinding.PublicationReadinessBinding is not null,
             cancellationToken);
     }
 
@@ -549,6 +554,7 @@ public sealed class ReleaseBundlePromotionService
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
         bool exactIncomingDesktopScopeIsFreshDelta,
         bool allowAuthorityBoundGenerationUrls,
+        bool allowProofBoundPreviewReadyProfile,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(bundleRoot))
@@ -562,7 +568,8 @@ public sealed class ReleaseBundlePromotionService
             bundleRoot,
             exactIncomingDesktopScope,
             exactIncomingDesktopScopeIsFreshDelta,
-            allowAuthorityBoundGenerationUrls);
+            allowAuthorityBoundGenerationUrls,
+            allowProofBoundPreviewReadyProfile);
         return Task.CompletedTask;
     }
 
@@ -1922,7 +1929,9 @@ public sealed class ReleaseBundlePromotionService
             bundleRoot,
             exactIncomingDesktopScope,
             exactIncomingDesktopScopeIsFreshDelta,
-            allowAuthorityBoundGenerationUrls: candidateImportBinding is not null);
+            allowAuthorityBoundGenerationUrls: candidateImportBinding is not null,
+            allowProofBoundPreviewReadyProfile:
+                candidateImportBinding?.PublicationReadinessBinding is not null);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
         ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
@@ -2200,7 +2209,8 @@ public sealed class ReleaseBundlePromotionService
             bundleRoot,
             exactIncomingDesktopScope,
             exactIncomingDesktopScopeIsFreshDelta: false,
-            allowAuthorityBoundGenerationUrls: false);
+            allowAuthorityBoundGenerationUrls: false,
+            allowProofBoundPreviewReadyProfile: false);
         PublicReleaseManifestDto incomingCompatibilityManifest = prepared.CompatibilityManifest;
         JsonObject incomingCompatibilityManifestObject = prepared.CompatibilityManifestObject;
         JsonObject incomingCanonicalManifest = prepared.CanonicalManifest;
@@ -2452,7 +2462,8 @@ public sealed class ReleaseBundlePromotionService
         string bundleRoot,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
         bool exactIncomingDesktopScopeIsFreshDelta,
-        bool allowAuthorityBoundGenerationUrls)
+        bool allowAuthorityBoundGenerationUrls,
+        bool allowProofBoundPreviewReadyProfile)
     {
         ValidateIncomingDesktopScopeProfile(
             exactIncomingDesktopScope,
@@ -2486,18 +2497,29 @@ public sealed class ReleaseBundlePromotionService
             HasExactUnsignedWindowsFreshDeltaProfile(
                 incomingCompatibilityManifestObject,
                 incomingCanonicalManifest);
-        if (hasUnsignedWindowsFreshDeltaProfile && !exactIncomingDesktopScopeIsFreshDelta)
+        bool hasUnsignedWindowsPreviewReadyProfile =
+            HasExactUnsignedWindowsPreviewReadyProfile(
+                incomingCompatibilityManifestObject,
+                incomingCanonicalManifest);
+        if (hasUnsignedWindowsPreviewReadyProfile && !allowProofBoundPreviewReadyProfile)
         {
             throw new InvalidDataException(
-                "v3 unsigned Windows projectionProfile requires authenticated fresh-delta admission.");
+                "preview-ready unsigned Windows projection requires its proof-bound v6 candidate authority.");
         }
-        bool unsignedWindowsFreshDeltaProfile = hasUnsignedWindowsFreshDeltaProfile;
+        if ((hasUnsignedWindowsFreshDeltaProfile || hasUnsignedWindowsPreviewReadyProfile)
+            && !exactIncomingDesktopScopeIsFreshDelta)
+        {
+            throw new InvalidDataException(
+                "unsigned Windows projectionProfile requires authenticated fresh-delta admission.");
+        }
+        bool boundedUnsignedWindowsProfile =
+            hasUnsignedWindowsFreshDeltaProfile || hasUnsignedWindowsPreviewReadyProfile;
         ValidateIncomingManifestIdentity(
             incomingCompatibilityManifestObject,
             incomingCompatibilityManifest,
             incomingCanonicalManifest,
             allowReviewRequiredProof: true,
-            allowExactUnsignedWindowsFreshDeltaProof: unsignedWindowsFreshDeltaProfile);
+            allowExactUnsignedWindowsFreshDeltaProof: hasUnsignedWindowsFreshDeltaProfile);
         ValidatePassedReleaseProofPublicationWindow(incomingCompatibilityManifest);
 
         IReadOnlyList<CanonicalArtifactRecord> incomingCanonicalArtifacts = LoadCanonicalArtifacts(incomingCanonicalManifest);
@@ -2513,7 +2535,7 @@ public sealed class ReleaseBundlePromotionService
             incomingCanonicalManifest,
             exactIncomingDesktopScope,
             exactIncomingDesktopScopeIsFreshDelta);
-        IReadOnlySet<string> profileAncillaryFiles = unsignedWindowsFreshDeltaProfile
+        IReadOnlySet<string> profileAncillaryFiles = boundedUnsignedWindowsProfile
             ? ValidateAndCollectProfileAurFiles(aurPackagesPath, filesRoot)
             : new HashSet<string>(StringComparer.Ordinal);
         ValidateIncomingBundle(
@@ -2523,11 +2545,12 @@ public sealed class ReleaseBundlePromotionService
             startupSmokeRoot,
             promotionEvidencePath,
             _timeProvider.GetUtcNow(),
-            unsignedWindowsFreshDeltaProfile,
+            boundedUnsignedWindowsProfile,
+            hasUnsignedWindowsFreshDeltaProfile,
             exactIncomingDesktopScope,
             profileAncillaryFiles,
             allowAuthorityBoundGenerationUrls);
-        if (!unsignedWindowsFreshDeltaProfile)
+        if (!boundedUnsignedWindowsProfile)
         {
             ReleaseBuildProvenanceValidator.Validate(incomingCanonicalManifest, filesRoot, proofRoot);
         }
@@ -2548,7 +2571,7 @@ public sealed class ReleaseBundlePromotionService
             releaseEvidenceRoot,
             aurPackagesPath,
             promotedArtifactIds,
-            unsignedWindowsFreshDeltaProfile,
+            boundedUnsignedWindowsProfile,
             profileAncillaryFiles);
     }
 
@@ -2661,15 +2684,16 @@ public sealed class ReleaseBundlePromotionService
         Directory.CreateDirectory(stagedSigningRoot);
         Directory.CreateDirectory(stagedProofRoot);
 
-        bool unsignedWindowsFreshDeltaProfile = string.Equals(
-            GetJsonString(canonicalManifest["projectionProfile"]),
-            UnsignedWindowsFreshDeltaProjectionProfile,
-            StringComparison.Ordinal);
+        string projectionProfile =
+            GetJsonString(canonicalManifest["projectionProfile"]) ?? string.Empty;
+        bool boundedUnsignedWindowsProfile =
+            projectionProfile is UnsignedWindowsFreshDeltaProjectionProfile
+                or UnsignedWindowsPreviewReadyProjectionProfile;
         // This bounded profile does not carry the AUR package's upstream Linux
         // artifact. Omit the catalog and its metadata files instead of exposing
         // a catalog entry that generation-bound delivery must reject.
         IReadOnlySet<string> publishedAncillaryFiles =
-            unsignedWindowsFreshDeltaProfile
+            boundedUnsignedWindowsProfile
                 ? new HashSet<string>(StringComparer.Ordinal)
                 : profileAncillaryFiles;
 
@@ -2711,7 +2735,7 @@ public sealed class ReleaseBundlePromotionService
 
         string activeAurPackagesPath = Path.Combine(activeShelfRoot, "aur-packages.json");
         string stagedAurPackagesPath = Path.Combine(stagedRoot, "aur-packages.json");
-        if (!unsignedWindowsFreshDeltaProfile)
+        if (!boundedUnsignedWindowsProfile)
         {
             if (!string.IsNullOrWhiteSpace(aurPackagesPath) && File.Exists(aurPackagesPath))
             {
@@ -2727,7 +2751,7 @@ public sealed class ReleaseBundlePromotionService
             stagedFilesRoot,
             compatibilityManifest,
             generationId,
-            unsignedWindowsFreshDeltaProfile);
+            boundedUnsignedWindowsProfile);
 
         byte[] projectedCompatibilityBytes = ProjectRegistryManifestForGeneration(
             compatibilityManifestObject,
@@ -5082,6 +5106,11 @@ public sealed class ReleaseBundlePromotionService
 
         if (binding.NativeEvidenceBinding is not { } native)
         {
+            if (binding.PublicationReadinessBinding is not null)
+            {
+                throw new InvalidDataException(
+                    "release stage receipt readiness binding requires native evidence.");
+            }
             return;
         }
         if (!IsBareLowerSha256(native.EvidenceSha256)
@@ -5106,6 +5135,21 @@ public sealed class ReleaseBundlePromotionService
         {
             throw new InvalidDataException(
                 "release stage receipt native evidence binding is invalid.");
+        }
+
+        if (binding.PublicationReadinessBinding is not { } readiness)
+        {
+            return;
+        }
+        if (!IsBareLowerSha256(readiness.ReceiptSha256)
+            || !IsBareLowerSha256(readiness.SourceCandidateAuthoritySha256)
+            || !IsBareLowerSha256(readiness.SourceCanonicalManifestSha256)
+            || !IsBareLowerSha256(readiness.SourceCompatibilityManifestSha256)
+            || !IsBareLowerSha256(readiness.ReadyCanonicalManifestSha256)
+            || !IsBareLowerSha256(readiness.ReadyCompatibilityManifestSha256))
+        {
+            throw new InvalidDataException(
+                "release stage receipt publication-readiness binding is invalid.");
         }
     }
 
@@ -6943,6 +6987,26 @@ public sealed class ReleaseBundlePromotionService
     private static bool HasExactUnsignedWindowsFreshDeltaProfile(
         JsonObject compatibilityManifest,
         JsonObject canonicalManifest)
+        => string.Equals(
+            ReadExactUnsignedWindowsProjectionProfile(
+                compatibilityManifest,
+                canonicalManifest),
+            UnsignedWindowsFreshDeltaProjectionProfile,
+            StringComparison.Ordinal);
+
+    private static bool HasExactUnsignedWindowsPreviewReadyProfile(
+        JsonObject compatibilityManifest,
+        JsonObject canonicalManifest)
+        => string.Equals(
+            ReadExactUnsignedWindowsProjectionProfile(
+                compatibilityManifest,
+                canonicalManifest),
+            UnsignedWindowsPreviewReadyProjectionProfile,
+            StringComparison.Ordinal);
+
+    private static string ReadExactUnsignedWindowsProjectionProfile(
+        JsonObject compatibilityManifest,
+        JsonObject canonicalManifest)
     {
         string compatibilityProfile =
             GetJsonString(compatibilityManifest["projectionProfile"])?.Trim()
@@ -6952,21 +7016,19 @@ public sealed class ReleaseBundlePromotionService
             ?? string.Empty;
         if (compatibilityProfile.Length == 0 && canonicalProfile.Length == 0)
         {
-            return false;
+            return string.Empty;
         }
         if (!string.Equals(
                 compatibilityProfile,
-                UnsignedWindowsFreshDeltaProjectionProfile,
-                StringComparison.Ordinal)
-            || !string.Equals(
                 canonicalProfile,
-                UnsignedWindowsFreshDeltaProjectionProfile,
-                StringComparison.Ordinal))
+                StringComparison.Ordinal)
+            || compatibilityProfile is not UnsignedWindowsFreshDeltaProjectionProfile
+                and not UnsignedWindowsPreviewReadyProjectionProfile)
         {
             throw new InvalidDataException(
                 "bundle manifests publish a mismatched or unsupported projectionProfile.");
         }
-        return true;
+        return compatibilityProfile;
     }
 
     private static void ValidateExactUnsignedWindowsFreshDeltaProof(JsonObject proof)
@@ -8024,7 +8086,8 @@ public sealed class ReleaseBundlePromotionService
         string? startupSmokeRoot,
         string? promotionEvidencePath,
         DateTimeOffset evaluatedAtUtc,
-        bool unsignedWindowsFreshDeltaProfile,
+        bool boundedUnsignedWindowsProfile,
+        bool retainedUnsignedWindowsFreshDeltaProfile,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
         IReadOnlySet<string> profileAncillaryFiles,
         bool allowAuthorityBoundGenerationUrls)
@@ -8053,7 +8116,7 @@ public sealed class ReleaseBundlePromotionService
             PublicReleaseArtifactDto compatibility = compatibilityById[artifactId];
             bool requireIncomingUrls = RequiresGovernedIncomingArtifactUrls(
                 exactIncomingDesktopScope,
-                unsignedWindowsFreshDeltaProfile,
+                boundedUnsignedWindowsProfile,
                 artifact.Head,
                 artifact.Platform,
                 artifact.Rid);
@@ -8066,7 +8129,7 @@ public sealed class ReleaseBundlePromotionService
                     compatibility,
                     requireIncomingUrls,
                     allowAuthorityBoundGenerationUrls,
-                    retainedProfileCanonical: unsignedWindowsFreshDeltaProfile
+                    retainedProfileCanonical: retainedUnsignedWindowsFreshDeltaProfile
                         ? artifact
                         : null);
             if (canonicalContract != compatibilityContract)
@@ -8079,14 +8142,14 @@ public sealed class ReleaseBundlePromotionService
                 filesRoot,
                 canonicalContract,
                 compatibilityManifest.Version,
-                unsignedWindowsFreshDeltaProfile);
+                boundedUnsignedWindowsProfile);
         }
 
-        // This profile carries fresh Windows bytes in a deliberately unpromoted,
-        // proof-required state and retains already-promoted macOS bytes through the
-        // authority-bound incumbent snapshot. Requiring fresh startup/promotion proof
-        // here would contradict both halves of that authenticated delta contract.
-        if (unsignedWindowsFreshDeltaProfile)
+        // Both bounded unsigned-Windows profiles inherit exact native proof and
+        // incumbent custody from their session authority. Requiring an unrelated
+        // bundle-local promotion receipt here would contradict that authenticated
+        // evidence graph.
+        if (boundedUnsignedWindowsProfile)
         {
             return;
         }

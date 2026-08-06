@@ -36,6 +36,14 @@ public sealed record ReleaseUploadCandidateNativeEvidenceBinding(
     string CanonicalManifestSha256,
     string InventorySha256);
 
+public sealed record ReleaseUploadCandidatePublicationReadinessBinding(
+    string ReceiptSha256,
+    string SourceCandidateAuthoritySha256,
+    string SourceCanonicalManifestSha256,
+    string SourceCompatibilityManifestSha256,
+    string ReadyCanonicalManifestSha256,
+    string ReadyCompatibilityManifestSha256);
+
 public sealed record ReleaseUploadCandidateSessionBinding(
     string SnapshotSha256,
     string AuthoritySha256,
@@ -47,7 +55,9 @@ public sealed record ReleaseUploadCandidateSessionBinding(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     ReleaseUploadCandidateIncumbentBinding? IncumbentBinding = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    ReleaseUploadCandidateNativeEvidenceBinding? NativeEvidenceBinding = null);
+    ReleaseUploadCandidateNativeEvidenceBinding? NativeEvidenceBinding = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    ReleaseUploadCandidatePublicationReadinessBinding? PublicationReadinessBinding = null);
 
 public sealed record ReleaseUploadCandidateAuthority(
     string SnapshotId,
@@ -62,7 +72,9 @@ public sealed record ReleaseUploadCandidateAuthority(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     ReleaseUploadCandidateIncumbentBinding? IncumbentBinding = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    ReleaseUploadCandidateNativeEvidenceBinding? NativeEvidenceBinding = null)
+    ReleaseUploadCandidateNativeEvidenceBinding? NativeEvidenceBinding = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    ReleaseUploadCandidatePublicationReadinessBinding? PublicationReadinessBinding = null)
 {
     public ReleaseUploadCandidateSessionBinding SessionBinding => new(
         SnapshotSha256,
@@ -72,7 +84,8 @@ public sealed record ReleaseUploadCandidateAuthority(
         Candidate.InventorySha256,
         ExactIncomingDesktopScopeIsFreshDelta,
         IncumbentBinding,
-        NativeEvidenceBinding);
+        NativeEvidenceBinding,
+        PublicationReadinessBinding);
 }
 
 public sealed record ReleaseUploadSnapshotAuthority(
@@ -119,6 +132,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         "chummer.release-upload.candidate-import-authority/v4";
     private const string UnsignedNativeGenerationCandidateContractName =
         "chummer.release-upload.candidate-import-authority/v5";
+    private const string UnsignedPreviewReadyCandidateContractName =
+        "chummer.release-upload.candidate-import-authority/v6";
+    private const string UnsignedWindowsPreviewReadyProjectionProfile =
+        "v4_unsigned_windows_preview_ready";
+    private const string PreviewPublicationReadinessContractName =
+        "chummer.registry.preview-publication-readiness/v1";
     private const string NativeStageGenerationProjectionContractName =
         "chummer.release-upload.native-stage-generation-projection/v1";
     private const string CandidateInventoryContractName =
@@ -472,6 +491,20 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         DateTimeOffset now = evaluatedAtUtc ?? DateTimeOffset.UtcNow;
         using JsonDocument document = ParseStrictObject(payload, "candidate import authority");
         JsonElement root = document.RootElement;
+        if (root.TryGetProperty("contractName", out JsonElement readyContractName)
+            && readyContractName.ValueKind == JsonValueKind.String
+            && string.Equals(
+                readyContractName.GetString(),
+                UnsignedPreviewReadyCandidateContractName,
+                StringComparison.Ordinal))
+        {
+            return ParseUnsignedPreviewReadyCandidateAuthority(
+                snapshotId,
+                snapshotSha256,
+                authoritySha256,
+                root,
+                now);
+        }
         if (root.TryGetProperty("contractName", out JsonElement contractName)
             && contractName.ValueKind == JsonValueKind.String
             && contractName.GetString() is { } unsignedContract
@@ -1043,6 +1076,469 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         return result
             ?? throw new InvalidDataException(
                 "unsigned publication source-manifest custody is incomplete.");
+    }
+
+    private static ReleaseUploadCandidateAuthority ParseUnsignedPreviewReadyCandidateAuthority(
+        string snapshotId,
+        string snapshotSha256,
+        string authoritySha256,
+        JsonElement root,
+        DateTimeOffset now)
+    {
+        RequireExactProperties(
+            root,
+            [
+                "candidate",
+                "candidateImportAuthority",
+                "candidateReviewAuthority",
+                "codeDeploymentAuthority",
+                "contractName",
+                "contractVersion",
+                "crossRunBitReproducible",
+                "custody",
+                "deployAuthority",
+                "exactIncomingDesktopScope",
+                "expiresAtUtc",
+                "generatedAtUtc",
+                "ownerNativeFinalizationBridgeAuthority",
+                "ownerNativeStageAuthoritySeedBridgeAuthority",
+                "platformScope",
+                "previewPublicationReadinessBridgeAuthority",
+                "publicationAuthorized",
+                "publicationEligible",
+                "releaseUploadAuthority",
+                "routeAuthority",
+                "signaturePolicy",
+                "status"
+            ],
+            "preview-ready candidate import authority");
+        RequireExactString(root, "contractName", UnsignedPreviewReadyCandidateContractName);
+        RequireExactInt32(root, "contractVersion", 6);
+        RequireExactString(root, "status", "candidate_import_ready");
+        RequireBoolean(root, "candidateImportAuthority", expected: true);
+        RequireBoolean(root, "candidateReviewAuthority", expected: true);
+        RequireBoolean(root, "ownerNativeFinalizationBridgeAuthority", expected: true);
+        RequireBoolean(root, "ownerNativeStageAuthoritySeedBridgeAuthority", expected: true);
+        RequireBoolean(root, "previewPublicationReadinessBridgeAuthority", expected: true);
+        RequireBoolean(root, "publicationAuthorized", expected: false);
+        RequireBoolean(root, "publicationEligible", expected: false);
+        RequireBoolean(root, "releaseUploadAuthority", expected: false);
+        RequireBoolean(root, "deployAuthority", expected: false);
+        RequireBoolean(root, "routeAuthority", expected: false);
+        RequireBoolean(root, "codeDeploymentAuthority", expected: false);
+        RequireBoolean(root, "crossRunBitReproducible", expected: false);
+        RequireExactString(root, "platformScope", "windows_only");
+        RequireExactString(root, "exactIncomingDesktopScope", CandidateExactIncomingDesktopScope);
+        ValidateUnsignedSignaturePolicy(RequireObject(root, "signaturePolicy"));
+
+        DateTimeOffset generatedAt = RequireUtcTimestamp(root, "generatedAtUtc");
+        DateTimeOffset expiresAt = RequireUtcTimestamp(root, "expiresAtUtc");
+        if (generatedAt > now.AddMinutes(5)
+            || generatedAt < now.AddHours(-6).AddMinutes(-5)
+            || expiresAt <= now
+            || expiresAt > now.AddHours(6).AddMinutes(5)
+            || expiresAt <= generatedAt
+            || expiresAt > generatedAt.AddHours(6))
+        {
+            throw new InvalidDataException(
+                "preview-ready candidate import authority is expired or future-dated");
+        }
+
+        JsonElement candidateElement = RequireObject(root, "candidate");
+        RequireExactProperties(
+            candidateElement,
+            [
+                "bundleIdentitySha256",
+                "canonicalManifestSha256",
+                "fileCount",
+                "inventorySha256",
+                "totalBytes",
+                "version"
+            ],
+            "preview-ready candidate identity");
+        string version = RequireString(candidateElement, "version");
+        if (!VersionPattern.IsMatch(version))
+        {
+            throw new InvalidDataException("preview-ready candidate version is invalid");
+        }
+        var candidate = new ReleaseUploadCandidateIdentity(
+            version,
+            RequireSha256(candidateElement, "canonicalManifestSha256"),
+            RequireSha256(candidateElement, "inventorySha256"),
+            RequirePositiveInt32(candidateElement, "fileCount"),
+            RequireNonNegativeInt64(candidateElement, "totalBytes"),
+            RequireSha256(candidateElement, "bundleIdentitySha256"));
+        if (!string.Equals(
+                ComputeBundleIdentity(candidate),
+                candidate.BundleIdentitySha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("preview-ready candidate bundle identity drifted");
+        }
+
+        JsonElement custody = RequireObject(root, "custody");
+        RequireExactProperties(
+            custody,
+            [
+                "canonicalManifest",
+                "compatibilityManifest",
+                "generationProjection",
+                "inventory",
+                "nativeWindowsFinalizedEvidence",
+                "preprojectionCanonicalManifest",
+                "preprojectionCompatibilityManifest",
+                "publicationReadinessReceipt",
+                "sourceCandidateAuthority"
+            ],
+            "preview-ready candidate custody");
+        byte[] canonicalManifest = DecodeEmbedded(
+            RequireObject(custody, "canonicalManifest"),
+            "preview-ready canonical manifest",
+            "RELEASE_CHANNEL.generated.json");
+        byte[] compatibilityManifest = DecodeEmbedded(
+            RequireObject(custody, "compatibilityManifest"),
+            "preview-ready compatibility manifest",
+            "releases.json");
+        byte[] inventoryBytes = DecodeEmbedded(
+            RequireObject(custody, "inventory"),
+            "preview-ready candidate inventory",
+            "CANDIDATE_UPLOAD_INVENTORY.generated.json");
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory =
+            ParseCandidateInventory(inventoryBytes);
+        if (inventory.Count != candidate.FileCount
+            || inventory.Sum(static row => row.SizeBytes) != candidate.TotalBytes
+            || !string.Equals(
+                ComputeInventoryDigest(inventory),
+                candidate.InventorySha256,
+                StringComparison.Ordinal)
+            || !inventory.Any(row =>
+                string.Equals(row.Path, "RELEASE_CHANNEL.generated.json", StringComparison.Ordinal)
+                && string.Equals(row.Sha256, candidate.CanonicalManifestSha256, StringComparison.Ordinal)
+                && row.SizeBytes == canonicalManifest.LongLength)
+            || !inventory.Any(row =>
+                string.Equals(row.Path, "releases.json", StringComparison.Ordinal)
+                && string.Equals(row.Sha256, Sha256(compatibilityManifest), StringComparison.Ordinal)
+                && row.SizeBytes == compatibilityManifest.LongLength))
+        {
+            throw new InvalidDataException("preview-ready candidate inventory summary drifted");
+        }
+
+        byte[] sourceAuthorityBytes = DecodeEmbedded(
+            RequireObject(custody, "sourceCandidateAuthority"),
+            "source v4 candidate authority",
+            "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.source-v4.generated.json");
+        string sourceAuthoritySha256 = Sha256(sourceAuthorityBytes);
+        ReleaseUploadCandidateAuthority sourceAuthority = ParseCandidateAuthority(
+            snapshotId,
+            snapshotSha256,
+            sourceAuthoritySha256,
+            sourceAuthorityBytes,
+            now);
+        if (sourceAuthority.NativeEvidenceBinding is null
+            || sourceAuthority.IncumbentBinding is null
+            || sourceAuthority.PublicationReadinessBinding is not null
+            || expiresAt > sourceAuthority.ExpiresAtUtc)
+        {
+            throw new InvalidDataException(
+                "preview-ready authority is not bounded by one fresh native v4 predecessor");
+        }
+
+        using JsonDocument sourceAuthorityDocument = ParseStrictObject(
+            sourceAuthorityBytes,
+            "source v4 candidate authority");
+        JsonElement sourceCustody = RequireObject(sourceAuthorityDocument.RootElement, "custody");
+        byte[] sourceCompatibilityManifest = DecodeEmbedded(
+            RequireObject(sourceCustody, "compatibilityManifest"),
+            "source v4 compatibility manifest",
+            "releases.json");
+        byte[] nativeEvidenceBytes = DecodeEmbedded(
+            RequireObject(custody, "nativeWindowsFinalizedEvidence"),
+            "preview-ready native Windows evidence",
+            "proof/windows-native/UNSIGNED_WINDOWS_PREVIEW_NATIVE_FINALIZED_EVIDENCE.generated.json");
+        using JsonDocument nativeEvidenceDocument = ParseStrictObject(
+            nativeEvidenceBytes,
+            "preview-ready native Windows evidence");
+        JsonNode? heldNative = JsonNode.Parse(
+            JsonSerializer.SerializeToUtf8Bytes(
+                RequireObject(sourceCustody, "nativeWindowsFinalizedEvidence")));
+        JsonNode? suppliedNative = JsonNode.Parse(nativeEvidenceBytes);
+        if (heldNative is null
+            || suppliedNative is null
+            || !JsonNode.DeepEquals(heldNative, suppliedNative))
+        {
+            throw new InvalidDataException(
+                "preview-ready authority substituted different native Windows evidence");
+        }
+
+        byte[] readinessReceiptBytes = DecodeEmbedded(
+            RequireObject(custody, "publicationReadinessReceipt"),
+            "Registry preview publication readiness receipt",
+            "PREVIEW_PUBLICATION_READINESS.generated.json");
+        using JsonDocument readinessReceiptDocument = ParseStrictObject(
+            readinessReceiptBytes,
+            "Registry preview publication readiness receipt");
+        JsonElement readiness = readinessReceiptDocument.RootElement;
+        RequireExactProperties(
+            readiness,
+            [
+                "canonicalManifest",
+                "compatibilityManifest",
+                "contractName",
+                "contractVersion",
+                "deployAuthority",
+                "generatedAtUtc",
+                "localizationGateSha256",
+                "nativeWindowsEvidenceSha256",
+                "platforms",
+                "publicationEligible",
+                "registryCommit",
+                "releaseProofSha256",
+                "releaseUploadAuthority",
+                "releaseVersion",
+                "routeAuthority",
+                "sourceCandidateAuthoritySha256",
+                "sourceCanonicalManifestSha256",
+                "sourceCompatibilityManifestSha256",
+                "status"
+            ],
+            "Registry preview publication readiness receipt");
+        RequireExactString(readiness, "contractName", PreviewPublicationReadinessContractName);
+        RequireExactInt32(readiness, "contractVersion", 1);
+        RequireExactString(readiness, "status", "preview_ready");
+        RequireExactString(readiness, "releaseVersion", candidate.Version);
+        RequireExactString(readiness, "sourceCandidateAuthoritySha256", sourceAuthoritySha256);
+        RequireExactString(
+            readiness,
+            "sourceCanonicalManifestSha256",
+            Sha256(sourceAuthority.CanonicalManifestBytes));
+        RequireExactString(
+            readiness,
+            "sourceCompatibilityManifestSha256",
+            Sha256(sourceCompatibilityManifest));
+        RequireExactString(readiness, "nativeWindowsEvidenceSha256", Sha256(nativeEvidenceBytes));
+        _ = RequireSha256(readiness, "releaseProofSha256");
+        _ = RequireSha256(readiness, "localizationGateSha256");
+        string registryCommit = RequireString(readiness, "registryCommit");
+        if (registryCommit.Length != 40
+            || registryCommit.Any(static character =>
+                character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+        {
+            throw new InvalidDataException("Registry readiness commit is invalid");
+        }
+        JsonElement platforms = RequireArray(readiness, "platforms");
+        if (platforms.GetArrayLength() != 2
+            || platforms[0].GetString() != "linux"
+            || platforms[1].GetString() != "windows")
+        {
+            throw new InvalidDataException("Registry readiness platform scope drifted");
+        }
+        RequireBoolean(readiness, "publicationEligible", expected: true);
+        RequireBoolean(readiness, "routeAuthority", expected: true);
+        RequireBoolean(readiness, "releaseUploadAuthority", expected: false);
+        RequireBoolean(readiness, "deployAuthority", expected: false);
+        DateTimeOffset readinessGeneratedAt = RequireUtcTimestamp(readiness, "generatedAtUtc");
+        if (readinessGeneratedAt > generatedAt
+            || generatedAt - readinessGeneratedAt > TimeSpan.FromHours(6))
+        {
+            throw new InvalidDataException("Registry readiness receipt is stale or future-dated");
+        }
+
+        byte[] preprojectionCanonical = DecodeEmbedded(
+            RequireObject(custody, "preprojectionCanonicalManifest"),
+            "preview-ready preprojection canonical manifest",
+            "preprojection/RELEASE_CHANNEL.generated.json");
+        byte[] preprojectionCompatibility = DecodeEmbedded(
+            RequireObject(custody, "preprojectionCompatibilityManifest"),
+            "preview-ready preprojection compatibility manifest",
+            "preprojection/releases.json");
+        ValidateReadinessOutputReference(
+            RequireObject(readiness, "canonicalManifest"),
+            "RELEASE_CHANNEL.generated.json",
+            preprojectionCanonical,
+            "canonical manifest");
+        ValidateReadinessOutputReference(
+            RequireObject(readiness, "compatibilityManifest"),
+            "releases.json",
+            preprojectionCompatibility,
+            "compatibility manifest");
+
+        using var sourceCanonical = new CandidateEvidenceDocument(
+            ParseStrictObject(preprojectionCanonical, "preview-ready preprojection canonical manifest"),
+            preprojectionCanonical,
+            Sha256(preprojectionCanonical),
+            preprojectionCanonical.LongLength);
+        using var sourceCompatibility = new CandidateEvidenceDocument(
+            ParseStrictObject(preprojectionCompatibility, "preview-ready preprojection compatibility manifest"),
+            preprojectionCompatibility,
+            Sha256(preprojectionCompatibility),
+            preprojectionCompatibility.LongLength);
+        _ = ValidateNativeStageGenerationProjection(
+            RequireObject(custody, "generationProjection"),
+            sourceCanonical,
+            sourceCompatibility,
+            ParseStrictObject(canonicalManifest, "preview-ready canonical manifest").RootElement,
+            canonicalManifest,
+            compatibilityManifest,
+            inventory);
+
+        using JsonDocument canonicalDocument = ParseStrictObject(
+            canonicalManifest,
+            "preview-ready canonical manifest");
+        using JsonDocument compatibilityDocument = ParseStrictObject(
+            compatibilityManifest,
+            "preview-ready compatibility manifest");
+        ValidatePreviewReadyManifestPair(
+            canonicalDocument.RootElement,
+            compatibilityDocument.RootElement,
+            candidate.Version);
+
+        var readinessBinding = new ReleaseUploadCandidatePublicationReadinessBinding(
+            Sha256(readinessReceiptBytes),
+            sourceAuthoritySha256,
+            Sha256(sourceAuthority.CanonicalManifestBytes),
+            Sha256(sourceCompatibilityManifest),
+            Sha256(preprojectionCanonical),
+            Sha256(preprojectionCompatibility));
+        ReleaseUploadCandidateNativeEvidenceBinding sourceNative =
+            sourceAuthority.NativeEvidenceBinding!;
+        var nativeBinding = new ReleaseUploadCandidateNativeEvidenceBinding(
+            Sha256(nativeEvidenceBytes),
+            sourceNative.CaptureInventorySha256,
+            sourceNative.SourceCommit,
+            candidate.BundleIdentitySha256,
+            candidate.CanonicalManifestSha256,
+            candidate.InventorySha256);
+        return new ReleaseUploadCandidateAuthority(
+            snapshotId,
+            snapshotSha256,
+            authoritySha256,
+            expiresAt,
+            candidate,
+            canonicalManifest,
+            inventory,
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: sourceAuthority.IncumbentBinding,
+            NativeEvidenceBinding: nativeBinding,
+            PublicationReadinessBinding: readinessBinding);
+    }
+
+    private static void ValidateReadinessOutputReference(
+        JsonElement reference,
+        string path,
+        byte[] payload,
+        string label)
+    {
+        RequireExactProperties(reference, ["path", "sha256", "sizeBytes"], label);
+        RequireExactString(reference, "path", path);
+        RequireExactString(reference, "sha256", Sha256(payload));
+        if (RequireNonNegativeInt64(reference, "sizeBytes") != payload.LongLength)
+        {
+            throw new InvalidDataException($"Registry readiness {label} size drifted");
+        }
+    }
+
+    private static void RequireExactProperties(
+        JsonElement value,
+        IEnumerable<string> expected,
+        string label)
+    {
+        if (!ExactPropertySet(value, expected.ToHashSet(StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"{label} property set drifted");
+        }
+    }
+
+    internal static void ValidatePreviewReadyManifestPair(
+        JsonElement canonical,
+        JsonElement compatibility,
+        string version)
+    {
+        foreach ((string label, JsonElement manifest) in new[]
+                 {
+                     ("canonical", canonical),
+                     ("compatibility", compatibility)
+                 })
+        {
+            ValidateUnsignedManifestIdentity(manifest, version, $"preview-ready {label} manifest");
+            RequireExactString(manifest, "projectionProfile", UnsignedWindowsPreviewReadyProjectionProfile);
+            RequireExactString(manifest, "status", "published");
+            RequireExactString(manifest, "rolloutState", "promoted_preview");
+            RequireExactString(manifest, "supportabilityState", "preview_supported");
+            RequireBoolean(manifest, "publicationEligible", expected: true);
+            RequireBoolean(manifest, "routeAuthority", expected: true);
+            RequireBoolean(manifest, "releaseUploadAuthority", expected: false);
+            RequireBoolean(manifest, "deployAuthority", expected: false);
+            JsonElement proof = RequireObject(manifest, "releaseProof");
+            string proofStatus = RequireString(proof, "status");
+            if (proofStatus is not "pass" and not "passed" and not "ready")
+            {
+                throw new InvalidDataException(
+                    $"preview-ready {label} manifest release proof is not passing");
+            }
+        }
+
+        JsonElement coverage = RequireObject(canonical, "desktopTupleCoverage");
+        RequireBoolean(coverage, "complete", expected: true);
+        RequireBoolean(coverage, "routeAuthority", expected: true);
+        foreach (string field in new[]
+                 {
+                     "missingRequiredPlatforms",
+                     "missingRequiredHeads",
+                     "missingRequiredPlatformHeadPairs",
+                     "missingRequiredPlatformHeadRidTuples"
+                 })
+        {
+            if (RequireArray(coverage, field).GetArrayLength() != 0)
+            {
+                throw new InvalidDataException(
+                    $"preview-ready desktop coverage still reports {field}");
+            }
+        }
+        JsonElement routes = RequireArray(coverage, "desktopRouteTruth");
+        var readyPlatforms = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement route in routes.EnumerateArray())
+        {
+            if (RequireString(route, "routeRole") != "primary")
+            {
+                continue;
+            }
+            RequireExactString(route, "head", "avalonia");
+            RequireExactString(route, "promotionState", "promoted");
+            RequireExactString(route, "publicationState", "published");
+            RequireExactString(route, "updateEligibility", "eligible");
+            RequireExactString(route, "installPosture", "installer_first");
+            RequireExactString(route, "revokeState", "not_revoked");
+            RequireBoolean(route, "routeAuthority", expected: true);
+            _ = RequireString(route, "artifactId");
+            _ = RequireString(route, "publicInstallRoute");
+            readyPlatforms.Add(RequireString(route, "platform"));
+        }
+        if (!readyPlatforms.SetEquals(["linux", "windows"]))
+        {
+            throw new InvalidDataException(
+                "preview-ready manifest does not authorize exactly Linux and Windows primary routes");
+        }
+
+        JsonElement artifacts = RequireArray(canonical, "artifacts");
+        var artifactIds = artifacts.EnumerateArray()
+            .Select(artifact => RequireString(artifact, "artifactId"))
+            .ToHashSet(StringComparer.Ordinal);
+        if (!artifactIds.SetEquals(
+                ["avalonia-linux-x64-installer", "avalonia-win-x64-installer"]))
+        {
+            throw new InvalidDataException(
+                "preview-ready manifest artifact scope drifted");
+        }
+        JsonElement bindings = RequireArray(canonical, "artifactPublicationBindings");
+        var publishedBindings = bindings.EnumerateArray()
+            .Where(binding => RequireString(binding, "publicationState") == "published")
+            .Select(binding => RequireString(binding, "artifactId"))
+            .ToHashSet(StringComparer.Ordinal);
+        if (!publishedBindings.SetEquals(artifactIds))
+        {
+            throw new InvalidDataException(
+                "preview-ready manifest has an unpublished artifact binding");
+        }
     }
 
     private static IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow>
