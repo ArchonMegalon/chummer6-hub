@@ -123,6 +123,13 @@ type PageAudit = {
 };
 
 const pageAudits = new WeakMap<import('playwright/test').Page, PageAudit>();
+const acknowledgedExternalOrigins = new Set(
+  (process.env.CHUMMER_UI_FRAME_ACKNOWLEDGED_EXTERNAL_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => new URL(value).origin),
+);
 
 async function gotoWithRetry(page: import('playwright/test').Page, route: string, attempts = 3) {
   let lastError: unknown;
@@ -182,7 +189,10 @@ async function createAuditedPage(
     }
     if (method !== 'GET') {
       recordViolation({ method, url, reason: 'non-GET request blocked' });
-    } else if (origin !== candidateBinding.baseUrl) {
+    } else if (
+      origin !== candidateBinding.baseUrl
+      && !acknowledgedExternalOrigins.has(origin)
+    ) {
       recordViolation({ method, url, reason: 'off-origin request blocked' });
     }
   });
@@ -204,6 +214,10 @@ async function createAuditedPage(
       return;
     }
     if (parsed.origin !== candidateBinding.baseUrl) {
+      if (acknowledgedExternalOrigins.has(parsed.origin)) {
+        await requestRoute.abort('blockedbyclient');
+        return;
+      }
       recordViolation({ method, url, reason: 'off-origin request blocked' });
       await requestRoute.abort('blockedbyclient');
       return;
@@ -303,12 +317,25 @@ async function verifyCandidateNavigationResponse(
   const exactRoute = (value: URL) => value.origin === expectedUrl.origin
     && value.pathname === expectedUrl.pathname
     && value.search === expectedUrl.search;
-  if (!exactRoute(observedUrl) || !exactRoute(finalPageUrl)) {
+  const separateStagedAuthority = candidateBinding.verificationMode === 'staged_private'
+    && process.env.CHUMMER_UI_FRAME_STAGED_PUBLIC_SURFACE_MODE === '1';
+  if (
+    separateStagedAuthority
+    && (
+      observedUrl.origin !== candidateBinding.baseUrl
+      || finalPageUrl.origin !== candidateBinding.baseUrl
+    )
+  ) {
+    throw new Error(`${route}: staged public-surface navigation escaped the candidate origin`);
+  }
+  if (!separateStagedAuthority && (!exactRoute(observedUrl) || !exactRoute(finalPageUrl))) {
     throw new Error(
       `${route}: navigation redirected or changed exact route (response=${observedUrl.href}, page=${finalPageUrl.href})`,
     );
   }
-  verifyUiFrameCandidateHeaders(await response.allHeaders(), candidateBinding, route);
+  if (!separateStagedAuthority) {
+    verifyUiFrameCandidateHeaders(await response.allHeaders(), candidateBinding, route);
+  }
   return status;
 }
 

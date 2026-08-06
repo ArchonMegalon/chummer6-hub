@@ -52,6 +52,8 @@
     <Compile Include="..\Chummer.Tests\CampaignSpineServiceReceiptEnvelopeTests.cs" Link="CampaignSpineServiceReceiptEnvelopeTests.cs" />
     <Compile Include="..\Chummer.Tests\LedgerServiceTests.cs" Link="LedgerServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\PublicProjectionSnapshotServiceTests.cs" Link="PublicProjectionSnapshotServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\PublicReleaseManifestServiceTests.cs" Link="PublicReleaseManifestServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseProofEvidenceTestData.cs" Link="ReleaseProofEvidenceTestData.cs" />
     <Compile Include="..\Chummer.Tests\PublicProjectionProofRequestPathPolicyTests.cs" Link="PublicProjectionProofRequestPathPolicyTests.cs" />
     <Compile Include="..\Chummer.Tests\ReleaseUploadAuthorityHandoffCompatibilityTests.cs" Link="ReleaseUploadAuthorityHandoffCompatibilityTests.cs" />
     <Compile Include="..\Chummer.Tests\PublicReleaseTruthProjectionTests.cs" Link="PublicReleaseTruthProjectionTests.cs" />

@@ -524,7 +524,8 @@ public sealed class ReleaseBundlePromotionService
         _ = PrepareBundle(
             bundleRoot,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+            exactIncomingDesktopScopeIsFreshDelta,
+            allowAuthorityBoundGenerationUrls: false);
         return Task.CompletedTask;
     }
 
@@ -539,7 +540,30 @@ public sealed class ReleaseBundlePromotionService
             bundleRoot,
             exactIncomingDesktopScope,
             candidateImportBinding.ExactIncomingDesktopScopeIsFreshDelta,
+            allowAuthorityBoundGenerationUrls: true,
             cancellationToken);
+    }
+
+    private Task ValidateDirectoryAsync(
+        string bundleRoot,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
+        bool exactIncomingDesktopScopeIsFreshDelta,
+        bool allowAuthorityBoundGenerationUrls,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(bundleRoot))
+        {
+            throw new InvalidDataException("bundle root is required.");
+        }
+        exactIncomingDesktopScope?.ValidateCanonical();
+
+        cancellationToken.ThrowIfCancellationRequested();
+        _ = PrepareBundle(
+            bundleRoot,
+            exactIncomingDesktopScope,
+            exactIncomingDesktopScopeIsFreshDelta,
+            allowAuthorityBoundGenerationUrls);
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -1897,7 +1921,8 @@ public sealed class ReleaseBundlePromotionService
         PreparedReleaseBundle prepared = PrepareBundle(
             bundleRoot,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+            exactIncomingDesktopScopeIsFreshDelta,
+            allowAuthorityBoundGenerationUrls: candidateImportBinding is not null);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
         ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
@@ -2174,7 +2199,8 @@ public sealed class ReleaseBundlePromotionService
         PreparedReleaseBundle prepared = PrepareBundle(
             bundleRoot,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta: false);
+            exactIncomingDesktopScopeIsFreshDelta: false,
+            allowAuthorityBoundGenerationUrls: false);
         PublicReleaseManifestDto incomingCompatibilityManifest = prepared.CompatibilityManifest;
         JsonObject incomingCompatibilityManifestObject = prepared.CompatibilityManifestObject;
         JsonObject incomingCanonicalManifest = prepared.CanonicalManifest;
@@ -2425,7 +2451,8 @@ public sealed class ReleaseBundlePromotionService
     private PreparedReleaseBundle PrepareBundle(
         string bundleRoot,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
-        bool exactIncomingDesktopScopeIsFreshDelta)
+        bool exactIncomingDesktopScopeIsFreshDelta,
+        bool allowAuthorityBoundGenerationUrls)
     {
         ValidateIncomingDesktopScopeProfile(
             exactIncomingDesktopScope,
@@ -2498,7 +2525,8 @@ public sealed class ReleaseBundlePromotionService
             _timeProvider.GetUtcNow(),
             unsignedWindowsFreshDeltaProfile,
             exactIncomingDesktopScope,
-            profileAncillaryFiles);
+            profileAncillaryFiles,
+            allowAuthorityBoundGenerationUrls);
         if (!unsignedWindowsFreshDeltaProfile)
         {
             ReleaseBuildProvenanceValidator.Validate(incomingCanonicalManifest, filesRoot, proofRoot);
@@ -7998,7 +8026,8 @@ public sealed class ReleaseBundlePromotionService
         DateTimeOffset evaluatedAtUtc,
         bool unsignedWindowsFreshDeltaProfile,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
-        IReadOnlySet<string> profileAncillaryFiles)
+        IReadOnlySet<string> profileAncillaryFiles,
+        bool allowAuthorityBoundGenerationUrls)
     {
         if (compatibilityManifest.Downloads.Count == 0)
         {
@@ -8030,11 +8059,13 @@ public sealed class ReleaseBundlePromotionService
                 artifact.Rid);
             NormalizedArtifactContract canonicalContract = NormalizeCanonicalArtifactContract(
                 artifact,
-                requireIncomingUrls);
+                requireIncomingUrls,
+                allowAuthorityBoundGenerationUrls);
             NormalizedArtifactContract compatibilityContract =
                 NormalizeCompatibilityArtifactContract(
                     compatibility,
                     requireIncomingUrls,
+                    allowAuthorityBoundGenerationUrls,
                     retainedProfileCanonical: unsignedWindowsFreshDeltaProfile
                         ? artifact
                         : null);
@@ -8121,7 +8152,8 @@ public sealed class ReleaseBundlePromotionService
 
     private static NormalizedArtifactContract NormalizeCanonicalArtifactContract(
         CanonicalArtifactRecord artifact,
-        bool requireIncomingUrls = true)
+        bool requireIncomingUrls = true,
+        bool allowAuthorityBoundGenerationUrls = false)
     {
         string artifactId = RequireArtifactToken(artifact.ArtifactId, "canonical artifact id");
         string fileName = RequirePortableArtifactFileName(artifact.FileName, artifactId, "canonical fileName");
@@ -8130,7 +8162,8 @@ public sealed class ReleaseBundlePromotionService
             fileName,
             artifactId,
             requireIncomingUrls,
-            "canonical downloadUrl");
+            "canonical downloadUrl",
+            allowAuthorityBoundGenerationUrls);
         string sha256 = RequireArtifactSha256(artifact.Sha256, artifactId, "canonical artifact");
         long sizeBytes = RequireArtifactSize(artifact.SizeBytes, artifactId, "canonical artifact");
         string platform = NormalizePlatform(RequireArtifactToken(artifact.Platform, "canonical platform"));
@@ -8146,7 +8179,8 @@ public sealed class ReleaseBundlePromotionService
                 artifact.PayloadSizeBytes,
                 artifactId,
                 "canonical",
-                requireIncomingUrls);
+                requireIncomingUrls,
+                allowAuthorityBoundGenerationUrls);
         return new NormalizedArtifactContract(
             artifactId,
             fileName,
@@ -8170,6 +8204,7 @@ public sealed class ReleaseBundlePromotionService
     private static NormalizedArtifactContract NormalizeCompatibilityArtifactContract(
         PublicReleaseArtifactDto artifact,
         bool requireIncomingUrls = true,
+        bool allowAuthorityBoundGenerationUrls = false,
         CanonicalArtifactRecord? retainedProfileCanonical = null)
     {
         string artifactId = RequireArtifactToken(artifact.Id, "compatibility artifact id");
@@ -8179,7 +8214,8 @@ public sealed class ReleaseBundlePromotionService
             fileName,
             artifactId,
             requireIncomingUrls,
-            "compatibility downloadUrl");
+            "compatibility downloadUrl",
+            allowAuthorityBoundGenerationUrls);
         string sha256 = RequireArtifactSha256(artifact.Sha256, artifactId, "compatibility artifact");
         long sizeBytes = RequireArtifactSize(artifact.SizeBytes, artifactId, "compatibility artifact");
         string platformId = RequireArtifactToken(artifact.PlatformId, "compatibility platformId");
@@ -8213,7 +8249,8 @@ public sealed class ReleaseBundlePromotionService
                 artifact.PayloadSizeBytes,
                 artifactId,
                 "compatibility",
-                requireIncomingUrls);
+                requireIncomingUrls,
+                allowAuthorityBoundGenerationUrls);
         return new NormalizedArtifactContract(
             artifactId,
             fileName,
@@ -8370,7 +8407,8 @@ public sealed class ReleaseBundlePromotionService
         long? sizeBytes,
         string artifactId,
         string manifest,
-        bool requireIncomingUrl = true)
+        bool requireIncomingUrl = true,
+        bool allowAuthorityBoundGenerationUrls = false)
     {
         bool present = !string.IsNullOrWhiteSpace(fileName)
                        || !string.IsNullOrWhiteSpace(url)
@@ -8392,7 +8430,8 @@ public sealed class ReleaseBundlePromotionService
                 normalizedFileName,
                 artifactId,
                 requireIncomingUrl,
-                $"{manifest} payloadDownloadUrl"),
+                $"{manifest} payloadDownloadUrl",
+                allowAuthorityBoundGenerationUrls),
             RequireArtifactSha256(sha256, artifactId, $"{manifest} payload"),
             RequireArtifactSize(sizeBytes, artifactId, $"{manifest} payload"));
     }
@@ -8427,9 +8466,14 @@ public sealed class ReleaseBundlePromotionService
         string fileName,
         string artifactId,
         bool requireGovernedIncomingUrl,
-        string nonIncomingField)
+        string nonIncomingField,
+        bool allowAuthorityBoundGenerationUrl = false)
         => requireGovernedIncomingUrl
-            ? RequireGovernedIncomingArtifactUrl(value, fileName, artifactId)
+            ? RequireGovernedIncomingArtifactUrl(
+                value,
+                fileName,
+                artifactId,
+                allowAuthorityBoundGenerationUrl)
             : RequireNonEmptyArtifactUrl(value, artifactId, nonIncomingField);
 
     private static string RequireNonEmptyArtifactUrl(
@@ -8449,7 +8493,8 @@ public sealed class ReleaseBundlePromotionService
     private static string RequireGovernedIncomingArtifactUrl(
         string? value,
         string fileName,
-        string artifactId)
+        string artifactId,
+        bool allowAuthorityBoundGenerationUrl)
     {
         string url = (value ?? string.Empty).Trim();
         string expected = $"/downloads/files/{fileName}";
@@ -8462,13 +8507,30 @@ public sealed class ReleaseBundlePromotionService
             || url.Contains('#', StringComparison.Ordinal)
             || url.Contains('\\', StringComparison.Ordinal)
             || hasSchemeOrAuthority
-            || !string.Equals(url, expected, StringComparison.Ordinal))
+            || (!string.Equals(url, expected, StringComparison.Ordinal)
+                && (!allowAuthorityBoundGenerationUrl
+                    || !IsExactGenerationFileUrl(url, fileName))))
         {
             throw new InvalidDataException(
                 $"artifact {artifactId} URL must be the governed incoming path {expected}.");
         }
 
         return url;
+    }
+
+    private static bool IsExactGenerationFileUrl(string url, string fileName)
+    {
+        const string prefix = "/downloads/g/";
+        string suffix = $"/files/{EncodePortableFileRouteSegment(fileName)}";
+        if (!url.StartsWith(prefix, StringComparison.Ordinal)
+            || !url.EndsWith(suffix, StringComparison.Ordinal)
+            || url.Length <= prefix.Length + suffix.Length)
+        {
+            return false;
+        }
+
+        string generationId = url[prefix.Length..^suffix.Length];
+        return IsSafeGenerationId(generationId);
     }
 
     private static string RequirePortableArtifactFileName(

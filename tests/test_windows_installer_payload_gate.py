@@ -864,6 +864,32 @@ def test_windows_installer_verifier_accepts_canonical_site_manifest_url_with_abs
     assert "windows_installer_payload_gate:ok checked=1" in result.stdout
 
 
+def test_windows_installer_verifier_accepts_stable_sidecar_for_generation_manifest(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    generation = "g-run-test-abcdef0123456789"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            f"/downloads/g/{generation}/files/"
+            "chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=(
+            f"/downloads/g/{generation}/files/{payload_name}"
+        ),
+        sidecar_download_url=(
+            f"https://example.invalid/downloads/files/{payload_name}"
+        ),
+        release_proof={"baseUrl": "https://example.invalid"},
+        require_embedded_metadata=True,
+        require_manifest_row=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "windows_installer_payload_gate:ok checked=1" in result.stdout
+
+
 def test_windows_installer_verifier_accepts_release_proof_origin_for_site_relative_urls(
     tmp_path: Path,
 ) -> None:

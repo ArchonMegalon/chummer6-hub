@@ -25,7 +25,8 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         HttpContext context,
         IReleaseTruthProjection releaseTruth,
         ReleaseBundlePromotionService promotions,
-        ReleaseShelfGenerationStore shelfStore)
+        ReleaseShelfGenerationStore shelfStore,
+        ILogger<PublicReleaseTruthProjectionMiddleware> logger)
     {
         if (!IsReleaseFacingRoute(context.Request.Path))
         {
@@ -35,13 +36,14 @@ public sealed class PublicReleaseTruthProjectionMiddleware
 
         string? stagedProbe = context.Request.Headers[StagedProbeHeaderName].FirstOrDefault();
         bool stagedRequest = stagedProbe is not null;
+        ReleaseShelfSnapshot? stagedSnapshot = null;
         if (stagedRequest)
         {
             _ = TryResolveGenerationId(context.Request.Path, out string? requestedGenerationId);
             if (!promotions.TryCaptureStageProbe(
                     stagedProbe,
                     requestedGenerationId,
-                    out ReleaseShelfSnapshot? stagedSnapshot)
+                    out stagedSnapshot)
                 || stagedSnapshot is null)
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -60,12 +62,22 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         PublicReleaseTruthCapture capture;
         try
         {
-            capture = TryResolveGenerationId(context.Request.Path, out string? generationId)
-                ? releaseTruth.CaptureGenerationWithAuthority(generationId!)
-                : releaseTruth.CaptureWithAuthority();
+            capture = stagedSnapshot is not null
+                      && releaseTruth is IStagedReleaseTruthProjection stagedReleaseTruth
+                ? stagedReleaseTruth.CaptureStagedWithAuthority(stagedSnapshot)
+                : TryResolveGenerationId(context.Request.Path, out string? generationId)
+                    ? releaseTruth.CaptureGenerationWithAuthority(generationId!)
+                    : releaseTruth.CaptureWithAuthority();
         }
         catch (Exception exception) when (exception is InvalidDataException or InvalidOperationException)
         {
+            if (stagedSnapshot is not null)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Authenticated staged release-truth projection failed for generation {GenerationId}.",
+                    stagedSnapshot.GenerationId);
+            }
             if (IsReleaseAuthorityRequiredHandoffRoute(context.Request.Path))
             {
                 context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;

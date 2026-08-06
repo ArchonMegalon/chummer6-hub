@@ -19,11 +19,17 @@ public interface IReleaseTruthProjection
         ReadOnlyMemory<byte>? immutableAuthorityManifestBytes);
 }
 
+internal interface IStagedReleaseTruthProjection
+{
+    PublicReleaseTruthCapture CaptureStagedWithAuthority(ReleaseShelfSnapshot snapshot);
+}
+
 public sealed record PublicReleaseTruthCapture(
     PublicReleaseTruthProjectionDto Projection,
     string AuthoritySnapshotSha256);
 
-public sealed class PublicReleaseTruthProjectionService : IReleaseTruthProjection
+public sealed class PublicReleaseTruthProjectionService
+    : IReleaseTruthProjection, IStagedReleaseTruthProjection
 {
     private const int MaximumTokenLength = 128;
     private const int MaximumPlatformCount = 16;
@@ -54,11 +60,21 @@ public sealed class PublicReleaseTruthProjectionService : IReleaseTruthProjectio
     public PublicReleaseTruthCapture CaptureGenerationWithAuthority(string generationId)
         => CaptureSnapshot(_releases.CaptureShelfGeneration(generationId));
 
-    private PublicReleaseTruthCapture CaptureSnapshot(ReleaseShelfSnapshot snapshot)
+    public PublicReleaseTruthCapture CaptureStagedWithAuthority(ReleaseShelfSnapshot snapshot)
+        => CaptureSnapshot(
+            snapshot ?? throw new ArgumentNullException(nameof(snapshot)),
+            stagedAuthority: true);
+
+    private PublicReleaseTruthCapture CaptureSnapshot(
+        ReleaseShelfSnapshot snapshot,
+        bool stagedAuthority = false)
     {
         PublicReleaseManifestDto manifest = _artifactDelivery.FilterRevokedArtifacts(
             snapshot,
-            _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(snapshot)));
+            _releaseSelection.ApplyAccessPolicy(
+                stagedAuthority
+                    ? _releases.LoadStagedAuthorityManifest(snapshot)
+                    : _releases.LoadManifest(snapshot)));
         ReadOnlyMemory<byte>? authorityBytes = snapshot.IsLegacy
             ? null
             : _releases.LoadGenerationCanonicalManifestBytes(snapshot);

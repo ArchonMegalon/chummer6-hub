@@ -51,11 +51,12 @@ UPLOAD_ATTEMPT_RECEIPT_PATH="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$BUN
 STAGE_RESPONSE_PATH="${CHUMMER_RELEASE_UPLOAD_STAGE_RESPONSE_PATH:-$BUNDLE_DIR/release-stage-response.json}"
 STAGED_PROBE_TOKEN_PATH="${CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE:-}"
 RESUME_SESSION_ID="${CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID:-}"
+LOOPBACK_CA_FILE="${CHUMMER_RELEASE_UPLOAD_LOOPBACK_CA_FILE:-}"
 
 # Keep inherited bearer credentials out of every preflight/materializer child.
 # Bash preserves an inherited export attribute across ordinary assignment, so
 # explicitly de-export the private shell copies before invoking any child.
-export -n TOKEN TOKEN_FILE STAGED_PROBE_TOKEN_PATH ARTIFACT_FACTORY_TOKEN 2>/dev/null || true
+export -n TOKEN TOKEN_FILE STAGED_PROBE_TOKEN_PATH ARTIFACT_FACTORY_TOKEN LOOPBACK_CA_FILE 2>/dev/null || true
 unset \
   CHUMMER_RELEASE_UPLOAD_TOKEN \
   CHUMMER_RELEASE_UPLOAD_TOKEN_FILE \
@@ -65,6 +66,7 @@ unset \
   CHUMMER_RELEASE_UPLOAD_TICKET_FILE \
   CHUMMER_RELEASE_UPLOAD_TICKET_PATH \
   CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID \
+  CHUMMER_RELEASE_UPLOAD_LOOPBACK_CA_FILE \
   CHUMMER_ARTIFACT_FACTORY_TOKEN \
   FLEET_INTERNAL_API_TOKEN \
   UPLOAD_AUTH_VALUE
@@ -77,6 +79,39 @@ fi
 if [[ -n "$RESUME_SESSION_ID" && ! "$RESUME_SESSION_ID" =~ ^[0-9a-f]{32}$ ]]; then
   echo "CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID must be a canonical lowercase 32-hex session identifier." >&2
   exit 1
+fi
+
+if [[ -n "$LOOPBACK_CA_FILE" ]]; then
+  if [[ "$SESSIONS_URL" != "https://chummer.run/api/internal/releases/upload-sessions" ]]; then
+    echo "CHUMMER_RELEASE_UPLOAD_LOOPBACK_CA_FILE requires the canonical chummer.run upload-session URL." >&2
+    exit 1
+  fi
+  if ! python3 - "$LOOPBACK_CA_FILE" <<'PY'
+import os
+from pathlib import Path
+import stat
+import sys
+
+path = Path(sys.argv[1])
+try:
+    metadata = path.lstat()
+except OSError:
+    raise SystemExit(1)
+if (
+    not path.is_absolute()
+    or not stat.S_ISREG(metadata.st_mode)
+    or stat.S_ISLNK(metadata.st_mode)
+    or metadata.st_uid != os.geteuid()
+    or stat.S_IMODE(metadata.st_mode) & 0o022
+    or metadata.st_size <= 0
+    or metadata.st_size > 1024 * 1024
+):
+    raise SystemExit(1)
+PY
+  then
+    echo "CHUMMER_RELEASE_UPLOAD_LOOPBACK_CA_FILE must be an owner-controlled absolute regular CA file." >&2
+    exit 1
+  fi
 fi
 
 if [[ ! "$MAX_RESPONSE_BYTES" =~ ^[0-9]+$ ]] || (( MAX_RESPONSE_BYTES < 1024 || MAX_RESPONSE_BYTES > 16777216 )); then
@@ -629,8 +664,15 @@ write_auth_curl_config() {
 }
 
 authenticated_curl() {
+  local -a curl_transport_args=()
+  if [[ -n "$LOOPBACK_CA_FILE" ]]; then
+    curl_transport_args+=(
+      --resolve "chummer.run:443:127.0.0.1"
+      --cacert "$LOOPBACK_CA_FILE"
+    )
+  fi
   write_auth_curl_config "$UPLOAD_AUTH_VALUE" \
-    | curl -q --config - "$@"
+    | curl -q "${curl_transport_args[@]}" --config - "$@"
 }
 
 resolve_json_field() {
@@ -730,7 +772,9 @@ collect_upload_files() {
   [[ -f "$MANIFEST_PATH" ]] && printf '%s\n' "$MANIFEST_PATH"
   [[ -f "$CANONICAL_MANIFEST_PATH" ]] && printf '%s\n' "$CANONICAL_MANIFEST_PATH"
   [[ -f "$bundle_root/aur-packages.json" ]] && printf '%s\n' "$bundle_root/aur-packages.json"
-  [[ -f "$bundle_root/release-evidence/public-promotion.json" ]] && printf '%s\n' "$bundle_root/release-evidence/public-promotion.json"
+  if [[ -d "$bundle_root/release-evidence" ]]; then
+    find "$bundle_root/release-evidence" -type f | sort
+  fi
   if [[ -d "$bundle_root/files" ]]; then
     find "$bundle_root/files" -type f | sort
   fi

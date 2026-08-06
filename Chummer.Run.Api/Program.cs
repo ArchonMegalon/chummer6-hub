@@ -8,6 +8,9 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Chummer.Run.Api.Services.KarmaForge;
+using Chummer.Run.Registry.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -75,6 +78,23 @@ DataProtectionKeyProtectionStatus dataProtectionKeyProtection =
         dataProtectionPath);
 builder.Services.AddSingleton(dataProtectionKeyProtection);
 builder.Services.AddPlayAuthorizationProcessLease();
+builder.Services
+    .AddAuthentication()
+    .AddScheme<AuthenticationSchemeOptions, RegistryControlApiKeyAuthenticationHandler>(
+        RegistryAuthorization.Scheme,
+        _ => { });
+builder.Services.AddAuthorization(options =>
+{
+    var registryControlPolicy = new AuthorizationPolicyBuilder(RegistryAuthorization.Scheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim("scope", RegistryAuthorization.ControlPolicy)
+        .Build();
+
+    options.AddPolicy(RegistryAuthorization.ControlPolicy, registryControlPolicy);
+});
+builder.Services.AddSingleton<IPublicationWorkflowService, PublicationWorkflowService>();
+builder.Services.AddSingleton<IHubArtifactStore, FileBackedHubArtifactStore>();
+builder.Services.AddSingleton<IReleaseChannelManifestStore, FileReleaseChannelManifestStore>();
 builder.Services
     .AddHubPublicGuideContext()
     .AddHubAccountsAndCommunityContext()

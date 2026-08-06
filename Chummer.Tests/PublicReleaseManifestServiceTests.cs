@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
@@ -85,6 +86,76 @@ public sealed class PublicReleaseManifestServiceTests
             manifest.RolloutState ?? string.Empty,
             new[] { "public_stable", "stable", "promoted_preview", "live" });
         Assert.Contains("public projection", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void StagedAuthorityManifestIsNotRewrittenByCandidateImportProjectionPointer()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        const string knownIssue =
+            "Known issue: fresh Windows bytes remain unpromoted until independent runtime proof is captured and reviewed.";
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["contractName"] = "Chummer.Hub.Registry.Contracts",
+            ["channelId"] = "preview",
+            ["channel"] = "preview",
+            ["version"] = "run-staged-candidate",
+            ["publishedAt"] = "2026-08-04T22:01:08Z",
+            ["status"] = "published",
+            ["rolloutState"] = "coverage_incomplete",
+            ["supportabilityState"] = "review_required",
+            ["knownIssueSummary"] = knownIssue,
+            ["artifacts"] = Array.Empty<object>()
+        });
+        byte[] canonicalBytes = fixture.ReadRegistryManifestBytes();
+        string canonicalSha256 = Convert.ToHexStringLower(
+            SHA256.HashData(canonicalBytes));
+        var inventory = new Dictionary<string, ReleaseShelfInventoryEntry>(
+            StringComparer.Ordinal)
+        {
+            [ReleaseShelfGenerationStore.CanonicalManifestFileName] = new(
+                ReleaseShelfGenerationStore.CanonicalManifestFileName,
+                canonicalSha256,
+                canonicalBytes.LongLength)
+        };
+        ReleaseShelfSnapshot snapshot = ReleaseShelfSnapshot.Active(
+            downloadsRoot: fixture.DownloadsRoot,
+            physicalRoot: fixture.DownloadsRoot,
+            generationId: "g-staged-candidate",
+            releaseVersion: "run-staged-candidate",
+            channel: "preview",
+            publishedAt: DateTimeOffset.Parse("2026-08-04T22:01:08Z"),
+            activatedAt: null,
+            activationReceiptId: "activation-staged-candidate",
+            canonicalManifestSha256: canonicalSha256,
+            compatibilityManifestSha256: new string('b', 64),
+            inventoryDigest: new string('c', 64),
+            pointerDigest: new string('d', 64),
+            inventory,
+            explicitGeneration: true);
+        string missingProjectionRoot = Path.Combine(
+            Path.GetTempPath(),
+            Guid.NewGuid().ToString("N"));
+        PublicReleaseManifestService service = fixture.CreateService(
+            additionalSettings: new Dictionary<string, string?>
+            {
+                [PublicProjectionSnapshotService.SnapshotRootConfigurationKey] =
+                    missingProjectionRoot,
+                [PublicProjectionSnapshotService.SnapshotRequiredConfigurationKey] = "true"
+            },
+            privacyLaunchGate: PrivacyLaunchGate.Current);
+
+        PublicReleaseManifestDto publicManifest = service.LoadManifest(snapshot);
+        PublicReleaseManifestDto stagedManifest =
+            service.LoadStagedAuthorityManifest(snapshot);
+
+        Assert.Contains(
+            "Current public projection authentication is incomplete",
+            publicManifest.KnownIssueSummary,
+            StringComparison.Ordinal);
+        Assert.Equal("coverage_incomplete", stagedManifest.RolloutState);
+        Assert.Equal("review_required", stagedManifest.SupportabilityState);
+        Assert.Equal(knownIssue, stagedManifest.KnownIssueSummary);
     }
 
     [Fact]
@@ -2678,6 +2749,8 @@ public sealed class PublicReleaseManifestServiceTests
     {
         private readonly string _root;
         private readonly string _downloadsRoot;
+
+        public string DownloadsRoot => _downloadsRoot;
         private readonly string _canonRoot;
 
         public PublicReleaseManifestFixture()

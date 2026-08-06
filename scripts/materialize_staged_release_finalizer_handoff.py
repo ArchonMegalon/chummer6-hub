@@ -245,6 +245,24 @@ def _sessions_url(value: str, live_origin: str) -> str:
     return result
 
 
+def _desktop_scope_tuples(value: Any, label: str) -> set[str]:
+    if not isinstance(value, str) or value != value.strip() or not value:
+        raise HandoffError(f"{label} must be a canonical desktop scope")
+    tuples = value.split(",")
+    if any(
+        re.fullmatch(
+            r"[a-z0-9][a-z0-9._-]{0,127}:[a-z0-9][a-z0-9._-]{0,127}:[a-z0-9][a-z0-9._-]{0,127}",
+            item,
+        )
+        is None
+        for item in tuples
+    ):
+        raise HandoffError(f"{label} contains an invalid desktop tuple")
+    if tuples != sorted(set(tuples)):
+        raise HandoffError(f"{label} must be sorted and unique")
+    return set(tuples)
+
+
 def _write_new(path: Path, root: Path, payload: dict[str, Any]) -> None:
     try:
         resolved = path.resolve(strict=False)
@@ -410,11 +428,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             or not scope_rows
             or not isinstance(candidate_ids, list)
             or sorted(candidate_ids) != scope_verification.get("artifactIds")
-            or stage.get("exactIncomingDesktopScope")
-            != scope_verification.get("exactIncomingDesktopScope")
         ):
             raise HandoffError(
                 "staged candidate does not bind the exact approved release scope and inventory"
+            )
+        incoming_scope = _desktop_scope_tuples(
+            stage.get("exactIncomingDesktopScope"),
+            "staged exact incoming desktop scope",
+        )
+        approved_scope = _desktop_scope_tuples(
+            scope_verification.get("exactIncomingDesktopScope"),
+            "approved candidate desktop scope",
+        )
+        if not incoming_scope.issubset(approved_scope):
+            raise HandoffError(
+                "staged exact incoming desktop scope is outside the approved candidate scope"
             )
         snapshot_sha256 = _sha(raws["predecessorSnapshot"])
         decision_sha256 = _sha(raws["predecessorDecision"])
@@ -585,7 +613,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "releaseScopeDecisionSha256": scope_sha256,
             "releaseScopeVerificationSha256": scope_verification_sha256,
             "releaseScopeAuthority": scope_authority,
-            "exactIncomingDesktopScope": scope_verification.get(
+            "exactIncomingDesktopScope": stage.get("exactIncomingDesktopScope"),
+            "releaseScopeApprovedDesktopScope": scope_verification.get(
                 "exactIncomingDesktopScope"
             ),
             "supportOwner": scope_verification.get("supportOwner"),

@@ -466,6 +466,31 @@ def run_publish_with_script(
     )
 
 
+def test_publish_download_bundle_http_dry_run_counts_all_release_evidence(
+    tmp_path: Path,
+) -> None:
+    bundle_root = write_bundle(tmp_path / "bundle")
+    evidence_root = bundle_root / "release-evidence"
+    evidence_root.mkdir()
+    for name in ("CURRENT.json", "RELEASE_DECISION.json", "SNAPSHOT.json"):
+        (evidence_root / name).write_text("{}\n", encoding="utf-8")
+    registry_root = write_registry(tmp_path / "registry")
+
+    result = run_publish_with_script(
+        SCRIPT,
+        bundle_root,
+        "https://example.invalid",
+        registry_root,
+        extra_env={
+            "CHUMMER_RELEASE_UPLOAD_DRY_RUN": "1",
+            "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1",
+        },
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Files staged: 6" in result.stdout
+
+
 def test_publish_download_bundle_http_rejects_legacy_direct_upload_configuration(tmp_path: Path) -> None:
     bundle_root = write_bundle(tmp_path / "bundle")
     registry_root = write_registry(tmp_path / "registry")

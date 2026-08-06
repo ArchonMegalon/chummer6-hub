@@ -87,6 +87,48 @@ public sealed class ReleaseBundlePromotionUnsignedPreviewTests
     }
 
     [Fact]
+    public void AuthorityBoundCandidateAcceptsOnlyExactImmutableGenerationFileUrl()
+    {
+        const string fileName = "chummer-avalonia-win-x64-installer.exe";
+        const string artifactId = "avalonia-win-x64-installer";
+        const string immutableUrl =
+            "/downloads/g/g-20260804T220108Z-d075fe4a261b4a14/files/chummer-avalonia-win-x64-installer.exe";
+
+        Assert.Equal(
+            immutableUrl,
+            ReleaseBundlePromotionService.NormalizeIncomingArtifactUrl(
+                immutableUrl,
+                fileName,
+                artifactId,
+                requireGovernedIncomingUrl: true,
+                nonIncomingField: "canonical downloadUrl",
+                allowAuthorityBoundGenerationUrl: true));
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.NormalizeIncomingArtifactUrl(
+                immutableUrl,
+                fileName,
+                artifactId,
+                requireGovernedIncomingUrl: true,
+                nonIncomingField: "canonical downloadUrl"));
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.NormalizeIncomingArtifactUrl(
+                "/downloads/g/g-20260804T220108Z-d075fe4a261b4a14/files/other.exe",
+                fileName,
+                artifactId,
+                requireGovernedIncomingUrl: true,
+                nonIncomingField: "canonical downloadUrl",
+                allowAuthorityBoundGenerationUrl: true));
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.NormalizeIncomingArtifactUrl(
+                immutableUrl + "?download=1",
+                fileName,
+                artifactId,
+                requireGovernedIncomingUrl: true,
+                nonIncomingField: "canonical downloadUrl",
+                allowAuthorityBoundGenerationUrl: true));
+    }
+
+    [Fact]
     public void FreshDeltaAcceptsMaterializedActiveShelfWhenPublishedArtifactInventoryMatches()
     {
         string root = Path.Combine(
