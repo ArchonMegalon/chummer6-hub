@@ -7652,6 +7652,15 @@ public sealed class ReleaseBundlePromotionService
                 $"{CanonicalManifestName} desktopTupleCoverage.complete disagrees with the canonical platform floor.");
         }
 
+        if (string.Equals(
+                GetJsonString(canonical["projectionProfile"]),
+                UnsignedWindowsPreviewReadyProjectionProfile,
+                StringComparison.Ordinal))
+        {
+            ValidateProofBoundPreviewReadyPosture(canonical, expectedComplete);
+            return;
+        }
+
         ValidateCanonicalPostureFloors(canonical, expectedComplete);
     }
 
@@ -7995,6 +8004,152 @@ public sealed class ReleaseBundlePromotionService
                 throw new InvalidDataException(
                     $"{CanonicalManifestName} {fieldName} must explain stale or incomplete proof receipts.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Validates the intentional split between global flagship trust and the narrowly
+    /// proof-bound Linux/Windows preview publication receipt. This profile is admitted
+    /// only from a parsed v6 candidate authority; all ordinary release profiles keep
+    /// using <see cref="ValidateCanonicalPostureFloors"/> and its agreement invariant.
+    /// </summary>
+    internal static void ValidateProofBoundPreviewReadyPosture(
+        JsonObject canonical,
+        bool desktopCoverageComplete)
+    {
+        if (!desktopCoverageComplete
+            || NormalizeToken(GetJsonString(canonical["projectionProfile"]))
+                != UnsignedWindowsPreviewReadyProjectionProfile
+            || NormalizeToken(GetJsonString(canonical["status"])) != "published"
+            || NormalizeToken(GetJsonString(canonical["rolloutState"])) != "promoted_preview"
+            || NormalizeToken(GetJsonString(canonical["supportabilityState"])) != "preview_supported"
+            || !TryGetJsonBoolean(canonical["publicationEligible"], out bool publicationEligible)
+            || !publicationEligible
+            || !TryGetJsonBoolean(canonical["routeAuthority"], out bool routeAuthority)
+            || !routeAuthority
+            || !TryGetJsonBoolean(canonical["releaseUploadAuthority"], out bool releaseUploadAuthority)
+            || releaseUploadAuthority
+            || !TryGetJsonBoolean(canonical["deployAuthority"], out bool deployAuthority)
+            || deployAuthority)
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} proof-bound preview posture is not exact.");
+        }
+
+        JsonObject publicTrustMetrics = canonical["publicTrustMetrics"] as JsonObject
+            ?? throw new InvalidDataException($"{CanonicalManifestName} must contain publicTrustMetrics.");
+        JsonObject trustReleaseChannel = publicTrustMetrics["releaseChannel"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain publicTrustMetrics.releaseChannel.");
+        JsonObject proofFreshness = publicTrustMetrics["proofFreshness"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain publicTrustMetrics.proofFreshness.");
+        JsonObject registryBoundary = canonical["registryBoundaryCoverage"] as JsonObject
+            ?? throw new InvalidDataException($"{CanonicalManifestName} must contain registryBoundaryCoverage.");
+        JsonObject registryReleaseChannel = registryBoundary["releaseChannel"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain registryBoundaryCoverage.releaseChannel.");
+
+        string trustSupportability = NormalizeToken(
+            GetJsonString(trustReleaseChannel["supportabilityState"]));
+        string registrySupportability = NormalizeToken(
+            GetJsonString(registryReleaseChannel["supportabilityState"]));
+        bool usesOrdinaryTrustAgreement = trustSupportability == "preview_supported"
+            && registrySupportability == "preview_supported";
+        if (!usesOrdinaryTrustAgreement)
+        {
+            string freshnessStatus = NormalizeToken(GetJsonString(proofFreshness["status"]));
+            if (NormalizeToken(GetJsonString(registryBoundary["owner"])) != "chummer6-hub-registry"
+                || NormalizeToken(GetJsonString(registryBoundary["status"])) != "closed"
+                || !TryGetJsonBoolean(
+                    registryReleaseChannel["desktopTupleComplete"],
+                    out bool registryComplete)
+                || !registryComplete
+                || NormalizeToken(GetJsonString(trustReleaseChannel["channelId"])) != "preview"
+                || NormalizeToken(GetJsonString(trustReleaseChannel["publicationStatus"])) != "published"
+                || NormalizeToken(GetJsonString(trustReleaseChannel["rolloutState"])) != "promoted_preview"
+                || trustSupportability != "review_required"
+                || NormalizeToken(GetJsonString(trustReleaseChannel["posture"])) != "blocked"
+                || freshnessStatus is not "stale" and not "missing"
+                || NormalizeToken(GetJsonString(registryReleaseChannel["publicationStatus"])) != "published"
+                || NormalizeToken(GetJsonString(registryReleaseChannel["rolloutState"])) != "promoted_preview"
+                || registrySupportability != "preview_supported"
+                || NormalizeToken(GetJsonString(registryReleaseChannel["publicTrustPosture"])) != "blocked")
+            {
+                throw new InvalidDataException(
+                    $"{CanonicalManifestName} proof-bound preview trust split is not exact.");
+            }
+        }
+
+        JsonObject readiness = canonical["previewPublicationReadiness"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} proof-bound preview readiness receipt is missing.");
+        RequireExactProperties(
+            readiness,
+            [
+                "contractName",
+                "contractVersion",
+                "generatedAtUtc",
+                "localizationGateSha256",
+                "nativeWindowsEvidenceSha256",
+                "platforms",
+                "registryCommit",
+                "releaseProofSha256",
+                "releaseVersion",
+                "sourceCandidateAuthoritySha256",
+                "sourceCanonicalManifestSha256",
+                "sourceCompatibilityManifestSha256",
+                "status"
+            ],
+            "proof-bound preview readiness receipt");
+        if (GetJsonString(readiness["contractName"])
+                != "chummer.registry.preview-publication-readiness/v1"
+            || readiness["contractVersion"] is not JsonValue contractVersion
+            || !contractVersion.TryGetValue<int>(out int parsedContractVersion)
+            || parsedContractVersion != 1
+            || GetJsonString(readiness["status"]) != "preview_ready"
+            || GetJsonString(readiness["releaseVersion"])
+                != GetJsonString(canonical["releaseVersion"]))
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} proof-bound preview readiness identity drifted.");
+        }
+        RequireExactStringArray(
+            readiness,
+            "platforms",
+            ["linux", "windows"],
+            "proof-bound preview readiness platform scope");
+        string? registryCommit = GetJsonString(readiness["registryCommit"]);
+        if (registryCommit is not { Length: 40 }
+            || registryCommit.Any(static character => character is not (>= '0' and <= '9')
+                and not (>= 'a' and <= 'f')))
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} proof-bound preview Registry commit is invalid.");
+        }
+        foreach (string propertyName in new[]
+                 {
+                     "localizationGateSha256",
+                     "nativeWindowsEvidenceSha256",
+                     "releaseProofSha256",
+                     "sourceCandidateAuthoritySha256",
+                     "sourceCanonicalManifestSha256",
+                     "sourceCompatibilityManifestSha256"
+                 })
+        {
+            if (!IsBareLowerSha256(GetJsonString(readiness[propertyName])))
+            {
+                throw new InvalidDataException(
+                    $"{CanonicalManifestName} proof-bound preview {propertyName} is invalid.");
+            }
+        }
+        _ = RequireTimestamp(
+            readiness,
+            "generatedAtUtc",
+            "proof-bound preview readiness receipt");
+        if (usesOrdinaryTrustAgreement)
+        {
+            ValidateCanonicalPostureFloors(canonical, desktopCoverageComplete);
         }
     }
 
