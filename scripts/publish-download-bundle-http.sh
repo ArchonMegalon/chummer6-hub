@@ -50,6 +50,8 @@ UPLOAD_ATTEMPT_RECEIPT_HELPER="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_HELPER:-
 UPLOAD_ATTEMPT_RECEIPT_PATH="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$BUNDLE_DIR/release-upload-handoff.json}"
 STAGE_RESPONSE_PATH="${CHUMMER_RELEASE_UPLOAD_STAGE_RESPONSE_PATH:-$BUNDLE_DIR/release-stage-response.json}"
 STAGED_PROBE_TOKEN_PATH="${CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE:-}"
+PREVIEW_READY_CANDIDATE_AUTHORITY_PATH="${CHUMMER_RELEASE_UPLOAD_CANDIDATE_AUTHORITY_PATH:-}"
+PREVIEW_READY_CANDIDATE_AUTHORITY_SHA256="${CHUMMER_RELEASE_UPLOAD_CANDIDATE_AUTHORITY_SHA256:-}"
 RESUME_SESSION_ID="${CHUMMER_RELEASE_UPLOAD_RESUME_SESSION_ID:-}"
 LOOPBACK_CA_FILE="${CHUMMER_RELEASE_UPLOAD_LOOPBACK_CA_FILE:-}"
 
@@ -159,42 +161,70 @@ python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" \
   --require-manifest-row \
   --allow-empty
 
-case "$(printf '%s' "$ALLOW_PROOF_ONLY_VISUAL_HANDOFF" | tr '[:upper:]' '[:lower:]')" in
-  1|true|yes|on)
-    case "$(printf '%s' "$FORCE_NIGHTLY_PUBLISH" | tr '[:upper:]' '[:lower:]')" in
-      1|true|yes|on) ;;
-      *)
-        echo "Proof-only Windows visual handoff also requires CHUMMER_FORCE_NIGHTLY_PUBLISH=1." >&2
-        exit 1
-        ;;
-    esac
-    if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-visual-proof-handoff.py" ]]; then
-      echo "Missing Windows proof-only visual handoff gate: $SCRIPT_DIR/verify-windows-installer-visual-proof-handoff.py" >&2
-      exit 1
-    fi
-    python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof-handoff.py" \
-      --files-dir "$BUNDLE_DIR/files" \
-      --manifest "$MANIFEST_PATH" \
-      --manifest "$CANONICAL_MANIFEST_PATH" \
-      --handoff "$WINDOWS_VISUAL_PROOF_HANDOFF_PATH" \
-      --windows-gate "$WINDOWS_DESKTOP_EXIT_GATE_PATH"
-    ;;
-  0|false|no|off|"")
-    if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" ]]; then
-      echo "Missing Windows installer visual proof gate: $SCRIPT_DIR/verify-windows-installer-visual-proof.py" >&2
-      exit 1
-    fi
-    python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" \
-      --files-dir "$BUNDLE_DIR/files" \
-      --manifest "$MANIFEST_PATH" \
-      --manifest "$CANONICAL_MANIFEST_PATH" \
-      --allow-empty
-    ;;
+case "$(printf '%s' "$STAGE_ONLY" | tr '[:upper:]' '[:lower:]')" in
+  1|true|yes|on) STAGE_ONLY=1 ;;
+  0|false|no|off|"") STAGE_ONLY=0 ;;
   *)
-    echo "CHUMMER_RELEASE_UPLOAD_ALLOW_PROOF_ONLY_VISUAL_HANDOFF must be an explicit boolean." >&2
+    echo "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY must be an explicit boolean." >&2
     exit 1
     ;;
 esac
+
+if (( STAGE_ONLY == 1 )) \
+  && [[ -n "$PREVIEW_READY_CANDIDATE_AUTHORITY_PATH" \
+    || -n "$PREVIEW_READY_CANDIDATE_AUTHORITY_SHA256" ]]; then
+  if [[ -z "$PREVIEW_READY_CANDIDATE_AUTHORITY_PATH" \
+    || -z "$PREVIEW_READY_CANDIDATE_AUTHORITY_SHA256" ]]; then
+    echo "Preview-ready candidate authority path and SHA-256 must both be supplied." >&2
+    exit 1
+  fi
+  preview_ready_verifier="$SCRIPT_DIR/release/verify_preview_ready_candidate_upload.py"
+  if [[ ! -f "$preview_ready_verifier" || -L "$preview_ready_verifier" ]]; then
+    echo "Missing or unsafe preview-ready candidate upload verifier: $preview_ready_verifier" >&2
+    exit 1
+  fi
+  python3 "$preview_ready_verifier" \
+    --authority "$PREVIEW_READY_CANDIDATE_AUTHORITY_PATH" \
+    --expected-authority-sha256 "$PREVIEW_READY_CANDIDATE_AUTHORITY_SHA256" \
+    --bundle-root "$BUNDLE_DIR"
+else
+  case "$(printf '%s' "$ALLOW_PROOF_ONLY_VISUAL_HANDOFF" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on)
+      case "$(printf '%s' "$FORCE_NIGHTLY_PUBLISH" | tr '[:upper:]' '[:lower:]')" in
+        1|true|yes|on) ;;
+        *)
+          echo "Proof-only Windows visual handoff also requires CHUMMER_FORCE_NIGHTLY_PUBLISH=1." >&2
+          exit 1
+          ;;
+      esac
+      if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-visual-proof-handoff.py" ]]; then
+        echo "Missing Windows proof-only visual handoff gate: $SCRIPT_DIR/verify-windows-installer-visual-proof-handoff.py" >&2
+        exit 1
+      fi
+      python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof-handoff.py" \
+        --files-dir "$BUNDLE_DIR/files" \
+        --manifest "$MANIFEST_PATH" \
+        --manifest "$CANONICAL_MANIFEST_PATH" \
+        --handoff "$WINDOWS_VISUAL_PROOF_HANDOFF_PATH" \
+        --windows-gate "$WINDOWS_DESKTOP_EXIT_GATE_PATH"
+      ;;
+    0|false|no|off|"")
+      if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" ]]; then
+        echo "Missing Windows installer visual proof gate: $SCRIPT_DIR/verify-windows-installer-visual-proof.py" >&2
+        exit 1
+      fi
+      python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" \
+        --files-dir "$BUNDLE_DIR/files" \
+        --manifest "$MANIFEST_PATH" \
+        --manifest "$CANONICAL_MANIFEST_PATH" \
+        --allow-empty
+      ;;
+    *)
+      echo "CHUMMER_RELEASE_UPLOAD_ALLOW_PROOF_ONLY_VISUAL_HANDOFF must be an explicit boolean." >&2
+      exit 1
+      ;;
+  esac
+fi
 
 if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
   echo "Missing registry verifier: $REGISTRY_ROOT/scripts/verify_public_release_channel.py" >&2
@@ -206,15 +236,6 @@ to_bool() {
   value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
-
-case "$(printf '%s' "$STAGE_ONLY" | tr '[:upper:]' '[:lower:]')" in
-  1|true|yes|on) STAGE_ONLY=1 ;;
-  0|false|no|off|"") STAGE_ONLY=0 ;;
-  *)
-    echo "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY must be an explicit boolean." >&2
-    exit 1
-    ;;
-esac
 
 preflight_staged_probe_token_path() {
   local output_path="${1:-}"
