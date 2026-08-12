@@ -102,6 +102,13 @@ public sealed record IdentitySessionRevokeResponse(
     string? SubjectId,
     DateTimeOffset RevokedAtUtc);
 
+public sealed record IdentitySubjectErasureResponse(
+    bool Erased,
+    string SubjectKeySha256,
+    int RevokedSessionCount,
+    int DeletedEmailTicketCount,
+    DateTimeOffset ErasedAtUtc);
+
 public static class IdentitySubjectDerivation
 {
     public static string FromEmail(string email)

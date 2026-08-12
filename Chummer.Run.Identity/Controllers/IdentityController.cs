@@ -114,6 +114,25 @@ public sealed class IdentityController : ControllerBase
         return subject is null ? NotFound() : Ok(subject);
     }
 
+    [HttpDelete("subjects/{subjectId}")]
+    [ProducesResponseType<IdentitySubjectErasureResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public ActionResult<IdentitySubjectErasureResponse> EraseSubject([FromRoute] string subjectId)
+    {
+        if (!IsAdminRouteAuthorized())
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "identity subject erasure is reserved for internal or admin callers.");
+        }
+
+        if (string.IsNullOrWhiteSpace(subjectId))
+        {
+            return BadRequest("subjectId is required.");
+        }
+
+        return Ok(_identity.EraseSubject(subjectId));
+    }
+
     [HttpPut("subjects/{subjectId}/roles")]
     [ProducesResponseType<IdentitySubjectResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

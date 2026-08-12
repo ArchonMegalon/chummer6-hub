@@ -15,6 +15,7 @@ public interface IIdentityAccessService
     EmailAuthStartResponse StartEmailEntry(EmailAuthStartRequest request);
     IdentitySessionIssueResponse CompleteEmailEntry(EmailAuthCompleteRequest request);
     IdentitySessionRevokeResponse RevokeSession(IdentitySessionRevokeRequest request);
+    IdentitySubjectErasureResponse EraseSubject(string subjectId);
     IdentitySubjectResponse SetRoles(string subjectId, IdentityRoleSetRequest request);
     IdentitySubjectResponse? GetSubject(string subjectId);
     IdentityIntrospectionResponse Introspect(IdentityIntrospectionRequest request);
@@ -277,6 +278,53 @@ public sealed class IdentityAccessService : IIdentityAccessService
             _sessionsByAccessTokenHash.Remove(accessTokenHash);
             PersistLocked();
             return new IdentitySessionRevokeResponse(true, session.SessionId, session.SubjectId, DateTimeOffset.UtcNow);
+        }
+    }
+
+    public IdentitySubjectErasureResponse EraseSubject(string subjectId)
+    {
+        string normalizedSubjectId = NormalizeRequired(subjectId);
+        DateTimeOffset erasedAtUtc = DateTimeOffset.UtcNow;
+        lock (_mutate)
+        {
+            string[] sessionKeys = _sessionsByAccessTokenHash
+                .Where(pair => string.Equals(
+                    pair.Value.SubjectId,
+                    normalizedSubjectId,
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(static pair => pair.Key)
+                .ToArray();
+            foreach (string sessionKey in sessionKeys)
+            {
+                _sessionsByAccessTokenHash.Remove(sessionKey);
+            }
+
+            string[] ticketKeys = _emailTicketsByHash
+                .Where(pair => string.Equals(
+                    pair.Value.SubjectId,
+                    normalizedSubjectId,
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(static pair => pair.Key)
+                .ToArray();
+            foreach (string ticketKey in ticketKeys)
+            {
+                _emailTicketsByHash.Remove(ticketKey);
+            }
+
+            bool erased = _subjects.Remove(normalizedSubjectId)
+                || sessionKeys.Length > 0
+                || ticketKeys.Length > 0;
+            if (erased)
+            {
+                PersistLocked();
+            }
+
+            return new IdentitySubjectErasureResponse(
+                Erased: erased,
+                SubjectKeySha256: BuildSubjectErasureKey(normalizedSubjectId),
+                RevokedSessionCount: sessionKeys.Length,
+                DeletedEmailTicketCount: ticketKeys.Length,
+                ErasedAtUtc: erasedAtUtc);
         }
     }
 
@@ -614,6 +662,19 @@ public sealed class IdentityAccessService : IIdentityAccessService
         }
 
         return Path.Combine(ResolveDefaultStateRoot(configuration), "identity", "identity-store.json");
+    }
+
+    private static string BuildSubjectErasureKey(string subjectId)
+    {
+        byte[] input = Encoding.UTF8.GetBytes($"chummer.identity.subject-erasure.v1\0{subjectId.ToLowerInvariant()}");
+        try
+        {
+            return Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(input);
+        }
     }
 
     private static string ResolveEmailStartPauseFlagPath(IConfiguration configuration, string storagePath)

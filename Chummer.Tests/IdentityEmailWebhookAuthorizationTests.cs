@@ -94,6 +94,8 @@ public sealed class IdentityEmailWebhookAuthorizationTests
 
         public IdentitySessionRevokeResponse RevokeSession(IdentitySessionRevokeRequest request) => throw new NotSupportedException();
 
+        public IdentitySubjectErasureResponse EraseSubject(string subjectId) => throw new NotSupportedException();
+
         public IdentitySubjectResponse SetRoles(string subjectId, IdentityRoleSetRequest request) => throw new NotSupportedException();
 
         public IdentitySubjectResponse? GetSubject(string subjectId) => throw new NotSupportedException();

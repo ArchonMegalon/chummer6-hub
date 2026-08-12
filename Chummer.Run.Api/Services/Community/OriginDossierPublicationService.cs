@@ -253,6 +253,57 @@ public sealed class OriginDossierPublicationService
         return BuildViewModel(entry);
     }
 
+    public int EraseForAccount(string? userId, string subjectId)
+    {
+        string normalizedSubject = Clean(subjectId, string.Empty);
+        string normalizedUser = Clean(userId, string.Empty);
+        if (string.IsNullOrWhiteSpace(normalizedSubject))
+        {
+            throw new ArgumentException("subjectId is required.", nameof(subjectId));
+        }
+
+        string? indexPath = ResolveIndexPath();
+        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        {
+            return 0;
+        }
+
+        lock (_writeGate)
+        {
+            List<OriginDossierPublicationIndexEntry> entries = LoadEntries(indexPath).ToList();
+            OriginDossierPublicationIndexEntry[] erased = entries
+                .Where(entry => IsOwnedBy(entry, normalizedUser, normalizedSubject))
+                .ToArray();
+            if (erased.Length == 0)
+            {
+                return 0;
+            }
+
+            HashSet<string> erasedProjectIds = erased
+                .Select(static entry => entry.ProjectId)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value!.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> erasedLinkCodes = erased
+                .Select(ResolveRunnerLinkCode)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .ToHashSet(StringComparer.Ordinal);
+
+            OriginDossierPublicationIndexEntry[] retained = entries
+                .Where(entry => !erased.Contains(entry))
+                .Select(entry => entry with
+                {
+                    StoryLinks = (entry.StoryLinks ?? Array.Empty<OriginDossierStoryLinkDto>())
+                        .Where(link => (link.LinkedProjectId is null || !erasedProjectIds.Contains(link.LinkedProjectId))
+                                       && (link.LinkedRunnerLinkCode is null || !erasedLinkCodes.Contains(link.LinkedRunnerLinkCode)))
+                        .ToArray()
+                })
+                .ToArray();
+            PersistEntries(indexPath, retained);
+            return erased.Length;
+        }
+    }
+
     public OriginDossierPublicationViewModel? SelectPortraitForAccount(
         string userId,
         string subjectId,
