@@ -28,6 +28,21 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true'">
+    <Reference Include="Chummer.Media.Contracts">
+      <HintPath>$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>
+    </Reference>
+    <Reference Include="Chummer.Media.Factory.Runtime">
+      <HintPath>$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll</HintPath>
+    </Reference>
+    <ProjectReference Include="$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj"
+                      ReferenceOutputAssembly="false"
+                      Condition="Exists('$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj')" />
+    <ProjectReference Include="$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj"
+                      ReferenceOutputAssembly="false"
+                      Condition="Exists('$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj')" />
+  </ItemGroup>
+
   <ItemGroup>
     <Content Include="$(Pkgxunit_abstractions)\lib\netstandard2.0\xunit.abstractions.dll"
              Condition="Exists('$(Pkgxunit_abstractions)\lib\netstandard2.0\xunit.abstractions.dll')"

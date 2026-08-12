@@ -39,67 +39,67 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
-    public void ProofBoundPreviewReadyPostureAcceptsSeparatedGlobalTrustTruth()
+    public void ProofBoundDesktopDeliveryPostureAcceptsSeparatedGlobalTrustTruth()
     {
-        JsonObject canonical = BuildProofBoundPreviewReadyPosture();
+        JsonObject canonical = BuildProofBoundDesktopDeliveryPosture();
 
-        ReleaseBundlePromotionService.ValidateProofBoundPreviewReadyPosture(
+        ReleaseBundlePromotionService.ValidateProofBoundDesktopDeliveryPosture(
             canonical,
             desktopCoverageComplete: true);
     }
 
     [Fact]
-    public void ProofBoundPreviewReadyPostureRejectsMissingReadinessReceipt()
+    public void ProofBoundDesktopDeliveryPostureRejectsMissingReadinessReceipt()
     {
-        JsonObject canonical = BuildProofBoundPreviewReadyPosture();
-        canonical.Remove("previewPublicationReadiness");
+        JsonObject canonical = BuildProofBoundDesktopDeliveryPosture();
+        canonical.Remove("desktopDeliveryReadiness");
 
         Assert.Throws<InvalidDataException>(() =>
-            ReleaseBundlePromotionService.ValidateProofBoundPreviewReadyPosture(
+            ReleaseBundlePromotionService.ValidateProofBoundDesktopDeliveryPosture(
                 canonical,
                 desktopCoverageComplete: true));
     }
 
     [Fact]
-    public void ProofBoundPreviewReadyPostureAlwaysRequiresReadinessReceipt()
+    public void ProofBoundDesktopDeliveryPostureAlwaysRequiresReadinessReceipt()
     {
-        JsonObject canonical = BuildProofBoundPreviewReadyPosture();
+        JsonObject canonical = BuildProofBoundDesktopDeliveryPosture();
         canonical["publicTrustMetrics"]!
             .AsObject()["releaseChannel"]!
-            .AsObject()["supportabilityState"] = "preview_supported";
+            .AsObject()["supportabilityState"] = "desktop_delivery_supported";
         canonical["publicTrustMetrics"]!
             .AsObject()["proofFreshness"]!
             .AsObject()["status"] = "fresh";
-        canonical.Remove("previewPublicationReadiness");
+        canonical.Remove("desktopDeliveryReadiness");
 
         Assert.Throws<InvalidDataException>(() =>
-            ReleaseBundlePromotionService.ValidateProofBoundPreviewReadyPosture(
+            ReleaseBundlePromotionService.ValidateProofBoundDesktopDeliveryPosture(
                 canonical,
                 desktopCoverageComplete: true));
     }
 
     [Fact]
-    public void ProofBoundPreviewReadyPostureRejectsGlobalTrustOverstatement()
+    public void ProofBoundDesktopDeliveryPostureRejectsGlobalTrustOverstatement()
     {
-        JsonObject canonical = BuildProofBoundPreviewReadyPosture();
+        JsonObject canonical = BuildProofBoundDesktopDeliveryPosture();
         canonical["publicTrustMetrics"]!
             .AsObject()["releaseChannel"]!
-            .AsObject()["supportabilityState"] = "preview_supported";
+            .AsObject()["supportabilityState"] = "desktop_delivery_supported";
 
         Assert.Throws<InvalidDataException>(() =>
-            ReleaseBundlePromotionService.ValidateProofBoundPreviewReadyPosture(
+            ReleaseBundlePromotionService.ValidateProofBoundDesktopDeliveryPosture(
                 canonical,
                 desktopCoverageComplete: true));
     }
 
     [Fact]
-    public void ProofBoundPreviewReadyPostureRejectsBroadenedUploadAuthority()
+    public void ProofBoundDesktopDeliveryPostureRejectsBroadenedUploadAuthority()
     {
-        JsonObject canonical = BuildProofBoundPreviewReadyPosture();
+        JsonObject canonical = BuildProofBoundDesktopDeliveryPosture();
         canonical["releaseUploadAuthority"] = true;
 
         Assert.Throws<InvalidDataException>(() =>
-            ReleaseBundlePromotionService.ValidateProofBoundPreviewReadyPosture(
+            ReleaseBundlePromotionService.ValidateProofBoundDesktopDeliveryPosture(
                 canonical,
                 desktopCoverageComplete: true));
     }
@@ -367,13 +367,13 @@ public sealed class ReleaseBundlePromotionServiceTests
                     "unsigned fresh-delta compatibility fixture is invalid"));
     }
 
-    private static JsonObject BuildProofBoundPreviewReadyPosture()
+    private static JsonObject BuildProofBoundDesktopDeliveryPosture()
     {
         (JsonObject canonical, _) = LoadUnsignedWindowsFreshDeltaManifestPair();
-        canonical["projectionProfile"] = "v4_unsigned_windows_preview_ready";
+        canonical["projectionProfile"] = "v4_unsigned_windows_desktop_delivery_ready";
         canonical["status"] = "published";
-        canonical["rolloutState"] = "promoted_preview";
-        canonical["supportabilityState"] = "preview_supported";
+        canonical["rolloutState"] = "artifact_shelf_ready";
+        canonical["supportabilityState"] = "desktop_delivery_supported";
         canonical["publicationEligible"] = true;
         canonical["routeAuthority"] = true;
         canonical["releaseUploadAuthority"] = false;
@@ -383,28 +383,33 @@ public sealed class ReleaseBundlePromotionServiceTests
         JsonObject trustReleaseChannel = canonical["publicTrustMetrics"]!
             .AsObject()["releaseChannel"]!
             .AsObject();
-        trustReleaseChannel["rolloutState"] = "promoted_preview";
+        trustReleaseChannel["rolloutState"] = "artifact_shelf_ready";
         JsonObject registryReleaseChannel = canonical["registryBoundaryCoverage"]!
             .AsObject()["releaseChannel"]!
             .AsObject();
         registryReleaseChannel["desktopTupleComplete"] = true;
-        registryReleaseChannel["rolloutState"] = "promoted_preview";
-        registryReleaseChannel["supportabilityState"] = "preview_supported";
-        canonical["previewPublicationReadiness"] = new JsonObject
+        registryReleaseChannel["rolloutState"] = "artifact_shelf_ready";
+        registryReleaseChannel["supportabilityState"] = "desktop_delivery_supported";
+        canonical["desktopDeliveryReadiness"] = new JsonObject
         {
-            ["contractName"] = "chummer.registry.preview-publication-readiness/v1",
+            ["contractName"] = "chummer.registry.desktop-delivery-readiness/v1",
             ["contractVersion"] = 1,
+            ["doesNotAssert"] = new JsonArray(
+                "whole_product_preview_readiness",
+                "stable_readiness",
+                "flagship_readiness"),
             ["generatedAtUtc"] = "2026-08-06T05:40:34Z",
             ["localizationGateSha256"] = new string('a', 64),
             ["nativeWindowsEvidenceSha256"] = new string('b', 64),
             ["platforms"] = new JsonArray("linux", "windows"),
+            ["readinessScope"] = "desktop_artifact_delivery",
             ["registryCommit"] = new string('c', 40),
             ["releaseProofSha256"] = new string('d', 64),
             ["releaseVersion"] = canonical["releaseVersion"]!.GetValue<string>(),
             ["sourceCandidateAuthoritySha256"] = new string('e', 64),
             ["sourceCanonicalManifestSha256"] = new string('f', 64),
             ["sourceCompatibilityManifestSha256"] = new string('0', 64),
-            ["status"] = "preview_ready"
+            ["status"] = "desktop_delivery_ready"
         };
         return canonical;
     }

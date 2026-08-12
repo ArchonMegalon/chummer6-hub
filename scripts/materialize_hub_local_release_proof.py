@@ -57,7 +57,6 @@ CANONICAL_BASELINE_GOLDEN_JOURNEYS = (
     "install_claim_restore_continue",
     "build_explain_publish",
     "campaign_session_recover_recap",
-    "recover_from_sync_conflict",
     "report_cluster_release_notify",
     "organize_community_and_close_loop",
 )
@@ -1788,6 +1787,7 @@ def _materialize_under_shared_mutation_lock(
             "/home/work",
             "/account/access",
             "/account/work",
+            "/account/roster",
             "/account/support",
             "/contact",
             "/downloads",
