@@ -98,6 +98,7 @@ public sealed class CommunityStore
     internal Dictionary<string, CampaignGmAuthorityIdempotencyState> CampaignGmAuthorityCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignTeardownIdempotencyState> CampaignTeardownsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Action? CampaignCollaborationPersistenceFaultInjector { get; set; }
+    internal Action? AccountErasurePersistenceFaultInjector { get; set; }
     internal Action? LedgerPersistenceFaultInjector { get; set; }
     internal Action? AftermathPersistenceFaultInjector { get; set; }
     public Dictionary<string, PlaySessionBinding> PlaySessionsById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -108,6 +109,31 @@ public sealed class CommunityStore
     public DateTimeOffset PlayAuthorizationTimeHighWaterUtc { get; internal set; } = DateTimeOffset.UnixEpoch;
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboardingState { get; set; }
+
+    internal T ExecuteAccountErasureTransactionLocked<T>(Func<T> mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        if (!System.Threading.Monitor.IsEntered(Gate))
+        {
+            throw new InvalidOperationException("Account erasure transactions require the community-store lock.");
+        }
+
+        // Persist a validated baseline before mutation. The store writes by temp-file replacement,
+        // so reloading that baseline restores memory if validation or durable persistence fails.
+        PersistLocked();
+        try
+        {
+            T result = mutation();
+            AccountErasurePersistenceFaultInjector?.Invoke();
+            PersistLocked();
+            return result;
+        }
+        catch
+        {
+            Load();
+            throw;
+        }
+    }
 
     internal T ExecuteCampaignCollaborationTransactionLocked<T>(Func<T> mutation)
     {

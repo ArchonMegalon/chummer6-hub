@@ -32,6 +32,45 @@ public sealed class SupportStore
     public Dictionary<string, string> ClusterIdByFingerprint { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CrashWorkItemProjection> WorkItemsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> WorkItemIdByClusterId { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal Action? AccountErasurePersistenceFaultInjector { get; set; }
+
+    public SupportReporterErasureResult EraseReporter(string? userId, string subjectId)
+    {
+        string normalizedSubject = NormalizeRequired(subjectId, nameof(subjectId));
+        string? normalizedUser = NormalizeOptional(userId);
+        lock (Gate)
+        {
+            // Establish a validated durable rollback point before deleting personal support content.
+            PersistLocked();
+            try
+            {
+                string[] caseIds = CasesById
+                    .Where(pair => IdEquals(pair.Value.ReporterSubjectId, normalizedSubject)
+                                   || (normalizedUser is not null && IdEquals(pair.Value.ReporterUserId, normalizedUser)))
+                    .Select(static pair => pair.Key)
+                    .ToArray();
+                HashSet<string> removedCaseIds = caseIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (string caseId in caseIds)
+                {
+                    CasesById.Remove(caseId);
+                }
+
+                int indexRecordsRemoved = RemoveIndexValues(CaseIdByClusterKey, removedCaseIds)
+                                          + RemoveIndexValues(CrashCaseIdByWorkItemId, removedCaseIds);
+                AccountErasurePersistenceFaultInjector?.Invoke();
+                PersistLocked();
+                return new SupportReporterErasureResult(
+                    Erased: caseIds.Length > 0,
+                    CasesRemoved: caseIds.Length,
+                    IndexRecordsRemoved: indexRecordsRemoved);
+            }
+            catch
+            {
+                Load();
+                throw;
+            }
+        }
+    }
 
     public void PersistLocked()
     {
@@ -146,7 +185,39 @@ public sealed class SupportStore
 
         return Path.Combine(Path.GetTempPath(), "chummer6-hub", "support-store.json");
     }
+
+    private static int RemoveIndexValues(
+        Dictionary<string, string> index,
+        IReadOnlySet<string> removedValues)
+    {
+        string[] keys = index
+            .Where(pair => removedValues.Contains(pair.Value))
+            .Select(static pair => pair.Key)
+            .ToArray();
+        foreach (string key in keys)
+        {
+            index.Remove(key);
+        }
+
+        return keys.Length;
+    }
+
+    private static string NormalizeRequired(string value, string parameterName)
+        => NormalizeOptional(value) ?? throw new ArgumentException($"{parameterName} is required.", parameterName);
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool IdEquals(string? left, string? right)
+        => !string.IsNullOrWhiteSpace(left)
+           && !string.IsNullOrWhiteSpace(right)
+           && string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
 }
+
+public sealed record SupportReporterErasureResult(
+    bool Erased,
+    int CasesRemoved,
+    int IndexRecordsRemoved);
 
 internal sealed record SupportStoreSnapshot(
     IReadOnlyDictionary<string, SupportCaseProjection>? CasesById,

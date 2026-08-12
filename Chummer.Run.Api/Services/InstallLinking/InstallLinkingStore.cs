@@ -7,6 +7,11 @@ using Microsoft.AspNetCore.DataProtection;
 
 namespace Chummer.Run.Api.Services.InstallLinking;
 
+public sealed record InstallLinkingPrincipalErasureResult(
+    bool Erased,
+    int RecordsRemoved,
+    int InstallationsRemoved);
+
 public sealed class InstallLinkingStore : IDisposable
 {
     internal const string EnvelopeFormat = "chummer.install-linking-store";
@@ -297,6 +302,104 @@ public sealed class InstallLinkingStore : IDisposable
             throw;
         }
     }
+
+    public InstallLinkingPrincipalErasureResult ErasePrincipal(string? userId, string subjectId)
+    {
+        string normalizedSubject = string.IsNullOrWhiteSpace(subjectId)
+            ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
+            : subjectId.Trim();
+        string? normalizedUser = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
+
+        lock (Gate)
+        {
+            HashSet<string> installationIds = InstallationsById.Values
+                .Where(item => IdEquals(item.SubjectId, normalizedSubject)
+                               || IdEquals(item.UserId, normalizedUser))
+                .Select(static item => item.InstallationId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> ticketIds = ClaimTicketsById.Values
+                .Where(item => IdEquals(item.SubjectId, normalizedSubject)
+                               || IdEquals(item.UserId, normalizedUser)
+                               || (item.InstallationId is not null && installationIds.Contains(item.InstallationId)))
+                .Select(static item => item.TicketId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> grantIds = GrantsById.Values
+                .Where(item => IdEquals(item.SubjectId, normalizedSubject)
+                               || IdEquals(item.UserId, normalizedUser)
+                               || installationIds.Contains(item.InstallationId))
+                .Select(static item => item.GrantId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (ClaimedInstallationDto installation in InstallationsById.Values)
+            {
+                if ((installation.ClaimTicketId is not null && ticketIds.Contains(installation.ClaimTicketId))
+                    || (installation.GrantId is not null && grantIds.Contains(installation.GrantId)))
+                {
+                    installationIds.Add(installation.InstallationId);
+                }
+            }
+
+            ticketIds.UnionWith(ClaimTicketsById.Values
+                .Where(item => item.InstallationId is not null && installationIds.Contains(item.InstallationId))
+                .Select(static item => item.TicketId));
+            grantIds.UnionWith(GrantsById.Values
+                .Where(item => installationIds.Contains(item.InstallationId))
+                .Select(static item => item.GrantId));
+            HashSet<string> callbackIds = BrowserCallbacksById.Values
+                .Where(item => IdEquals(item.SubjectId, normalizedSubject)
+                               || IdEquals(item.UserId, normalizedUser)
+                               || installationIds.Contains(item.InstallationId)
+                               || (item.GrantId is not null && grantIds.Contains(item.GrantId)))
+                .Select(static item => item.CallbackId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> receiptIds = ReceiptsById.Values
+                .Where(item => IdEquals(item.SubjectId, normalizedSubject)
+                               || IdEquals(item.UserId, normalizedUser)
+                               || (item.ClaimTicketId is not null && ticketIds.Contains(item.ClaimTicketId)))
+                .Select(static item => item.ReceiptId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> scriptIds = PersonalizedInstallScriptsById.Values
+                .Where(item => IdEquals(item.SubjectId, normalizedSubject)
+                               || IdEquals(item.UserId, normalizedUser))
+                .Select(static item => item.ScriptId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            int removed = RemoveKeys(ReceiptsById, receiptIds)
+                          + RemoveKeys(BrowserCallbacksById, callbackIds)
+                          + RemoveKeys(GrantsById, grantIds)
+                          + RemoveKeys(ClaimTicketsById, ticketIds)
+                          + RemoveKeys(InstallationsById, installationIds)
+                          + RemoveKeys(PersonalizedInstallScriptsById, scriptIds);
+            if (removed > 0)
+            {
+                PersistLocked();
+            }
+
+            return new InstallLinkingPrincipalErasureResult(
+                Erased: removed > 0,
+                RecordsRemoved: removed,
+                InstallationsRemoved: installationIds.Count);
+        }
+    }
+
+    private static int RemoveKeys<T>(Dictionary<string, T> dictionary, IReadOnlySet<string> keys)
+    {
+        int removed = 0;
+        foreach (string key in keys)
+        {
+            if (dictionary.Remove(key))
+            {
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
+    private static bool IdEquals(string? left, string? right)
+        => !string.IsNullOrWhiteSpace(left)
+           && !string.IsNullOrWhiteSpace(right)
+           && string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
 
     private InstallLinkingStoreSnapshot BuildRetainedSnapshot(DateTimeOffset now)
         => BuildRetainedSnapshot(

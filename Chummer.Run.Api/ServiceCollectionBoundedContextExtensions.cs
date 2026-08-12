@@ -102,6 +102,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHostedService<TeableImportantWorkSyncWorker>();
         services.AddHttpClient();
         services.AddSingleton<AccountService>();
+        services.AddSingleton<CommunityAccountErasureService>();
         services.AddSingleton<IdentityLinkService>();
         services.AddSingleton<UserExperienceService>();
         services.AddSingleton<GroupService>();
@@ -316,6 +317,9 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<HubIdentitySubjectCache>();
         services.AddHttpClient<FleetBridgeService>();
         services.AddHttpClient<HubIdentityClient>();
+        services.AddHttpClient<IHostedBuildAccountErasureClient, HostedBuildAccountErasureClient>();
+        services.AddTransient<IAccountAuxiliaryDataErasureService, AccountAuxiliaryDataErasureService>();
+        services.AddTransient<AccountErasureService>();
         services.AddTransient<IPublicPlayIdentityResolver, HubPublicPlayIdentityResolver>();
         services.AddSingleton<IPlaySessionGrantAuthorizer, DenyAllPlaySessionGrantAuthorizer>();
         services.AddTransient<PublicPlaySessionAccessPolicy>();

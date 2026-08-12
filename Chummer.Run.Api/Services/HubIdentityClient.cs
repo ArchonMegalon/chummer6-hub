@@ -66,6 +66,18 @@ public sealed class HubIdentitySubjectCache
     public void Remove(string cacheScope, string accessToken)
         => _entries.TryRemove(BuildCacheKey(cacheScope, accessToken), out _);
 
+    public void RemoveSubject(string cacheScope, string subjectId)
+    {
+        foreach ((string key, CachedAuthenticatedHubSubject value) in _entries.ToArray())
+        {
+            if (key.StartsWith($"{cacheScope}|", StringComparison.Ordinal)
+                && string.Equals(value.Subject.SubjectId, subjectId, StringComparison.OrdinalIgnoreCase))
+            {
+                _entries.TryRemove(key, out _);
+            }
+        }
+    }
+
     private static string BuildCacheKey(string cacheScope, string accessToken)
         => string.Concat(cacheScope, "|", accessToken);
 }
@@ -96,6 +108,11 @@ public sealed class HubIdentityClient
     private string BaseUrl =>
         (_configuration["IDENTITY_SERVICE_BASE_URL"] ?? "http://chummer-run-identity:8080").TrimEnd('/');
 
+    private string? AdminKey =>
+        string.IsNullOrWhiteSpace(_configuration["IDENTITY_ADMIN_KEY"])
+            ? null
+            : _configuration["IDENTITY_ADMIN_KEY"]!.Trim();
+
     private TimeSpan SubjectCacheTtl
     {
         get
@@ -119,6 +136,81 @@ public sealed class HubIdentityClient
         HttpRequest request,
         CancellationToken cancellationToken)
         => ResolveSubjectAsync(request, allowCachedSubject: false, cancellationToken);
+
+    public async Task<IdentitySubjectErasureResponse> EraseSubjectAsync(
+        string subjectId,
+        CancellationToken cancellationToken)
+    {
+        string normalizedSubject = string.IsNullOrWhiteSpace(subjectId)
+            ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
+            : subjectId.Trim();
+        if (AdminKey is null)
+        {
+            _logger.LogError("Hub cannot complete account erasure because IDENTITY_ADMIN_KEY is missing.");
+            throw new HubRequestAuthException(
+                StatusCodes.Status503ServiceUnavailable,
+                "Account erasure is unavailable right now. Try again later.");
+        }
+
+        HttpResponseMessage response;
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Delete,
+                $"{BaseUrl}/api/v1/identity/subjects/{Uri.EscapeDataString(normalizedSubject)}");
+            request.Headers.Add("X-Identity-Admin-Key", AdminKey);
+            response = await _httpClient.SendAsync(request, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Identity erasure request failed for the authenticated subject.");
+            throw new HubRequestAuthException(
+                StatusCodes.Status503ServiceUnavailable,
+                "Account erasure is unavailable right now. Try again later.");
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Identity erasure request timed out for the authenticated subject.");
+            throw new HubRequestAuthException(
+                StatusCodes.Status503ServiceUnavailable,
+                "Account erasure is unavailable right now. Try again later.");
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                string detail = await SafeReadBodyAsync(response, cancellationToken);
+                _logger.LogError(
+                    "Identity erasure returned status {StatusCode}. Detail: {Detail}",
+                    (int)response.StatusCode,
+                    string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
+                throw new HubRequestAuthException(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "Account erasure is unavailable right now. Try again later.");
+            }
+
+            try
+            {
+                IdentitySubjectErasureResponse? result =
+                    await response.Content.ReadFromJsonAsync<IdentitySubjectErasureResponse>(cancellationToken: cancellationToken);
+                if (result is null)
+                {
+                    throw new System.Text.Json.JsonException("Identity erasure returned an empty payload.");
+                }
+
+                _subjectCache.RemoveSubject(BaseUrl, normalizedSubject);
+                return result;
+            }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
+            {
+                _logger.LogError(ex, "Identity erasure returned an unreadable payload.");
+                throw new HubRequestAuthException(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "Account erasure is unavailable right now. Try again later.");
+            }
+        }
+    }
 
     private async Task<AuthenticatedHubSubject> ResolveSubjectAsync(
         HttpRequest request,
