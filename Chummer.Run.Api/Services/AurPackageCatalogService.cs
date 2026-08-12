@@ -47,8 +47,17 @@ public sealed class AurPackageCatalogService
 
         try
         {
+            ReadOnlySpan<byte> jsonBytes = catalogBytes;
+            if (jsonBytes.Length >= 3
+                && jsonBytes[0] == 0xEF
+                && jsonBytes[1] == 0xBB
+                && jsonBytes[2] == 0xBF)
+            {
+                jsonBytes = jsonBytes[3..];
+            }
+
             var payload = JsonSerializer.Deserialize<AurPackageCatalogDocument>(
-                catalogBytes,
+                jsonBytes,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
             IReadOnlyList<AurPackageEntry> packages = (payload?.Packages ?? [])
                 .Where(IsComplete)

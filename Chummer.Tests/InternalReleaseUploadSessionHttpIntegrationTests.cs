@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Controllers;
@@ -889,9 +890,11 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
         {
             string root = Path.Combine(Path.GetTempPath(), "chummer-release-upload-http-tests", Guid.NewGuid().ToString("N"));
             string downloadsRoot = Path.Combine(root, "downloads");
+            string snapshotRoot = Path.Combine(root, "release-authority");
             string localProofPath = Path.Combine(root, "local-release-proof.json");
             Directory.CreateDirectory(root);
             Directory.CreateDirectory(downloadsRoot);
+            PublishReleaseUploadAuthority(snapshotRoot);
             await File.WriteAllTextAsync(
                 localProofPath,
                 JsonSerializer.Serialize(new Dictionary<string, object?>
@@ -922,6 +925,8 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
                 ["CHUMMER_RELEASE_UPLOAD_MIN_FREE_FRACTION"] = "0",
                 ["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"] = "false",
                 ["CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED"] = "true",
+                ["CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_ROOT"] = snapshotRoot,
+                ["CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_REQUIRED"] = "true",
                 ["GOOGLE_OIDC_REDIRECT_URI"] = "https://chummer.run/auth/google/callback",
                 ["CHUMMER_PUBLIC_CANON_ROOT"] = Path.Combine(root, "canon"),
                 ["CHUMMER_PUBLIC_FLAGSHIP_READINESS_FILE"] = Path.Combine(root, "flagship-readiness-not-present.json"),
@@ -1016,6 +1021,92 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
         private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
         {
             public override DateTimeOffset GetUtcNow() => utcNow;
+        }
+
+        private static void PublishReleaseUploadAuthority(string snapshotRoot)
+        {
+            string[] outputNames =
+            [
+                "HUB_LOCAL_RELEASE_PROOF.generated.json",
+                "HUB_SERVED_RELEASE_PROOF.generated.json",
+                "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+                "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
+                "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+                "RELEASE_CHANNEL.generated.json",
+                "FLAGSHIP_PRODUCT_READINESS.generated.json"
+            ];
+            byte[] sharedHubProof = "{\"status\":\"test\"}\n"u8.ToArray();
+            Dictionary<string, byte[]> payloads = outputNames.ToDictionary(
+                static name => name,
+                _ => "{\"status\":\"test\"}\n"u8.ToArray(),
+                StringComparer.Ordinal);
+            payloads[outputNames[0]] = sharedHubProof;
+            payloads[outputNames[1]] = sharedHubProof;
+            Dictionary<string, string> digests = payloads.ToDictionary(
+                static pair => pair.Key,
+                static pair => Convert.ToHexStringLower(SHA256.HashData(pair.Value)),
+                StringComparer.Ordinal);
+
+            using IncrementalHash aggregateHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            foreach (string name in outputNames)
+            {
+                aggregateHash.AppendData(Encoding.UTF8.GetBytes(name));
+                aggregateHash.AppendData([0]);
+                aggregateHash.AppendData(Encoding.ASCII.GetBytes(digests[name]));
+                aggregateHash.AppendData([(byte)'\n']);
+            }
+
+            string snapshotSha256 = Convert.ToHexStringLower(aggregateHash.GetHashAndReset());
+            string snapshotId = $"public-projection-{snapshotSha256}";
+            string snapshotDirectory = Path.Combine(snapshotRoot, snapshotId);
+            Directory.CreateDirectory(snapshotDirectory);
+            foreach ((string name, byte[] payload) in payloads)
+            {
+                File.WriteAllBytes(Path.Combine(snapshotDirectory, name), payload);
+            }
+
+            var common = new Dictionary<string, object?>
+            {
+                ["status"] = "pass",
+                ["projectionStage"] = "release_upload_ready",
+                ["codeDeploymentAuthority"] = true,
+                ["releaseUploadAuthority"] = true,
+                ["candidateImportAuthority"] = false,
+                ["releaseGateFindings"] = Array.Empty<object>(),
+                ["snapshotId"] = snapshotId,
+                ["snapshotSha256"] = snapshotSha256
+            };
+            var manifest = new Dictionary<string, object?>(common)
+            {
+                ["contractName"] = "chummer.public_projection_snapshot/v1",
+                ["authorityInputs"] = new Dictionary<string, object?>(),
+                ["outputs"] = outputNames.ToDictionary(
+                    static name => name,
+                    name => (object)new Dictionary<string, object?>
+                    {
+                        ["relativePath"] = name,
+                        ["sha256"] = digests[name],
+                        ["sizeBytes"] = payloads[name].LongLength
+                    },
+                    StringComparer.Ordinal)
+            };
+            byte[] manifestBytes = JsonSerializer.SerializeToUtf8Bytes(manifest);
+            File.WriteAllBytes(
+                Path.Combine(snapshotDirectory, "PUBLIC_PROJECTION_SNAPSHOT.generated.json"),
+                manifestBytes);
+            var pointer = new Dictionary<string, object?>(common)
+            {
+                ["contractName"] = "chummer.public_projection_current/v1",
+                ["manifestRelativePath"] = $"{snapshotId}/PUBLIC_PROJECTION_SNAPSHOT.generated.json",
+                ["manifestSha256"] = Convert.ToHexStringLower(SHA256.HashData(manifestBytes)),
+                ["outputs"] = outputNames.ToDictionary(
+                    static name => name,
+                    name => (object)$"{snapshotId}/{name}",
+                    StringComparer.Ordinal)
+            };
+            File.WriteAllBytes(
+                Path.Combine(snapshotRoot, "CURRENT.json"),
+                JsonSerializer.SerializeToUtf8Bytes(pointer));
         }
 
         public async ValueTask DisposeAsync()

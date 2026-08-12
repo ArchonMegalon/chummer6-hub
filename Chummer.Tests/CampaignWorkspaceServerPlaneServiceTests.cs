@@ -2860,13 +2860,13 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
-    public void CampaignSpineResolveRosterTransferRequestIdentityThrowsForWhitespaceOnlyIds()
+    public void CampaignSpineResolveRosterTransferRequestIdentityRejectsWhitespaceOnlyIdsAsInvalidInput()
     {
         TargetInvocationException ex = Assert.Throws<TargetInvocationException>(
             () => InvokeCampaignSpineResolveRosterTransferRequestIdentity("   ", "dossier"));
 
-        KeyNotFoundException inner = Assert.IsType<KeyNotFoundException>(ex.InnerException);
-        Assert.Contains("Unknown dossier", inner.Message, StringComparison.Ordinal);
+        ArgumentException inner = Assert.IsType<ArgumentException>(ex.InnerException);
+        Assert.Equal("dossier", inner.ParamName);
     }
 
     [Fact]

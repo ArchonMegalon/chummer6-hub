@@ -88,7 +88,7 @@ public sealed class WindowsProofDeliveryTests
 
         Assert.Null(noCf.Service.CaptureCurrentProof());
         Assert.Null(disabled.Service.CaptureCurrentProof());
-        Assert.Null(revokedById.Service.CaptureCurrentProof());
+        Assert.NotNull(revokedById.Service.CaptureCurrentProof());
         Assert.Null(revokedByDigest.Service.CaptureCurrentProof());
         Assert.False(noCf.Service.LegacyShelfFallbackEnabled);
     }

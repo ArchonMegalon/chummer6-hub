@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using Npgsql;
@@ -362,6 +363,65 @@ public sealed class NpgsqlPlayAuthorizationRepository : IPlayAuthorizationPostgr
         }
     }
 
+    private async Task<PlayAuthorizationPostgresMutationResult>
+        RecoverConcurrentReceiptAsync(
+            PlayAuthorizationDurableRequest request,
+            PlayAuthorizationPostgresOutcomeCode unresolvedOutcome,
+            CancellationToken cancellationToken)
+    {
+        using var recoveryDeadline = new CancellationTokenSource(
+            PostCommitRecoveryDeadline,
+            _timeProvider);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            recoveryDeadline.Token);
+        try
+        {
+            while (true)
+            {
+                PlayAuthorizationPostgresMutationResult? recovered =
+                    await LookupIdempotencyReceiptCoreAsync(request, linked.Token);
+                if (recovered is not null
+                    && recovered.Code is not PlayAuthorizationPostgresOutcomeCode.AuthorityUnavailable
+                        and not PlayAuthorizationPostgresOutcomeCode.CheckpointPending
+                        and not PlayAuthorizationPostgresOutcomeCode.PersistenceUnavailable)
+                {
+                    return recovered;
+                }
+
+                if (recovered is null
+                    || recovered.Code == PlayAuthorizationPostgresOutcomeCode.CheckpointPending)
+                {
+                    try
+                    {
+                        await _checkpointReconciler.ReconcileAsync(
+                            MaximumRecoveryPublications,
+                            linked.Token);
+                    }
+                    catch (Exception exception) when (
+                        exception is PlayAuthorizationCheckpointProviderCallInFlightException
+                            or NpgsqlException
+                            or IOException
+                            or TimeoutException)
+                    {
+                        // Another process or repository instance still owns the recovery lease.
+                    }
+                }
+
+                await Task.Delay(
+                    RecoveryRetryDelay,
+                    _timeProvider,
+                    linked.Token);
+            }
+        }
+        catch (OperationCanceledException) when (
+            recoveryDeadline.IsCancellationRequested
+            && !cancellationToken.IsCancellationRequested)
+        {
+            return new(unresolvedOutcome);
+        }
+    }
+
     private async Task<PlayAuthorizationPostgresMutationResult> ExecuteAtomicAsync(
         PlayAuthorizationDurableRequest request,
         PlayAuthorizationOperation operationKind,
@@ -383,6 +443,34 @@ public sealed class NpgsqlPlayAuthorizationRepository : IPlayAuthorizationPostgr
             return new(PlayAuthorizationPostgresOutcomeCode.ReceiptBindingConflict);
         }
 
+        PostgresAdvisoryLease idempotencyLease;
+        try
+        {
+            idempotencyLease = await AcquireIdempotencyLeaseAsync(request, cancellationToken);
+        }
+        catch (Exception exception) when (
+            exception is NpgsqlException or IOException or TimeoutException)
+        {
+            return new(PlayAuthorizationPostgresOutcomeCode.PersistenceUnavailable);
+        }
+
+        await using PostgresAdvisoryLease acquiredIdempotencyLease = idempotencyLease;
+
+        PlayAuthorizationPostgresMutationResult? durableReplay =
+            await LookupIdempotencyReceiptCoreAsync(request, cancellationToken);
+        if (durableReplay is not null)
+        {
+            if (durableReplay.Code == PlayAuthorizationPostgresOutcomeCode.CheckpointPending)
+            {
+                return await RecoverConcurrentReceiptAsync(
+                    request,
+                    PlayAuthorizationPostgresOutcomeCode.CheckpointPending,
+                    cancellationToken);
+            }
+
+            return durableReplay;
+        }
+
         try
         {
             PlayAuthorizationCheckpointReconciliationResult preflight =
@@ -391,7 +479,10 @@ public sealed class NpgsqlPlayAuthorizationRepository : IPlayAuthorizationPostgr
                     cancellationToken);
             if (!preflight.Complete)
             {
-                return new(PlayAuthorizationPostgresOutcomeCode.CheckpointPending);
+                return await RecoverConcurrentReceiptAsync(
+                    request,
+                    PlayAuthorizationPostgresOutcomeCode.CheckpointPending,
+                    cancellationToken);
             }
         }
         catch (PlayAuthorizationExternalAuthorityUnavailableException)
@@ -567,7 +658,10 @@ public sealed class NpgsqlPlayAuthorizationRepository : IPlayAuthorizationPostgr
                     {
                         if (existing.Code == PlayAuthorizationPostgresOutcomeCode.CheckpointPending)
                         {
-                            return await ReconcileAndLookupReceiptAsync(request);
+                            return await RecoverConcurrentReceiptAsync(
+                                request,
+                                PlayAuthorizationPostgresOutcomeCode.CheckpointPending,
+                                cancellationToken);
                         }
 
                         if (existing.Code == PlayAuthorizationPostgresOutcomeCode.Replayed)
@@ -604,7 +698,10 @@ public sealed class NpgsqlPlayAuthorizationRepository : IPlayAuthorizationPostgr
                 }
             }
 
-            return new(PlayAuthorizationPostgresOutcomeCode.PersistenceUnavailable);
+            return await RecoverConcurrentReceiptAsync(
+                request,
+                PlayAuthorizationPostgresOutcomeCode.PersistenceUnavailable,
+                cancellationToken);
         }
         catch (PostgresException exception) when (exception.SqlState.StartsWith("23", StringComparison.Ordinal))
         {
@@ -621,7 +718,10 @@ public sealed class NpgsqlPlayAuthorizationRepository : IPlayAuthorizationPostgr
         catch (PlayAuthorizationCheckpointProviderCallInFlightException exception)
             when (exception.Lane == PlayAuthorizationCheckpointProviderLaneKind.Validation)
         {
-            return new(PlayAuthorizationPostgresOutcomeCode.AuthorityUnavailable);
+            return await RecoverConcurrentReceiptAsync(
+                request,
+                PlayAuthorizationPostgresOutcomeCode.AuthorityUnavailable,
+                cancellationToken);
         }
         catch (CryptographicException)
         {
@@ -1330,6 +1430,38 @@ public sealed class NpgsqlPlayAuthorizationRepository : IPlayAuthorizationPostgr
         catch (Exception exception) when (!IsFatal(exception) && exception is not OperationCanceledException)
         {
             // The bounded optimistic loop will retry from current durable truth.
+        }
+    }
+
+    private async Task<PostgresAdvisoryLease> AcquireIdempotencyLeaseAsync(
+        PlayAuthorizationDurableRequest request,
+        CancellationToken cancellationToken)
+    {
+        byte[] scopeHash = HashUtf8(request.Scope);
+        byte[] keyHash = HashUtf8(request.IdempotencyKey);
+        NpgsqlConnection? connection = null;
+        try
+        {
+            int scopeKey = BinaryPrimitives.ReadInt32BigEndian(scopeHash);
+            int idempotencyKey = BinaryPrimitives.ReadInt32BigEndian(keyHash);
+            connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+            await using NpgsqlCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT pg_advisory_lock(@scope_key, @idempotency_key)";
+            command.Parameters.AddWithValue("scope_key", scopeKey);
+            command.Parameters.AddWithValue("idempotency_key", idempotencyKey);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            PostgresAdvisoryLease lease = new(connection, scopeKey, idempotencyKey);
+            connection = null;
+            return lease;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(scopeHash);
+            CryptographicOperations.ZeroMemory(keyHash);
+            if (connection is not null)
+            {
+                await connection.DisposeAsync();
+            }
         }
     }
 
@@ -2557,6 +2689,53 @@ public sealed class NpgsqlPlayAuthorizationRepository : IPlayAuthorizationPostgr
     {
         public static ReceiptSnapshotRead Resolved(PlayAuthorizationPostgresOutcomeCode code)
             => new(null, new PlayAuthorizationPostgresMutationResult(code));
+    }
+
+    private sealed class PostgresAdvisoryLease : IAsyncDisposable
+    {
+        private readonly NpgsqlConnection _connection;
+        private readonly int _scopeKey;
+        private readonly int _idempotencyKey;
+        private bool _disposed;
+
+        public PostgresAdvisoryLease(
+            NpgsqlConnection connection,
+            int scopeKey,
+            int idempotencyKey)
+        {
+            _connection = connection;
+            _scopeKey = scopeKey;
+            _idempotencyKey = idempotencyKey;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            try
+            {
+                await using NpgsqlCommand command = _connection.CreateCommand();
+                command.CommandTimeout = 2;
+                command.CommandText =
+                    "SELECT pg_advisory_unlock(@scope_key, @idempotency_key)";
+                command.Parameters.AddWithValue("scope_key", _scopeKey);
+                command.Parameters.AddWithValue("idempotency_key", _idempotencyKey);
+                await command.ExecuteNonQueryAsync(CancellationToken.None);
+            }
+            catch (Exception exception) when (
+                exception is NpgsqlException or IOException or TimeoutException)
+            {
+                // Closing the physical session below also releases every advisory lock it owns.
+            }
+            finally
+            {
+                await _connection.DisposeAsync();
+            }
+        }
     }
 
     private sealed class ReceiptSnapshot : IDisposable

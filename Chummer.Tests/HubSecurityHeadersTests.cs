@@ -87,7 +87,7 @@ public sealed class HubSecurityHeadersTests
         HubSecurityHeaders.Apply(context.Response.Headers);
 
         string hsts = Assert.Single(
-            context.Response.Headers["Strict-Transport-Security"]);
+            context.Response.Headers["Strict-Transport-Security"])!;
         Assert.DoesNotContain("includeSubDomains", hsts, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("preload", hsts, StringComparison.OrdinalIgnoreCase);
     }

@@ -1130,46 +1130,6 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: redirect to the browser app entry
-- path: /ready/handoff/mobile.json
-  title: Ready mobile handoff
-  audience: public
-  purpose: ready_mobile_handoff
-  requires_auth: false
-  guest_fallback: /ready/handoff/mobile.json
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: session companion handoff only
-  contract_terms:
-  - playtime_tools
-  - account opt-in
-  - followed-world selection
-- path: /mobile/player
-  title: Mobile player alias
-  audience: public
-  purpose: play_projection
-  requires_auth: false
-  guest_fallback: /mobile/player
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: bounded mobile player alias only
-- path: /mobile/gm
-  title: Mobile GM alias
-  audience: public
-  purpose: play_projection
-  requires_auth: false
-  guest_fallback: /mobile/gm
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: bounded mobile GM alias only
-- path: /mobile/observer
-  title: Mobile observer alias
-  audience: public
-  purpose: play_projection
-  requires_auth: false
-  guest_fallback: /mobile/observer
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: bounded mobile observer alias only
 - path: /pwa
   title: App alias
   audience: public
@@ -1198,16 +1158,6 @@ public_routes:
   required_redirect_location_prefix: /mobile/player
   placeholder_allowed: false
   placeholder_requirements: bounded play alias only
-- path: /jammer
-  title: Jammer Companion alias
-  audience: public
-  purpose: play_projection
-  requires_auth: false
-  guest_fallback: /jammer
-  must_exist: true
-  required_redirect_location_prefix: /mobile/player
-  placeholder_allowed: false
-  placeholder_requirements: no-authority Jammer Companion alias only
 - path: /gm
   title: GM alias
   audience: public

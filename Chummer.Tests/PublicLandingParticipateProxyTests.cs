@@ -56,7 +56,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageRendersChummerShellWithEmbeddedBoardHref()
+    public async Task ParticipatePageRendersChummerShellWithFirstPartyEmbeddedBoardHref()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -71,13 +71,13 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.Equal("Participate", model.Heading);
         Assert.Equal("Participate", model.Summary);
         Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal(HostedFeedbackUrl, model.EmbeddedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
         Assert.Equal("/participate/board", model.DirectBoardHref);
-        Assert.Contains("productlift.dev", model.EmbeddedBoardHref ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("productlift.dev", model.EmbeddedBoardHref ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task ParticipatePageSkipsPlaceholderHostedBoardCallsInDevelopment()
+    public async Task ParticipatePageKeepsTheFirstPartyBoardRouteFastInDevelopment()
     {
         var controller = CreatePublicLandingController(
             new SlowHostedBoardPostsHttpClientFactory(),
@@ -89,10 +89,11 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         stopwatch.Stop();
         ViewResult view = Assert.IsType<ViewResult>(result);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.False(model.EmbeddedBoardEnabled);
-        Assert.Equal("Offline", model.StatusLabel);
-        Assert.Equal("Board offline right now", model.SyncedLabel);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(3), $"development placeholder hosted-board fetch should short-circuit, but took {stopwatch.Elapsed}.");
+        Assert.True(model.EmbeddedBoardEnabled);
+        Assert.Equal("Open", model.StatusLabel);
+        Assert.Equal("Board is live.", model.SyncedLabel);
+        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(3), $"first-party board shell should not wait for a hosted-board fetch, but took {stopwatch.Elapsed}.");
     }
 
     [Fact]
@@ -110,7 +111,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.True(model.EmbeddedBoardEnabled);
         Assert.Equal("Open", model.StatusLabel);
         Assert.Equal("Board is live.", model.SyncedLabel);
-        Assert.Equal(HostedFeedbackUrl, model.EmbeddedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
     }
 
     [Fact]
@@ -154,7 +155,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageUsesCanonicalShellWhenHostedBoardChromeIsAvailable()
+    public async Task ParticipatePageUsesCanonicalShellWhenProviderContentIsAvailable()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), seedParticipateSnapshot: false);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -168,11 +169,11 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.Equal("Participate", model.Heading);
         Assert.Equal("Participate", model.Summary);
         Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal(HostedFeedbackUrl, model.EmbeddedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
     }
 
     [Fact]
-    public async Task RoadmapPageRendersTheSameHostedProductLiftBoardFrame()
+    public async Task RoadmapPageRendersTheFirstPartyBoardFrame()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), seedParticipateSnapshot: true);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -184,7 +185,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Equal("/roadmap/board?embed=1", model.HostedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
@@ -211,7 +212,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Equal("/roadmap/board?embed=1", model.HostedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
         Assert.True(model.Milestones.Count >= 0);
         Assert.False(string.IsNullOrWhiteSpace(model.PublicRequestSyncedLabel));
     }
@@ -228,7 +229,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Equal("/roadmap/board?embed=1", model.HostedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
@@ -243,7 +244,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Equal("/roadmap/board?embed=1", model.HostedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
@@ -349,7 +350,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         IActionResult result = await controller.RoadmapBoardProxy(null, CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal(HostedRoadmapUrl, redirect.Url);
+        Assert.Equal("/participate/board?embed=1", redirect.Url);
     }
 
     [Fact]
@@ -361,7 +362,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         IActionResult result = await controller.RoadmapBoardProxy("posts/mobile-companion", CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal($"{HostedRoadmapUrl}/posts/mobile-companion", redirect.Url);
+        Assert.Equal("/participate/board/posts/mobile-companion?embed=1", redirect.Url);
     }
 
     [Fact]
@@ -437,7 +438,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.Equal("application/json", file.ContentType);
         Assert.Equal("{\"ok\":true}", Encoding.UTF8.GetString(file.FileContents));
         Assert.NotNull(factory.Request);
-        Assert.Equal("https://ideas.example.test/http_api/tabs/feedback/fetch", factory.Request!.RequestUri!.ToString());
+        Assert.Equal("https://chummer6.productlift.dev/http_api/tabs/feedback/fetch", factory.Request!.RequestUri!.ToString());
         Assert.False(factory.Request.Headers.Contains("Cookie"));
         Assert.False(factory.Request.Headers.Contains("Authorization"));
         Assert.Contains("XMLHttpRequest", factory.Request.Headers.GetValues("X-Requested-With"));

@@ -154,6 +154,7 @@ cleanup_bootstrap_tmp_paths() {
     && [[ -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" ]]; then
     chmod 600 "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" 2>/dev/null || true
     rm -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}"
+    log "removed sanitized release upload response summary"
   fi
 
   if (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_CURRENT_ACTIVATED:-0}" == "1" ]]; then

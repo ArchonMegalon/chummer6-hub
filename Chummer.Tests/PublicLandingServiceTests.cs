@@ -188,9 +188,6 @@ public sealed class PublicLandingServiceTests
             string.Equals(route.Path, "/player", StringComparison.Ordinal)
             && string.Equals(route.RequiredRedirectLocationPrefix, "/mobile/player", StringComparison.Ordinal));
         Assert.Contains(document.PublicRoutes!, static route =>
-            string.Equals(route.Path, "/jammer", StringComparison.Ordinal)
-            && string.Equals(route.RequiredRedirectLocationPrefix, "/mobile/player", StringComparison.Ordinal));
-        Assert.Contains(document.PublicRoutes!, static route =>
             string.Equals(route.Path, "/gm", StringComparison.Ordinal)
             && string.Equals(route.RequiredRedirectLocationPrefix, "/mobile/gm", StringComparison.Ordinal));
         Assert.Contains(document.RegisteredRoutes!, static route =>

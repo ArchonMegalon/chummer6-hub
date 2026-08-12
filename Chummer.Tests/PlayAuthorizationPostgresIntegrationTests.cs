@@ -670,7 +670,14 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             PlayAuthorizationPostgresMutationResult[] results = await Task.WhenAll(attempts);
 
             Assert.Single(results, result => result.Code == PlayAuthorizationPostgresOutcomeCode.Applied);
-            Assert.Equal(31, results.Count(result => result.Code == PlayAuthorizationPostgresOutcomeCode.Replayed));
+            Assert.True(
+                results.Count(result => result.Code == PlayAuthorizationPostgresOutcomeCode.Replayed) == 31,
+                string.Join(
+                    ", ",
+                    results
+                        .GroupBy(result => result.Code)
+                        .OrderBy(group => group.Key)
+                        .Select(group => $"{group.Key}={group.Count()}")));
             Assert.All(results, result => Assert.Equal(body, result.Response?.Body));
             Assert.Equal(1, await _fixture.CountAsync(
                 "SELECT COUNT(*) FROM play_auth.exchanges WHERE exchange_id = @id",
@@ -2144,11 +2151,19 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
         PlayAuthorizationPostgresDormantFactory first = providerFactory;
         provider.SynchronousPrefix = () =>
         {
-            provider.ReentrantValidationCallsInFlight =
-                second.ProviderCallDiagnostics.ValidationCallsInFlight;
-            PlayAuthorizationCheckpointReconciliationResult reentrant =
-                second.ReconcileAsync(1).GetAwaiter().GetResult();
-            provider.ReentrantReconciliationCode = reentrant.Code;
+            try
+            {
+                provider.ReentrantValidationCallsInFlight =
+                    second.ProviderCallDiagnostics.ValidationCallsInFlight;
+                PlayAuthorizationCheckpointReconciliationResult reentrant =
+                    second.ReconcileAsync(1).GetAwaiter().GetResult();
+                provider.ReentrantReconciliationCode = reentrant.Code;
+            }
+            catch (Exception exception)
+            {
+                provider.ReentrantReconciliationCode = $"{exception.GetType().Name}: {exception.Message}";
+                throw;
+            }
         };
         PlayAuthorizationPostgresReadinessProbe readiness =
             providerFactory.CreateReadinessProbe(
@@ -2167,7 +2182,6 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             Assert.Equal("external_authority_timeout", timedOut.Code);
             Assert.Equal(1, provider.ValidationInvocationCount);
             Assert.Equal(1, provider.ReentrantValidationCallsInFlight);
-            Assert.Equal("complete", provider.ReentrantReconciliationCode);
             Assert.Equal(1, first.ProviderCallDiagnostics.ValidationCallsInFlight);
             Assert.Equal(1, second.ProviderCallDiagnostics.ValidationCallsInFlight);
             Assert.Equal(1, second.ProviderCallDiagnostics.TotalCallsInFlight);
@@ -2212,6 +2226,14 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             Assert.Same(retainedStateCheckpoint, provider.LastStateCheckpointReference);
 
             await provider.ReleaseAsync();
+            for (int attempt = 0;
+                 attempt < 50 && provider.ReentrantReconciliationCode is null;
+                 attempt++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(10));
+            }
+            Assert.Equal("complete", provider.ReentrantReconciliationCode);
+            provider.SynchronousPrefix = null;
             for (int attempt = 0;
                  attempt < 50 && providerFactory.ProviderCallDiagnostics.TotalCallsInFlight != 0;
                  attempt++)
@@ -2322,8 +2344,9 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             var provider = new AliasingCheckpointAuthority(authority);
             var services = new ServiceCollection();
             services.AddSingleton<PlayAuthorizationCheckpointProviderCallRegistry>();
-            services.AddPlayAuthorizationPostgresDormantProviderBoundary(provider);
-            using ServiceProvider serviceProvider = services.BuildServiceProvider();
+            PlayAuthorizationPostgresDormantProviderActivationHandle activation =
+                services.AddPlayAuthorizationPostgresDormantProviderBoundary(provider);
+            using ServiceProvider serviceProvider = activation.BuildServiceProvider();
             PlayAuthorizationPostgresDormantFactory providerFactory = serviceProvider
                 .GetRequiredService<PlayAuthorizationPostgresDormantFactory>();
             PlayAuthorizationPostgresDormantFactory reconciler =
@@ -2398,8 +2421,14 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
         await connection.DisposeAsync();
         await Task.Delay(shortLeasePolicy.ClaimLease + TimeSpan.FromMilliseconds(150));
 
+        var shortDeadlineAuthority = new CheckpointCapabilityOverrideAuthority(
+            _fixture.Authorities,
+            _fixture.Authorities.Capabilities with
+            {
+                HardDeadline = TimeSpan.FromMilliseconds(40)
+            });
         PlayAuthorizationPostgresDormantFactory higherFenceReconciler =
-            _fixture.CreateProviderFactory(_fixture.Authorities)
+            _fixture.CreateProviderFactory(shortDeadlineAuthority)
                 .BindCheckpointReconciliation(
                     _fixture.AdminDataSource,
                     _fixture.Authorities,

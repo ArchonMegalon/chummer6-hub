@@ -48,7 +48,7 @@ public sealed class PublicSignalOperationsViewTests
         Assert.DoesNotContain("_PublicSignalOperationsPacket", participateView, StringComparison.Ordinal);
         Assert.Contains(".route-participate.surface-participate .site-header", siteCss, StringComparison.Ordinal);
         Assert.Contains(".route-participate.surface-participate .site-main", siteCss, StringComparison.Ordinal);
-        Assert.Contains("--participate-frame-visible-height: 100svh;", siteCss, StringComparison.Ordinal);
+        Assert.Contains("--participate-frame-visible-height: calc(100svh - 5.5rem);", siteCss, StringComparison.Ordinal);
         Assert.Contains(".surface-partizipate:not(.route-participate) .site-main", siteCss, StringComparison.Ordinal);
     }
 

@@ -181,7 +181,17 @@ public sealed class HubGoogleAuthService
     }
 
     public CookieOptions BuildStateCookie(HttpRequest request, DateTimeOffset expiresAtUtc)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        string? callbackDomain = ResolveConfiguredStateCookieDomain();
+        string? requestHost = NormalizeCookieDomainHost(request.Host.Host);
+        bool needsSharedDomain = callbackDomain is not null
+            && requestHost is not null
+            && !string.Equals(requestHost, callbackDomain, StringComparison.OrdinalIgnoreCase)
+            && requestHost.EndsWith($".{callbackDomain}", StringComparison.OrdinalIgnoreCase);
+
+        return new CookieOptions
         {
             HttpOnly = true,
             Secure = _publicOrigin.UsesHttps || CookieSecureDefault,
@@ -189,8 +199,9 @@ public sealed class HubGoogleAuthService
             Expires = expiresAtUtc.UtcDateTime,
             IsEssential = true,
             Path = "/",
-            Domain = null
+            Domain = needsSharedDomain ? callbackDomain : null
         };
+    }
 
     public void ClearStateCookie(HttpRequest request, HttpResponse response)
     {

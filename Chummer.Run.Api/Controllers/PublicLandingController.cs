@@ -8822,9 +8822,18 @@ document.addEventListener('DOMContentLoaded', function () {
             mode = "mobile_pwa_living_world",
             status = "opt_in_required",
             status_label = "Opt in required",
-            summary = "Black Ledger live updates are available when you opt in via account preferences.",
-            legal_posture = "Public lane stays aggregate only. No private run table state is published.",
+            summary = "Black Ledger world heat and session continuity are available after opt in and followed-world selection.",
+            legal_posture = "Only aggregate world heat and session continuity are returned. No private run table state is published.",
             opt_in_route = "/account",
+            world_gate = "account_opt_in_and_followed_world_selection",
+            heat_visibility = "hidden_until_opt_in",
+            session_visibility = "hidden_until_opt_in",
+            opt_in_required_for = new[]
+            {
+                "black_ledger_heat",
+                "followed_world_updates",
+                "session_continuity"
+            },
             updates_route = "/mobile/pwa/ledger.json",
             generated_at_utc = DateTimeOffset.UtcNow
         }, PublicJsonContentOptions);
@@ -12652,14 +12661,14 @@ Boundary:
             "invalid" => "the immutable release decision is invalid",
             _ => proofFreshnessStatus switch
             {
-                "stale" => "canonical release proof freshness is stale",
-                "missing" => "canonical release proof freshness is missing",
-                { Length: > 0 } => $"canonical release proof freshness is {HumanizeToken(proofFreshnessStatus, "under review").ToLowerInvariant()}",
+                "stale" => "the current release checks are out of date",
+                "missing" => "the current release checks are unavailable",
+                { Length: > 0 } => $"the current release checks are {HumanizeToken(proofFreshnessStatus, "under review").ToLowerInvariant()}",
                 _ => "canonical release supportability requires review"
             }
         };
         string summary =
-            $"Release review is required because {proofReason}. Current installers may remain listed, but launch-ready, completion-percentage, and no-blocker claims are withheld until current release proof is published.";
+            $"Release review is required because {proofReason}. Current installers may remain listed, but wider availability is not confirmed until those checks are current.";
         return new(true, proofFreshnessStatus, summary);
     }
 
@@ -12672,8 +12681,8 @@ Boundary:
         string installerSummary = artifactCount switch
         {
             <= 0 => "No authority-bound installer availability is published right now.",
-            1 => "1 authority-listed installer remains visible while release proof is refreshed; availability is not asserted.",
-            _ => $"{artifactCount} authority-listed installers remain visible while release proof is refreshed; availability is not asserted."
+            1 => "1 listed installer remains visible while release checks are refreshed; availability is not confirmed.",
+            _ => $"{artifactCount} listed installers remain visible while release checks are refreshed; availability is not confirmed."
         };
         string releaseVersion = releaseTruth?.ReleaseVersion ?? manifest.Version;
         string supportabilityState = releaseTruth?.SupportabilityState ?? manifest.SupportabilityState ?? string.Empty;
@@ -12685,7 +12694,7 @@ Boundary:
             new("Recommended now", "Use the current downloads page only with its review-required status visible; keep parity-sensitive rollout with support."),
             new("Who can get it now", installerSummary),
             new("Release truth", gate.Summary),
-            new("Launch readiness", "Wider launch remains paused until canonical release proof is fresh and the review-required posture is cleared."),
+            new("Launch readiness", "Wider launch remains paused until the release review is current."),
             new("Current caution", gate.Summary)
         ];
 
