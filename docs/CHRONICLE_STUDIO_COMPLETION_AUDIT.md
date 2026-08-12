@@ -65,14 +65,17 @@ an external action or platform build that did not occur.
 - A replacement upload key is provisioned outside the repository, and its
   owner-only recovery bundle passes EA table verification and a full restore
   drill (616 logical rows and 9 referenced files). The Play Console upload-key
-  reset request was submitted with the replacement certificate and is pending
-  Google's review.
+  reset request was submitted with the replacement certificate. A read-only
+  Console check on 2026-08-12 confirmed that Google accepted it, lists the
+  replacement certificate as the active upload key, and shows no pending-reset
+  notice.
 - A fresh current-source arm64 preview.3 AAB is signed with that replacement key
   and passes all 26 Android contracts, bundletool validation, structural
   inspection, and signer verification. Its SHA-256 is
-  `e36083b5c8861d66781585e98d97acd2379db6c53d9824a3cf8c5ffbce781e1a`.
-  It cannot be uploaded until Play accepts the key reset, and its digest has not
-  yet received exact-artifact upload approval.
+  `4e73ebb8678b8d11b63e6a5f6a02b2981ab6003403daece60b127c511eaa659c`.
+  The signer was restored from the hash-verified EA custody bundle and matches
+  Play's active upload certificate. The exact digest has not yet received
+  artifact-specific upload approval, so no upload was attempted.
 - EA AIWriteBook governance, canary, provider-registry, and recovery tests:
   173/173. Account materialization and the offline PDF/EPUB/DOCX round-trip
   verifier pass. The lane verifier reports
@@ -88,10 +91,10 @@ an external action or platform build that did not occur.
 - No canary publication or external send occurred.
 - Chronicle approval actions record permission only; they never upload, generate,
   spend credits, publish, or send on their own.
-- The upload-key reset request was submitted after explicit approval. No AAB was
-  uploaded and no testing or production rollout was started. The current native
-  screenshot set, signed preview.3 AAB, and accelerated device runs pass their
-  local gates.
+- The upload-key reset request was submitted after explicit approval and Google
+  accepted it. No AAB was uploaded and no testing or production rollout was
+  started. The current native screenshot set, signed preview.3 AAB, and
+  accelerated device runs pass their local gates.
 
 ## Remaining proof boundary
 
@@ -105,10 +108,11 @@ builds, and an accelerated API 36 device journey. The structurally validated
 unsigned AAB is retained only as superseded provenance because native source has
 changed since it was built.
 
-The registered preview.2 certificate and signed bundle still exist, but their
-private upload key was not recoverable. A dedicated replacement key, verified EA
-recovery bundle, and signed/inspected current-source AAB are ready; the Play
-Console reset is submitted and still pending. Finishing publication therefore
-requires Play acceptance and approval of the exact staged artifact before
-upload. Every
-pre-rewrite or pre-fix Android bundle remains superseded.
+The historical preview.2 certificate and signed bundle still exist, but that
+certificate is no longer Play's active upload key. A dedicated replacement key,
+verified EA recovery bundle, and signed/inspected current-source AAB are ready,
+and Play has accepted the reset. Finishing the internal-test upload therefore
+requires explicit approval of exact AAB SHA-256
+`4e73ebb8678b8d11b63e6a5f6a02b2981ab6003403daece60b127c511eaa659c`.
+Every pre-rewrite, pre-fix, old-signer, or differently hashed Android bundle
+remains superseded.
