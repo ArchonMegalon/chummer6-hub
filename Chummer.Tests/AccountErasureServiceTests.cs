@@ -45,6 +45,7 @@ public sealed class AccountErasureServiceTests
             new EmptyAuxiliaryEraser(),
             hosted,
             identity,
+            fixture.Journal,
             fixture.Configuration);
 
         CurrentAccountErasureResponse result =
@@ -79,6 +80,7 @@ public sealed class AccountErasureServiceTests
             new EmptyAuxiliaryEraser(),
             new FailingHostedBuildEraser(),
             identity,
+            fixture.Journal,
             fixture.Configuration);
 
         await Assert.ThrowsAsync<HubRequestAuthException>(
@@ -87,6 +89,73 @@ public sealed class AccountErasureServiceTests
         Assert.Equal(0, identityCalls);
         Assert.Single(fixture.Community.UsersById);
         Assert.Single(fixture.Support.CasesById);
+    }
+
+    [Fact]
+    public async Task Identity_failure_is_recovered_from_independent_journal_without_retaining_plaintext()
+    {
+        using Fixture fixture = new();
+        int identityCalls = 0;
+        HubIdentityClient identity = fixture.CreateIdentityClient(_ =>
+        {
+            identityCalls++;
+            if (identityCalls == 1)
+            {
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new IdentitySubjectErasureResponse(
+                    Erased: true,
+                    SubjectKeySha256: new string('c', 64),
+                    RevokedSessionCount: 1,
+                    DeletedEmailTicketCount: 0,
+                    ErasedAtUtc: DateTimeOffset.UtcNow))
+            };
+        });
+        var hosted = new RecordingHostedBuildEraser();
+        var service = new AccountErasureService(
+            fixture.Accounts,
+            new CommunityAccountErasureService(fixture.Community),
+            fixture.Support,
+            new EmptyAuxiliaryEraser(),
+            hosted,
+            identity,
+            fixture.Journal,
+            fixture.Configuration);
+
+        await Assert.ThrowsAsync<HubRequestAuthException>(
+            () => service.EraseAsync("subject-delete", CancellationToken.None));
+
+        Assert.Empty(fixture.Community.UsersById);
+        Assert.Empty(fixture.Support.CasesById);
+        PendingIdentityAccountErasure pending = Assert.Single(
+            fixture.Journal.GetPendingIdentityDue(DateTimeOffset.UtcNow.AddMinutes(2)));
+        Assert.Equal("subject-delete", pending.SubjectId);
+
+        await service.RecoverPendingIdentityAsync(pending, CancellationToken.None);
+
+        AccountErasureJournalEntry completed = Assert.IsType<AccountErasureJournalEntry>(
+            fixture.Journal.Find(pending.Entry.SubjectKeySha256));
+        Assert.Equal(AccountErasureJournalStage.Completed, completed.Stage);
+        Assert.Null(completed.PendingSubjectCiphertext);
+        Assert.Equal(5, completed.Components.Count);
+        Assert.Equal(2, identityCalls);
+        string persisted = File.ReadAllText(fixture.Journal.StoragePath);
+        Assert.DoesNotContain("subject-delete", persisted, StringComparison.Ordinal);
+        Assert.DoesNotContain("delete@example.invalid", persisted, StringComparison.Ordinal);
+
+        var reloaded = new AccountErasureJournalStore(
+            fixture.Configuration,
+            new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider(),
+            NullLogger<AccountErasureJournalStore>.Instance);
+        Assert.Equal(AccountErasureJournalStage.Completed, reloaded.Find(completed.SubjectKeySha256)?.Stage);
+
+        CurrentAccountErasureResponse replay =
+            await service.EraseAsync("subject-delete", CancellationToken.None);
+        Assert.Equal(completed.ReceiptSha256, replay.ReceiptSha256);
+        Assert.Equal(2, identityCalls);
     }
 
     private sealed class Fixture : IDisposable
@@ -104,6 +173,7 @@ public sealed class AccountErasureServiceTests
                 {
                     ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_directory, "community.json"),
                     ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(_directory, "support.json"),
+                    ["CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH"] = Path.Combine(_directory, "account-erasure-journal.json"),
                     ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.test",
                     ["IDENTITY_ADMIN_KEY"] = "identity-admin",
                     ["CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"] = Convert.ToBase64String(Enumerable.Repeat((byte)0x5a, 32).ToArray())
@@ -112,6 +182,10 @@ public sealed class AccountErasureServiceTests
             Community = new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance);
             Support = new SupportStore(Configuration, NullLogger<SupportStore>.Instance);
             Accounts = new AccountService(Community);
+            Journal = new AccountErasureJournalStore(
+                Configuration,
+                new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider(),
+                NullLogger<AccountErasureJournalStore>.Instance);
             HubUserDto user = Accounts.EnsureUser("subject-delete", "Delete Me", "delete@example.invalid");
             Support.CasesById["case-delete"] = new SupportCaseProjection(
                 "case-delete", "cluster-delete", "account", "open", "Private request", "Private summary",
@@ -125,6 +199,7 @@ public sealed class AccountErasureServiceTests
         public CommunityStore Community { get; }
         public SupportStore Support { get; }
         public AccountService Accounts { get; }
+        public AccountErasureJournalStore Journal { get; }
 
         public HubIdentityClient CreateIdentityClient(Func<HttpRequestMessage, HttpResponseMessage> response)
             => new(
