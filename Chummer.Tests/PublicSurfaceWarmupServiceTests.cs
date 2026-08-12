@@ -200,7 +200,10 @@ public sealed class PublicSurfaceWarmupServiceTests : IDisposable
                 owner.RequestStarted.TrySetResult(true);
                 try
                 {
-                    owner.AllowResponse.Wait(cancellationToken);
+                    // Keep the transport blocked until the test releases it. The production
+                    // snapshot request has its own timeout; allowing that token to release this
+                    // fake turns a scheduler-load test into a race against the timeout.
+                    owner.AllowResponse.Wait();
                     return Task.FromResult(
                         new HttpResponseMessage(HttpStatusCode.OK)
                         {

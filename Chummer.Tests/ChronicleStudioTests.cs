@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
@@ -38,6 +39,8 @@ public sealed class ChronicleStudioTests
         Assert.Contains("Switchback", created.RunnerRoster);
         Assert.Throws<InvalidOperationException>(() =>
             fixture.Groups.GetChronicleSourcePacket(fixture.Group.GroupId, created.ChronicleProjectId, "subject.gm"));
+        Assert.Throws<InvalidOperationException>(() =>
+            fixture.Groups.GetChronicleOperatorHandoff(fixture.Group.GroupId, created.ChronicleProjectId, "subject.gm"));
 
         ChronicleProjectDto sourceApproved = fixture.Groups.UpdateChronicleProject(
             fixture.Group.GroupId,
@@ -51,6 +54,34 @@ public sealed class ChronicleStudioTests
         Assert.Equal("upload_approved", uploadApproved.Status);
         Assert.NotNull(uploadApproved.UploadApprovedAtUtc);
 
+        byte[] uploadHandoff = fixture.Groups.GetChronicleOperatorHandoff(
+            fixture.Group.GroupId,
+            created.ChronicleProjectId,
+            "subject.gm");
+        Assert.Equal(
+            uploadHandoff,
+            fixture.Groups.GetChronicleOperatorHandoff(
+                fixture.Group.GroupId,
+                created.ChronicleProjectId,
+                "subject.gm"));
+        using (JsonDocument document = JsonDocument.Parse(uploadHandoff))
+        {
+            JsonElement handoff = document.RootElement;
+            Assert.Equal("chummer.chronicle.operator-handoff", handoff.GetProperty("contract").GetString());
+            Assert.Equal(1, handoff.GetProperty("contractVersion").GetInt32());
+            Assert.Equal(created.SourcePacketSha256, handoff.GetProperty("sourcePacketSha256").GetString());
+            Assert.True(handoff.GetProperty("authorizedActions").GetProperty("providerProjectCreation").GetBoolean());
+            Assert.True(handoff.GetProperty("authorizedActions").GetProperty("sourceUpload").GetBoolean());
+            Assert.False(handoff.GetProperty("authorizedActions").GetProperty("generation").GetBoolean());
+            Assert.False(handoff.GetProperty("creditApproval").GetProperty("approved").GetBoolean());
+            Assert.Equal(0, handoff.GetProperty("creditApproval").GetProperty("maximumCredits").GetInt32());
+        }
+        string uploadHandoffText = Encoding.UTF8.GetString(uploadHandoff);
+        Assert.DoesNotContain(created.SourceSummary, uploadHandoffText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Switchback", uploadHandoffText, StringComparison.Ordinal);
+        Assert.Contains("separate_authenticated_download", uploadHandoffText, StringComparison.Ordinal);
+        Assert.Contains("unattended_automation", uploadHandoffText, StringComparison.Ordinal);
+
         ChronicleProjectDto generationApproved = fixture.Groups.UpdateChronicleProject(
             fixture.Group.GroupId,
             created.ChronicleProjectId,
@@ -58,6 +89,19 @@ public sealed class ChronicleStudioTests
         Assert.Equal("generation_approved", generationApproved.Status);
         Assert.NotNull(generationApproved.GenerationApprovedAtUtc);
         Assert.Equal(uploadApproved.UploadApprovedAtUtc, generationApproved.UploadApprovedAtUtc);
+        using (JsonDocument document = JsonDocument.Parse(fixture.Groups.GetChronicleOperatorHandoff(
+                   fixture.Group.GroupId,
+                   created.ChronicleProjectId,
+                   "subject.gm")))
+        {
+            JsonElement handoff = document.RootElement;
+            Assert.True(handoff.GetProperty("authorizedActions").GetProperty("generation").GetBoolean());
+            Assert.True(handoff.GetProperty("creditApproval").GetProperty("approved").GetBoolean());
+            Assert.Equal(created.EstimatedCredits, handoff.GetProperty("creditApproval").GetProperty("maximumCredits").GetInt32());
+            Assert.Equal("aiwb-project-42", handoff.GetProperty("externalProjectRef").GetString());
+            Assert.False(handoff.GetProperty("authorizedActions").GetProperty("publication").GetBoolean());
+            Assert.False(handoff.GetProperty("authorizedActions").GetProperty("externalSend").GetBoolean());
+        }
 
         byte[] firstPacket = fixture.Groups.GetChronicleSourcePacket(fixture.Group.GroupId, created.ChronicleProjectId, "subject.gm");
         byte[] secondPacket = fixture.Groups.GetChronicleSourcePacket(fixture.Group.GroupId, created.ChronicleProjectId, "subject.gm");

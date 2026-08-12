@@ -454,6 +454,20 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
         project = Advance("approve_upload");
         Assert.Equal("upload_approved", project.Status);
         Assert.NotNull(project.UploadApprovedAtUtc);
+
+        AndroidLinkedChroniclePacketResponse uploadHandoff = Assert.IsType<OkObjectResult>(fixture.AndroidCampaigns.DownloadChronicleHandoff(
+            group.GroupId,
+            project.ChronicleProjectId,
+            new AndroidLinkedGrantRequest("ins-chronicle", grant.AccessToken)).Result).Value as AndroidLinkedChroniclePacketResponse
+            ?? throw new Xunit.Sdk.XunitException("Expected operator handoff payload.");
+        Assert.Equal("application/json", uploadHandoff.MediaType);
+        Assert.EndsWith("-handoff.json", uploadHandoff.FileName, StringComparison.Ordinal);
+        using (System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(
+                   Convert.FromBase64String(uploadHandoff.ContentBase64)))
+        {
+            Assert.False(document.RootElement.GetProperty("creditApproval").GetProperty("approved").GetBoolean());
+            Assert.True(document.RootElement.GetProperty("authorizedActions").GetProperty("sourceUpload").GetBoolean());
+        }
         project = Advance("approve_generation", externalProjectRef: "aiwritebook-project-42");
         Assert.Equal("generation_approved", project.Status);
         Assert.NotNull(project.GenerationApprovedAtUtc);

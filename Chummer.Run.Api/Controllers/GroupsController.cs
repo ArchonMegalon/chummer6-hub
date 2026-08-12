@@ -349,6 +349,29 @@ public sealed class GroupsController : Controller
         }
     }
 
+    [HttpGet("/groups/{groupId}/chronicles/{chronicleProjectId}/handoff")]
+    public async Task<IActionResult> DownloadChronicleHandoffFromPage(
+        [FromRoute] string groupId,
+        [FromRoute] string chronicleProjectId,
+        CancellationToken cancellationToken)
+    {
+        string groupPath = $"/groups/{Uri.EscapeDataString(groupId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            byte[] handoff = _groups.GetChronicleOperatorHandoff(groupId, chronicleProjectId, subject.SubjectId);
+            return File(handoff, "application/json; charset=utf-8", $"chronicle-{chronicleProjectId}-handoff.json");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(groupPath)}");
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or CommunityAccessDeniedException or KeyNotFoundException)
+        {
+            return Redirect($"{groupPath}?notice={Uri.EscapeDataString(ex.Message)}");
+        }
+    }
+
     [HttpPost("/groups/{groupId}/invites")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> CreateInviteFromPage([FromRoute] string groupId, CancellationToken cancellationToken)
@@ -676,6 +699,32 @@ public sealed class GroupsController : Controller
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             byte[] packet = _groups.GetChronicleSourcePacket(groupId, chronicleProjectId, subject.SubjectId);
             return File(packet, "text/markdown; charset=utf-8", $"chronicle-{chronicleProjectId}.md");
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpGet("{groupId}/chronicles/{chronicleProjectId}/handoff")]
+    public async Task<IActionResult> DownloadChronicleHandoff(
+        [FromRoute] string groupId,
+        [FromRoute] string chronicleProjectId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            byte[] handoff = _groups.GetChronicleOperatorHandoff(groupId, chronicleProjectId, subject.SubjectId);
+            return File(handoff, "application/json; charset=utf-8", $"chronicle-{chronicleProjectId}-handoff.json");
         }
         catch (CommunityAccessDeniedException ex)
         {
