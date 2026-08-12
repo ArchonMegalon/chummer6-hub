@@ -157,7 +157,6 @@ public sealed class AccountErasureServiceTests
         Assert.Equal(completed.ReceiptSha256, replay.ReceiptSha256);
         Assert.Equal(2, identityCalls);
     }
-
     private sealed class Fixture : IDisposable
     {
         private readonly string _directory = Path.Combine(

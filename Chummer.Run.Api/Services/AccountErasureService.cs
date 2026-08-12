@@ -71,7 +71,6 @@ public sealed class AccountErasureService : IAccountErasureService
             {
                 return ToResponse(journalEntry);
             }
-
             // Identity is deliberately last. If any first-party data plane fails, the caller
             // retains an authenticated session and can safely retry the idempotent sequence.
             HostedBuildAccountErasureResult hosted =
@@ -287,7 +286,6 @@ public sealed class AccountErasureService : IAccountErasureService
             CryptographicOperations.ZeroMemory(rightBytes);
         }
     }
-
     private static void RequireReceipt(string receiptSha256, string component)
     {
         if (receiptSha256.Length != 64 || receiptSha256.Any(static value => !Uri.IsHexDigit(value)))
