@@ -7,7 +7,14 @@ using Chummer.Run.Contracts.Privacy;
 
 namespace Chummer.Run.Api.Services;
 
-public sealed class AccountErasureService
+public interface IAccountErasureService
+{
+    Task<CurrentAccountErasureResponse> EraseAsync(
+        string subjectId,
+        CancellationToken cancellationToken);
+}
+
+public sealed class AccountErasureService : IAccountErasureService
 {
     private const string ReceiptKeyConfig = "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY";
     private readonly AccountService _accounts;

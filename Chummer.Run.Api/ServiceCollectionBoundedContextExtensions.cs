@@ -321,6 +321,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<AccountErasureJournalStore>();
         services.AddTransient<IAccountAuxiliaryDataErasureService, AccountAuxiliaryDataErasureService>();
         services.AddTransient<AccountErasureService>();
+        services.AddTransient<IAccountErasureService>(static provider =>
+            provider.GetRequiredService<AccountErasureService>());
         services.AddHostedService<AccountErasureRecoveryWorker>();
         services.AddTransient<IPublicPlayIdentityResolver, HubPublicPlayIdentityResolver>();
         services.AddSingleton<IPlaySessionGrantAuthorizer, DenyAllPlaySessionGrantAuthorizer>();

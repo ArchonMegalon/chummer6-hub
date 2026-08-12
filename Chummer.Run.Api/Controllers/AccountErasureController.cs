@@ -10,12 +10,12 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class AccountErasureController : ControllerBase
 {
     private readonly HubIdentityClient _identity;
-    private readonly AccountErasureService _erasure;
+    private readonly IAccountErasureService _erasure;
     private readonly HubBrowserAuthService _browserAuth;
 
     public AccountErasureController(
         HubIdentityClient identity,
-        AccountErasureService erasure,
+        IAccountErasureService erasure,
         HubBrowserAuthService browserAuth)
     {
         _identity = identity;
