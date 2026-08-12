@@ -6,6 +6,7 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.DataProtection;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Privacy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
@@ -383,6 +384,34 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
     }
 
     [Fact]
+    public async Task Android_linked_account_erasure_requires_exact_confirmation_and_uses_grant_subject()
+    {
+        using Fixture fixture = new();
+        InstallationGrantDto grant = fixture.SeedClaimedInstall(
+            "ins-delete",
+            "user-delete",
+            "subject-delete");
+
+        ActionResult<CurrentAccountErasureResponse> rejected = await fixture.AndroidAccounts.Erase(
+            new AndroidLinkedAccountErasureRequest("ins-delete", grant.AccessToken, "delete"),
+            CancellationToken.None);
+        Assert.Equal(StatusCodes.Status400BadRequest, Assert.IsType<ObjectResult>(rejected.Result).StatusCode);
+        Assert.Equal(0, fixture.AccountEraser.Calls);
+
+        ActionResult<CurrentAccountErasureResponse> accepted = await fixture.AndroidAccounts.Erase(
+            new AndroidLinkedAccountErasureRequest(
+                "ins-delete",
+                grant.AccessToken,
+                AccountErasureConfirmation.RequiredPhrase),
+            CancellationToken.None);
+        CurrentAccountErasureResponse response = Assert.IsType<OkObjectResult>(accepted.Result).Value as CurrentAccountErasureResponse
+            ?? throw new Xunit.Sdk.XunitException("Expected account erasure payload.");
+        Assert.True(response.Erased);
+        Assert.Equal("subject-delete", fixture.AccountEraser.SubjectId);
+        Assert.Equal("no-store, max-age=0", fixture.AndroidAccounts.Response.Headers.CacheControl);
+    }
+
+    [Fact]
     public void Android_linked_chronicle_keeps_every_approval_boundary_native_and_explicit()
     {
         using Fixture fixture = new();
@@ -553,6 +582,27 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
         Assert.Equal(StatusCodes.Status403Forbidden, packetDenied.StatusCode);
     }
 
+    private sealed class RecordingAccountEraser : IAccountErasureService
+    {
+        public int Calls { get; private set; }
+        public string? SubjectId { get; private set; }
+
+        public Task<CurrentAccountErasureResponse> EraseAsync(
+            string subjectId,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            SubjectId = subjectId;
+            return Task.FromResult(new CurrentAccountErasureResponse(
+                true,
+                new string('a', 64),
+                new string('b', 64),
+                [],
+                DateTimeOffset.UtcNow,
+                new string('c', 64)));
+        }
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
@@ -608,6 +658,11 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
             {
                 ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
             };
+            AccountEraser = new RecordingAccountEraser();
+            AndroidAccounts = new AndroidLinkedAccountController(InstallLinking, AccountEraser)
+            {
+                ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+            };
         }
 
         public IConfiguration Configuration { get; }
@@ -627,6 +682,10 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
         public InstallLinkingController Controller { get; }
 
         public AndroidLinkedCampaignController AndroidCampaigns { get; }
+
+        public RecordingAccountEraser AccountEraser { get; }
+
+        public AndroidLinkedAccountController AndroidAccounts { get; }
 
         public InstallationGrantDto SeedClaimedInstall(string installationId, string userId, string? subjectId)
         {

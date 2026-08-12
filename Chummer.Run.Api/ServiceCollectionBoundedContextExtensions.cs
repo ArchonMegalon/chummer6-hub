@@ -318,8 +318,12 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHttpClient<FleetBridgeService>();
         services.AddHttpClient<HubIdentityClient>();
         services.AddHttpClient<IHostedBuildAccountErasureClient, HostedBuildAccountErasureClient>();
+        services.AddSingleton<AccountErasureJournalStore>();
         services.AddTransient<IAccountAuxiliaryDataErasureService, AccountAuxiliaryDataErasureService>();
         services.AddTransient<AccountErasureService>();
+        services.AddTransient<IAccountErasureService>(static provider =>
+            provider.GetRequiredService<AccountErasureService>());
+        services.AddHostedService<AccountErasureRecoveryWorker>();
         services.AddTransient<IPublicPlayIdentityResolver, HubPublicPlayIdentityResolver>();
         services.AddSingleton<IPlaySessionGrantAuthorizer, DenyAllPlaySessionGrantAuthorizer>();
         services.AddTransient<PublicPlaySessionAccessPolicy>();
