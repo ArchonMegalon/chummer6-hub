@@ -168,7 +168,7 @@ cards:
     audience: public
     image_family: streetfront
     action_label: Open Chummer
-    status_note: "The signed API 36 Android candidate passes local gates, but Play upload and tester installation wait on Google's pending upload-key reset."
+    status_note: "The signed API 36 Android candidate passes local gates and Google accepted its replacement upload key. Play upload still waits on approval of the exact AAB digest; tester installation is not yet proven."
   - id: real_package_browser
     bucket: whats_real_now
     title: Package browser
