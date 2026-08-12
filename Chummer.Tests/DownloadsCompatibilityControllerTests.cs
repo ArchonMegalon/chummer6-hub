@@ -196,8 +196,18 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Contains(coverage.GetProperty("promotedInstallerTuples").EnumerateArray(), item =>
             string.Equals(item.GetProperty("tupleId").GetString(), "avalonia:windows:win-x64", StringComparison.OrdinalIgnoreCase)
             && string.Equals(item.GetProperty("rid").GetString(), "win-x64", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(coverage.GetProperty("missingRequiredPlatformHeadRidTuples").EnumerateArray(), item =>
-            string.Equals(item.GetString(), "avalonia:osx-arm64:macos", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(
+            new[] { "linux", "windows" },
+            coverage.GetProperty("requiredDesktopPlatforms")
+                .EnumerateArray()
+                .Select(static item => item.GetString())
+                .ToArray());
+        Assert.Equal(
+            new[] { "avalonia:linux-x64:linux" },
+            coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
+                .EnumerateArray()
+                .Select(static item => item.GetString())
+                .ToArray());
     }
 
     [Fact]
@@ -248,7 +258,7 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Equal("chummer-avalonia-osx-x64-installer.dmg", file.FileDownloadName);
         Assert.Equal(11, file.FileStream.Length);
         await file.FileStream.DisposeAsync();
-        Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.Equal("private, no-store, max-age=0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
     }
 
     [Fact]
@@ -448,7 +458,7 @@ public sealed class DownloadsCompatibilityControllerTests
 
         var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
-        Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.Equal("private, no-store, max-age=0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
     }
 
     [Fact]

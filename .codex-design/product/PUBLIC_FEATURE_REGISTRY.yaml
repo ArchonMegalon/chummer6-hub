@@ -162,12 +162,13 @@ cards:
   - id: real_app_entry
     bucket: whats_real_now
     title: Build in Chummer
-    summary: Open the browser app. Mobile-specific surfaces return when they have real product content.
+    summary: Use the browser build today; the dedicated native Android preview now covers Build, Play, Campaign, account-linked runners, and group workflows without wrapping the PWA.
     href: /build
-    badge: Live now
+    badge: Web live · Android gated
     audience: public
     image_family: streetfront
     action_label: Open Chummer
+    status_note: "The signed API 36 Android candidate passes local gates, but Play upload and tester installation wait on Google's pending upload-key reset."
   - id: real_package_browser
     bucket: whats_real_now
     title: Package browser

@@ -66,7 +66,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound(new
             {
                 status = "review_required",
-                message = "Current release proof is withheld until the public projection snapshot authenticates."
+                message = "Current release status is withheld until the public projection snapshot authenticates."
             });
         }
 

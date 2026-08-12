@@ -833,8 +833,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("release_upload_attempt_receipt.py", template, StringComparison.Ordinal);
         Assert.Contains("record_upload_attempt_state created", template, StringComparison.Ordinal);
         Assert.Contains("record_upload_attempt_state request_started", template, StringComparison.Ordinal);
-        Assert.Contains("BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=1", template, StringComparison.Ordinal);
-        Assert.Contains("Do not create or publish another session", template, StringComparison.Ordinal);
+        Assert.Contains("BOOTSTRAP_RELEASE_STAGE_ACCEPTED=1", template, StringComparison.Ordinal);
+        Assert.Contains("do not create a different candidate session", template, StringComparison.Ordinal);
         Assert.Contains("validate_release_response_probe_url", template, StringComparison.Ordinal);
         Assert.Contains("candidate_authority != canonical_authority", template, StringComparison.Ordinal);
         Assert.Contains("release upload response contained an unsafe install handoff URL", template, StringComparison.Ordinal);
@@ -853,9 +853,9 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("validate_hub_local_release_proof_with_registry()", template, StringComparison.Ordinal);
         Assert.Contains("proof = module.load_release_proof(proof_path)", template, StringComparison.Ordinal);
         Assert.Contains("hub local release proof generation produced a Registry-incompatible receipt", template, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \\", template, StringComparison.Ordinal);
-        Assert.Contains("bash scripts/verify-releases-manifest.sh \"$dist_dir/releases.json\"", template, StringComparison.Ordinal);
-        Assert.Contains("bash scripts/verify-releases-manifest.sh \"$canonical_verify_url\"", template, StringComparison.Ordinal);
+        Assert.Contains("scripts/verify_release_upload_response_truth.py", template, StringComparison.Ordinal);
+        Assert.Contains("--local-manifest \"$dist_dir/releases.json\"", template, StringComparison.Ordinal);
+        Assert.Contains("--local-canonical-manifest \"$dist_dir/RELEASE_CHANNEL.generated.json\"", template, StringComparison.Ordinal);
         Assert.Contains("resolve_live_release_verify_urls \"$verify_url\"", template, StringComparison.Ordinal);
         Assert.Contains("compatibility release projection is still missing installer tuples after promotion", template, StringComparison.Ordinal);
         Assert.Contains("canonical release truth is already live", template, StringComparison.Ordinal);

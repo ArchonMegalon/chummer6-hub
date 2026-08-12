@@ -114,7 +114,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
     {
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
 
-        Assert.Contains("var absoluteRequestUrl = string.IsNullOrWhiteSpace(resolvedRequestHost)", layout, StringComparison.Ordinal);
+        Assert.Contains("var absoluteRequestUrl = PublicOrigin.BuildAbsolute(", layout, StringComparison.Ordinal);
         Assert.Contains("var socialUrl = string.IsNullOrWhiteSpace(canonicalUrl) ? absoluteRequestUrl : canonicalUrl;", layout, StringComparison.Ordinal);
         Assert.Contains("<meta property=\"og:url\" content=\"@socialUrl\" />", layout, StringComparison.Ordinal);
         Assert.Contains("<meta name=\"twitter:url\" content=\"@socialUrl\" />", layout, StringComparison.Ordinal);

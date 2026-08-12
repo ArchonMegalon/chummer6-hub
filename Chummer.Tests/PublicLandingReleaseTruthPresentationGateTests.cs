@@ -32,7 +32,7 @@ public sealed class PublicLandingReleaseTruthPresentationGateTests
         Assert.True(panel.ParityClaimsReviewRequired);
         Assert.Empty(panel.TrendSamples);
         Assert.DoesNotContain(panel.Rows, row => row.Label is "Progress trend" or "Journey pulse" or "Closure health");
-        Assert.Contains("claims are withheld", panel.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("wider availability is not confirmed", panel.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("paused", panel.Rows.Single(row => row.Label == "Launch readiness").Value, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(
             "100%",
@@ -97,8 +97,8 @@ public sealed class PublicLandingReleaseTruthPresentationGateTests
             new[] { signedInStatus.Heading, signedInStatus.Summary }
                 .Concat(signedInStatus.Rows.Select(row => row.Value)));
         Assert.True(gate.ReviewRequired);
-        Assert.Contains("2 authority-listed installers", pulseText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("availability is not asserted", pulseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("2 listed installers", pulseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("availability is not confirmed", pulseText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("availability is not asserted", signedInText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("review required", signedInStatus.Heading, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Preview builds are available", signedInText, StringComparison.OrdinalIgnoreCase);
@@ -158,7 +158,7 @@ public sealed class PublicLandingReleaseTruthPresentationGateTests
 
         Assert.True(gate.ReviewRequired);
         Assert.Equal("missing", gate.ProofFreshnessStatus);
-        Assert.Contains("freshness is missing", gate.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("release checks are unavailable", gate.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     private static PublicReleaseManifestDto BuildManifest(

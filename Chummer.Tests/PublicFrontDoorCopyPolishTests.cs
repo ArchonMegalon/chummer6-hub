@@ -181,7 +181,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.Contains("See the explanation trail", registry, StringComparison.Ordinal);
             Assert.Contains("NEXUS-PAN now has a Chummer continuity page", registry, StringComparison.Ordinal);
             Assert.Contains("vague suggestions", registry, StringComparison.Ordinal);
-            Assert.Contains("later build-help context", registry, StringComparison.Ordinal);
+            Assert.Contains("Open the ALICE compare bench", registry, StringComparison.Ordinal);
             Assert.Contains("Derived projections", registry, StringComparison.Ordinal);
             Assert.Contains("Compare grounded tradeoffs with readable history", registry, StringComparison.Ordinal);
             Assert.Contains("Open JACKPOINT", registry, StringComparison.Ordinal);
@@ -1117,7 +1117,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string[] publicFeatureMethodMarkers =
         [
-            "public IActionResult MobileProjectionPage",
+            "public async Task<IActionResult> MobileProjectionPage",
             "public async Task<IActionResult> ParticipatePage",
             "public async Task<IActionResult> AlicePage",
             "public async Task<IActionResult> TablePulsePage",
@@ -1299,10 +1299,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             Assert.Contains(cleanedBinding, nexusPan, StringComparison.Ordinal);
         }
 
-        Assert.Contains("PublicMobileText(Model.Heading)", mobile, StringComparison.Ordinal);
-        Assert.Contains("PublicMobileText(Model.PrimaryAction.Label)", mobile, StringComparison.Ordinal);
-        Assert.Contains("PublicMobileText(Model.InstallabilitySummary)", mobile, StringComparison.Ordinal);
-        Assert.Contains("PublicMobileText(role.Label)", mobile, StringComparison.Ordinal);
+        Assert.Contains("@roleProfile.PurposeHeading", mobile, StringComparison.Ordinal);
+        Assert.Contains("@roleProfile.PurposeSummary", mobile, StringComparison.Ordinal);
+        Assert.Contains("@roleProfile.OpenTargetLabel", mobile, StringComparison.Ordinal);
+        Assert.Contains("@capability.Label", mobile, StringComparison.Ordinal);
         Assert.Contains("PublicAnarchyText(Model.Heading)", anarchy, StringComparison.Ordinal);
         Assert.Contains("PublicAnarchyText(Model.ScopeLabel)", anarchy, StringComparison.Ordinal);
         Assert.Contains("PublicAnarchyText(Model.FeaturedProfile.Notes)", anarchy, StringComparison.Ordinal);
@@ -1327,10 +1327,15 @@ public sealed partial class PublicFrontDoorCopyPolishTests
     public void Public_api_sources_do_not_reintroduce_old_human_copy_markers()
     {
         string apiRoot = RepoPaths.FromRoot("Chummer.Run.Api");
-        string[] sourceFiles = Directory.EnumerateFiles(apiRoot, "*.*", SearchOption.AllDirectories)
+        string[] publicSourceRoots =
+        [
+            Path.Combine(apiRoot, "Controllers"),
+            Path.Combine(apiRoot, "Views")
+        ];
+        string[] sourceFiles = publicSourceRoots
+            .SelectMany(static root => Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories))
             .Where(static path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
                 || path.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase))
-            .Where(static path => !path.EndsWith($"{Path.DirectorySeparatorChar}PublicFacingCopyHumanizer.cs", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         string[] forbiddenPhrases =

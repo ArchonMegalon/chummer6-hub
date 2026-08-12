@@ -13,8 +13,8 @@ public sealed class FaqFlagshipViewTests
         Assert.Contains("Quick paths", faqView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", faqView, StringComparison.Ordinal);
         Assert.Contains("Current release", faqView, StringComparison.Ordinal);
-        Assert.Contains("Use support for private problems", faqView, StringComparison.Ordinal);
-        Assert.Contains("Discord first", faqView, StringComparison.Ordinal);
+        Assert.Contains("Use support when the answer depends on your device, account, logs, or campaign.", faqView, StringComparison.Ordinal);
+        Assert.Contains("Chummer5 Discord", faqView, StringComparison.Ordinal);
         Assert.DoesNotContain("Leave with the right next page", faqView, StringComparison.Ordinal);
         Assert.DoesNotContain("Answers first", faqView, StringComparison.Ordinal);
         Assert.DoesNotContain("Route stays calm", faqView, StringComparison.Ordinal);
@@ -33,7 +33,7 @@ public sealed class FaqFlagshipViewTests
         Assert.True(firstSectionIndex >= 0, "FAQ should still render grouped answer sections");
         Assert.True(searchDeckIndex < firstSectionIndex, "FAQ search deck should appear before the grouped answer sections");
         Assert.Contains("Still stuck?", faqView, StringComparison.Ordinal);
-        Assert.Contains("Open support", faqView, StringComparison.Ordinal);
+        Assert.Contains("Open contact", faqView, StringComparison.Ordinal);
         Assert.Contains("href=\"/help\"", faqView, StringComparison.Ordinal);
     }
 
