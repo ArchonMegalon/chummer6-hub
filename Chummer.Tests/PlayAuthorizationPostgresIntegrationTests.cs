@@ -1356,6 +1356,17 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             PlayAuthorizationPostgresMutationResult? lookupResult = await lookup;
             Assert.Equal(PlayAuthorizationPostgresOutcomeCode.Expired, lookupResult?.Code);
 
+            PlayAuthorizationReceiptPruneResult racedPrune = await prune;
+            if (racedPrune.ScrubbedCount == 0)
+            {
+                // The lookup deliberately takes a shared receipt lock while the maintenance
+                // query uses SKIP LOCKED. If the lookup wins that race, the first maintenance
+                // pass must remain non-blocking and a subsequent pass performs the scrub.
+                racedPrune = await pruner.PruneExpiredAsync(1000);
+            }
+
+            Assert.True(racedPrune.ScrubbedCount >= 1);
+
             await using (NpgsqlConnection connection = await _fixture.AdminDataSource.OpenConnectionAsync())
             await using (NpgsqlCommand scrubbed = connection.CreateCommand())
             {

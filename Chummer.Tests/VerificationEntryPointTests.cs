@@ -4198,7 +4198,10 @@ public sealed class VerificationEntryPointTests
     [Fact]
     public void PublicDownloadCanonUsesCurrentInstallWording()
     {
-        string designRoot = RepoPaths.FromRoot("..", "chummer-design", "products", "chummer");
+        string? configuredCanonRoot = Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_CANON_ROOT");
+        string designRoot = string.IsNullOrWhiteSpace(configuredCanonRoot)
+            ? RepoPaths.FromRoot("..", "chummer-design", "products", "chummer")
+            : Path.GetFullPath(configuredCanonRoot);
         string downloadsPolicyPath = Path.Combine(designRoot, "PUBLIC_DOWNLOADS_POLICY.md");
         string landingPolicyPath = Path.Combine(designRoot, "PUBLIC_LANDING_POLICY.md");
         string landingManifestPath = Path.Combine(designRoot, "PUBLIC_LANDING_MANIFEST.yaml");
