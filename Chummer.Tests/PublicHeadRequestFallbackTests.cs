@@ -18,6 +18,7 @@ public sealed class PublicHeadRequestFallbackTests
             "/help",
             "/faq",
             "/privacy",
+            "/account/delete",
             "/terms",
             "/contact",
             "/mobile",
@@ -43,6 +44,18 @@ public sealed class PublicHeadRequestFallbackTests
         }
 
         Assert.Contains("[HttpHead(\"/account/billing\")]", billingController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicAccountDeletionPageIsDiscoverableAndKeepsLocalFilesOutOfScope()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+
+        Assert.Contains("[HttpGet(\"/account/delete\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("Request deletion without reopening the app", controller, StringComparison.Ordinal);
+        Assert.Contains("/login?next=%2Faccount%2Fsupport", controller, StringComparison.Ordinal);
+        Assert.Contains("Local-only files remain under the user's Android or desktop storage control.", controller, StringComparison.Ordinal);
+        Assert.Contains("new TrustPageActionViewModel(\"Request account deletion\", \"/account/delete\", \"secondary\")", controller, StringComparison.Ordinal);
     }
 
     [Fact]
