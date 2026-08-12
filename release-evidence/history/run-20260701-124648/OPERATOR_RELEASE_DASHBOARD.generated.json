@@ -1,0 +1,218 @@
+{
+  "contract_name": "chummer.operator_release_dashboard",
+  "generated_at_utc": "2026-07-02T11:43:09Z",
+  "status": "pass",
+  "verdict": "NIGHTLY_HANDOFF_READY",
+  "release_readiness": {
+    "full_release_ready": false,
+    "nightly_handoff_ready": true,
+    "full_release_blockers": [
+      "release_ready",
+      "windows_installer_visual_audit"
+    ]
+  },
+  "release": {
+    "version": "run-20260701-124648",
+    "published_at": "2026-07-01T14:29:35Z",
+    "channel": "preview",
+    "rollout_state": "promoted_preview",
+    "supportability_state": "preview_supported",
+    "known_issue_summary": "Current release checks are clear, and the downloads page has recent install, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up coverage."
+  },
+  "mirrors": {
+    "external_required": false,
+    "required_providers": [
+      "local_registry",
+      "public_edge"
+    ],
+    "providers": {
+      "local_registry": "pass",
+      "public_edge": "pass",
+      "pcloud": "fail",
+      "onedrive": "fail"
+    }
+  },
+  "rulesets": {
+    "sr4": {
+      "status": null,
+      "workflow_parity_status": "pass",
+      "human_side_gold_assumption": false
+    },
+    "sr5": {
+      "status": null,
+      "workflow_parity_status": null,
+      "human_side_gold_assumption": null
+    },
+    "sr6": {
+      "status": null,
+      "workflow_parity_status": "pass",
+      "human_side_gold_assumption": false
+    }
+  },
+  "ui": {
+    "frame_base_url": "https://chummer.run",
+    "frame_checked_pages": 66,
+    "frame_failure_count": 0,
+    "design_verdict": "DESIGN_READY"
+  },
+  "public_edge": {
+    "status": "pass",
+    "release_manifest_version": "run-20260701-124648",
+    "visible_version": "Version run-20260701-124648",
+    "navigation_status": "pass",
+    "pwa_static_status": "pass",
+    "mobile_ledger_status": "pass",
+    "mobile_ledger_payload_status": "opt_in_required",
+    "ready_mobile_handoff_status": "pass",
+    "participate_iframe_shell_status": "pass",
+    "flagship_horizons_status": "pass"
+  },
+  "windows_installer_visual_audit": {
+    "status": "fail",
+    "failures": [
+      "Windows installer visual audit source digest does not match promoted installer"
+    ],
+    "artifact_file_name": "chummer-avalonia-win-x64-installer.exe",
+    "artifact_sha256": "4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3",
+    "visual_source_status": "pass",
+    "visual_source_artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+    "visual_source_matches_promoted": false,
+    "intake_status": "external_artifact_required",
+    "intake_promoted_sha256": "4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3",
+    "matching_promoted_visual_source_count": 0,
+    "gold_proof_zip_status": "not_found",
+    "operator_request_summary": "Run the promoted Windows installer on a native Windows host and provide the gold proof bundle.",
+    "import_command": "python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
+    "post_import_gates": [
+      "python3 scripts/verify_windows_installer_visual_audit.py --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
+      "python3 scripts/materialize_operator_release_dashboard.py",
+      "python3 scripts/materialize_release_ready_receipt.py",
+      "python3 scripts/final_gold_janitor.py",
+      "python3 scripts/verify_flagship_product_readiness_gate.py --summary-output .codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+    ]
+  },
+  "account_handoffs": {
+    "billing_mode": "unavailable",
+    "release_upload_mode": "default_single_operator"
+  },
+  "checks": {
+    "release_channel": {
+      "path": "/tmp/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json",
+      "exists": true,
+      "status": "published",
+      "verdict": null,
+      "generated_at_utc": "2026-07-01T14:29:35Z",
+      "pass": true
+    },
+    "external_distribution_mirror_proof": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T07:50:11Z",
+      "pass": true
+    },
+    "ruleset_readiness": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/RULESET_READINESS.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T07:48:45.819680Z",
+      "pass": true
+    },
+    "ui_frame_integrity": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_FRAME_INTEGRITY.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "READY",
+      "generated_at_utc": "2026-07-02T03:45:17.715Z",
+      "pass": true
+    },
+    "design_quality_gate": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "DESIGN_READY",
+      "generated_at_utc": "2026-07-02T06:48:30Z",
+      "pass": true
+    },
+    "public_copy_leak_gate": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T09:23:34Z",
+      "pass": true
+    },
+    "participate_billing_honesty": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "READY",
+      "generated_at_utc": "2026-07-02T05:32:00.388087Z",
+      "pass": true
+    },
+    "account_handoff_runtime_config": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "READY",
+      "generated_at_utc": "2026-07-02T11:05:19Z",
+      "pass": true
+    },
+    "public_edge_postdeploy_gate": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T11:43:01.307234+00:00",
+      "pass": true
+    },
+    "release_ready": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/RELEASE_READY.generated.json",
+      "exists": true,
+      "status": "fail",
+      "verdict": "NOT_RELEASE_READY",
+      "generated_at_utc": "2026-07-02T11:28:31Z",
+      "pass": false,
+      "release_blocking": false
+    },
+    "final_gold_janitor": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
+      "exists": true,
+      "status": "fail",
+      "verdict": "NOT_GOLD",
+      "generated_at_utc": "2026-07-02T11:28:35Z",
+      "pass": false,
+      "release_blocking": false
+    },
+    "google_oauth_linking_proof": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-05-08T20:02:00.000000Z",
+      "pass": true,
+      "release_blocking": false
+    },
+    "windows_installer_visual_audit": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
+      "exists": true,
+      "status": "fail",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T11:28:31Z",
+      "pass": false,
+      "release_blocking": false
+    },
+    "windows_installer_visual_audit_intake_request": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json",
+      "exists": true,
+      "status": "external_artifact_required",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T10:57:52Z",
+      "pass": true,
+      "release_blocking": false
+    }
+  },
+  "failures": []
+}
