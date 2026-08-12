@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 using Chummer.Campaign.Contracts;
@@ -469,6 +470,32 @@ public sealed class GroupService
             }
 
             return packet;
+        }
+    }
+
+    public byte[] GetChronicleOperatorHandoff(string groupId, string chronicleProjectId, string subjectId)
+    {
+        var requester = _accounts.EnsureUser(subjectId, subjectId);
+        var group = RequireGroup(groupId);
+        if (!CanManageGroup(group, requester.UserId))
+        {
+            throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm to download an operator handoff.");
+        }
+
+        lock (_store.Gate)
+        {
+            if (!_store.ChronicleProjectsById.TryGetValue(AccountService.NormalizeRequired(chronicleProjectId, nameof(chronicleProjectId)), out var project)
+                || !string.Equals(project.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new KeyNotFoundException($"Unknown chronicle project: {chronicleProjectId}");
+            }
+
+            if (project.Status is not ("upload_approved" or "handoff_ready" or "generation_approved" or "outline_approved" or "artifact_ready" or "publication_approved" or "external_send_approved"))
+            {
+                throw new InvalidOperationException("approve the source upload before downloading the operator handoff.");
+            }
+
+            return BuildChronicleOperatorHandoff(project);
         }
     }
 
@@ -1124,6 +1151,83 @@ public sealed class GroupService
             string.Empty
         ]);
         return Encoding.UTF8.GetBytes(string.Join('\n', lines));
+    }
+
+    private static byte[] BuildChronicleOperatorHandoff(ChronicleProjectDto project)
+    {
+        bool uploadApproved = project.UploadApprovedAtUtc is not null || project.HandoffApprovedAtUtc is not null;
+        bool generationApproved = project.GenerationApprovedAtUtc is not null;
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("contract", "chummer.chronicle.operator-handoff");
+            writer.WriteNumber("contractVersion", 1);
+            writer.WriteString("chronicleProjectId", project.ChronicleProjectId);
+            writer.WriteString("groupId", project.GroupId);
+            writer.WriteString("provider", project.Provider);
+            writer.WriteString("status", project.Status);
+            writer.WriteNumber("sourcePacketVersion", project.SourcePacketVersion);
+            writer.WriteString("sourcePacketSha256", project.SourcePacketSha256);
+            writer.WriteString("modelKey", project.ModelKey);
+            writer.WriteBoolean("operatorRequired", project.OperatorRequired);
+            writer.WriteBoolean("unattendedAutomationAllowed", project.UnattendedAutomationAllowed);
+            writer.WriteBoolean("sourceContentIncluded", false);
+            writer.WriteString("sourcePacketAcquisition", "separate_authenticated_download");
+            if (string.IsNullOrWhiteSpace(project.ExternalProjectRef))
+            {
+                writer.WriteNull("externalProjectRef");
+            }
+            else
+            {
+                writer.WriteString("externalProjectRef", project.ExternalProjectRef);
+            }
+
+            writer.WriteStartObject("creditApproval");
+            writer.WriteBoolean("approved", generationApproved);
+            writer.WriteNumber("maximumCredits", generationApproved ? project.EstimatedCredits : 0);
+            writer.WriteEndObject();
+
+            writer.WriteStartObject("authorizedActions");
+            writer.WriteBoolean("providerProjectCreation", uploadApproved);
+            writer.WriteBoolean("sourceUpload", uploadApproved);
+            writer.WriteBoolean("generation", generationApproved);
+            writer.WriteBoolean("creditSpend", generationApproved);
+            writer.WriteBoolean("exportDownload", generationApproved);
+            writer.WriteBoolean("publication", false);
+            writer.WriteBoolean("externalSend", false);
+            writer.WriteEndObject();
+
+            writer.WriteStartArray("doesNotAuthorize");
+            writer.WriteStringValue("unattended_automation");
+            writer.WriteStringValue("publication");
+            writer.WriteStringValue("external_send");
+            writer.WriteStringValue("source_content_outside_the_bound_packet");
+            writer.WriteEndArray();
+
+            writer.WriteStartObject("approvalTimestampsUtc");
+            WriteNullableTimestamp(writer, "source", project.SourceApprovedAtUtc);
+            WriteNullableTimestamp(writer, "upload", project.UploadApprovedAtUtc ?? project.HandoffApprovedAtUtc);
+            WriteNullableTimestamp(writer, "generation", project.GenerationApprovedAtUtc);
+            WriteNullableTimestamp(writer, "outline", project.OutlineApprovedAtUtc);
+            writer.WriteEndObject();
+            writer.WriteString("projectUpdatedAtUtc", project.UpdatedAtUtc.ToUniversalTime());
+            writer.WriteEndObject();
+        }
+
+        return stream.ToArray();
+    }
+
+    private static void WriteNullableTimestamp(Utf8JsonWriter writer, string propertyName, DateTimeOffset? value)
+    {
+        if (value is null)
+        {
+            writer.WriteNull(propertyName);
+        }
+        else
+        {
+            writer.WriteString(propertyName, value.Value.ToUniversalTime());
+        }
     }
 
     private static string ComputeSha256(byte[] content)

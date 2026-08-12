@@ -120,6 +120,7 @@
                             @if (Model.CanManage && packetReady)
                             {
                                 <a class="button-like button-like--ghost" href="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/packet">Source packet</a>
+                                <a class="button-like button-like--ghost" href="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/handoff">Operator handoff</a>
                             }
                         </div>
                         @if (Model.CanManage)

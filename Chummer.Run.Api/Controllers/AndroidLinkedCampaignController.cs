@@ -300,6 +300,47 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         }
     }
 
+    [HttpPost("groups/{groupId}/chronicles/{chronicleProjectId}/handoff")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
+    [ProducesResponseType<AndroidLinkedChroniclePacketResponse>(StatusCodes.Status200OK)]
+    public ActionResult<AndroidLinkedChroniclePacketResponse> DownloadChronicleHandoff(
+        [FromRoute] string groupId,
+        [FromRoute] string chronicleProjectId,
+        [FromBody] AndroidLinkedGrantRequest? request)
+    {
+        ApplyPrivateResponseHeaders();
+        if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
+        {
+            return denied!;
+        }
+
+        byte[]? handoff = null;
+        try
+        {
+            handoff = _groups.GetChronicleOperatorHandoff(groupId, chronicleProjectId, installation!.SubjectId!);
+            return Ok(new AndroidLinkedChroniclePacketResponse(
+                $"chronicle-{chronicleProjectId}-handoff.json",
+                "application/json",
+                Convert.ToBase64String(handoff),
+                Convert.ToHexString(SHA256.HashData(handoff)).ToLowerInvariant()));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException)
+        {
+            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
+        }
+        finally
+        {
+            if (handoff is not null)
+            {
+                CryptographicOperations.ZeroMemory(handoff);
+            }
+        }
+    }
+
     private bool TryResolveInstallation(
         AndroidLinkedGrantRequest? request,
         out ClaimedInstallationDto? installation,
