@@ -84,6 +84,11 @@ Redaction baseline:
 
 Owner: `chummer-presentation`
 
+Policy authority: Chummer project owner. Infrastructure and service providers
+are processors only and do not approve or define product retention or deletion
+truth. The detailed account lifecycle is defined in
+`PUBLIC_PRIVACY_AND_ACCOUNT_LIFECYCLE.md`.
+
 Current runtime behavior:
 
 * hosted workspace content is stored and served inside an owner-scoped boundary
@@ -92,16 +97,18 @@ Current runtime behavior:
 
 Retention posture:
 
-* the backup and point-in-time-recovery retention policy is unresolved and has no approved numeric public window
-* tombstone or lineage retention, restore-time deletion replay, and whole-account export and erasure policy are unresolved
-* restore-time deletion replay is not implemented, so the product must not claim that a deleted workspace cannot reappear after recovery from older data
-* launch and release posture remains `review_required` until these policies are approved, implemented, and proven by restore and erasure evidence
+* Chummer-controlled content-bearing backup and point-in-time-recovery data: maximum 30 days
+* content-free deletion tombstones and replay journal: 35 days
+* content-free deletion audit receipt: 365 days
+* operational logs: maximum 30 days and no workspace payload by default
+* active workspace rows leave serving surfaces immediately and are deleted within 24 hours of a verified workspace or account deletion
+* restore-time deletion replay and owner-wide erasure are required implementation gates; public permanent-deletion claims remain `review_required` until restore and erasure evidence passes
 
 Redaction baseline:
 
 * workspace content must remain owner-scoped and must not be copied into support, telemetry, or operator logs by default
 * deletion copy must distinguish removal from the active hosted serving store from backup retention and from files the user already downloaded
-* public and in-product copy must not promise permanent deletion or invent a retention window while the policy is unresolved
+* public and in-product copy may state the approved numeric windows only after the live implementation and cleanup receipts are candidate-bound; it must not imply that downloaded or independently shared files remain in Chummer custody
 
 ### Survey and follow-up results
 
@@ -196,5 +203,5 @@ Redaction baseline:
 * a surface that persists passwords, raw outside-service logs, or undefined retention windows fails release signoff
 * a new help or outside-service integration must declare redaction and retention posture before it can be promoted
 * product review may freeze a wave when retention or privacy posture drifts behind shipped user trust claims
-* Hosted Build remains `review_required` for launch and release while backup/PITR retention, tombstone or lineage retention, deletion replay, and whole-account erasure remain unresolved or unproven
+* Hosted Build remains `review_required` for launch and release until the approved 30-day backup, 35-day deletion-replay, 365-day content-free receipt, active-store erasure, and whole-account erasure rules are implemented and proven
 * any new contribution, Teable, Emailit, Signitic, ProductLift, Icanpreneur, Hedy, Nonverbia, Unmixr, or Deftform workflow must declare contribution class, visibility class, redaction posture, and delete-or-summarize rule before promotion

@@ -43,14 +43,15 @@ internal sealed record PrivacyLaunchGateSnapshot(
 internal static class PrivacyLaunchGate
 {
     public const string ContractName = "chummer.privacy_launch_gate";
-    public const int ContractVersion = 1;
+    public const int ContractVersion = 2;
     public const string HostedBuildCapabilityContractName = "chummer.hosted_build_privacy_lifecycle";
-    public const int HostedBuildCapabilityContractVersion = 1;
+    public const int HostedBuildCapabilityContractVersion = 2;
 
     public const string ActiveRecordDelete = "active-record-delete";
+    public const string AtomicDeletionJournal = "atomic-deletion-journal";
+    public const string AutomaticDeletionReplay = "automatic-deletion-replay";
+    public const string OwnerWorkspaceErasure = "owner-workspace-erasure";
     public const string MemoryOnlyRecovery = "memory-only-recovery";
-    public const string NoDeleteReplay = "no-delete-replay";
-    public const string NoOwnerErasure = "no-owner-erasure";
     public const string ProductionRecoveryUnverified = "production-recovery-unverified";
 
     public const string PermanentDeleteClaim = "permanent-delete";
@@ -60,9 +61,10 @@ internal static class PrivacyLaunchGate
     public static IReadOnlyList<string> HostedBuildFacts { get; } = Array.AsReadOnly(
     [
         ActiveRecordDelete,
+        AtomicDeletionJournal,
+        AutomaticDeletionReplay,
+        OwnerWorkspaceErasure,
         MemoryOnlyRecovery,
-        NoDeleteReplay,
-        NoOwnerErasure,
         ProductionRecoveryUnverified
     ]);
 
@@ -74,7 +76,7 @@ internal static class PrivacyLaunchGate
     ]);
 
     public const string HostedBuildReason =
-        "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified.";
+        "Hosted Build now has atomic content-free deletion receipts, readiness replay, and owner-workspace erasure. Launch remains blocked until the journal is proven to survive independently across production backup recovery and whole-account erasure is implemented across every account-owned store.";
 
     public static PrivacyLaunchGateSnapshot Current { get; } = new(
         ContractName,

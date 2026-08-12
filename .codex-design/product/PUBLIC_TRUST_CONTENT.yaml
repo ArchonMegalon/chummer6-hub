@@ -53,14 +53,14 @@ trust_pages:
           - "Support stays private."
   - id: privacy
     eyebrow: "Privacy"
-    heading: "What Chummer stores, and what it does not"
-    intro: "This is the simple privacy picture right now: what your account stores, what stays out, and how support and linked installs work."
+    heading: "Your data, and how to leave"
+    intro: "Local files stay local unless you choose a connected feature. Chummer owns its retention and deletion policy; service providers do not. Hosted Build deletion claims stay review-gated until restore and whole-account erasure proof passes."
     effective_date: "2026-03-25"
-    updated_date: "2026-03-28"
+    updated_date: "2026-08-12"
     summary_points:
-      - "The download file stays the same for everyone"
-      - "Your account stores sign-in and help history"
-      - "Passwords and access keys stay out of your account record"
+      - "Local runner files stay on your device until you choose a connected action"
+      - "Chummer, not a provider, owns account and deletion truth"
+      - "You can request deletion from the web without reopening the app"
     actions:
       - label: "Open account"
         href: "/account"
@@ -88,6 +88,10 @@ trust_pages:
         eyebrow: "Privacy and recognition"
         heading: "Recognition should not force publicity"
         body: "Participation and recognition remain optional layers. Private product use, private support, and a quiet account setup remain valid even while community pages exist."
+      - id: deletion-lifecycle
+        eyebrow: "Leaving Chummer"
+        heading: "Deletion has a clock and a proof gate"
+        body: "A verified deletion removes active data within 24 hours. Chummer-controlled content backups have a 30-day maximum, content-free replay tombstones last 35 days, and a content-free audit receipt may remain for 365 days. These windows become a public deletion promise only after restore and whole-account erasure evidence passes."
   - id: terms
     eyebrow: "Terms"
     heading: "Terms in plain language"

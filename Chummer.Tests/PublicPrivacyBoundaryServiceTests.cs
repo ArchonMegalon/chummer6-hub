@@ -149,8 +149,10 @@ public sealed class PublicPrivacyBoundaryServiceTests
         Assert.Equal("review_required", hostedBuild.GetProperty("status").GetString());
         Assert.True(hostedBuild.GetProperty("reviewRequired").GetBoolean());
         string retention = hostedBuild.GetProperty("retentionSummary").GetString() ?? string.Empty;
-        Assert.Contains("unresolved", retention, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotMatch(@"\b\d+\s*(day|days|month|months|year|years)\b", retention);
+        Assert.Contains("maximum 30 days", retention, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("35 days", retention, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("365 days", retention, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("active workspace rows leave serving surfaces immediately", retention, StringComparison.OrdinalIgnoreCase);
         Assert.False(string.IsNullOrWhiteSpace(hostedBuild.GetProperty("launchBlockingReason").GetString()));
     }
 
