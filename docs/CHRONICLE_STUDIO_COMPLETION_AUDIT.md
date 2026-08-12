@@ -76,8 +76,12 @@ an external action or platform build that did not occur.
   inspection, and signer verification. Its SHA-256 is
   `4e73ebb8678b8d11b63e6a5f6a02b2981ab6003403daece60b127c511eaa659c`.
   The signer was restored from the hash-verified EA custody bundle and matches
-  Play's active upload certificate. The exact digest has not yet received
-  artifact-specific upload approval, so no upload was attempted.
+  Play's active upload certificate. The owner approved this exact digest for
+  the internal-testing transaction only. The file transfer was attempted, but
+  Play rejected bundle ingestion because a recently reset upload certificate
+  cannot upload until `2026-08-14T03:29:49Z`. The rejected bundle was removed
+  and the empty draft discarded; version code 1 remains active, version code 3
+  is absent from the bundle library, and the tester list is unchanged.
 - EA AIWriteBook governance, canary, provider-registry, and recovery tests:
   173/173. Account materialization and the offline PDF/EPUB/DOCX round-trip
   verifier pass. The lane verifier reports
@@ -94,9 +98,12 @@ an external action or platform build that did not occur.
 - Chronicle approval actions record permission only; they never upload, generate,
   spend credits, publish, or send on their own.
 - The upload-key reset request was submitted after explicit approval and Google
-  accepted it. No AAB was uploaded and no testing or production rollout was
-  started. The current native screenshot set, signed preview.3 AAB, and
-  accelerated device runs pass their local gates.
+  accepted it. The exact preview.3 AAB transfer was attempted after its separate
+  artifact approval, but Play rejected it before ingestion under the reset
+  cooldown. No preview.3 testing release or production rollout was started, no
+  public announcement was made, and no tester membership changed. The current
+  native screenshot set, signed preview.3 AAB, and accelerated device runs pass
+  their local gates.
 
 ## Remaining proof boundary
 
@@ -113,8 +120,10 @@ changed since it was built.
 The historical preview.2 certificate and signed bundle still exist, but that
 certificate is no longer Play's active upload key. A dedicated replacement key,
 verified EA recovery bundle, and signed/inspected current-source AAB are ready,
-and Play has accepted the reset. Finishing the internal-test upload therefore
-requires explicit approval of exact AAB SHA-256
-`4e73ebb8678b8d11b63e6a5f6a02b2981ab6003403daece60b127c511eaa659c`.
+and Play has accepted the reset. Exact AAB SHA-256
+`4e73ebb8678b8d11b63e6a5f6a02b2981ab6003403daece60b127c511eaa659c`
+already has internal-test-only approval. Finishing the transaction requires
+retrying those same frozen bytes after Google's `2026-08-14T03:29:49Z`
+cooldown, then proving Play ingestion, track activation, and a tester install.
 Every pre-rewrite, pre-fix, old-signer, or differently hashed Android bundle
 remains superseded.
