@@ -33,6 +33,8 @@ public sealed class CommunityStore
     public Dictionary<string, string> UserIdBySubjectId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, GroupDto> GroupsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, JoinCodeDto> JoinCodesByValue { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, RunnerTicketDto> RunnerTicketsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, ChronicleProjectDto> ChronicleProjectsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, BoostCampaignDto> CampaignsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, BoostCodeDto> BoostCodesByValue { get; } = new(StringComparer.OrdinalIgnoreCase);
     internal Dictionary<string, SponsorSessionState> SponsorSessionsById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -344,6 +346,12 @@ public sealed class CommunityStore
             PlayExchanges: PlayExchangesById.Values.OrderBy(static item => item.ExchangeId, StringComparer.OrdinalIgnoreCase).ToArray(),
             PlayGrants: PlayGrantsById.Values.OrderBy(static item => item.GrantId, StringComparer.OrdinalIgnoreCase).ToArray(),
             PlayAuthorizationTimeHighWaterUtc: PlayAuthorizationTimeHighWaterUtc,
+            RunnerTickets: RunnerTicketsById.Values
+                .OrderBy(static ticket => ticket.RunnerTicketId, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            ChronicleProjects: ChronicleProjectsById.Values
+                .OrderBy(static project => project.ChronicleProjectId, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
             CampaignCollaborationInvites: CampaignCollaborationInvitesById.Values
                 .OrderBy(static item => item.InviteId, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
@@ -500,6 +508,8 @@ public sealed class CommunityStore
         UserIdBySubjectId.Clear();
         GroupsById.Clear();
         JoinCodesByValue.Clear();
+        RunnerTicketsById.Clear();
+        ChronicleProjectsById.Clear();
         CampaignsById.Clear();
         BoostCodesByValue.Clear();
         SponsorSessionsById.Clear();
@@ -592,6 +602,16 @@ public sealed class CommunityStore
         foreach (var joinCode in snapshot.JoinCodes ?? Array.Empty<JoinCodeDto>())
         {
             JoinCodesByValue[joinCode.Code] = joinCode;
+        }
+
+        foreach (var runnerTicket in snapshot.RunnerTickets ?? Array.Empty<RunnerTicketDto>())
+        {
+            RunnerTicketsById[runnerTicket.RunnerTicketId] = runnerTicket;
+        }
+
+        foreach (var project in snapshot.ChronicleProjects ?? Array.Empty<ChronicleProjectDto>())
+        {
+            ChronicleProjectsById[project.ChronicleProjectId] = project;
         }
 
         foreach (var campaign in snapshot.Campaigns ?? Array.Empty<BoostCampaignDto>())
@@ -895,6 +915,8 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<PlaySessionExchange>? PlayExchanges = null,
     IReadOnlyList<PlaySessionGrant>? PlayGrants = null,
     DateTimeOffset? PlayAuthorizationTimeHighWaterUtc = null,
+    IReadOnlyList<RunnerTicketDto>? RunnerTickets = null,
+    IReadOnlyList<ChronicleProjectDto>? ChronicleProjects = null,
     IReadOnlyList<CampaignCollaborationInviteState>? CampaignCollaborationInvites = null,
     IReadOnlyList<CampaignCharacterBindingState>? CampaignCharacterBindings = null,
     IReadOnlyList<CampaignSharedSheetAuditState>? CampaignSharedSheetAudit = null,

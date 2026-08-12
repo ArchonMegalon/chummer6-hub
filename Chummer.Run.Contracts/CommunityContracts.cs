@@ -239,7 +239,12 @@ public sealed record GroupMembershipDto(
     string GroupId,
     string UserId,
     string Role,
-    DateTimeOffset JoinedAtUtc);
+    DateTimeOffset JoinedAtUtc)
+{
+    public string? RunnerDossierId { get; init; }
+    public string? RunnerHandle { get; init; }
+    public string? RunnerTicketId { get; init; }
+}
 
 public sealed record GroupDto(
     string GroupId,
@@ -259,7 +264,23 @@ public sealed record JoinCodeDto(
     string Role,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? ExpiresAtUtc,
-    int Uses);
+    int Uses)
+{
+    public int? MaxUses { get; init; }
+    public DateTimeOffset? RevokedAtUtc { get; init; }
+    public string InviteUrl { get; init; } = string.Empty;
+}
+
+public sealed record RunnerTicketDto(
+    string RunnerTicketId,
+    string JoinCodeId,
+    string GroupId,
+    string UserId,
+    string DossierId,
+    string RunnerHandle,
+    string Status,
+    DateTimeOffset IssuedAtUtc,
+    DateTimeOffset ConsumedAtUtc);
 
 public sealed record CreateGroupRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
@@ -271,8 +292,117 @@ public sealed record CreateGroupRequest(
 public sealed record CreateJoinCodeRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
     string Role = "member",
-    TimeSpan? Ttl = null);
+    TimeSpan? Ttl = null,
+    [Range(1, 1000)] int? MaxUses = 25);
+
+public sealed record UpdateGroupRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(128)] string Name,
+    [Required(AllowEmptyStrings = false), StringLength(32)] string Visibility = "private");
+
+public sealed record CreateRunnerRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(64)] string RunnerHandle,
+    [StringLength(128)] string? DisplayName = null);
 
 public sealed record JoinGroupByCodeRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
-    [Required(AllowEmptyStrings = false), StringLength(128)] string Code);
+    [Required(AllowEmptyStrings = false), StringLength(128)] string Code,
+    [StringLength(128)] string? DossierId = null);
+
+public sealed record ChronicleProjectDto(
+    string ChronicleProjectId,
+    string GroupId,
+    string CreatedByUserId,
+    string Title,
+    string BookKind,
+    string Audience,
+    string Status,
+    string SourceSummary,
+    string ModelKey,
+    int TargetChapterCount,
+    int TargetWordsPerChapter,
+    bool IncludeRunnerRoster,
+    IReadOnlyList<string> RunnerRoster,
+    bool IncludeCover,
+    bool IncludeTranslation,
+    bool IncludeAudiobook,
+    bool ExternalProcessingConsent,
+    bool ParticipantConsentConfirmed,
+    bool RedactionReviewed,
+    bool SourceRightsConfirmed,
+    int SourcePacketVersion,
+    string SourcePacketSha256,
+    int EstimatedCredits,
+    string Provider,
+    bool OperatorRequired,
+    bool UnattendedAutomationAllowed,
+    string? ExternalProjectRef,
+    string? ArtifactUrl,
+    string? ArtifactSha256,
+    string? ExportFormat,
+    DateTimeOffset? SourceApprovedAtUtc,
+    DateTimeOffset? HandoffApprovedAtUtc,
+    DateTimeOffset? OutlineApprovedAtUtc,
+    DateTimeOffset? ArtifactImportedAtUtc,
+    DateTimeOffset? PublicationApprovedAtUtc,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc)
+{
+    public IReadOnlyList<ChronicleSourcePacketRevisionDto> SourcePacketRevisions { get; init; } = [];
+    public bool SpoilerReviewConfirmed { get; init; }
+    public DateTimeOffset? UploadApprovedAtUtc { get; init; }
+    public DateTimeOffset? GenerationApprovedAtUtc { get; init; }
+    public DateTimeOffset? ExternalSendApprovedAtUtc { get; init; }
+}
+
+public sealed record ChronicleSourcePacketRevisionDto(
+    int Version,
+    string Sha256,
+    DateTimeOffset CreatedAtUtc);
+
+public sealed record CreateChronicleProjectRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(160)] string Title,
+    [Required(AllowEmptyStrings = false), StringLength(32)] string BookKind,
+    [Required(AllowEmptyStrings = false), StringLength(32)] string Audience,
+    [Required(AllowEmptyStrings = false), StringLength(4000)] string SourceSummary,
+    [Required(AllowEmptyStrings = false), StringLength(32)] string ModelKey,
+    [Range(1, 40)] int TargetChapterCount,
+    [Range(100, 5000)] int TargetWordsPerChapter,
+    bool IncludeRunnerRoster,
+    bool IncludeCover,
+    bool IncludeTranslation,
+    bool IncludeAudiobook,
+    bool ExternalProcessingConsent,
+    bool ParticipantConsentConfirmed,
+    bool RedactionReviewed,
+    bool SourceRightsConfirmed,
+    bool SpoilerReviewConfirmed = false);
+
+public sealed record ReviseChronicleProjectRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(160)] string Title,
+    [Required(AllowEmptyStrings = false), StringLength(32)] string BookKind,
+    [Required(AllowEmptyStrings = false), StringLength(32)] string Audience,
+    [Required(AllowEmptyStrings = false), StringLength(4000)] string SourceSummary,
+    [Required(AllowEmptyStrings = false), StringLength(32)] string ModelKey,
+    [Range(1, 40)] int TargetChapterCount,
+    [Range(100, 5000)] int TargetWordsPerChapter,
+    bool IncludeRunnerRoster,
+    bool IncludeCover,
+    bool IncludeTranslation,
+    bool IncludeAudiobook,
+    bool ExternalProcessingConsent,
+    bool ParticipantConsentConfirmed,
+    bool RedactionReviewed,
+    bool SourceRightsConfirmed,
+    bool SpoilerReviewConfirmed = false);
+
+public sealed record UpdateChronicleProjectRequest(
+    [Required(AllowEmptyStrings = false), StringLength(128)] string SubjectId,
+    [Required(AllowEmptyStrings = false), StringLength(32)] string Action,
+    [StringLength(256)] string? ExternalProjectRef = null,
+    [StringLength(2048)] string? ArtifactUrl = null,
+    [StringLength(64)] string? ArtifactSha256 = null,
+    [StringLength(16)] string? ExportFormat = null);

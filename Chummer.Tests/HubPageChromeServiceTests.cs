@@ -130,6 +130,25 @@ public sealed class HubPageChromeServiceTests
     }
 
     [Fact]
+    public void BuildAuthenticatedChromeKeepsGroupsOneTapAway()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildAuthenticatedChrome("Groups", "Your tables.", "/groups", "Runner", "runner@example.com");
+
+        var groups = Assert.Single(chrome.HeaderActions, action => action.Label == "Groups");
+        Assert.Equal("/groups", groups.Href);
+        Assert.True(groups.Current);
+    }
+
+    [Fact]
     public void PublicLayoutSuppressesLandingDownloadHeaderAction()
     {
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));

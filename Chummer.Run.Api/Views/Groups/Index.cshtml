@@ -1,0 +1,65 @@
+@model GroupListPageViewModel
+@{
+    ViewData["Title"] = "Groups";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal surface-groups";
+}
+
+<section class="minimal-page-hero">
+    <div>
+        <p class="eyebrow">Play</p>
+        <h1>@(Model.FocusChronicles ? "Chronicle Studio" : "Your groups")</h1>
+        <p>@(Model.FocusChronicles ? "Choose the group whose book you want to manage." : "Create a table, manage its roster, and share one clear invite link.")</p>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.Notice))
+{
+    <section class="minimal-section"><p class="notice notice--warning" role="status">@Model.Notice</p></section>
+}
+
+<section class="minimal-section" aria-labelledby="group-list-heading">
+    <div class="minimal-section__heading">
+        <div><p class="eyebrow">Roster</p><h2 id="group-list-heading">Open a group</h2></div>
+    </div>
+    <div class="minimal-lane-grid minimal-platform-list">
+        @if (Model.Groups.Count == 0)
+        {
+            <article class="minimal-lane-card">
+                <span class="tag">No groups yet</span>
+                <h2>Start with your table</h2>
+                <p>Name the group below. You can edit it before sending an invite.</p>
+            </article>
+        }
+        @foreach (var group in Model.Groups)
+        {
+            <article class="minimal-lane-card">
+                <span class="tag">@group.GroupType</span>
+                <h2>@group.Name</h2>
+                <p>@group.Memberships.Count member@(group.Memberships.Count == 1 ? string.Empty : "s") · @group.Visibility</p>
+                <div class="minimal-actions">
+                    <a class="button-like button-like--primary" href="/groups/@Uri.EscapeDataString(group.GroupId)@(Model.FocusChronicles ? "#chronicle-heading" : string.Empty)">@(Model.FocusChronicles ? "Open Chronicle Studio" : "Open group")</a>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="minimal-section" aria-labelledby="create-group-heading">
+    <article class="minimal-lane-card">
+        <span class="tag">Game Master</span>
+        <h2 id="create-group-heading">Create a group</h2>
+        <form method="post" action="/groups" class="minimal-form">
+            @Html.AntiForgeryToken()
+            <label>Group name<input name="name" maxlength="128" required autocomplete="off" /></label>
+            <label>Visibility
+                <select name="visibility">
+                    <option value="private">Private</option>
+                    <option value="group">Members</option>
+                    <option value="unlisted">Unlisted</option>
+                </select>
+            </label>
+            <button class="button-like button-like--primary" type="submit">Create group</button>
+        </form>
+    </article>
+</section>

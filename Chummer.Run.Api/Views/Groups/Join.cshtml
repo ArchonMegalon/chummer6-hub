@@ -1,0 +1,70 @@
+@model GroupJoinPageViewModel
+@{
+    ViewData["Title"] = $"Join {Model.Group.Name}";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal surface-groups";
+    bool inviteOpen = Model.Invite.RevokedAtUtc is null
+        && (Model.Invite.ExpiresAtUtc is null || Model.Invite.ExpiresAtUtc > DateTimeOffset.UtcNow)
+        && (Model.Invite.MaxUses is null || Model.Invite.Uses < Model.Invite.MaxUses);
+}
+
+<section class="minimal-page-hero">
+    <div>
+        <p class="eyebrow">Group invite</p>
+        <h1>Join @Model.Group.Name</h1>
+        <p>Choose the runner who should appear at this table. Chummer creates the runner ticket when you confirm.</p>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.Notice))
+{
+    <section class="minimal-section"><p class="notice notice--warning" role="status">@Model.Notice</p></section>
+}
+
+@if (!inviteOpen)
+{
+    <section class="minimal-section">
+        <article class="minimal-lane-card"><span class="tag">Invite closed</span><h2>Ask the GM for a new link</h2><p>This link expired, was revoked, or reached its use limit.</p></article>
+    </section>
+}
+else
+{
+    <section class="minimal-section" aria-labelledby="runner-choice-heading">
+        <article class="minimal-lane-card">
+            <span class="tag">Runner ticket</span>
+            <h2 id="runner-choice-heading">Choose your runner</h2>
+            @if (Model.Runners.Count > 0)
+            {
+                <form method="post" action="/groups/join/@Uri.EscapeDataString(Model.Invite.Code)" class="minimal-form">
+                    @Html.AntiForgeryToken()
+                    <label>Runner
+                        <select name="dossierId" required>
+                            <option value="">Select a runner</option>
+                            @foreach (var runner in Model.Runners)
+                            {
+                                <option value="@runner.DossierId" selected="@(runner.DossierId == Model.SelectedDossierId)">@runner.RunnerHandle · @runner.Status</option>
+                            }
+                        </select>
+                    </label>
+                    <button class="button-like button-like--primary" type="submit">Join with this runner</button>
+                </form>
+            }
+            else
+            {
+                <p>You do not have a runner yet. Create one below, then confirm the invite.</p>
+            }
+        </article>
+    </section>
+
+    <section class="minimal-section" aria-labelledby="create-runner-heading">
+        <article class="minimal-lane-card">
+            <span class="tag">New runner</span>
+            <h2 id="create-runner-heading">Create a runner</h2>
+            <form method="post" action="/groups/join/@Uri.EscapeDataString(Model.Invite.Code)/runners" class="minimal-form">
+                @Html.AntiForgeryToken()
+                <label>Runner handle<input name="runnerHandle" maxlength="64" required autocomplete="off" /></label>
+                <button class="button-like button-like--ghost" type="submit">Create runner</button>
+            </form>
+        </article>
+    </section>
+}

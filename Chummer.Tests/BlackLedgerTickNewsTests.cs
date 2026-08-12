@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Chummer.Campaign.Contracts;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
@@ -272,7 +273,8 @@ public sealed class BlackLedgerTickNewsTests
             HubUserDto player = accounts.EnsureUserWithStatus("subject.player", "Player", "player@example.com").User;
             GroupDto group = groups.CreateGroup(new CreateGroupRequest(gm.SubjectId, "Ledger Ops", GroupType: "community", Visibility: "private", Capabilities: ["campaigns", "can_issue_join_codes"]));
             JoinCodeDto joinCode = groups.CreateJoinCode(group.GroupId, new CreateJoinCodeRequest(gm.SubjectId, Role: "member"));
-            _ = groups.JoinGroup(new JoinGroupByCodeRequest(player.SubjectId, joinCode.Code));
+            RunnerDossierProjection runner = groups.CreateRunner(new CreateRunnerRequest(player.SubjectId, "player", "Player"));
+            _ = groups.JoinGroup(new JoinGroupByCodeRequest(player.SubjectId, joinCode.Code, runner.DossierId));
 
             WorkspaceLifecyclePolicyService lifecycle = new(configuration);
             CampaignArtifactRegistryBridge artifactBridge = new(store);
