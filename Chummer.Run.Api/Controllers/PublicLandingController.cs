@@ -8081,14 +8081,68 @@ document.addEventListener('DOMContentLoaded', function () {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Privacy", "What the account keeps, what stays out of it, and how recognition and privacy stay separate.", "/privacy", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        TrustPageViewModel privacyPage = _trustContent.BuildPrivacyPage(chrome);
         return View(
             "~/Views/PublicLanding/TrustPage.cshtml",
-            _trustContent.BuildPrivacyPage(chrome) with
+            privacyPage with
             {
+                Actions = privacyPage.Actions
+                    .Append(new TrustPageActionViewModel("Request account deletion", "/account/delete", "secondary"))
+                    .ToArray(),
                 PrivacyBoundary = _privacyBoundaries.BuildPanel("privacy"),
                 TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
                 SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
             });
+    }
+
+    [HttpGet("/account/delete")]
+    [HttpHead("/account/delete")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountDeletionPage(CancellationToken cancellationToken)
+    {
+        SiteChromeViewModel chrome = await BuildPublicOrAuthenticatedChromeAsync(
+            "Delete account",
+            "Request deletion of a Chummer account and associated data.",
+            "/account/delete",
+            cancellationToken);
+        string requestHref = chrome.Authenticated
+            ? "/account/support"
+            : "/login?next=%2Faccount%2Fsupport";
+        var model = new TrustPageViewModel(
+            PageId: "account-delete",
+            Chrome: chrome,
+            Eyebrow: "Account deletion",
+            Heading: "Request deletion without reopening the app",
+            Intro: "Sign in to verify ownership and open a deletion request. If sign-in is unavailable, contact support from this page and include the account email, but never a password or access key.",
+            Sections:
+            [
+                new TrustPageSectionViewModel(
+                    "request",
+                    "Request",
+                    "Verify the account, then request deletion",
+                    "The support request records the deletion request and its status so the operator can verify ownership, prevent accidental deletion, and provide a completion receipt.",
+                    ["Use the account's sign-in method when possible.", "Use public contact when account access is lost.", "Do not include secrets or raw character files in the request."]),
+                new TrustPageSectionViewModel(
+                    "scope",
+                    "Scope",
+                    "The request covers account-linked Chummer data",
+                    "The operator reviews profile, linked installs, preferences, owner-scoped hosted workspaces, continuity records, and support linkage for deletion or de-identification.",
+                    ["Local-only files remain under the user's Android or desktop storage control.", "Unlinking or uninstalling alone does not delete a hosted account."]),
+                new TrustPageSectionViewModel(
+                    "retention",
+                    "Retention",
+                    "Required records are separated from active product data",
+                    "Security, abuse-prevention, transaction, and support records that must be retained are restricted and expire under the published privacy policy. Hosted Build recovery and whole-account erasure limits remain visibly review-gated until their retention windows are approved.")
+            ],
+            Actions:
+            [
+                new TrustPageActionViewModel("Request account deletion", requestHref, "primary"),
+                new TrustPageActionViewModel("Contact support", "/contact", "secondary"),
+                new TrustPageActionViewModel("Read privacy policy", "/privacy", "ghost")
+            ],
+            EffectiveDate: "2026-08-07",
+            PrivacyBoundary: _privacyBoundaries.BuildPanel("privacy"));
+        return View("~/Views/PublicLanding/TrustPage.cshtml", model);
     }
 
     [HttpGet("/terms")]
