@@ -455,6 +455,19 @@
     });
   });
 
+  document.querySelectorAll("[data-copy-input]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.getAttribute("data-copy-input"));
+      if (!(target instanceof HTMLInputElement)) return;
+      try {
+        await ChummerUi.copyToClipboard(target.value, button, "Copied");
+      } catch {
+        target.focus();
+        target.select();
+      }
+    });
+  });
+
   document.querySelectorAll("[data-email-toggle]").forEach((button) => {
     button.addEventListener("click", () => {
       const target = document.getElementById(button.getAttribute("data-email-toggle"));

@@ -1,0 +1,305 @@
+@model GroupDetailPageViewModel
+@{
+    ViewData["Title"] = Model.Group.Name;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal surface-groups";
+    var now = DateTimeOffset.UtcNow;
+}
+
+<section class="minimal-page-hero">
+    <div>
+        <p class="eyebrow">@Model.Group.GroupType group</p>
+        <h1>@Model.Group.Name</h1>
+        <p>@Model.Group.Memberships.Count member@(Model.Group.Memberships.Count == 1 ? string.Empty : "s") · @Model.Group.Visibility</p>
+        <div class="minimal-actions"><a class="button-like button-like--ghost" href="/groups">All groups</a></div>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.Notice))
+{
+    <section class="minimal-section"><p class="notice notice--warning" role="status">@Model.Notice</p></section>
+}
+
+<section class="minimal-section" aria-labelledby="roster-heading">
+    <div class="minimal-section__heading"><div><p class="eyebrow">Roster</p><h2 id="roster-heading">Members</h2></div></div>
+    <div class="minimal-lane-grid minimal-platform-list">
+        @foreach (var member in Model.Group.Memberships)
+        {
+            <article class="minimal-lane-card">
+                <span class="tag">@member.Role</span>
+                <h2>@(string.IsNullOrWhiteSpace(member.RunnerHandle) ? "Game Master" : member.RunnerHandle)</h2>
+                <p>@(string.IsNullOrWhiteSpace(member.RunnerTicketId) ? "Group manager" : "Runner ticket confirmed")</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.CanManage || Model.ChronicleProjects.Count > 0)
+{
+    <section class="minimal-section" aria-labelledby="chronicle-heading">
+        <div class="minimal-section__heading">
+            <div><p class="eyebrow">Chronicle Studio</p><h2 id="chronicle-heading">Books</h2></div>
+            @if (Model.CanManage)
+            {
+                <details class="minimal-disclosure">
+                    <summary class="button-like button-like--primary">New chronicle</summary>
+                    <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles" class="minimal-form minimal-form--panel">
+                        @Html.AntiForgeryToken()
+                        <label>Title<input name="title" maxlength="160" required /></label>
+                        <div class="minimal-form-grid">
+                            <label>Book type
+                                <select name="bookKind">
+                                    <option value="season_chronicle">Season chronicle</option>
+                                    <option value="campaign_bible">Campaign bible</option>
+                                    <option value="player_recap">Player recap</option>
+                                    <option value="adventure_booklet">Adventure booklet</option>
+                                    <option value="world_guide">World guide</option>
+                                </select>
+                            </label>
+                            <label>Audience
+                                <select name="audience">
+                                    <option value="gm_private">GM only</option>
+                                    <option value="player_safe">Player safe</option>
+                                </select>
+                            </label>
+                            <label>Writing model
+                                <select name="modelKey">
+                                    <option value="gemini">Gemini · 15 credits/chapter</option>
+                                    <option value="grok">Grok · 20 credits/chapter</option>
+                                    <option value="claude">Claude · 30 credits/chapter</option>
+                                </select>
+                            </label>
+                            <label>Chapters<input name="targetChapterCount" type="number" min="1" max="40" value="8" required /></label>
+                            <label>Words per chapter<input name="targetWordsPerChapter" type="number" min="100" max="5000" value="1500" required /></label>
+                        </div>
+                        <label>Source brief<textarea name="sourceSummary" rows="5" maxlength="4000" required></textarea></label>
+                        <div class="minimal-check-grid">
+                            <label><input name="includeRunnerRoster" type="checkbox" value="true" /> Include runner handles</label>
+                            <label><input name="includeCover" type="checkbox" value="true" checked /> Cover</label>
+                            <label><input name="includeTranslation" type="checkbox" value="true" /> Translation</label>
+                            <label><input name="includeAudiobook" type="checkbox" value="true" /> Audiobook</label>
+                        </div>
+                        <fieldset class="minimal-gate-list">
+                            <legend>Before the source can leave Chummer</legend>
+                            <label><input name="externalProcessingConsent" type="checkbox" value="true" /> External processing approved</label>
+                            <label><input name="participantConsentConfirmed" type="checkbox" value="true" /> Participant consent confirmed</label>
+                            <label><input name="redactionReviewed" type="checkbox" value="true" /> Private details and identifiers reviewed</label>
+                            <label><input name="spoilerReviewConfirmed" type="checkbox" value="true" /> Player-facing spoilers reviewed</label>
+                            <label><input name="sourceRightsConfirmed" type="checkbox" value="true" /> I may use this source material</label>
+                        </fieldset>
+                        <button class="button-like button-like--primary" type="submit">Create draft</button>
+                    </form>
+                </details>
+            }
+        </div>
+        @if (Model.ChronicleProjects.Count == 0)
+        {
+            <p class="minimal-empty">No chronicles yet.</p>
+        }
+        else
+        {
+            <div class="minimal-lane-grid minimal-platform-list">
+                @foreach (var project in Model.ChronicleProjects)
+                {
+                    bool packetReady = project.Status is "upload_approved" or "handoff_ready" or "generation_approved" or "outline_approved" or "artifact_ready" or "publication_approved" or "external_send_approved";
+                    string packetDigest = string.IsNullOrWhiteSpace(project.SourcePacketSha256)
+                        ? "pending"
+                        : project.SourcePacketSha256[..Math.Min(8, project.SourcePacketSha256.Length)];
+                    string projectMeta = Model.CanManage
+                        ? $"{project.BookKind.Replace('_', ' ')} · {project.Audience.Replace('_', ' ')} · v{project.SourcePacketVersion} · {packetDigest} · about {project.EstimatedCredits} credits"
+                        : $"{project.BookKind.Replace('_', ' ')} · {project.ExportFormat?.ToUpperInvariant()} artifact";
+                    <article class="minimal-lane-card">
+                        <span class="tag">@project.Status.Replace('_', ' ')</span>
+                        <h2>@project.Title</h2>
+                        <p>@projectMeta</p>
+                        <div class="minimal-actions">
+                            @if (!string.IsNullOrWhiteSpace(project.ArtifactUrl))
+                            {
+                                <a class="button-like button-like--primary" href="@project.ArtifactUrl">Open @project.ExportFormat</a>
+                            }
+                            @if (Model.CanManage && packetReady)
+                            {
+                                <a class="button-like button-like--ghost" href="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/packet">Source packet</a>
+                            }
+                        </div>
+                        @if (Model.CanManage)
+                        {
+                            @if (project.Status == "draft")
+                            {
+                                <details class="minimal-disclosure">
+                                    <summary>Edit draft</summary>
+                                    <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/draft" class="minimal-form minimal-form--panel">
+                                        @Html.AntiForgeryToken()
+                                        <label>Title<input name="title" value="@project.Title" maxlength="160" required /></label>
+                                        <div class="minimal-form-grid">
+                                            <label>Book type
+                                                <select name="bookKind">
+                                                    <option value="season_chronicle" selected="@(project.BookKind == "season_chronicle")">Season chronicle</option>
+                                                    <option value="campaign_bible" selected="@(project.BookKind == "campaign_bible")">Campaign bible</option>
+                                                    <option value="player_recap" selected="@(project.BookKind == "player_recap")">Player recap</option>
+                                                    <option value="adventure_booklet" selected="@(project.BookKind == "adventure_booklet")">Adventure booklet</option>
+                                                    <option value="world_guide" selected="@(project.BookKind == "world_guide")">World guide</option>
+                                                </select>
+                                            </label>
+                                            <label>Audience
+                                                <select name="audience">
+                                                    <option value="gm_private" selected="@(project.Audience == "gm_private")">GM only</option>
+                                                    <option value="player_safe" selected="@(project.Audience == "player_safe")">Player safe</option>
+                                                </select>
+                                            </label>
+                                            <label>Writing model
+                                                <select name="modelKey">
+                                                    <option value="gemini" selected="@(project.ModelKey == "gemini")">Gemini</option>
+                                                    <option value="grok" selected="@(project.ModelKey == "grok")">Grok</option>
+                                                    <option value="claude" selected="@(project.ModelKey == "claude")">Claude</option>
+                                                </select>
+                                            </label>
+                                            <label>Chapters<input name="targetChapterCount" type="number" min="1" max="40" value="@project.TargetChapterCount" required /></label>
+                                            <label>Words per chapter<input name="targetWordsPerChapter" type="number" min="100" max="5000" value="@project.TargetWordsPerChapter" required /></label>
+                                        </div>
+                                        <label>Source brief<textarea name="sourceSummary" rows="5" maxlength="4000" required>@project.SourceSummary</textarea></label>
+                                        <div class="minimal-check-grid">
+                                            <label><input name="includeRunnerRoster" type="checkbox" value="true" checked="@project.IncludeRunnerRoster" /> Include runner handles</label>
+                                            <label><input name="includeCover" type="checkbox" value="true" checked="@project.IncludeCover" /> Cover</label>
+                                            <label><input name="includeTranslation" type="checkbox" value="true" checked="@project.IncludeTranslation" /> Translation</label>
+                                            <label><input name="includeAudiobook" type="checkbox" value="true" checked="@project.IncludeAudiobook" /> Audiobook</label>
+                                        </div>
+                                        <fieldset class="minimal-gate-list">
+                                            <legend>Approval gates</legend>
+                                            <label><input name="externalProcessingConsent" type="checkbox" value="true" checked="@project.ExternalProcessingConsent" /> External processing approved</label>
+                                            <label><input name="participantConsentConfirmed" type="checkbox" value="true" checked="@project.ParticipantConsentConfirmed" /> Participant consent confirmed</label>
+                                            <label><input name="redactionReviewed" type="checkbox" value="true" checked="@project.RedactionReviewed" /> Private details and identifiers reviewed</label>
+                                            <label><input name="spoilerReviewConfirmed" type="checkbox" value="true" checked="@project.SpoilerReviewConfirmed" /> Player-facing spoilers reviewed</label>
+                                            <label><input name="sourceRightsConfirmed" type="checkbox" value="true" checked="@project.SourceRightsConfirmed" /> I may use this source material</label>
+                                        </fieldset>
+                                        <button class="button-like button-like--primary" type="submit">Save new version</button>
+                                    </form>
+                                </details>
+                                <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/actions">
+                                    @Html.AntiForgeryToken()<input name="action" type="hidden" value="approve_source" />
+                                    <button class="button-like button-like--primary" type="submit">Approve source</button>
+                                </form>
+                            }
+                            else if (project.Status == "source_approved")
+                            {
+                                <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/actions">
+                                    @Html.AntiForgeryToken()<input name="action" type="hidden" value="approve_upload" />
+                                    <button class="button-like button-like--primary" type="submit">Approve source upload</button>
+                                </form>
+                            }
+                            else if (project.Status is "upload_approved" or "handoff_ready")
+                            {
+                                <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/actions" class="minimal-form">
+                                    @Html.AntiForgeryToken()<input name="action" type="hidden" value="approve_generation" />
+                                    <label>AIWriteBook project reference<input name="externalProjectRef" maxlength="256" required /></label>
+                                    <button class="button-like button-like--primary" type="submit">Approve generation</button>
+                                </form>
+                            }
+                            else if (project.Status == "generation_approved")
+                            {
+                                <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/actions">
+                                    @Html.AntiForgeryToken()<input name="action" type="hidden" value="approve_outline" />
+                                    <button class="button-like button-like--primary" type="submit">Approve reviewed outline</button>
+                                </form>
+                            }
+                            else if (project.Status == "outline_approved")
+                            {
+                                <details class="minimal-disclosure">
+                                    <summary>Import export</summary>
+                                    <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/actions" class="minimal-form">
+                                        @Html.AntiForgeryToken()<input name="action" type="hidden" value="import_artifact" />
+                                        <label>Artifact URL or Chummer path<input name="artifactUrl" maxlength="2048" placeholder="https://… or /artifacts/…" required /></label>
+                                        <label>SHA-256<input name="artifactSha256" minlength="64" maxlength="64" required /></label>
+                                        <label>Format<select name="exportFormat"><option value="pdf">PDF</option><option value="epub">EPUB</option><option value="docx">DOCX</option></select></label>
+                                        <button class="button-like button-like--primary" type="submit">Import</button>
+                                    </form>
+                                </details>
+                            }
+                            else if (project.Status == "artifact_ready")
+                            {
+                                <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/actions">
+                                    @Html.AntiForgeryToken()<input name="action" type="hidden" value="approve_publication" />
+                                    <button class="button-like button-like--primary" type="submit">Approve publication</button>
+                                </form>
+                            }
+                            else if (project.Status == "publication_approved")
+                            {
+                                <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/actions">
+                                    @Html.AntiForgeryToken()<input name="action" type="hidden" value="approve_external_send" />
+                                    <button class="button-like button-like--primary" type="submit">Approve external sharing</button>
+                                </form>
+                            }
+                            @if (project.Status != "archived")
+                            {
+                                <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/chronicles/@Uri.EscapeDataString(project.ChronicleProjectId)/actions">
+                                    @Html.AntiForgeryToken()<input name="action" type="hidden" value="archive" />
+                                    <button class="button-like button-like--ghost" type="submit">Archive</button>
+                                </form>
+                            }
+                        }
+                    </article>
+                }
+            </div>
+        }
+        @if (Model.CanManage)
+        {
+            <p class="minimal-caption">AIWriteBook stays operator-run. Chummer does not upload, spend credits, or publish automatically.</p>
+        }
+    </section>
+}
+
+@if (Model.CanManage)
+{
+    <section class="minimal-section" aria-labelledby="invite-heading">
+        <div class="minimal-section__heading">
+            <div><p class="eyebrow">Invite links</p><h2 id="invite-heading">Bring players in</h2></div>
+            <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/invites">
+                @Html.AntiForgeryToken()
+                <button class="button-like button-like--primary" type="submit">New invite link</button>
+            </form>
+        </div>
+        <div class="minimal-lane-grid minimal-platform-list">
+            @foreach (var invite in Model.JoinCodes)
+            {
+                bool active = invite.RevokedAtUtc is null
+                    && (invite.ExpiresAtUtc is null || invite.ExpiresAtUtc > now)
+                    && (invite.MaxUses is null || invite.Uses < invite.MaxUses);
+                <article class="minimal-lane-card">
+                    <span class="tag">@(active ? "Active" : "Closed")</span>
+                    <h2>Player invite</h2>
+                    <p>@invite.Uses use@(invite.Uses == 1 ? string.Empty : "s") · expires @(invite.ExpiresAtUtc?.ToString("d MMM yyyy") ?? "never")</p>
+                    <label class="invite-link-label">Invite link<input id="invite-@invite.JoinCodeId" value="@invite.InviteUrl" readonly /></label>
+                    <div class="minimal-actions">
+                        @if (active)
+                        {
+                            <button class="button-like button-like--primary" type="button" data-copy-input="invite-@invite.JoinCodeId">Copy link</button>
+                            <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/invites/@Uri.EscapeDataString(invite.Code)/revoke">
+                                @Html.AntiForgeryToken()
+                                <button class="button-like button-like--ghost" type="submit">Revoke</button>
+                            </form>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+
+    <section class="minimal-section" aria-labelledby="edit-group-heading">
+        <article class="minimal-lane-card">
+            <span class="tag">Settings</span>
+            <h2 id="edit-group-heading">Edit group</h2>
+            <form method="post" action="/groups/@Uri.EscapeDataString(Model.Group.GroupId)/edit" class="minimal-form">
+                @Html.AntiForgeryToken()
+                <label>Group name<input name="name" value="@Model.Group.Name" maxlength="128" required /></label>
+                <label>Visibility
+                    <select name="visibility">
+                        <option value="private" selected="@(Model.Group.Visibility == "private")">Private</option>
+                        <option value="group" selected="@(Model.Group.Visibility == "group")">Members</option>
+                        <option value="unlisted" selected="@(Model.Group.Visibility == "unlisted")">Unlisted</option>
+                    </select>
+                </label>
+                <button class="button-like button-like--primary" type="submit">Save changes</button>
+            </form>
+        </article>
+    </section>
+}

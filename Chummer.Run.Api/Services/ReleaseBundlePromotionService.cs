@@ -245,8 +245,10 @@ public sealed class ReleaseBundlePromotionService
     private const string PromotionEvidenceRelativePath = "release-evidence/public-promotion.json";
     private const string UnsignedWindowsFreshDeltaProjectionProfile =
         "v3_unsigned_windows_fresh_delta";
-    private const string UnsignedWindowsPreviewReadyProjectionProfile =
+    private const string LegacyUnsignedWindowsPreviewReadyProjectionProfile =
         "v4_unsigned_windows_preview_ready";
+    private const string UnsignedWindowsDesktopDeliveryReadyProjectionProfile =
+        "v4_unsigned_windows_desktop_delivery_ready";
     private const string PublicBaseUrlKey = "GOOGLE_OIDC_REDIRECT_URI";
     private static readonly TimeSpan MaximumReleaseProofPublicationLag = TimeSpan.FromHours(24);
     private static readonly TimeSpan MaximumReleaseProofPublicationClockSkew = TimeSpan.FromMinutes(5);
@@ -2497,23 +2499,23 @@ public sealed class ReleaseBundlePromotionService
             HasExactUnsignedWindowsFreshDeltaProfile(
                 incomingCompatibilityManifestObject,
                 incomingCanonicalManifest);
-        bool hasUnsignedWindowsPreviewReadyProfile =
-            HasExactUnsignedWindowsPreviewReadyProfile(
+        bool hasUnsignedWindowsDesktopDeliveryReadyProfile =
+            HasExactUnsignedWindowsDesktopDeliveryReadyProfile(
                 incomingCompatibilityManifestObject,
                 incomingCanonicalManifest);
-        if (hasUnsignedWindowsPreviewReadyProfile && !allowProofBoundPreviewReadyProfile)
+        if (hasUnsignedWindowsDesktopDeliveryReadyProfile && !allowProofBoundPreviewReadyProfile)
         {
             throw new InvalidDataException(
-                "preview-ready unsigned Windows projection requires its proof-bound v6 candidate authority.");
+                "desktop-delivery-ready unsigned Windows projection requires its proof-bound v6 candidate authority.");
         }
-        if ((hasUnsignedWindowsFreshDeltaProfile || hasUnsignedWindowsPreviewReadyProfile)
+        if ((hasUnsignedWindowsFreshDeltaProfile || hasUnsignedWindowsDesktopDeliveryReadyProfile)
             && !exactIncomingDesktopScopeIsFreshDelta)
         {
             throw new InvalidDataException(
                 "unsigned Windows projectionProfile requires authenticated fresh-delta admission.");
         }
         bool boundedUnsignedWindowsProfile =
-            hasUnsignedWindowsFreshDeltaProfile || hasUnsignedWindowsPreviewReadyProfile;
+            hasUnsignedWindowsFreshDeltaProfile || hasUnsignedWindowsDesktopDeliveryReadyProfile;
         ValidateIncomingManifestIdentity(
             incomingCompatibilityManifestObject,
             incomingCompatibilityManifest,
@@ -2688,7 +2690,8 @@ public sealed class ReleaseBundlePromotionService
             GetJsonString(canonicalManifest["projectionProfile"]) ?? string.Empty;
         bool boundedUnsignedWindowsProfile =
             projectionProfile is UnsignedWindowsFreshDeltaProjectionProfile
-                or UnsignedWindowsPreviewReadyProjectionProfile;
+                or LegacyUnsignedWindowsPreviewReadyProjectionProfile
+                or UnsignedWindowsDesktopDeliveryReadyProjectionProfile;
         // This bounded profile does not carry the AUR package's upstream Linux
         // artifact. Omit the catalog and its metadata files instead of exposing
         // a catalog entry that generation-bound delivery must reject.
@@ -6994,15 +6997,16 @@ public sealed class ReleaseBundlePromotionService
             UnsignedWindowsFreshDeltaProjectionProfile,
             StringComparison.Ordinal);
 
-    private static bool HasExactUnsignedWindowsPreviewReadyProfile(
+    private static bool HasExactUnsignedWindowsDesktopDeliveryReadyProfile(
         JsonObject compatibilityManifest,
         JsonObject canonicalManifest)
-        => string.Equals(
-            ReadExactUnsignedWindowsProjectionProfile(
-                compatibilityManifest,
-                canonicalManifest),
-            UnsignedWindowsPreviewReadyProjectionProfile,
-            StringComparison.Ordinal);
+    {
+        string profile = ReadExactUnsignedWindowsProjectionProfile(
+            compatibilityManifest,
+            canonicalManifest);
+        return profile is LegacyUnsignedWindowsPreviewReadyProjectionProfile
+            or UnsignedWindowsDesktopDeliveryReadyProjectionProfile;
+    }
 
     private static string ReadExactUnsignedWindowsProjectionProfile(
         JsonObject compatibilityManifest,
@@ -7023,7 +7027,8 @@ public sealed class ReleaseBundlePromotionService
                 canonicalProfile,
                 StringComparison.Ordinal)
             || compatibilityProfile is not UnsignedWindowsFreshDeltaProjectionProfile
-                and not UnsignedWindowsPreviewReadyProjectionProfile)
+                and not LegacyUnsignedWindowsPreviewReadyProjectionProfile
+                and not UnsignedWindowsDesktopDeliveryReadyProjectionProfile)
         {
             throw new InvalidDataException(
                 "bundle manifests publish a mismatched or unsupported projectionProfile.");
@@ -7652,12 +7657,11 @@ public sealed class ReleaseBundlePromotionService
                 $"{CanonicalManifestName} desktopTupleCoverage.complete disagrees with the canonical platform floor.");
         }
 
-        if (string.Equals(
-                GetJsonString(canonical["projectionProfile"]),
-                UnsignedWindowsPreviewReadyProjectionProfile,
-                StringComparison.Ordinal))
+        if (GetJsonString(canonical["projectionProfile"])
+            is LegacyUnsignedWindowsPreviewReadyProjectionProfile
+                or UnsignedWindowsDesktopDeliveryReadyProjectionProfile)
         {
-            ValidateProofBoundPreviewReadyPosture(canonical, expectedComplete);
+            ValidateProofBoundDesktopDeliveryPosture(canonical, expectedComplete);
             return;
         }
 
@@ -8009,20 +8013,20 @@ public sealed class ReleaseBundlePromotionService
 
     /// <summary>
     /// Validates the intentional split between global flagship trust and the narrowly
-    /// proof-bound Linux/Windows preview publication receipt. This profile is admitted
+    /// proof-bound Linux/Windows desktop-delivery receipt. This profile is admitted
     /// only from a parsed v6 candidate authority; all ordinary release profiles keep
     /// using <see cref="ValidateCanonicalPostureFloors"/> and its agreement invariant.
     /// </summary>
-    internal static void ValidateProofBoundPreviewReadyPosture(
+    internal static void ValidateProofBoundDesktopDeliveryPosture(
         JsonObject canonical,
         bool desktopCoverageComplete)
     {
         if (!desktopCoverageComplete
             || NormalizeToken(GetJsonString(canonical["projectionProfile"]))
-                != UnsignedWindowsPreviewReadyProjectionProfile
+                != UnsignedWindowsDesktopDeliveryReadyProjectionProfile
             || NormalizeToken(GetJsonString(canonical["status"])) != "published"
-            || NormalizeToken(GetJsonString(canonical["rolloutState"])) != "promoted_preview"
-            || NormalizeToken(GetJsonString(canonical["supportabilityState"])) != "preview_supported"
+            || NormalizeToken(GetJsonString(canonical["rolloutState"])) != "artifact_shelf_ready"
+            || NormalizeToken(GetJsonString(canonical["supportabilityState"])) != "desktop_delivery_supported"
             || !TryGetJsonBoolean(canonical["publicationEligible"], out bool publicationEligible)
             || !publicationEligible
             || !TryGetJsonBoolean(canonical["routeAuthority"], out bool routeAuthority)
@@ -8033,7 +8037,7 @@ public sealed class ReleaseBundlePromotionService
             || deployAuthority)
         {
             throw new InvalidDataException(
-                $"{CanonicalManifestName} proof-bound preview posture is not exact.");
+                $"{CanonicalManifestName} proof-bound desktop delivery posture is not exact.");
         }
 
         JsonObject publicTrustMetrics = canonical["publicTrustMetrics"] as JsonObject
@@ -8054,8 +8058,8 @@ public sealed class ReleaseBundlePromotionService
             GetJsonString(trustReleaseChannel["supportabilityState"]));
         string registrySupportability = NormalizeToken(
             GetJsonString(registryReleaseChannel["supportabilityState"]));
-        bool usesOrdinaryTrustAgreement = trustSupportability == "preview_supported"
-            && registrySupportability == "preview_supported";
+        bool usesOrdinaryTrustAgreement = trustSupportability == "desktop_delivery_supported"
+            && registrySupportability == "desktop_delivery_supported";
         if (!usesOrdinaryTrustAgreement)
         {
             string freshnessStatus = NormalizeToken(GetJsonString(proofFreshness["status"]));
@@ -8067,32 +8071,34 @@ public sealed class ReleaseBundlePromotionService
                 || !registryComplete
                 || NormalizeToken(GetJsonString(trustReleaseChannel["channelId"])) != "preview"
                 || NormalizeToken(GetJsonString(trustReleaseChannel["publicationStatus"])) != "published"
-                || NormalizeToken(GetJsonString(trustReleaseChannel["rolloutState"])) != "promoted_preview"
+                || NormalizeToken(GetJsonString(trustReleaseChannel["rolloutState"])) != "artifact_shelf_ready"
                 || trustSupportability != "review_required"
                 || NormalizeToken(GetJsonString(trustReleaseChannel["posture"])) != "blocked"
                 || freshnessStatus is not "stale" and not "missing"
                 || NormalizeToken(GetJsonString(registryReleaseChannel["publicationStatus"])) != "published"
-                || NormalizeToken(GetJsonString(registryReleaseChannel["rolloutState"])) != "promoted_preview"
-                || registrySupportability != "preview_supported"
+                || NormalizeToken(GetJsonString(registryReleaseChannel["rolloutState"])) != "artifact_shelf_ready"
+                || registrySupportability != "desktop_delivery_supported"
                 || NormalizeToken(GetJsonString(registryReleaseChannel["publicTrustPosture"])) != "blocked")
             {
                 throw new InvalidDataException(
-                    $"{CanonicalManifestName} proof-bound preview trust split is not exact.");
+                    $"{CanonicalManifestName} proof-bound desktop delivery trust split is not exact.");
             }
         }
 
-        JsonObject readiness = canonical["previewPublicationReadiness"] as JsonObject
+        JsonObject readiness = canonical["desktopDeliveryReadiness"] as JsonObject
             ?? throw new InvalidDataException(
-                $"{CanonicalManifestName} proof-bound preview readiness receipt is missing.");
+                $"{CanonicalManifestName} proof-bound desktop delivery readiness receipt is missing.");
         RequireExactProperties(
             readiness,
             [
                 "contractName",
                 "contractVersion",
+                "doesNotAssert",
                 "generatedAtUtc",
                 "localizationGateSha256",
                 "nativeWindowsEvidenceSha256",
                 "platforms",
+                "readinessScope",
                 "registryCommit",
                 "releaseProofSha256",
                 "releaseVersion",
@@ -8101,31 +8107,41 @@ public sealed class ReleaseBundlePromotionService
                 "sourceCompatibilityManifestSha256",
                 "status"
             ],
-            "proof-bound preview readiness receipt");
+            "proof-bound desktop delivery readiness receipt");
         if (GetJsonString(readiness["contractName"])
-                != "chummer.registry.preview-publication-readiness/v1"
+                != "chummer.registry.desktop-delivery-readiness/v1"
             || readiness["contractVersion"] is not JsonValue contractVersion
             || !contractVersion.TryGetValue<int>(out int parsedContractVersion)
             || parsedContractVersion != 1
-            || GetJsonString(readiness["status"]) != "preview_ready"
+            || GetJsonString(readiness["status"]) != "desktop_delivery_ready"
+            || GetJsonString(readiness["readinessScope"]) != "desktop_artifact_delivery"
             || GetJsonString(readiness["releaseVersion"])
                 != GetJsonString(canonical["releaseVersion"]))
         {
             throw new InvalidDataException(
-                $"{CanonicalManifestName} proof-bound preview readiness identity drifted.");
+                $"{CanonicalManifestName} proof-bound desktop delivery readiness identity drifted.");
         }
         RequireExactStringArray(
             readiness,
             "platforms",
             ["linux", "windows"],
-            "proof-bound preview readiness platform scope");
+            "proof-bound desktop delivery readiness platform scope");
+        RequireExactStringArray(
+            readiness,
+            "doesNotAssert",
+            [
+                "whole_product_preview_readiness",
+                "stable_readiness",
+                "flagship_readiness"
+            ],
+            "proof-bound desktop delivery non-assertions");
         string? registryCommit = GetJsonString(readiness["registryCommit"]);
         if (registryCommit is not { Length: 40 }
             || registryCommit.Any(static character => character is not (>= '0' and <= '9')
                 and not (>= 'a' and <= 'f')))
         {
             throw new InvalidDataException(
-                $"{CanonicalManifestName} proof-bound preview Registry commit is invalid.");
+                $"{CanonicalManifestName} proof-bound desktop delivery Registry commit is invalid.");
         }
         foreach (string propertyName in new[]
                  {
@@ -8140,13 +8156,13 @@ public sealed class ReleaseBundlePromotionService
             if (!IsBareLowerSha256(GetJsonString(readiness[propertyName])))
             {
                 throw new InvalidDataException(
-                    $"{CanonicalManifestName} proof-bound preview {propertyName} is invalid.");
+                    $"{CanonicalManifestName} proof-bound desktop delivery {propertyName} is invalid.");
             }
         }
         _ = RequireTimestamp(
             readiness,
             "generatedAtUtc",
-            "proof-bound preview readiness receipt");
+            "proof-bound desktop delivery readiness receipt");
         if (usesOrdinaryTrustAgreement)
         {
             ValidateCanonicalPostureFloors(canonical, desktopCoverageComplete);

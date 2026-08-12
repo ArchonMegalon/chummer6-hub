@@ -976,7 +976,11 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         TryApplyGenerationHeader(snapshot);
         PublicReleaseTruthProjectionDto? releaseTruth =
             PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext);
-        if (releaseTruth?.AvailabilityClaimsAllowed != true)
+        // The release-truth middleware owns admission on composed requests. Direct
+        // controller invocations (including internal verification) have no
+        // projection, so do not let the absence of middleware short-circuit
+        // generation, credential, digest, or revocation validation below.
+        if (releaseTruth is not null && !releaseTruth.AvailabilityClaimsAllowed)
         {
             TryApplyImmutableGenerationHeaders();
             return Ok(new

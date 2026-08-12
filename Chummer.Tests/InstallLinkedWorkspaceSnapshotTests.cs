@@ -5,6 +5,7 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.DataProtection;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
@@ -330,6 +331,228 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
         Assert.Equal("ws-user-fallback", snapshot.WorkspaceId);
     }
 
+    [Fact]
+    public void Android_linked_campaign_roundtrips_create_update_list_and_invite()
+    {
+        using Fixture fixture = new();
+        const string subjectId = "subject-gm";
+        string userId = fixture.Accounts.EnsureUser(subjectId, "Game Master").UserId;
+        InstallationGrantDto grant = fixture.SeedClaimedInstall("ins-gm", userId, subjectId);
+
+        ActionResult<AndroidLinkedGroupDto> createdResult = fixture.AndroidCampaigns.CreateGroup(
+            new AndroidLinkedGroupCreateRequest("ins-gm", grant.AccessToken, "Vienna Shadows", "private"));
+        AndroidLinkedGroupDto created = Assert.IsType<OkObjectResult>(createdResult.Result).Value as AndroidLinkedGroupDto
+            ?? throw new Xunit.Sdk.XunitException("Expected linked group payload.");
+        Assert.Equal("Vienna Shadows", created.Name);
+        Assert.True(created.CanManage);
+        Assert.Equal("owner", created.Role);
+        Assert.DoesNotContain(userId, System.Text.Json.JsonSerializer.Serialize(created), StringComparison.Ordinal);
+
+        ActionResult<AndroidLinkedGroupDto> updatedResult = fixture.AndroidCampaigns.UpdateGroup(
+            created.GroupId,
+            new AndroidLinkedGroupUpdateRequest("ins-gm", grant.AccessToken, "Vienna After Dark", "unlisted"));
+        AndroidLinkedGroupDto updated = Assert.IsType<OkObjectResult>(updatedResult.Result).Value as AndroidLinkedGroupDto
+            ?? throw new Xunit.Sdk.XunitException("Expected updated linked group payload.");
+        Assert.Equal("Vienna After Dark", updated.Name);
+        Assert.Equal("unlisted", updated.Visibility);
+
+        ActionResult<AndroidLinkedGroupListResponse> listResult = fixture.AndroidCampaigns.ListGroups(
+            new AndroidLinkedGrantRequest("ins-gm", grant.AccessToken));
+        AndroidLinkedGroupListResponse list = Assert.IsType<OkObjectResult>(listResult.Result).Value as AndroidLinkedGroupListResponse
+            ?? throw new Xunit.Sdk.XunitException("Expected linked group list payload.");
+        Assert.Equal(created.GroupId, Assert.Single(list.Groups).GroupId);
+
+        ActionResult<AndroidLinkedInviteResponse> inviteResult = fixture.AndroidCampaigns.CreateInvite(
+            created.GroupId,
+            new AndroidLinkedGrantRequest("ins-gm", grant.AccessToken));
+        AndroidLinkedInviteResponse invite = Assert.IsType<OkObjectResult>(inviteResult.Result).Value as AndroidLinkedInviteResponse
+            ?? throw new Xunit.Sdk.XunitException("Expected linked invite payload.");
+        Assert.StartsWith("https://chummer.run/groups/join/", invite.InviteUrl, StringComparison.Ordinal);
+        Assert.Equal("no-store, max-age=0", fixture.AndroidCampaigns.Response.Headers.CacheControl);
+    }
+
+    [Fact]
+    public void Android_linked_campaign_rejects_unknown_grant()
+    {
+        using Fixture fixture = new();
+        ActionResult<AndroidLinkedGroupListResponse> result = fixture.AndroidCampaigns.ListGroups(
+            new AndroidLinkedGrantRequest("missing", "expired"));
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, problem.StatusCode);
+    }
+
+    [Fact]
+    public void Android_linked_chronicle_keeps_every_approval_boundary_native_and_explicit()
+    {
+        using Fixture fixture = new();
+        const string subjectId = "subject-chronicle-gm";
+        string userId = fixture.Accounts.EnsureUser(subjectId, "Chronicle GM").UserId;
+        InstallationGrantDto grant = fixture.SeedClaimedInstall("ins-chronicle", userId, subjectId);
+        AndroidLinkedGroupDto group = Assert.IsType<OkObjectResult>(fixture.AndroidCampaigns.CreateGroup(
+            new AndroidLinkedGroupCreateRequest("ins-chronicle", grant.AccessToken, "Book Club", "private")).Result).Value as AndroidLinkedGroupDto
+            ?? throw new Xunit.Sdk.XunitException("Expected linked group payload.");
+        AndroidLinkedChronicleDraftRequest draft = new(
+            "ins-chronicle",
+            grant.AccessToken,
+            "Neon Vienna",
+            "campaign_bible",
+            "gm_private",
+            "A source brief with private names removed.",
+            "gemini",
+            4,
+            900,
+            IncludeRunnerRoster: false,
+            IncludeCover: true,
+            IncludeTranslation: false,
+            IncludeAudiobook: false,
+            ExternalProcessingConsent: true,
+            ParticipantConsentConfirmed: true,
+            RedactionReviewed: true,
+            SourceRightsConfirmed: true,
+            SpoilerReviewConfirmed: true);
+
+        AndroidLinkedChronicleDto project = Assert.IsType<OkObjectResult>(fixture.AndroidCampaigns.CreateChronicle(
+            group.GroupId,
+            draft).Result).Value as AndroidLinkedChronicleDto
+            ?? throw new Xunit.Sdk.XunitException("Expected linked chronicle payload.");
+        Assert.Equal("draft", project.Status);
+        Assert.False(project.UnattendedAutomationAllowed);
+        Assert.DoesNotContain(userId, System.Text.Json.JsonSerializer.Serialize(project), StringComparison.Ordinal);
+
+        project = Advance("approve_source");
+        Assert.Equal("source_approved", project.Status);
+        project = Advance("approve_upload");
+        Assert.Equal("upload_approved", project.Status);
+        Assert.NotNull(project.UploadApprovedAtUtc);
+        project = Advance("approve_generation", externalProjectRef: "aiwritebook-project-42");
+        Assert.Equal("generation_approved", project.Status);
+        Assert.NotNull(project.GenerationApprovedAtUtc);
+        Assert.NotNull(project.UploadApprovedAtUtc);
+
+        AndroidLinkedChroniclePacketResponse packet = Assert.IsType<OkObjectResult>(fixture.AndroidCampaigns.DownloadChroniclePacket(
+            group.GroupId,
+            project.ChronicleProjectId,
+            new AndroidLinkedGrantRequest("ins-chronicle", grant.AccessToken)).Result).Value as AndroidLinkedChroniclePacketResponse
+            ?? throw new Xunit.Sdk.XunitException("Expected source packet payload.");
+        Assert.Equal(project.SourcePacketSha256, packet.Sha256);
+        Assert.Contains("# Neon Vienna", System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(packet.ContentBase64)), StringComparison.Ordinal);
+
+        project = Advance("approve_outline");
+        Assert.Equal("outline_approved", project.Status);
+        project = Advance(
+            "import_artifact",
+            artifactUrl: "https://chummer.run/artifacts/neon-vienna.pdf",
+            artifactSha256: new string('a', 64),
+            exportFormat: "pdf");
+        Assert.Equal("artifact_ready", project.Status);
+        project = Advance("approve_publication");
+        Assert.Equal("publication_approved", project.Status);
+        project = Advance("approve_external_send");
+        Assert.Equal("external_send_approved", project.Status);
+        Assert.NotNull(project.ExternalSendApprovedAtUtc);
+
+        AndroidLinkedChronicleDto Advance(
+            string action,
+            string? externalProjectRef = null,
+            string? artifactUrl = null,
+            string? artifactSha256 = null,
+            string? exportFormat = null)
+            => Assert.IsType<OkObjectResult>(fixture.AndroidCampaigns.AdvanceChronicle(
+                group.GroupId,
+                project.ChronicleProjectId,
+                new AndroidLinkedChronicleActionRequest(
+                    "ins-chronicle",
+                    grant.AccessToken,
+                    action,
+                    externalProjectRef,
+                    artifactUrl,
+                    artifactSha256,
+                    exportFormat)).Result).Value as AndroidLinkedChronicleDto
+                ?? throw new Xunit.Sdk.XunitException("Expected advanced chronicle payload.");
+    }
+
+    [Fact]
+    public void Android_linked_player_receives_only_publication_approved_artifact_metadata()
+    {
+        using Fixture fixture = new();
+        const string gmSubject = "subject-chronicle-manager";
+        const string playerSubject = "subject-chronicle-player";
+        fixture.Accounts.EnsureUser(gmSubject, "Chronicle Manager");
+        HubUserDto player = fixture.Accounts.EnsureUser(playerSubject, "Chronicle Player");
+        InstallationGrantDto playerGrant = fixture.SeedClaimedInstall("ins-chronicle-player", player.UserId, playerSubject);
+
+        GroupDto group = fixture.Groups.CreateGroup(new CreateGroupRequest(gmSubject, "Artifact Readers", "campaign", "private"));
+        JoinCodeDto invite = fixture.Groups.CreateJoinCode(group.GroupId, new CreateJoinCodeRequest(gmSubject));
+        var runner = fixture.Groups.CreateRunner(new CreateRunnerRequest(playerSubject, "Quiet Signal", "Quiet Signal"));
+        fixture.Groups.JoinGroup(new JoinGroupByCodeRequest(playerSubject, invite.Code, runner.DossierId));
+
+        ChronicleProjectDto project = fixture.Groups.CreateChronicleProject(
+            group.GroupId,
+            new CreateChronicleProjectRequest(
+                gmSubject,
+                "Player-safe field report",
+                "player_recap",
+                "player_safe",
+                "Private source brief that must never reach the player response.",
+                "claude",
+                3,
+                800,
+                IncludeRunnerRoster: true,
+                IncludeCover: true,
+                IncludeTranslation: false,
+                IncludeAudiobook: false,
+                ExternalProcessingConsent: true,
+                ParticipantConsentConfirmed: true,
+                RedactionReviewed: true,
+                SourceRightsConfirmed: true,
+                SpoilerReviewConfirmed: true));
+        project = fixture.Groups.UpdateChronicleProject(group.GroupId, project.ChronicleProjectId, new(gmSubject, "approve_source"));
+        project = fixture.Groups.UpdateChronicleProject(group.GroupId, project.ChronicleProjectId, new(gmSubject, "approve_upload"));
+        project = fixture.Groups.UpdateChronicleProject(group.GroupId, project.ChronicleProjectId, new(gmSubject, "approve_generation", "private-provider-ref"));
+        project = fixture.Groups.UpdateChronicleProject(group.GroupId, project.ChronicleProjectId, new(gmSubject, "approve_outline"));
+        project = fixture.Groups.UpdateChronicleProject(group.GroupId, project.ChronicleProjectId, new(
+            gmSubject,
+            "import_artifact",
+            ArtifactUrl: "/artifacts/player-field-report.epub",
+            ArtifactSha256: new string('c', 64),
+            ExportFormat: "epub"));
+
+        AndroidLinkedChronicleListResponse beforePublication = Assert.IsType<OkObjectResult>(fixture.AndroidCampaigns.ListChronicles(
+            group.GroupId,
+            new AndroidLinkedGrantRequest("ins-chronicle-player", playerGrant.AccessToken)).Result).Value as AndroidLinkedChronicleListResponse
+            ?? throw new Xunit.Sdk.XunitException("Expected player chronicle list.");
+        Assert.Empty(beforePublication.Projects);
+        project = fixture.Groups.UpdateChronicleProject(
+            group.GroupId,
+            project.ChronicleProjectId,
+            new(gmSubject, "approve_publication"));
+
+        AndroidLinkedChronicleListResponse response = Assert.IsType<OkObjectResult>(fixture.AndroidCampaigns.ListChronicles(
+            group.GroupId,
+            new AndroidLinkedGrantRequest("ins-chronicle-player", playerGrant.AccessToken)).Result).Value as AndroidLinkedChronicleListResponse
+            ?? throw new Xunit.Sdk.XunitException("Expected player chronicle list.");
+        AndroidLinkedChronicleDto visible = Assert.Single(response.Projects);
+        Assert.Equal(project.ChronicleProjectId, visible.ChronicleProjectId);
+        Assert.Equal("Player-safe field report", visible.Title);
+        Assert.Equal("/artifacts/player-field-report.epub", visible.ArtifactUrl);
+        Assert.Equal(new string('c', 64), visible.ArtifactSha256);
+        Assert.Equal("epub", visible.ExportFormat);
+        Assert.Empty(visible.SourceSummary);
+        Assert.Empty(visible.ModelKey);
+        Assert.Empty(visible.RunnerRoster);
+        Assert.Empty(visible.SourcePacketSha256);
+        Assert.Empty(visible.Provider);
+        Assert.Null(visible.ExternalProjectRef);
+        Assert.Equal(0, visible.EstimatedCredits);
+
+        ObjectResult packetDenied = Assert.IsType<ObjectResult>(fixture.AndroidCampaigns.DownloadChroniclePacket(
+            group.GroupId,
+            project.ChronicleProjectId,
+            new AndroidLinkedGrantRequest("ins-chronicle-player", playerGrant.AccessToken)).Result);
+        Assert.Equal(StatusCodes.Status403Forbidden, packetDenied.StatusCode);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
@@ -356,6 +579,7 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
                 {
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking-store.json"),
                     ["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"] = Path.Combine(_root, "install-linked-workspaces.json"),
+                    ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
                     ["CHUMMER_DOWNLOADS_ROOT"] = downloadsRoot
                 })
                 .Build();
@@ -367,9 +591,12 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
                 NullLogger<InstallLinkingStore>.Instance);
             InstallLinking = new InstallLinkingService(InstallStore, Configuration);
             Workspaces = new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(Configuration));
+            Community = new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance);
+            Accounts = new AccountService(Community);
+            Groups = new GroupService(Community, Accounts);
             Controller = new InstallLinkingController(
                 identity: new HubIdentityClient(new HttpClient(), Configuration),
-                accounts: new AccountService(new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance)),
+                accounts: Accounts,
                 installLinking: InstallLinking,
                 desktopLaunchTickets: new AccountDesktopLaunchTicketService(dataProtection, Configuration),
                 releases: new PublicReleaseManifestService(Configuration),
@@ -377,6 +604,10 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
                 supportPresentation: new SupportCasePresentationService(),
                 configuration: Configuration,
                 workspaceSnapshots: Workspaces);
+            AndroidCampaigns = new AndroidLinkedCampaignController(InstallLinking, Groups)
+            {
+                ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+            };
         }
 
         public IConfiguration Configuration { get; }
@@ -387,7 +618,15 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
 
         public InstallLinkedWorkspaceSnapshotService Workspaces { get; }
 
+        public CommunityStore Community { get; }
+
+        public AccountService Accounts { get; }
+
+        public GroupService Groups { get; }
+
         public InstallLinkingController Controller { get; }
+
+        public AndroidLinkedCampaignController AndroidCampaigns { get; }
 
         public InstallationGrantDto SeedClaimedInstall(string installationId, string userId, string? subjectId)
         {

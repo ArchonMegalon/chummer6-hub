@@ -1609,7 +1609,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                     projection,
                     new string('d', 64)),
                 promotions,
-                new ReleaseShelfGenerationStore(Configuration));
+                new ReleaseShelfGenerationStore(Configuration),
+                NullLogger<PublicReleaseTruthProjectionMiddleware>.Instance);
             return (result, context, controllerInvoked);
         }
 
@@ -1640,7 +1641,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                 context,
                 new FixedReleaseTruthProjection(projection, new string('d', 64)),
                 promotions,
-                new ReleaseShelfGenerationStore(Configuration));
+                new ReleaseShelfGenerationStore(Configuration),
+                NullLogger<PublicReleaseTruthProjectionMiddleware>.Instance);
             return result
                 ?? throw new InvalidOperationException(
                     "Authenticated release manifest middleware did not invoke the controller.");

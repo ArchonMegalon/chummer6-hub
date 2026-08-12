@@ -144,6 +144,7 @@ public sealed class HubPageChromeService
 
         actions.AddRange(
         [
+            new SiteChromeActionViewModel("Groups", "/groups", "secondary", normalizedCurrentPath.StartsWith("/groups", StringComparison.OrdinalIgnoreCase)),
             new SiteChromeActionViewModel("Account", "/account", "secondary", normalizedCurrentPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)),
             new SiteChromeActionViewModel("Sign out", "/logout", "primary")
         ]);
