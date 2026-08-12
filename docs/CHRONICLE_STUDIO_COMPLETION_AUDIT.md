@@ -34,8 +34,10 @@ an external action or platform build that did not occur.
 - Chronicle Studio and linked-install tests: 21/21 within the full runs on both
   `net10.0` and `net10.0-windows`. These include the artifact-only player
   projection and linked Android packet-denial boundary.
-- Full Chummer suite: 2,909/2,909 on `net10.0` and 2,909/2,909 on
-  `net10.0-windows`.
+- The original Chronicle integration baseline passed 2,909/2,909 on both
+  `net10.0` and `net10.0-windows`. The later full Hub baseline closure passes
+  3,669/3,669 on `net10.0`; this document does not infer a matching Windows run
+  that was not executed for that later source state.
 - Native Android platform-neutral compile gate: pass, zero warnings and zero
   errors. Android contracts: 26/26. After the exact toolchain approval, the
   guarded bootstrap installed Android SDK/API and build-tools 36, platform-tools,
