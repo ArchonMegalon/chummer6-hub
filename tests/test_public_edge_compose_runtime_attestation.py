@@ -172,6 +172,10 @@ def rendered_compose(
                 "environment": {
                     "ASPNETCORE_ENVIRONMENT": "Production",
                     "AllowedHosts": "chummer.run",
+                    "CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH": (
+                        "/app/state/account-erasure-journal.json"
+                    ),
+                    "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY": "a" * 64,
                     "CHUMMER_DATA_PROTECTION_KEYS_PATH": (
                         "/app/state/data-protection-keys-v2"
                     ),

@@ -165,6 +165,20 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
             module.validate_compose(payload),
         )
 
+    def test_account_erasure_journal_is_durable_and_keyed_fail_closed(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        payload["services"]["chummer-portal"]["environment"][
+            "CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH"
+        ] = "/tmp/account-erasure-journal.json"
+
+        self.assertIn(
+            "chummer-portal account-erasure configuration "
+            "CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH must use the durable "
+            "fail-closed value /app/state/account-erasure-journal.json",
+            module.validate_compose(payload),
+        )
+
     def test_cloudflared_probe_must_verify_an_active_tunnel(self) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())

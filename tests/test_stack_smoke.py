@@ -311,6 +311,14 @@ class StackConfigSmokeTests(unittest.TestCase):
             "/app",
             msg="public edge should read baked canonical product truth instead of a drift-prone repo mirror mount",
         )
+        self.assertEqual(
+            environment.get("CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH"),
+            "/app/state/account-erasure-journal.json",
+        )
+        self.assertEqual(
+            environment.get("CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"),
+            "${CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY:?Set a persistent 64-character lowercase hexadecimal account-erasure receipt HMAC key}",
+        )
 
         volumes = portal.get("volumes") or []
         self.assertNotIn(

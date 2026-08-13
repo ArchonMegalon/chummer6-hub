@@ -64,6 +64,9 @@ EXPECTED_FINAL_GOLD_SOURCE = (
 EXPECTED_PORTAL_ENVIRONMENT = {
     "ASPNETCORE_ENVIRONMENT": "Production",
     "AllowedHosts": "chummer.run",
+    "CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH": (
+        "/app/state/account-erasure-journal.json"
+    ),
     "CHUMMER_DATA_PROTECTION_KEYS_PATH": "/app/state/data-protection-keys-v2",
     "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
     "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
@@ -980,6 +983,17 @@ def validate_runtime(
         )
 
     environment = mapping(portal.get("environment"), label="rendered portal environment")
+    account_erasure_hmac_key = environment.get(
+        "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"
+    )
+    if (
+        not isinstance(account_erasure_hmac_key, str)
+        or re.fullmatch(r"[0-9a-f]{64}", account_erasure_hmac_key) is None
+    ):
+        raise ValueError(
+            "rendered portal account-erasure receipt HMAC key must be one "
+            "persistent 64-character lowercase hexadecimal secret"
+        )
     for key in PROXY_GATE_KEYS:
         if environment.get(key) != "false":
             raise ValueError(f"rendered {key} must be the literal string false")
@@ -1095,6 +1109,8 @@ def validate_runtime(
             ),
             "status": "pass",
             "checks": {
+                "accountErasureJournalDurablePath": True,
+                "accountErasureReceiptKeyPresent": True,
                 "productionEnvironment": True,
                 "canonicalOriginPresent": True,
                 "canonicalOriginAbsoluteHttps": True,

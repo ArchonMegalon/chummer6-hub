@@ -75,6 +75,13 @@ PUBLIC_PORTAL_ENVIRONMENT = {
     "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run;www.chummer.run",
     "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
     "CHUMMER_PUBLIC_CANON_ROOT": "/app",
+    "CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH": (
+        "/app/state/account-erasure-journal.json"
+    ),
+    "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY": (
+        "${CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY:"
+        "?Set a persistent 64-character lowercase hexadecimal account-erasure receipt HMAC key}"
+    ),
     "CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT": "/fleet-artifacts",
     "CHUMMER_DATA_PROTECTION_KEYS_PATH": (
         "/app/state/data-protection-keys-v2"
