@@ -19,6 +19,8 @@ def _play_source_worker() -> Path:
     if configured:
         candidates.append(Path(configured))
     candidates.append(REPO_ROOT.parent / "chummer-play")
+    candidates.append(REPO_ROOT.parent.parent / "chummer-play")
+    candidates.append(Path("/docker/chummercomplete/chummer-play"))
 
     for root in candidates:
         worker = root / "src" / "Chummer.Play.Web" / "wwwroot" / "service-worker.js"
