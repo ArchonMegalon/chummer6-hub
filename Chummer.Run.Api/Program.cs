@@ -118,6 +118,7 @@ builder.Services
     });
 builder.Services.AddSingleton<PublicPlayProxyGateway>();
 builder.Services.AddSingleton<IPublicPlayPrivateRouteDelegator, DenyAllPublicPlayPrivateRouteDelegator>();
+builder.Services.AddSingleton<PlayReviewAccessService>();
 var trustedProxies = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_PROXIES"]);
 var trustedIpNetworks = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_IP_NETWORKS"]);
 
@@ -154,6 +155,11 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var app = builder.Build();
+var playReviewAccess = app.Services.GetRequiredService<PlayReviewAccessService>();
+if (playReviewAccess.Enabled)
+{
+    app.Logger.LogWarning("Dedicated Google Play review access is enabled for this host.");
+}
 PublicPlayProxyGateway playProjectionGateway = app.Services.GetRequiredService<PublicPlayProxyGateway>();
 PublicPlayProjectionReadiness playProjectionReadiness = playProjectionGateway.GetReadiness();
 if (!playProjectionReadiness.Ready)

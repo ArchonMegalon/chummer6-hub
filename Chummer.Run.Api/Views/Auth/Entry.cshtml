@@ -43,5 +43,38 @@
             }
             <a class="button-like @(Model.EmailEntryEnabled ? "button-like--secondary" : "button-like--primary") auth-panel__primary" href="@Model.GoogleStartHref">Continue with Google</a>
         }
+
+        @if (Model.PlayReviewAccessAvailable)
+        {
+            <div class="auth-divider"><span>Play review</span></div>
+            <form class="auth-form" method="post" action="/auth/play-review">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="next" value="@Model.NextPath" />
+                <p class="auth-panel__hint">Use the review access details from Play Console.</p>
+                @if (!string.IsNullOrWhiteSpace(Model.PlayReviewError))
+                {
+                    <p class="auth-panel__hint" role="alert">@Model.PlayReviewError</p>
+                }
+                <div class="field">
+                    <label for="play-review-username" class="field-label">Review username</label>
+                    <input
+                        id="play-review-username"
+                        name="username"
+                        type="text"
+                        autocomplete="username"
+                        required />
+                </div>
+                <div class="field">
+                    <label for="play-review-password" class="field-label">Review password</label>
+                    <input
+                        id="play-review-password"
+                        name="password"
+                        type="password"
+                        autocomplete="current-password"
+                        required />
+                </div>
+                <button class="button-like button-like--secondary auth-panel__primary" type="submit">Continue as reviewer</button>
+            </form>
+        }
     </div>
 </section>
