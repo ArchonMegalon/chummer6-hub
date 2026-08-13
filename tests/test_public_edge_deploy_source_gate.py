@@ -560,6 +560,7 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in script
     assert "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS" in script
     assert "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_RETRY_DELAY_SECONDS" in script
+    assert "CHUMMER_PUBLIC_EDGE_OVERLAY_PUBLISH_TIMEOUT_SECONDS" in script
     assert "CHUMMER_RUN_SERVICES_CONTEXT_DIR" in script
     assert "CHUMMER_RUN_SERVICES_SOURCE" in script
     assert (
@@ -645,6 +646,9 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert '--playwright-host-build-root "$PUBLIC_EDGE_HOST_BUILD_ROOT"' in script
     assert script.count("--surface-profile public-download") == 2
     assert script.count("--delivery-phase windows-preview") == 2
+    assert script.count(
+        '--publish-timeout-seconds "$OVERLAY_PUBLISH_TIMEOUT_SECONDS"'
+    ) == 2
     assert "--overlay-root \"$OVERLAY_ROOT\"" in script
     assert "--expected-build-info \"$OVERLAY_ROOT/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json\"" in script
     assert "verify_candidate_runtime_identity" in script
