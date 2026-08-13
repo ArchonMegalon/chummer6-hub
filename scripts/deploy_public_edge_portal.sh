@@ -204,6 +204,7 @@ PROGRESS="${CHUMMER_PUBLIC_EDGE_BUILD_PROGRESS:-auto}"
 POSTDEPLOY_ATTEMPTS="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS:-3}"
 POSTDEPLOY_RETRY_DELAY_SECONDS="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_RETRY_DELAY_SECONDS:-10}"
 PORTAL_READY_TIMEOUT_SECONDS="${CHUMMER_PUBLIC_EDGE_PORTAL_READY_TIMEOUT_SECONDS:-180}"
+OVERLAY_PUBLISH_TIMEOUT_SECONDS="${CHUMMER_PUBLIC_EDGE_OVERLAY_PUBLISH_TIMEOUT_SECONDS:-1800}"
 PUBLIC_EDGE_PORT="${CHUMMER_PUBLIC_EDGE_PORT:-$CANONICAL_PUBLIC_EDGE_PORT}"
 RELEASE_UPLOAD_TICKET_NEXT_EPOCH="${CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_NEXT_EPOCH-}"
 RELEASE_UPLOAD_OLD_TICKET_PATH="${CHUMMER_RELEASE_UPLOAD_OLD_TICKET_PATH-}"
@@ -647,6 +648,11 @@ if [[ ! -f "$SOURCE_ROOT/Chummer.Run.Api/Dockerfile" ]]; then
 fi
 if [[ ! "$PORTAL_READY_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "public edge portal readiness timeout must be a positive integer" >&2
+  exit 2
+fi
+if [[ ! "$OVERLAY_PUBLISH_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] \
+  || ((OVERLAY_PUBLISH_TIMEOUT_SECONDS > 7200)); then
+  echo "public edge overlay publish timeout must be an integer from 1 through 7200 seconds" >&2
   exit 2
 fi
 if [[ ! "$PUBLIC_EDGE_PORT" =~ ^[1-9][0-9]{0,4}$ || "$PUBLIC_EDGE_PORT" -gt 65535 ]]; then
@@ -4225,6 +4231,7 @@ trusted_source_python "$SOURCE_ROOT/scripts/publish_public_edge_portal_overlay.p
   --playwright-authority-sha256 "$PLAYWRIGHT_AUTHORITY_SHA256" \
   --surface-profile public-download \
   --delivery-phase windows-preview \
+  --publish-timeout-seconds "$OVERLAY_PUBLISH_TIMEOUT_SECONDS" \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$OVERLAY_STAGE_OUTPUT"
@@ -5881,6 +5888,7 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/publish_public_edge_portal_over
   --playwright-authority-sha256 "$PLAYWRIGHT_AUTHORITY_SHA256" \
   --surface-profile public-download \
   --delivery-phase windows-preview \
+  --publish-timeout-seconds "$OVERLAY_PUBLISH_TIMEOUT_SECONDS" \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$OVERLAY_ACTIVATION_OUTPUT"; then

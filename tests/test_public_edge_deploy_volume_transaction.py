@@ -4645,6 +4645,9 @@ def test_migration_loop_runs_default_preflight_before_build_mutation(
         ("CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS", "0"),
         ("CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS", "not-a-number"),
         ("CHUMMER_PUBLIC_EDGE_POSTDEPLOY_RETRY_DELAY_SECONDS", "-1"),
+        ("CHUMMER_PUBLIC_EDGE_OVERLAY_PUBLISH_TIMEOUT_SECONDS", "0"),
+        ("CHUMMER_PUBLIC_EDGE_OVERLAY_PUBLISH_TIMEOUT_SECONDS", "7201"),
+        ("CHUMMER_PUBLIC_EDGE_OVERLAY_PUBLISH_TIMEOUT_SECONDS", "not-a-number"),
     ),
 )
 def test_guarded_deploy_rejects_postdeploy_bypass_before_docker(
