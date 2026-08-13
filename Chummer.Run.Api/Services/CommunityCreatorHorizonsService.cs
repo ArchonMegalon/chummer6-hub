@@ -149,7 +149,7 @@ public sealed class CommunityCreatorHorizonsService
         _publicCreatorDiscovery = publicCreatorDiscovery;
     }
 
-    public CommunityCreatorHorizonsService(
+    internal CommunityCreatorHorizonsService(
         CommunityStore communityStore,
         InstallLinkingStoreAccess installLinkingStoreAccess,
         PublicCreatorPublicationDiscoveryService publicCreatorDiscovery)

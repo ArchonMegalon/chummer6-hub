@@ -58,7 +58,7 @@ public sealed class NexusPanContinuityService
         _installLinkingStore = installLinkingStore;
     }
 
-    public NexusPanContinuityService(InstallLinkingStoreAccess installLinkingStoreAccess)
+    internal NexusPanContinuityService(InstallLinkingStoreAccess installLinkingStoreAccess)
     {
         _installLinkingStoreAccess = installLinkingStoreAccess
             ?? throw new ArgumentNullException(nameof(installLinkingStoreAccess));
