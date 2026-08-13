@@ -1299,7 +1299,25 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         Visibility: "private",
         Timezone: "UTC",
         CountryCode: "AT"));
-    groups.JoinGroup(new JoinGroupByCodeRequest("subject.member", ownerJoinCode.Code));
+    var memberRunner = groups.CreateRunner(new CreateRunnerRequest(
+        SubjectId: "subject.member",
+        RunnerHandle: "switchback",
+        DisplayName: "Switchback"));
+    var runnerRequired = false;
+    try
+    {
+        groups.JoinGroup(new JoinGroupByCodeRequest("subject.member", ownerJoinCode.Code));
+    }
+    catch (ArgumentException ex)
+    {
+        runnerRequired = ex.Message.Contains("dossier", StringComparison.OrdinalIgnoreCase);
+    }
+
+    Assert(runnerRequired, "group invites should not create a membership before the player chooses an owned runner.");
+    var joinedRunnerGroup = groups.JoinGroup(new JoinGroupByCodeRequest("subject.member", ownerJoinCode.Code, memberRunner.DossierId));
+    var joinedRunnerMembership = joinedRunnerGroup.Memberships.Single(member => string.Equals(member.RunnerDossierId, memberRunner.DossierId, StringComparison.OrdinalIgnoreCase));
+    Assert(!string.IsNullOrWhiteSpace(joinedRunnerMembership.RunnerTicketId), "accepted group invites should mint a consumed runner ticket and bind it to the membership.");
+    Assert(ownerJoinCode.Code.Length >= 32, "browser invite links should use a high-entropy opaque code.");
     var memberJoinCodeBlocked = false;
     try
     {
