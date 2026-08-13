@@ -44,6 +44,12 @@ DEFAULT_MAX_WORKERS = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_MAX_WORKERS
 DEFAULT_TIMEOUT_RECOVERY_SECONDS = float(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_TIMEOUT_RECOVERY_SECONDS", "30"))
 DEFAULT_TIMEOUT_RECOVERY_RETRIES = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_TIMEOUT_RECOVERY_RETRIES", "1"))
 TIMEOUT_FAILURE_TOKENS = ("timed out", "timeout", "read operation timed out")
+LOCAL_BASE_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+LOCAL_BASE_MAX_WORKERS = 1
+LOCAL_BASE_REQUEST_TIMEOUT_SECONDS = 12.0
+CANONICAL_PUBLIC_ROUTE_PROOF_HOSTS = frozenset({"chummer.run", "www.chummer.run"})
+CANONICAL_PUBLIC_ROUTE_PROOF_MAX_WORKERS = 1
+CANONICAL_PUBLIC_ROUTE_PROOF_REQUEST_TIMEOUT_SECONDS = 20.0
 
 
 @dataclass
@@ -117,6 +123,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--seed-receipts",
         action="store_true",
         help="Allow seeded sample receipt routes to satisfy strict positive proof for parameterized receipt pages.")
+    parser.add_argument(
+        "--path",
+        action="append",
+        default=[],
+        help="Verify only this exact manifest route. Repeat to select multiple routes.")
     parser.add_argument(
         "--request-timeout-seconds",
         type=float,
@@ -211,6 +222,10 @@ def resolve_effective_request_timeout_seconds(base_url: str, requested_timeout_s
         return max(requested_timeout_seconds, CANONICAL_PUBLIC_ROUTE_PROOF_REQUEST_TIMEOUT_SECONDS)
 
     return requested_timeout_seconds
+
+
+def option_was_explicitly_supplied(argv: list[str], option: str) -> bool:
+    return any(argument == option or argument.startswith(f"{option}=") for argument in argv)
 
 
 def _normalize_placeholder_token(token: str) -> str:
@@ -665,8 +680,26 @@ def verify_route(
             or final_url.startswith(f"{base_url.rstrip('/')}{required_final_url_prefix}")
             or final_url.startswith(required_final_url_prefix)
         )
-        success = status == 200 and not missing_texts and final_url_ok
-        detail_parts = [f"expected 200 from public route, got {status}"]
+        redirect_location_ok = (
+            not required_redirect_location_prefix
+            or (
+                status == 302
+                and redirect_location_matches_exact_alias_contract(
+                    base_url,
+                    redirect_location,
+                    required_redirect_location_prefix,
+                )
+            )
+        )
+        status_ok = status == 302 if required_redirect_location_prefix else status == 200
+        success = status_ok and redirect_location_ok and not missing_texts and final_url_ok
+        detail_parts = [
+            (
+                f"expected exact HTTP 302 from public alias route, got {status}"
+                if required_redirect_location_prefix
+                else f"expected 200 from public route, got {status}"
+            )
+        ]
         if missing_texts:
             detail_parts.append("missing required text: " + ", ".join(missing_texts))
         if not redirect_location_ok:
@@ -851,9 +884,27 @@ def build_report(
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
-    if args.max_workers <= 0:
-        raise SystemExit("--max-workers must be positive")
+    raw_argv = list(argv) if argv is not None else list(sys.argv[1:])
+    args = parse_args(raw_argv)
+    effective_max_workers = resolve_effective_max_workers(
+        args.base_url,
+        args.max_workers,
+    )
+    effective_request_timeout_seconds = (
+        args.request_timeout_seconds
+        if base_url_is_local(args.base_url)
+        and option_was_explicitly_supplied(raw_argv, "--request-timeout-seconds")
+        else resolve_effective_request_timeout_seconds(
+            args.base_url,
+            args.request_timeout_seconds,
+        )
+    )
+    args.effective_max_workers = effective_max_workers
+    args.effective_request_timeout_seconds = effective_request_timeout_seconds
+    if args.max_retries < 0:
+        raise SystemExit("--max-retries must be non-negative")
+    if args.retry_delay_seconds < 0:
+        raise SystemExit("--retry-delay-seconds must be non-negative")
     if args.timeout_recovery_seconds <= 0:
         raise SystemExit("--timeout-recovery-seconds must be positive")
     if args.timeout_recovery_retries < 0:
