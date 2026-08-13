@@ -4259,6 +4259,40 @@ def test_isolated_overlay_process_env_scrubs_every_inherited_retired_play_transp
     assert (tmp_path / "tmp" / "data-protection-keys").stat().st_mode & 0o777 == 0o700
 
 
+def test_isolated_overlay_process_env_uses_fresh_nonproduction_erasure_key(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    inherited_secret = "must-not-survive"
+
+    first = module.build_isolated_overlay_process_env(
+        {"CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY": inherited_secret},
+        base_url="http://127.0.0.1:5010",
+        temp_root=tmp_path / "first",
+        source_root=tmp_path / "source",
+    )
+    second = module.build_isolated_overlay_process_env(
+        {"CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY": inherited_secret},
+        base_url="http://127.0.0.1:5011",
+        temp_root=tmp_path / "second",
+        source_root=tmp_path / "source",
+    )
+
+    first_secret = first["CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"]
+    second_secret = second["CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"]
+    assert first_secret != inherited_secret
+    assert second_secret != inherited_secret
+    assert first_secret != second_secret
+    assert len(first_secret) == 64
+    receipt = module.production_runtime_environment_compatibility(
+        {**first, "ASPNETCORE_ENVIRONMENT": "Production"}
+    )
+    assert receipt["status"] == "pass"
+    assert receipt["checks"]["requiredStartupSecretsPresent"] is True
+    assert first_secret not in json.dumps(receipt, sort_keys=True)
+    assert receipt["secretValuesPersisted"] is False
+
+
 @pytest.mark.parametrize(
     "environment",
     [
