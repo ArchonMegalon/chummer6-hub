@@ -99,6 +99,26 @@ def write_valid_runtime_proof(path: Path) -> str:
     )
     proof_payload["generatedAt"] = generated_at
     proof_payload["generated_at"] = generated_at
+    proof_payload["journeys_passed"] = [
+        "install_claim_restore_continue",
+        "build_explain_publish",
+        "campaign_session_recover_recap",
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop",
+    ]
+    proof_payload["proof_routes"] = [
+        "/downloads/install/avalonia-linux-x64-installer",
+        "/home/access",
+        "/home/work",
+        "/account/access",
+        "/account/work",
+        "/account/roster",
+        "/account/support",
+        "/contact",
+        "/downloads",
+        "/downloads/install/avalonia-osx-arm64-installer",
+        "/downloads/install/avalonia-win-x64-installer",
+    ]
     proof_payload["release_channel"] = {
         "status": "available",
         "path": "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
@@ -4717,11 +4737,15 @@ def test_public_download_wrapper_passes_only_private_cloudflare_credentials_path
     ):
         assert secret_name not in branch
 
-    controller = branch.index('"$TRUSTED_PYTHON" -I "$PUBLIC_DOWNLOAD_CONTROLLER"')
+    controller = branch.index(
+        'CHUMMER_PUBLIC_EDGE_DEPLOY_LEASE_FD="$deploy_lock_lease_fd"'
+    )
     clean_env = branch.rindex('"$TRUSTED_ENV" -i', 0, controller)
     assert clean_env < controller
     controller_environment = branch[clean_env:controller]
     assert "HOME=" not in controller_environment
+    assert 'exec {public_download_controller_fd}<"$PUBLIC_DOWNLOAD_CONTROLLER"' in branch
+    assert 'exec(code, namespace, namespace)' in branch
     assert "compose_cli stop" not in branch
     assert "docker stop" not in branch
 
@@ -4854,7 +4878,8 @@ def test_deploy_bounds_initial_release_shelf_cutover_and_returns_to_steady() -> 
         encoding="utf-8"
     )
 
-    assert "deploy|recover|initial-release-shelf-cutover" in deploy
+    assert "deploy|recover|recover-adopt-verified-prior-runtime-baseline" in deploy
+    assert "initial-release-shelf-cutover|initial-release-shelf-cutover-recover" in deploy
     assert "configure_compose_operation initial-release-shelf-cutover" in deploy
     assert "configure_compose_operation initial-release-shelf-cutover-recover" in deploy
     assert 'CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED="$layout_v1_required"' in deploy

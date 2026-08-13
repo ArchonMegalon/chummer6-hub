@@ -154,6 +154,7 @@ RELEASE_PROOF_REQUIRED_ROUTE_PREFIX = (
     "/home/work",
     "/account/access",
     "/account/work",
+    "/account/roster",
     "/account/support",
     "/contact",
     "/downloads",

@@ -41,6 +41,11 @@ class _RouteFixtureHandler(BaseHTTPRequestHandler):
         if self.path == "/public-required":
             self._send_text(200, "public route with flagship marker")
             return
+        if self.path == "/player":
+            self.send_response(302)
+            self.send_header("Location", "/mobile/player#")
+            self.end_headers()
+            return
         if self.path == "/flaky-timeout":
             if self.__class__.request_counts[self.path] == 1:
                 time.sleep(0.25)

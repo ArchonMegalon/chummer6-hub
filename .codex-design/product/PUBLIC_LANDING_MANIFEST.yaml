@@ -1158,6 +1158,16 @@ public_routes:
   required_redirect_location_prefix: /mobile/player
   placeholder_allowed: false
   placeholder_requirements: bounded play alias only
+- path: /jammer
+  title: Jammer Companion alias
+  audience: public
+  purpose: play_projection
+  requires_auth: false
+  guest_fallback: /jammer
+  must_exist: true
+  required_redirect_location_prefix: /mobile/player
+  placeholder_allowed: false
+  placeholder_requirements: no-authority Jammer Companion alias only
 - path: /gm
   title: GM alias
   audience: public
