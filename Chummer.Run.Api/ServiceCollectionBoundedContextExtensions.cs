@@ -276,11 +276,11 @@ internal static class ServiceCollectionBoundedContextExtensions
         bool deferAuthorityActivation)
     {
         services.AddSingleton<InstallLinkingStoreActivation>();
+        services.AddSingleton<InstallLinkingStoreAccess>();
         services.AddSingleton<IInstallLinkingStoreReadinessProbe>(static provider =>
             provider.GetRequiredService<InstallLinkingStoreActivation>());
         if (deferAuthorityActivation)
         {
-            services.AddSingleton<InstallLinkingStoreAccess>();
             services.AddSingleton(static provider => new InstallLinkingService(
                 provider.GetRequiredService<InstallLinkingStoreAccess>(),
                 provider.GetRequiredService<IConfiguration>(),

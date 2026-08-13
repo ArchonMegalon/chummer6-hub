@@ -68,6 +68,20 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
         Assert.Equal(0, repeated.RecordsRemoved);
     }
 
+    [Fact]
+    public void Public_constructor_defers_install_linking_authority_until_erasure_runs()
+    {
+        System.Reflection.ConstructorInfo constructor = Assert.Single(
+            typeof(AccountAuxiliaryDataErasureService).GetConstructors());
+        Type[] dependencyTypes = constructor
+            .GetParameters()
+            .Select(static parameter => parameter.ParameterType)
+            .ToArray();
+
+        Assert.Contains(typeof(InstallLinkingStoreAccess), dependencyTypes);
+        Assert.DoesNotContain(typeof(InstallLinkingStore), dependencyTypes);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _directory = Path.Combine(
@@ -122,7 +136,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
                 ArtifactRequests,
                 PayFunnels,
                 InstallSnapshots,
-                InstallLinking,
+                new InstallLinkingStoreAccess(InstallLinking),
                 Venues,
                 VideoFoundry,
                 PromptFoundry,
