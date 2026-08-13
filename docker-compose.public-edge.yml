@@ -242,6 +242,8 @@ services:
     depends_on:
       chummer-portal-volume-init:
         condition: service_completed_successfully
+      chummer-public-blazor:
+        condition: service_healthy
       chummer-run-identity:
         condition: service_healthy
       support-progress-mock:
