@@ -173,6 +173,9 @@ RETIRED_PUBLIC_PLAY_PROXY_ENV_NAMES = frozenset(
         "CHUMMER_PUBLIC_PLAY_PROXY_ALLOWLIST",
     }
 )
+REQUIRED_STAGED_STARTUP_SECRET_NAMES = frozenset(
+    {"CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"}
+)
 SEALED_PYTHON_PROGRAM_WRAPPER = """
 import hashlib
 import os
@@ -3032,6 +3035,10 @@ def production_runtime_environment_compatibility(
         "canonicalHostAllowed": bool(
             canonical_host and canonical_host in allowed_hosts
         ),
+        "requiredStartupSecretsPresent": all(
+            bool(str(environment.get(name) or "").strip())
+            for name in REQUIRED_STAGED_STARTUP_SECRET_NAMES
+        ),
     }
     return {
         "contractName": "chummer.public_edge_production_runtime_compatibility.v1",
@@ -3064,6 +3071,10 @@ def build_isolated_overlay_process_env(
     env["CHUMMER_PUBLIC_CANONICAL_ORIGIN"] = "https://chummer.run"
     env["CHUMMER_PUBLIC_ALLOWED_HOSTS"] = "chummer.run;localhost;127.0.0.1"
     env["AllowedHosts"] = "chummer.run;localhost;127.0.0.1"
+    # The verifier runs against disposable stores and must never inherit or read
+    # the live account-erasure receipt key. Generate an invocation-local key so
+    # startup exercises the required-key path without exposing production state.
+    env["CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"] = secrets.token_hex(32)
     for name in ("HTTP_PORTS", "HTTPS_PORTS", "ASPNETCORE_HTTP_PORTS", "ASPNETCORE_HTTPS_PORTS"):
         env.pop(name, None)
     env["TMPDIR"] = str(temp_root)
