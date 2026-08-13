@@ -1,11 +1,44 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 API = ROOT / "Chummer.Run.Api"
-PLAY_ROOT = ROOT.parent / "chummer-play" / "src" / "Chummer.Play.Web" / "wwwroot"
+
+
+def _play_web_root() -> Path:
+    configured = (
+        os.environ.get("CHUMMER_PLAY_SOURCE_ROOT", "").strip()
+        or os.environ.get("CHUMMER_PLAY_ROOT", "").strip()
+    )
+    candidates: list[Path] = []
+    if configured:
+        candidates.append(Path(configured))
+    candidates.extend(
+        (
+            ROOT.parent / "chummer-play",
+            ROOT.parent.parent / "chummer-play",
+            Path("/docker/chummercomplete/chummer-play"),
+        )
+    )
+    for root in candidates:
+        web = root / "src" / "Chummer.Play.Web"
+        if (web / "Components" / "App.razor").is_file() or (
+            web / "wwwroot" / "service-worker.js"
+        ).is_file():
+            return web
+    pytest.skip(
+        "The actual chummer-play source checkout is not available; set "
+        "CHUMMER_PLAY_SOURCE_ROOT to enable the Play shell contract checks."
+    )
+
+
+def _play_wwwroot() -> Path:
+    return _play_web_root() / "wwwroot"
 
 
 def test_program_has_no_public_projection_transport_and_private_routes_are_denied_first() -> None:
@@ -93,7 +126,7 @@ def test_local_role_shell_uses_dedicated_no_inline_layout_and_restrictive_csp() 
 
 
 def test_install_only_play_shell_has_no_blazor_boot_or_circuit_script() -> None:
-    play_web = ROOT.parent / "chummer-play" / "src" / "Chummer.Play.Web"
+    play_web = _play_web_root()
     app = (play_web / "Components" / "App.razor").read_text(encoding="utf-8")
     page = (play_web / "Components" / "Pages" / "MobileTurnCompanionPage.razor").read_text(encoding="utf-8")
 
@@ -104,7 +137,7 @@ def test_install_only_play_shell_has_no_blazor_boot_or_circuit_script() -> None:
 
 
 def test_private_play_api_null_remote_ip_fails_closed() -> None:
-    play_web = ROOT.parent / "chummer-play" / "src" / "Chummer.Play.Web"
+    play_web = _play_web_root()
     application = (play_web / "PlayWebApplication.cs").read_text(encoding="utf-8")
 
     trust_boundary = application.split("public static bool IsTrustedPlayApiRequest", 1)[1].split(
@@ -121,7 +154,7 @@ def test_private_play_api_null_remote_ip_fails_closed() -> None:
 
 
 def test_service_workers_use_exact_mime_checked_atomic_critical_precache() -> None:
-    for worker in (API / "wwwroot" / "service-worker.js", PLAY_ROOT / "service-worker.js"):
+    for worker in (API / "wwwroot" / "service-worker.js", _play_wwwroot() / "service-worker.js"):
         source = worker.read_text(encoding="utf-8")
         assert "PUBLIC_CACHEABLE_ASSETS = new Map" in source
         assert "CRITICAL_SHELL_ASSETS" in source
@@ -137,7 +170,7 @@ def test_qr_control_and_display_mode_are_bidirectional() -> None:
     partial = (API / "Views" / "Shared" / "_MobileAppHandoff.cshtml").read_text(encoding="utf-8")
     handoff = (API / "wwwroot" / "js" / "mobile-app-handoff.js").read_text(encoding="utf-8")
     install_source = (API / "wwwroot" / "mobile-install-shell.js").read_text(encoding="utf-8")
-    install_projection = (PLAY_ROOT / "mobile-install-shell.js").read_text(encoding="utf-8")
+    install_projection = (_play_wwwroot() / "mobile-install-shell.js").read_text(encoding="utf-8")
 
     assert 'aria-expanded="false"' in partial
     qr_card_tag = next(
