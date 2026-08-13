@@ -1422,6 +1422,7 @@ def bind_state_volume_inventory(
     suffix = hashlib.sha256(cutover_id.encode("utf-8")).hexdigest()[:24]
     observed_ids: set[str] = set()
     observed_incumbent = False
+    observed_origin_media_worker = False
     for consumer in consumers:
         if (
             not isinstance(consumer, dict)
@@ -1443,7 +1444,7 @@ def bind_state_volume_inventory(
             is None
             or re.fullmatch(r"sha256:[0-9a-f]{64}", image_id) is None
             or consumer.get("composeOneoff") not in {"False", "True"}
-            or consumer.get("running") is not False
+            or type(consumer.get("running")) is not bool
             or consumer.get("volumeDestination") != "/app/state"
         ):
             raise ValueError(
@@ -1458,11 +1459,30 @@ def bind_state_volume_inventory(
                 or consumer.get("composeService") != "chummer-portal"
                 or consumer.get("jobName") is not None
                 or consumer.get("readWrite") is not True
+                or consumer.get("running") is not False
             ):
                 raise ValueError(
                     "InstallLinking incumbent volume consumer is invalid"
                 )
             observed_incumbent = True
+            continue
+        if consumer.get("composeService") == "chummer-origin-media-worker":
+            if (
+                observed_origin_media_worker
+                or consumer.get("classification")
+                != "governed_read_only_origin_media_worker"
+                or consumer.get("containerName")
+                != "chummer6-hub-chummer-origin-media-worker-1"
+                or consumer.get("composeProject") != "chummer6-hub"
+                or consumer.get("composeOneoff") != "False"
+                or consumer.get("jobName") is not None
+                or consumer.get("readWrite") is not False
+                or consumer.get("running") is not True
+            ):
+                raise ValueError(
+                    "InstallLinking Origin media volume consumer is invalid"
+                )
+            observed_origin_media_worker = True
             continue
         job_name = consumer.get("jobName")
         if not isinstance(job_name, str) or (
@@ -1504,6 +1524,7 @@ def bind_state_volume_inventory(
             )
             or consumer.get("composeOneoff") != "False"
             or consumer.get("readWrite") is not False
+            or consumer.get("running") is not False
         ):
             raise ValueError(
                 "InstallLinking governed volume consumer is invalid"

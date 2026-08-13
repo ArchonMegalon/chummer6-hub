@@ -637,6 +637,83 @@ def test_state_volume_inventory_accepts_retained_governed_proof(
     assert payload["consumers"] == [consumer]
 
 
+def test_state_volume_inventory_accepts_governed_origin_media_reader(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    consumer = {
+        "classification": "governed_read_only_origin_media_worker",
+        "composeOneoff": "False",
+        "composeProject": "chummer6-hub",
+        "composeService": "chummer-origin-media-worker",
+        "containerId": "a" * 64,
+        "containerName": "chummer6-hub-chummer-origin-media-worker-1",
+        "imageId": "sha256:" + "b" * 64,
+        "jobName": None,
+        "readWrite": False,
+        "running": True,
+        "volumeDestination": "/app/state",
+    }
+    inventory_path, inventory_sha256 = state_volume_inventory(
+        module,
+        tmp_path,
+        consumers=[consumer],
+    )
+
+    _, bound_sha256, payload = module.bind_state_volume_inventory(
+        inventory_path,
+        expected_sha256=inventory_sha256,
+        attempt_id="attempt01",
+        cutover_id="2026-07-17T12:00:00Z",
+        candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+        mutation_lock_token_sha256="f" * 64,
+    )
+
+    assert bound_sha256 == inventory_sha256
+    assert payload["consumers"] == [consumer]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("running", False), ("readWrite", True), ("composeOneoff", "True")],
+)
+def test_state_volume_inventory_rejects_invalid_origin_media_reader(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    module = load_module()
+    consumer = {
+        "classification": "governed_read_only_origin_media_worker",
+        "composeOneoff": "False",
+        "composeProject": "chummer6-hub",
+        "composeService": "chummer-origin-media-worker",
+        "containerId": "a" * 64,
+        "containerName": "chummer6-hub-chummer-origin-media-worker-1",
+        "imageId": "sha256:" + "b" * 64,
+        "jobName": None,
+        "readWrite": False,
+        "running": True,
+        "volumeDestination": "/app/state",
+    }
+    consumer[field] = value
+    inventory_path, inventory_sha256 = state_volume_inventory(
+        module,
+        tmp_path,
+        consumers=[consumer],
+    )
+
+    with pytest.raises(ValueError, match="Origin media volume consumer"):
+        module.bind_state_volume_inventory(
+            inventory_path,
+            expected_sha256=inventory_sha256,
+            attempt_id="attempt01",
+            cutover_id="2026-07-17T12:00:00Z",
+            candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+            mutation_lock_token_sha256="f" * 64,
+        )
+
+
 def test_state_volume_inventory_rejects_retained_classification_for_current(
     tmp_path: Path,
 ) -> None:

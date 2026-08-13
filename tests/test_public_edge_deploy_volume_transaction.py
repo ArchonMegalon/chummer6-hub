@@ -33,6 +33,8 @@ PRIOR_TUNNEL_REPLICA_CONTAINER_ID = "f" * 64
 POSTQUIESCE_PROOF_CONTAINER_ID = "d" * 64
 ORPHAN_STATE_CONSUMER_CONTAINER_ID = "e" * 64
 RETAINED_PROOF_CONTAINER_ID = "8" * 64
+ORIGIN_MEDIA_WORKER_CONTAINER_ID = "9" * 64
+ORIGIN_MEDIA_WORKER_IMAGE_ID = "sha256:" + "a" * 64
 TOPOLOGY_B_GUARD_MESSAGE = (
     "canonical public edge mutation is blocked while topology-B downloads "
     "authority exists"
@@ -1013,12 +1015,17 @@ def write_fake_blue_green_docker(path: Path) -> None:
     path.write_text(
         r'''#!/bin/sh
 set -eu
+FAKE_ORIGIN_MEDIA_WORKER_CONTAINER_ID="${FAKE_ORIGIN_MEDIA_WORKER_CONTAINER_ID:-9999999999999999999999999999999999999999999999999999999999999999}"
+FAKE_ORIGIN_MEDIA_WORKER_IMAGE_ID="${FAKE_ORIGIN_MEDIA_WORKER_IMAGE_ID:-sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
 printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG"
 printf 'docker:%s\n' "$*" >> "$FAKE_EVENT_LOG"
 case "$*" in
   *" config --format json") cat "$FAKE_COMPOSE_CONFIG_JSON"; exit 0;;
   "container ls --all --quiet --no-trunc --filter volume=chummer6-hub_chummer-run-api-state")
     printf '%s\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID"
+    if [ "${FAKE_ORIGIN_MEDIA_STATE_VOLUME_READER:-0}" = 1 ]; then
+      printf '%s\n' "$FAKE_ORIGIN_MEDIA_WORKER_CONTAINER_ID"
+    fi
     if [ "${FAKE_RETAINED_STATE_VOLUME_PROOF:-0}" = 1 ]; then
       printf '%s\n' "$FAKE_RETAINED_PROOF_CONTAINER_ID"
     fi
@@ -1034,6 +1041,16 @@ case "$*" in
     ;;
   "container inspect --format {{json .Id}}"*" $FAKE_PRIOR_PORTAL_CONTAINER_ID")
     printf '"%s" "/chummer6-hub-chummer-portal-1" "%s" false {"com.docker.compose.oneoff":"%s","com.docker.compose.project":"chummer6-hub","com.docker.compose.service":"chummer-portal"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":true,"Type":"volume"}]\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID" "$FAKE_PRIOR_PORTAL_IMAGE_ID" "${FAKE_PRIOR_PORTAL_ONEOFF:-False}"
+    ;;
+  "container inspect --format {{json .Id}}"*" $FAKE_ORIGIN_MEDIA_WORKER_CONTAINER_ID")
+    worker_running=true
+    worker_rw=false
+    if [ "${FAKE_ORIGIN_MEDIA_STATE_VOLUME_READER_INVALID:-}" = stopped ]; then
+      worker_running=false
+    elif [ "${FAKE_ORIGIN_MEDIA_STATE_VOLUME_READER_INVALID:-}" = rw ]; then
+      worker_rw=true
+    fi
+    printf '"%s" "/chummer6-hub-chummer-origin-media-worker-1" "%s" %s {"com.docker.compose.image":"%s","com.docker.compose.oneoff":"False","com.docker.compose.project":"chummer6-hub","com.docker.compose.service":"chummer-origin-media-worker"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":%s,"Type":"volume"}]\n' "$FAKE_ORIGIN_MEDIA_WORKER_CONTAINER_ID" "$FAKE_ORIGIN_MEDIA_WORKER_IMAGE_ID" "$worker_running" "$FAKE_ORIGIN_MEDIA_WORKER_IMAGE_ID" "$worker_rw"
     ;;
   "container inspect --format {{json .Id}}"*" $FAKE_POSTQUIESCE_PROOF_CONTAINER_ID")
     attempt="$(/usr/bin/cat "$FAKE_POSTQUIESCE_COMPLETED_STATE")"
@@ -2324,6 +2341,105 @@ def test_guarded_deploy_accepts_retained_prior_readonly_local_store_proof(
         )
         assert retained[0]["running"] is False
         assert retained[0]["readWrite"] is False
+
+
+def test_guarded_deploy_accepts_governed_origin_media_readonly_consumer(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(tmp_path / "docker.log"),
+            "FAKE_POSTDEPLOY_LOG": str(tmp_path / "postdeploy.json"),
+            "FAKE_ORIGIN_MEDIA_STATE_VOLUME_READER": "1",
+            "FAKE_ORIGIN_MEDIA_WORKER_CONTAINER_ID": (
+                ORIGIN_MEDIA_WORKER_CONTAINER_ID
+            ),
+            "FAKE_ORIGIN_MEDIA_WORKER_IMAGE_ID": ORIGIN_MEDIA_WORKER_IMAGE_ID,
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    cutover_root = Path(env["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"]).parent
+    inventories = sorted(
+        cutover_root.glob("INSTALL_LINKING_STATE_VOLUME_INVENTORY.*.json")
+    )
+    assert len(inventories) == 2
+    for inventory in inventories:
+        consumers = json.loads(inventory.read_text(encoding="utf-8"))["consumers"]
+        worker = next(
+            consumer
+            for consumer in consumers
+            if consumer["containerId"] == ORIGIN_MEDIA_WORKER_CONTAINER_ID
+        )
+        assert worker["classification"] == (
+            "governed_read_only_origin_media_worker"
+        )
+        assert worker["running"] is True
+        assert worker["readWrite"] is False
+
+
+@pytest.mark.parametrize("invalid_posture", ["stopped", "rw"])
+def test_guarded_deploy_rejects_invalid_origin_media_volume_consumer(
+    tmp_path: Path,
+    invalid_posture: str,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(tmp_path / "docker.log"),
+            "FAKE_ORIGIN_MEDIA_STATE_VOLUME_READER": "1",
+            "FAKE_ORIGIN_MEDIA_STATE_VOLUME_READER_INVALID": invalid_posture,
+            "FAKE_ORIGIN_MEDIA_WORKER_CONTAINER_ID": (
+                ORIGIN_MEDIA_WORKER_CONTAINER_ID
+            ),
+            "FAKE_ORIGIN_MEDIA_WORKER_IMAGE_ID": ORIGIN_MEDIA_WORKER_IMAGE_ID,
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "post-quiesce state-volume consumer inventory failed" in result.stderr
 
 
 def test_guarded_deploy_rejects_orphan_state_volume_consumer_before_reproof(
