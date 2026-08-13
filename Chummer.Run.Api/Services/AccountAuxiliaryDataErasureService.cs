@@ -28,7 +28,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
     private readonly HorizonArtifactRequestReceiptStore _artifactRequests;
     private readonly PayFunnelsBillingStore _payFunnels;
     private readonly InstallLinkedWorkspaceSnapshotStore _installSnapshots;
-    private readonly InstallLinkingStore _installLinking;
+    private readonly InstallLinkingStoreAccess _installLinking;
     private readonly GmSessionVenueStore _venues;
     private readonly GmSessionVideoFoundryStore _videoFoundry;
     private readonly PromptFoundryStore _promptFoundry;
@@ -43,7 +43,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         HorizonArtifactRequestReceiptStore artifactRequests,
         PayFunnelsBillingStore payFunnels,
         InstallLinkedWorkspaceSnapshotStore installSnapshots,
-        InstallLinkingStore installLinking,
+        InstallLinkingStoreAccess installLinking,
         GmSessionVenueStore venues,
         GmSessionVideoFoundryStore videoFoundry,
         PromptFoundryStore promptFoundry,
@@ -100,7 +100,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
                 _artifactRequests.PersistLocked),
             ["payfunnels_billing"] = ErasePayFunnels(normalizedUser),
             ["install_workspace_snapshots"] = EraseInstallSnapshots(normalizedUser, normalizedSubject),
-            ["install_linking"] = _installLinking
+            ["install_linking"] = _installLinking.GetRequired()
                 .ErasePrincipal(normalizedUser, normalizedSubject)
                 .RecordsRemoved,
             ["gm_session_venues"] = EraseVenues(normalizedUser, normalizedSubject),
