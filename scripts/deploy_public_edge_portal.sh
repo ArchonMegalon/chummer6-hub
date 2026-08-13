@@ -4889,6 +4889,7 @@ container_name = name[1:]
 project = labels.get("com.docker.compose.project")
 service = labels.get("com.docker.compose.service")
 oneoff = labels.get("com.docker.compose.oneoff")
+compose_image_id = labels.get("com.docker.compose.image")
 classification = ""
 job_name = None
 if container_id == incumbent_id:
@@ -4904,6 +4905,22 @@ if container_id == incumbent_id:
     ):
         raise SystemExit(1)
     classification = "incumbent_portal"
+elif service == "chummer-origin-media-worker":
+    # The governed Origin Dossier worker continuously reads character source
+    # material from the portal state volume. It has its own writable output
+    # volume, but this shared mount is deliberately read-only. Keep it live
+    # while the portal writer is quiesced and bind its exact Compose identity;
+    # every other sibling consumer still fails closed below.
+    if (
+        container_name != "chummer6-hub-chummer-origin-media-worker-1"
+        or project != "chummer6-hub"
+        or oneoff != "False"
+        or compose_image_id != image_id
+        or running is not True
+        or mount["RW"] is not False
+    ):
+        raise SystemExit(1)
+    classification = "governed_read_only_origin_media_worker"
 else:
     current_suffix = hashlib.sha256(
         cutover_id.encode("utf-8")
