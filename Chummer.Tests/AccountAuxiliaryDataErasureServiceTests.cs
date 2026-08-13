@@ -85,6 +85,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
     [Theory]
     [InlineData(typeof(InstallLinkingService))]
     [InlineData(typeof(PersonalizedInstallScriptService))]
+    [InlineData(typeof(CommunityCreatorHorizonsService))]
+    [InlineData(typeof(NexusPanContinuityService))]
     public void Install_linking_services_expose_one_unambiguous_dependency_injection_constructor(Type serviceType)
     {
         System.Reflection.ConstructorInfo constructor = Assert.Single(serviceType.GetConstructors());
