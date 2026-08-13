@@ -178,6 +178,7 @@ def render(output: Path, tmp_path: Path) -> str:
         "CHUMMER_PUBLIC_DOWNLOAD_PROJECTION_VOLUME": VOLUMES["projection"],
         "CHUMMER_PUBLIC_DOWNLOAD_PROOFS_VOLUME": VOLUMES["proofs"],
         "CHUMMER_PUBLIC_DOWNLOAD_SHELF_VOLUME": VOLUMES["shelf"],
+        "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY": "a" * 64,
     }
     return subprocess.run(
         [
@@ -331,6 +332,13 @@ def test_materialized_runtime_is_exact_isolated_portal_and_initializer_closure(
     assert "public-download-shelf:/downloads-source:ro" in portal["volumes"]
     assert portal["environment"]["CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED"] == (
         "false"
+    )
+    assert portal["environment"]["CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH"] == (
+        "/app/state/account-erasure-journal.json"
+    )
+    assert portal["environment"]["CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"] == (
+        "${CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY:"
+        "?Set a persistent 64-character lowercase hexadecimal account-erasure receipt HMAC key}"
     )
     assert not any("TOKEN" in key for key in portal["environment"])
     assert portal["environment"]["AllowedHosts"] == (

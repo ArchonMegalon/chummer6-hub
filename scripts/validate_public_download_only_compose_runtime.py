@@ -133,6 +133,9 @@ PUBLIC_PORTAL_ENVIRONMENT = {
     "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run;www.chummer.run",
     "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
     "CHUMMER_PUBLIC_CANON_ROOT": "/app",
+    "CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH": (
+        "/app/state/account-erasure-journal.json"
+    ),
     "CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT": "/fleet-artifacts",
     "CHUMMER_DATA_PROTECTION_KEYS_PATH": (
         "/app/state/data-protection-keys-v2"
@@ -349,17 +352,26 @@ def validate_materialization_authority(
         materialized_services.get(PORTAL_SERVICE),
         "materialized portal",
     )
+    materialized_environment = mapping(
+        materialized_portal.get("environment"),
+        "materialized portal environment",
+    )
     if (
         "env_file" in materialized_portal
-        or set(mapping(
-            materialized_portal.get("environment"),
-            "materialized portal environment",
-        ))
+        or set(materialized_environment)
         != set(PUBLIC_PORTAL_ENVIRONMENT).union(
             {
+                "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY",
                 "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED",
                 "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED",
             }
+        )
+        or materialized_environment.get(
+            "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"
+        )
+        != (
+            "${CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY:"
+            "?Set a persistent 64-character lowercase hexadecimal account-erasure receipt HMAC key}"
         )
     ):
         raise ValueError("materialized portal environment closure drifted")
@@ -643,11 +655,24 @@ def validate(
         raise ValueError("rendered portal core limit drifted")
 
     environment = mapping(portal.get("environment"), "rendered portal environment")
+    account_erasure_hmac_key = environment.get(
+        "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"
+    )
+    if (
+        not isinstance(account_erasure_hmac_key, str)
+        or re.fullmatch(r"[0-9a-f]{64}", account_erasure_hmac_key) is None
+    ):
+        raise ValueError(
+            "rendered portal account-erasure receipt HMAC key must be one "
+            "persistent 64-character lowercase hexadecimal secret"
+        )
     expected_environment = {
         **PUBLIC_PORTAL_ENVIRONMENT,
         **POSTURES[operation],
     }
-    if environment != expected_environment:
+    environment_without_secrets = dict(environment)
+    del environment_without_secrets["CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"]
+    if environment_without_secrets != expected_environment:
         raise ValueError("rendered portal environment allowlist drifted")
 
     if portal.get("extra_hosts") not in (None, []):

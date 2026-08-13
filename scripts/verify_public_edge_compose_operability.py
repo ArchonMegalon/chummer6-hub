@@ -55,6 +55,15 @@ PLAY_REVIEW_ACCESS_COMPOSE_CONTRACTS = {
     "CHUMMER_PLAY_REVIEW_ACCESS_SUBJECT_ID": "${CHUMMER_PLAY_REVIEW_ACCESS_SUBJECT_ID:-}",
     "CHUMMER_PLAY_REVIEW_ACCESS_DISPLAY_NAME": "${CHUMMER_PLAY_REVIEW_ACCESS_DISPLAY_NAME:-Play Reviewer}",
 }
+ACCOUNT_ERASURE_COMPOSE_CONTRACTS = {
+    "CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH": (
+        "/app/state/account-erasure-journal.json"
+    ),
+    "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY": (
+        "${CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY:"
+        "?Set a persistent 64-character lowercase hexadecimal account-erasure receipt HMAC key}"
+    ),
+}
 
 DEPENDENCY_CONTRACTS = {
     "chummer-public-blazor": {"chummer-presentation-api"},
@@ -306,6 +315,12 @@ def validate_compose(payload: dict[str, Any]) -> list[str]:
                 "an explicit empty-default opt-in"
             )
         if isinstance(environment, dict):
+            for key, expected in ACCOUNT_ERASURE_COMPOSE_CONTRACTS.items():
+                if environment.get(key) != expected:
+                    failures.append(
+                        f"chummer-portal account-erasure configuration {key} "
+                        f"must use the durable fail-closed value {expected}"
+                    )
             for key, expected in PLAY_REVIEW_ACCESS_COMPOSE_CONTRACTS.items():
                 if environment.get(key) != expected:
                     failures.append(

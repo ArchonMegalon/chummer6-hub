@@ -265,6 +265,11 @@ services:
       CHUMMER_PUBLIC_CANON_ROOT: /app
       CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT: /fleet-artifacts
       CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
+      # Account-erasure progress must survive restarts independently from the
+      # mutable community/support store files. The receipt key is operator-owned
+      # and persistent so an in-flight deletion remains authenticated after restart.
+      CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH: /app/state/account-erasure-journal.json
+      CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY: ${CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY:?Set a persistent 64-character lowercase hexadecimal account-erasure receipt HMAC key}
       # Core's delegated GM edit boundary requires an explicit, pre-provisioned
       # directory and never falls back to temporary or in-memory character state.
       Chummer__CoreGmCharacterEdits__WorkspaceStorePath: /app/state/core-workspaces
