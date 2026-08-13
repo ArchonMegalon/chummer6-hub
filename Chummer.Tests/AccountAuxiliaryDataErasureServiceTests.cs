@@ -82,6 +82,21 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
         Assert.DoesNotContain(typeof(InstallLinkingStore), dependencyTypes);
     }
 
+    [Theory]
+    [InlineData(typeof(InstallLinkingService))]
+    [InlineData(typeof(PersonalizedInstallScriptService))]
+    public void Install_linking_services_expose_one_unambiguous_dependency_injection_constructor(Type serviceType)
+    {
+        System.Reflection.ConstructorInfo constructor = Assert.Single(serviceType.GetConstructors());
+        Type[] dependencyTypes = constructor
+            .GetParameters()
+            .Select(static parameter => parameter.ParameterType)
+            .ToArray();
+
+        Assert.Contains(typeof(InstallLinkingStore), dependencyTypes);
+        Assert.DoesNotContain(typeof(InstallLinkingStoreAccess), dependencyTypes);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _directory = Path.Combine(

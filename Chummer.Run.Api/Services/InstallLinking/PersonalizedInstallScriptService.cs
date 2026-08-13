@@ -69,7 +69,7 @@ public sealed class PersonalizedInstallScriptService
     {
     }
 
-    public PersonalizedInstallScriptService(
+    internal PersonalizedInstallScriptService(
         InstallLinkingStoreAccess storeAccess,
         IConfiguration configuration,
         IInstallLinkingStoreReadinessProbe readinessProbe)

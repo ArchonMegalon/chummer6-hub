@@ -49,7 +49,7 @@ public sealed class InstallLinkingService
     {
     }
 
-    public InstallLinkingService(
+    internal InstallLinkingService(
         InstallLinkingStoreAccess storeAccess,
         IConfiguration configuration,
         IInstallLinkingStoreReadinessProbe readinessProbe)
