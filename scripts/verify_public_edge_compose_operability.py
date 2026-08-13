@@ -48,6 +48,13 @@ CORE_GM_WORKSPACE_CONFIGURATION_KEY = (
 CORE_GM_WORKSPACE_DIRECTORY = "/app/state/core-workspaces"
 REGISTRY_BASE_URL_CONFIGURATION_KEY = "CHUMMER_HUB_REGISTRY_BASE_URL"
 REGISTRY_BASE_URL_COMPOSE_VALUE = "${CHUMMER_HUB_REGISTRY_BASE_URL:-}"
+PLAY_REVIEW_ACCESS_COMPOSE_CONTRACTS = {
+    "CHUMMER_PLAY_REVIEW_ACCESS_ENABLED": "${CHUMMER_PLAY_REVIEW_ACCESS_ENABLED:-false}",
+    "CHUMMER_PLAY_REVIEW_ACCESS_USERNAME": "${CHUMMER_PLAY_REVIEW_ACCESS_USERNAME:-}",
+    "CHUMMER_PLAY_REVIEW_ACCESS_PASSWORD_SHA256": "${CHUMMER_PLAY_REVIEW_ACCESS_PASSWORD_SHA256:-}",
+    "CHUMMER_PLAY_REVIEW_ACCESS_SUBJECT_ID": "${CHUMMER_PLAY_REVIEW_ACCESS_SUBJECT_ID:-}",
+    "CHUMMER_PLAY_REVIEW_ACCESS_DISPLAY_NAME": "${CHUMMER_PLAY_REVIEW_ACCESS_DISPLAY_NAME:-Play Reviewer}",
+}
 
 DEPENDENCY_CONTRACTS = {
     "chummer-public-blazor": {"chummer-presentation-api"},
@@ -298,6 +305,13 @@ def validate_compose(payload: dict[str, Any]) -> list[str]:
                 "chummer-portal must expose the private Registry base URL as "
                 "an explicit empty-default opt-in"
             )
+        if isinstance(environment, dict):
+            for key, expected in PLAY_REVIEW_ACCESS_COMPOSE_CONTRACTS.items():
+                if environment.get(key) != expected:
+                    failures.append(
+                        f"chummer-portal Play review configuration {key} must use "
+                        f"the fail-closed value {expected}"
+                    )
 
     return failures
 

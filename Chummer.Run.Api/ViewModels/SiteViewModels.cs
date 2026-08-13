@@ -2457,6 +2457,8 @@ public sealed record AuthPageViewModel(
     bool GoogleAvailable,
     string? GoogleUnavailableReason,
     string GoogleStartHref,
+    bool PlayReviewAccessAvailable,
+    string? PlayReviewError,
     PublicAccessPostureViewModel? AccessPosture = null);
 
 public sealed record AuthMessagePageViewModel(

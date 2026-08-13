@@ -3,7 +3,8 @@
   <PropertyGroup>
     <TargetFrameworks Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == 'true'">net10.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(RunIdentityTestsOnly)' == 'true'">net10.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true'">net10.0;net10.0-windows</TargetFrameworks>
+    <TargetFrameworks Condition="'$(RunPlayReviewAccessTestsOnly)' == 'true'">net10.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true'">net10.0;net10.0-windows</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -12,7 +13,8 @@
     <TestTfmsInParallel>false</TestTfmsInParallel>
     <RunBrowserSurfaceProxyTimeoutTestsOnly Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == ''">false</RunBrowserSurfaceProxyTimeoutTestsOnly>
     <RunIdentityTestsOnly Condition="'$(RunIdentityTestsOnly)' == ''">false</RunIdentityTestsOnly>
-    <EnableDefaultCompileItems Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == 'true' or '$(RunIdentityTestsOnly)' == 'true'">false</EnableDefaultCompileItems>
+    <RunPlayReviewAccessTestsOnly Condition="'$(RunPlayReviewAccessTestsOnly)' == ''">false</RunPlayReviewAccessTestsOnly>
+    <EnableDefaultCompileItems Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == 'true' or '$(RunIdentityTestsOnly)' == 'true' or '$(RunPlayReviewAccessTestsOnly)' == 'true'">false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,7 +32,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true'">
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true'">
     <Reference Include="Chummer.Media.Contracts">
       <HintPath>$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>
     </Reference>
@@ -65,7 +67,17 @@
     <Compile Include="IdentityEmailWebhookAuthorizationTests.cs" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true'">
+  <ItemGroup Condition="'$(RunPlayReviewAccessTestsOnly)' == 'true'">
+    <Compile Include="PlayReviewAccessServiceTests.cs" />
+    <Compile Include="HubBrowserAuthSanitizationTests.cs" />
+    <Compile Include="InstallLinkingControllerBrowserCallbackTests.cs" />
+    <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />
+    <Content Include="..\Chummer.Run.Api\Views\Auth\Entry.cshtml"
+             Link="Fixtures\AuthEntry.cshtml"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true'">
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />
     <ProjectReference Include="..\Chummer.Run.AI\Chummer.Run.AI.csproj" />
     <ProjectReference Include="..\Chummer.Run.Identity\Chummer.Run.Identity.csproj" />
@@ -80,13 +92,13 @@
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' == 'true'">
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' == 'true'">
     <ProjectReference Include="$(ChummerHubRegistryRoot)/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj" />
     <ProjectReference Include="$(ChummerHubRegistryRoot)/Chummer.Run.Registry/Chummer.Run.Registry.csproj" />
     <ProjectReference Include="$(ChummerMediaFactoryRoot)/src/Chummer.Media.Factory.Runtime/Chummer.Media.Factory.Runtime.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' != 'true'">
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' != 'true'">
     <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerHubRegistryContractsPackageVersion)" />
     <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerRunRegistryPackageVersion)" />
   </ItemGroup>

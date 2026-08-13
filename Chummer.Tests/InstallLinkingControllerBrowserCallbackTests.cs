@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
@@ -20,6 +21,97 @@ namespace Chummer.Tests;
 
 public sealed class InstallLinkingControllerBrowserCallbackTests
 {
+    [Fact]
+    public async Task Android_proof_poll_links_the_exact_approved_install_without_exposing_callback_code()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer android-review-access-token";
+        using RSA rsa = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+        const string callbackUri = "https://chummer.run/app/install-link?state=android-review-state";
+
+        IActionResult approval = await fixture.Controller.BrowserInstallLink(
+            installationId: "android-review-install",
+            headId: "android",
+            applicationVersion: "0.1.0-preview.7",
+            releaseChannel: "preview",
+            platform: "android",
+            arch: "arm64",
+            installLinkCallbackUri: callbackUri,
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: "proof_poll",
+            publicKey: publicKey);
+
+        ContentResult page = Assert.IsType<ContentResult>(approval);
+        Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        Assert.Contains("Account linked", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Return to Chummer", page.Content, StringComparison.Ordinal);
+        Assert.Contains(callbackUri.Replace("&", "&amp;", StringComparison.Ordinal), page.Content, StringComparison.Ordinal);
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        Assert.Equal(publicKey, callback.PublicKey);
+        Assert.Equal("android-play-app", callback.ArtifactId);
+        Assert.DoesNotContain(callback.CallbackCode, page.Content, StringComparison.Ordinal);
+
+        long issuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        const string nonce = "0123456789abcdef0123456789abcdef0123456789abcdef";
+        byte[] proof = Encoding.UTF8.GetBytes(string.Join(
+            '\n',
+            "chummer.install-link.remote-callback.v1",
+            "android-review-install",
+            "android",
+            "0.1.0-preview.7",
+            "preview",
+            "android",
+            "arm64",
+            issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            nonce));
+        string signature;
+        try
+        {
+            signature = Convert.ToBase64String(rsa.SignData(
+                proof,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(proof);
+        }
+
+        AndroidInstallLinkProofPollRequest poll = new(
+            "android-review-install",
+            "android",
+            "0.1.0-preview.7",
+            "preview",
+            "android",
+            "arm64",
+            publicKey,
+            issuedAt,
+            nonce,
+            signature,
+            "Play review device");
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> pollResult =
+            fixture.Controller.PollBrowserCallback(poll);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(pollResult.Result);
+        ExchangeInstallBrowserCallbackResponseDto exchanged =
+            Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(ok.Value);
+        Assert.Equal(InstallationGrantStates.Active, exchanged.Grant.Status);
+        Assert.Equal("android-review-install", exchanged.Grant.InstallationId);
+        Assert.Equal("subject.install.browser", exchanged.Installation.SubjectId);
+
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> replay =
+            fixture.Controller.PollBrowserCallback(poll);
+        ObjectResult conflict = Assert.IsType<ObjectResult>(replay.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
     [Fact]
     public async Task Browser_install_link_redirects_unauthenticated_requests_to_login_with_return_path()
     {

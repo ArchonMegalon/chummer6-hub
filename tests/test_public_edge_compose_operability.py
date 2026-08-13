@@ -151,6 +151,20 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
             module.validate_compose(payload),
         )
 
+    def test_play_review_access_is_explicit_and_disabled_by_default(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        payload["services"]["chummer-portal"]["environment"][
+            "CHUMMER_PLAY_REVIEW_ACCESS_ENABLED"
+        ] = "true"
+
+        self.assertIn(
+            "chummer-portal Play review configuration "
+            "CHUMMER_PLAY_REVIEW_ACCESS_ENABLED must use the fail-closed value "
+            "${CHUMMER_PLAY_REVIEW_ACCESS_ENABLED:-false}",
+            module.validate_compose(payload),
+        )
+
     def test_cloudflared_probe_must_verify_an_active_tunnel(self) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())

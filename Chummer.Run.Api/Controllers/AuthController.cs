@@ -29,6 +29,7 @@ public sealed class AuthController : Controller
     private readonly IdentityLinkService _links;
     private readonly HubEmailLinkVerificationService _emailLinks;
     private readonly ILogger<AuthController> _logger;
+    private readonly PlayReviewAccessService _playReviewAccess;
 
     public AuthController(
         HubBrowserAuthService browserAuth,
@@ -42,7 +43,8 @@ public sealed class AuthController : Controller
         ParticipationOperatorNotificationService participationNotifications,
         IdentityLinkService links,
         HubEmailLinkVerificationService emailLinks,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        PlayReviewAccessService? playReviewAccess = null)
     {
         _browserAuth = browserAuth;
         _identity = identity;
@@ -56,6 +58,91 @@ public sealed class AuthController : Controller
         _links = links;
         _emailLinks = emailLinks;
         _logger = logger;
+        _playReviewAccess = playReviewAccess ?? new PlayReviewAccessService(new ConfigurationBuilder().Build());
+    }
+
+    [HttpPost("/auth/play-review")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
+    [ValidateAntiForgeryToken]
+    [Consumes("application/x-www-form-urlencoded")]
+    [Produces("text/html")]
+    public async Task<IActionResult> CompletePlayReview(
+        [FromForm] string? username,
+        [FromForm] string? password,
+        [FromForm] string? next,
+        CancellationToken cancellationToken)
+    {
+        string nextPath = HubBrowserAuthService.SanitizeNextPath(next);
+        PlayReviewAuthenticationResult authentication = _playReviewAccess.Authenticate(
+            username,
+            password,
+            HubApiRateLimiterFactory.ResolveClientKey(HttpContext),
+            DateTimeOffset.UtcNow);
+
+        if (authentication.Status == PlayReviewAuthenticationStatus.Disabled)
+        {
+            return NotFound();
+        }
+
+        if (authentication.Status == PlayReviewAuthenticationStatus.Throttled)
+        {
+            int retryAfterSeconds = Math.Max(1, (int)Math.Ceiling(authentication.RetryAfter?.TotalSeconds ?? 1));
+            Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            Response.Headers.RetryAfter = retryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
+                nextPath,
+                createAccount: false,
+                playReviewError: "Too many attempts. Wait a few minutes and try again."));
+        }
+
+        if (authentication.Status != PlayReviewAuthenticationStatus.Succeeded || authentication.Principal is null)
+        {
+            Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
+                nextPath,
+                createAccount: false,
+                playReviewError: "Those review details did not match."));
+        }
+
+        try
+        {
+            PlayReviewAccessPrincipal principal = authentication.Principal;
+            var session = await _browserAuth.IssueSessionAsync(
+                principal.SubjectId,
+                principal.DisplayName,
+                email: null,
+                requestedRoles: principal.Roles,
+                cancellationToken);
+            _browserAuth.WriteCookie(Request, Response, session);
+            HubUserEnsureResult ensuredUser = _accounts.EnsureUserWithStatus(
+                session.SubjectId,
+                session.DisplayName,
+                email: null);
+            await _participationNotifications.NotifyAccountOpenedIfNeededAsync(
+                ensuredUser.User,
+                email: null,
+                nextPath,
+                authProviderFamily: "play_review",
+                accountCreated: ensuredUser.Created,
+                cancellationToken);
+        }
+        catch (HubBrowserAuthUnavailableException ex)
+        {
+            _logger.LogWarning(ex, "Play review access could not issue a browser session.");
+            return BuildAuthMessage(
+                chromeTitle: "Review sign-in unavailable",
+                chromeDescription: "Chummer could not finish the Play review sign-in.",
+                currentPath: "/login",
+                heading: "Review sign-in is unavailable",
+                supportLine: "Chummer could not finish this sign-in right now. Try again in a moment.",
+                notice: null,
+                primaryLabel: "Try again",
+                primaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
+                secondaryLabel: "Return home",
+                secondaryHref: "/");
+        }
+
+        return LocalRedirect(nextPath);
     }
 
     public override void OnActionExecuting(ActionExecutingContext context)
@@ -758,7 +845,7 @@ public sealed class AuthController : Controller
         _browserAuth.ClearCookie(Request, Response);
     }
 
-    private AuthPageViewModel BuildAuthModel(string nextPath, bool createAccount)
+    private AuthPageViewModel BuildAuthModel(string nextPath, bool createAccount, string? playReviewError = null)
     {
         _landing.LoadSurface();
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
@@ -780,6 +867,8 @@ public sealed class AuthController : Controller
             GoogleAvailable: googleAvailable,
             GoogleUnavailableReason: _google.DisabledReason(),
             GoogleStartHref: $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}",
+            PlayReviewAccessAvailable: _playReviewAccess.Enabled,
+            PlayReviewError: playReviewError,
             AccessPosture: accessPosture);
     }
 
@@ -904,7 +993,7 @@ public sealed class AuthController : Controller
     }
 
     private bool HasInteractiveAuthEntry()
-        => ResolveEmailEntryAvailability().Enabled || _google.IsConfigured();
+        => ResolveEmailEntryAvailability().Enabled || _google.IsConfigured() || _playReviewAccess.Enabled;
 
     private HubEmailSignInAvailability ResolveEmailEntryAvailability()
         => HubEmailSignInPolicy.Resolve(HttpContext?.RequestServices.GetService<IConfiguration>());

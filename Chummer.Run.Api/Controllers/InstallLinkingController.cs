@@ -219,22 +219,44 @@ public sealed class InstallLinkingController : ControllerBase
         [FromQuery] string? platform,
         [FromQuery] string? arch,
         [FromQuery] string? installLinkCallbackUri,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] string? installLinkTransport = null,
+        [FromQuery] string? publicKey = null)
     {
         ApplySensitiveResponseHeaders();
+        bool proofPoll = string.Equals(installLinkTransport, "proof_poll", StringComparison.Ordinal);
+        if (!proofPoll && !string.IsNullOrWhiteSpace(installLinkTransport))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link transport is invalid.");
+        }
+
+        string? normalizedCallbackUri = proofPoll
+            ? HubBrowserAuthService.SanitizeProofPollCallbackUri(installLinkCallbackUri)
+            : NormalizeCallbackUri(installLinkCallbackUri);
+        string? normalizedPublicKey = proofPoll
+            ? HubBrowserAuthService.SanitizeInstallLinkPublicKey(publicKey)
+            : null;
+        if (normalizedCallbackUri is null)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link callback uri is invalid.");
+        }
+        if (proofPoll
+            && (normalizedPublicKey is null
+                || !string.Equals(headId, "android", StringComparison.Ordinal)
+                || !string.Equals(platform, "android", StringComparison.Ordinal)))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Android proof-poll install identity is invalid.");
+        }
+
         try
         {
-            string? normalizedCallbackUri = NormalizeCallbackUri(installLinkCallbackUri);
-            if (normalizedCallbackUri is null)
-            {
-                return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link callback uri is invalid.");
-            }
-
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             PublicReleaseManifestDto manifest = _releases.LoadManifest();
-            PublicReleaseArtifactDto? artifact = ResolveBrowserCallbackArtifact(manifest, headId, platform, arch);
-            if (artifact is null)
+            PublicReleaseArtifactDto? artifact = proofPoll
+                ? null
+                : ResolveBrowserCallbackArtifact(manifest, headId, platform, arch);
+            if (!proofPoll && artifact is null)
             {
                 return BuildBrowserInstallLinkStatusPage(
                     statusCode: StatusCodes.Status404NotFound,
@@ -258,28 +280,52 @@ public sealed class InstallLinkingController : ControllerBase
             IssueInstallBrowserCallbackResponseDto issued = _installLinking.IssueBrowserCallback(
                 new IssueInstallBrowserCallbackRequestDto(
                     InstallationId: installationId ?? string.Empty,
-                    ArtifactId: artifact.Id,
+                    ArtifactId: proofPoll ? "android-play-app" : artifact!.Id,
                     ApplicationVersion: applicationVersion ?? manifest.Version,
                     ChannelId: releaseChannel ?? manifest.Channel,
-                    HeadId: headId ?? artifact.Head ?? "desktop",
-                    Platform: platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
-                    Arch: arch ?? artifact.Arch ?? "unknown",
+                    HeadId: headId ?? artifact?.Head ?? "desktop",
+                    Platform: platform ?? artifact?.PlatformId ?? artifact?.Platform ?? "unknown",
+                    Arch: arch ?? artifact?.Arch ?? "unknown",
                     CallbackUri: normalizedCallbackUri,
-                    PublicKey: null,
+                    PublicKey: normalizedPublicKey,
                     HostLabel: null,
-                    InstallAccessClass: artifact.InstallAccessClass),
+                    InstallAccessClass: proofPoll ? InstallAccessClasses.AccountRequired : artifact!.InstallAccessClass),
                 user.UserId,
                 subject.SubjectId);
+
+            if (proofPoll)
+            {
+                return BuildBrowserInstallLinkStatusPage(
+                    statusCode: StatusCodes.Status200OK,
+                    heading: "Account linked",
+                    supportLine: "Return to Chummer. The app will verify this device and finish the link.",
+                    primaryLabel: "Return to Chummer",
+                    primaryHref: normalizedCallbackUri,
+                    secondaryLabel: "Open installs",
+                    secondaryHref: "/account/access",
+                    stateLabel: "Device approved",
+                    highlights:
+                    [
+                        $"Install: {NormalizeBrowserInstallLinkLabel(installationId, issued.Callback.InstallationId)}",
+                        $"Build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}",
+                        "The private device key never leaves Chummer."
+                    ],
+                    autoOpenHref: normalizedCallbackUri,
+                    appLocalCallback: true);
+            }
+
+            PublicReleaseArtifactDto approvedArtifact = artifact
+                ?? throw new InvalidOperationException("Desktop install-link artifact resolution was incomplete.");
 
             string callbackRedirectUri = BuildBrowserInstallCallbackRedirectUri(
                 normalizedCallbackUri,
                 issued.Callback.CallbackCode,
                 installationId ?? string.Empty,
-                headId ?? artifact.Head ?? "desktop",
+                headId ?? approvedArtifact.Head ?? "desktop",
                 applicationVersion ?? manifest.Version,
                 releaseChannel ?? manifest.Channel,
-                platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
-                arch ?? artifact.Arch ?? "unknown");
+                platform ?? approvedArtifact.PlatformId ?? approvedArtifact.Platform ?? "unknown",
+                arch ?? approvedArtifact.Arch ?? "unknown");
             bool appLocalCallback = IsAppLocalInstallLinkCallbackUri(callbackRedirectUri);
             return BuildBrowserInstallLinkStatusPage(
                 statusCode: StatusCodes.Status200OK,
@@ -295,7 +341,7 @@ public sealed class InstallLinkingController : ControllerBase
                 highlights:
                 [
                     $"Install: {NormalizeBrowserInstallLinkLabel(installationId, issued.Callback.InstallationId)}",
-                    $"Installer: {artifact.Id}",
+                    $"Installer: {approvedArtifact.Id}",
                     $"Build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}"
                 ],
                 autoOpenHref: callbackRedirectUri,
@@ -310,12 +356,40 @@ public sealed class InstallLinkingController : ControllerBase
                 releaseChannel,
                 platform,
                 arch,
-                NormalizeCallbackUri(installLinkCallbackUri)!);
+                normalizedCallbackUri,
+                proofPoll ? "proof_poll" : null,
+                normalizedPublicKey);
             return Redirect($"/login?next={Uri.EscapeDataString(returnPath)}");
         }
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("callbacks/poll")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
+    [ProducesResponseType<ExchangeInstallBrowserCallbackResponseDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<AndroidInstallLinkProofPollStatus>(StatusCodes.Status202Accepted)]
+    public ActionResult<ExchangeInstallBrowserCallbackResponseDto> PollBrowserCallback(
+        [FromBody] AndroidInstallLinkProofPollRequest? request)
+    {
+        ApplySensitiveResponseHeaders();
+        if (request is null)
+        {
+            return BadRequest("remote proof payload is required.");
+        }
+
+        try
+        {
+            PollInstallBrowserCallbackResult result = _installLinking.PollBrowserCallback(request);
+            return result.Exchange is null
+                ? Accepted(result.Status)
+                : Ok(result.Exchange);
         }
         catch (InstallLinkingOperationException ex)
         {
