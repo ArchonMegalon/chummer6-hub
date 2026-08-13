@@ -2128,6 +2128,7 @@ def test_materialize_isolated_build_workspace_copies_build_and_overlay_payload_c
         Path("Directory.Build.props"),
         Path("Directory.Build.targets"),
         Path("global.json"),
+        Path("compat") / "Chummer.Media.Contracts.dll",
         Path("Chummer.Campaign.Contracts") / "marker.txt",
         Path("Chummer.Control.Contracts") / "marker.txt",
         Path("Chummer.Play.Contracts") / "marker.txt",
@@ -2196,6 +2197,9 @@ def test_materialize_isolated_build_workspace_copies_build_and_overlay_payload_c
     assert (build_source_root / "Chummer.Run.Api" / "Chummer.Run.Api.csproj").is_file()
     assert (build_source_root / "Chummer.Campaign.Contracts" / "marker.txt").is_file()
     assert (build_source_root / "Directory.Build.props").is_file()
+    assert (
+        build_source_root / "compat" / "Chummer.Media.Contracts.dll"
+    ).read_text(encoding="utf-8") == "compat/Chummer.Media.Contracts.dll"
     assert (build_root / "workspace" / ".dockerignore").is_file()
     assert (
         build_root / "workspace" / "chummer-design" / "products" / "chummer" / "marker.txt"
@@ -2336,6 +2340,7 @@ def test_build_input_fingerprint_binds_frontdoor_playwright_proof_and_postdeploy
         f"{prefix}/tests/public/frontdoor-mobile-launch.spec.ts",
         f"{prefix}/tests/public/black-ledger-frontdoor.spec.ts",
         f"{prefix}/scripts/verify_public_edge_postdeploy_gate.py",
+        f"{prefix}/compat/Chummer.Media.Contracts.dll",
     }.issubset(paths)
 
 

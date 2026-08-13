@@ -210,6 +210,7 @@ ISOLATED_BUILD_WORKSPACE_COPY_MAP = {
         Path("Directory.Build.targets"),
         Path("global.json"),
         Path("eng") / "package-plane.lock.json",
+        Path("compat") / "Chummer.Media.Contracts.dll",
         Path(".dockerignore"),
         Path("docker-compose.public-edge.yml"),
         Path("package.json"),
