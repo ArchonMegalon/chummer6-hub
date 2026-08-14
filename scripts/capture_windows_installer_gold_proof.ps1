@@ -103,6 +103,7 @@ elseif ($LaunchInstaller) {
 $completedAtUtc = (Get-Date).ToUniversalTime()
 $os = Get-CimInstance Win32_OperatingSystem
 $hostName = [System.Net.Dns]::GetHostName()
+$runnerName = $(if ([string]$env:GITHUB_ACTIONS -eq "true") { "github-actions-windows" } else { "native-windows-powershell" })
 $relativeInstallerPath = "files/$([System.IO.Path]::GetFileName($installerFullPath))"
 
 $receipt = [ordered]@{
@@ -118,6 +119,17 @@ $receipt = [ordered]@{
     readyCheckpoint = "pre_ui_event_loop"
     hostClass = "native-windows"
     operatingSystem = $os.Caption
+    executionEnvironment = "native_windows"
+    verificationScope = "native_installer_startup_and_visual_audit"
+    nativeHostEvidence = [ordered]@{
+        contractName = "chummer6-ui.native_windows_host_evidence"
+        status = "verified"
+        isNativeWindows = $true
+        hostPlatform = "windows"
+        hostKernel = $os.Caption
+        runner = $runnerName
+        evidenceSource = "native_windows_os_and_process_capture"
+    }
     processPath = $processPath
     artifactDigest = "sha256:$artifactHash"
     artifactDigestSource = "artifact_path"
@@ -145,6 +157,7 @@ if ($CaptureVisualAudit) {
     $captureArgs = @{
         InstallerPath = $installerFullPath
         OutputRoot = (Join-Path $downloadsFullRoot "visual-audit\windows-installer")
+        TraceExportPath = (Join-Path $startupRoot "windows-installer-progress-$HeadId-$Rid.log")
         CaptureRequiredSet = $true
         ScaledDpiScale = $ScaledDpiScale
         ClippingStatus = $VisualClippingStatus

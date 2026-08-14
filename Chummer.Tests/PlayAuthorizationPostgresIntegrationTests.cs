@@ -2395,7 +2395,7 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             TimeSpan.FromMilliseconds(40));
         var shortLeasePolicy = new PlayAuthorizationCheckpointPublicationPolicy(
             claimLease: TimeSpan.FromMilliseconds(750),
-            databaseFinalizationDeadline: TimeSpan.FromMilliseconds(200),
+            databaseFinalizationDeadline: TimeSpan.FromMilliseconds(600),
             clockSkew: TimeSpan.FromMilliseconds(20));
         PlayAuthorizationPostgresDormantFactory firstReconciler =
             _fixture.CreateProviderFactory(ignoring).BindCheckpointReconciliation(

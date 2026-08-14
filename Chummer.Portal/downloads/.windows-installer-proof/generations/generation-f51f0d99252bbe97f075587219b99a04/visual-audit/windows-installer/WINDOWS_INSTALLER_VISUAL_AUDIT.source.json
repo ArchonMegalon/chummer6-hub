@@ -1,0 +1,93 @@
+{
+  "contract_name": "chummer.windows_installer_visual_audit.source",
+  "status": "pass",
+  "platform": "windows",
+  "hostClass": "native-windows-Microsoft Windows Server 2025 Datacenter",
+  "artifactPath": "D:\\a\\chummer6-hub\\chummer6-hub\\Chummer.Portal\\downloads\\files\\chummer-avalonia-win-x64-installer.exe",
+  "artifactSha256": "bd45bceac8358b6402ccb0799d0ecf661bb24061301296930791c736f1232dfe",
+  "sourceUpdatedAtUtc": "2026-08-11T05:33:20.2375965Z",
+  "requiredSurfaces": [
+    "install-progress",
+    "completion"
+  ],
+  "surfaceCoverage": {
+    "install-progress": {
+      "scaledDpi": true,
+      "defaultDpi": true
+    },
+    "completion": {
+      "scaledDpi": true,
+      "defaultDpi": true
+    }
+  },
+  "screenshots": [
+    {
+      "path": "windows-installer-install-progress-dpi-1.0-20260811T053252Z.png",
+      "dpiScale": "1.0",
+      "surface": "install-progress",
+      "clippingStatus": "pass",
+      "readabilityStatus": "pass",
+      "hostClass": "native-windows",
+      "captureMode": "window-bounds",
+      "windowTitle": "Chummer6 Avalonia Desktop Installer: Installing",
+      "captureBounds": {
+        "left": 299,
+        "top": 214,
+        "width": 426,
+        "height": 292
+      },
+      "capturedAtUtc": "2026-08-11T05:32:52.5251873Z"
+    },
+    {
+      "path": "windows-installer-install-progress-dpi-1.5-20260811T053253Z.png",
+      "dpiScale": "1.5",
+      "surface": "install-progress",
+      "clippingStatus": "pass",
+      "readabilityStatus": "pass",
+      "hostClass": "native-windows",
+      "captureMode": "window-bounds",
+      "windowTitle": "Chummer6 Avalonia Desktop Installer: Installing",
+      "captureBounds": {
+        "left": 299,
+        "top": 214,
+        "width": 426,
+        "height": 292
+      },
+      "capturedAtUtc": "2026-08-11T05:32:53.3258878Z"
+    },
+    {
+      "path": "windows-installer-completion-dpi-1.0-20260811T053309Z.png",
+      "dpiScale": "1.0",
+      "surface": "completion",
+      "clippingStatus": "pass",
+      "readabilityStatus": "pass",
+      "hostClass": "native-windows",
+      "captureMode": "window-bounds",
+      "windowTitle": "Chummer6 Avalonia Desktop Installer: Installing",
+      "captureBounds": {
+        "left": 299,
+        "top": 214,
+        "width": 426,
+        "height": 292
+      },
+      "capturedAtUtc": "2026-08-11T05:33:09.6608641Z"
+    },
+    {
+      "path": "windows-installer-completion-dpi-1.5-20260811T053320Z.png",
+      "dpiScale": "1.5",
+      "surface": "completion",
+      "clippingStatus": "pass",
+      "readabilityStatus": "pass",
+      "hostClass": "native-windows",
+      "captureMode": "window-bounds",
+      "windowTitle": "Chummer6 Avalonia Desktop Installer: Completed",
+      "captureBounds": {
+        "left": 299,
+        "top": 214,
+        "width": 426,
+        "height": 292
+      },
+      "capturedAtUtc": "2026-08-11T05:33:20.1372930Z"
+    }
+  ]
+}

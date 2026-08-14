@@ -1,0 +1,9 @@
+{
+  "contract_name": "chummer.windows_installer_proof_generation_publication.v1",
+  "created_anchors": [],
+  "generation_id": "generation-f51f0d99252bbe97f075587219b99a04",
+  "generation_manifest_sha256": "3a04f45dbee1b477e2b527b18ecbfbaf93d8ae58855aea4101db7a527e3de697",
+  "new_target": "generations/generation-f51f0d99252bbe97f075587219b99a04",
+  "previous_target": "generations/generation-f51f0d99252bbe97f075587219b99a04",
+  "state": "committed"
+}
