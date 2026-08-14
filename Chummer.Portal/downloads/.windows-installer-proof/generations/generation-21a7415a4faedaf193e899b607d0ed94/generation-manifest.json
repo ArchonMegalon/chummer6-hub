@@ -1,0 +1,87 @@
+{
+  "allowed_visual_public_basenames": [
+    "windows-installer-completion-dpi-1.0-20260811T050940Z.png",
+    "windows-installer-completion-dpi-1.5-20260811T050950Z.png",
+    "windows-installer-install-progress-dpi-1.0-20260811T050920Z.png",
+    "windows-installer-install-progress-dpi-1.5-20260811T050921Z.png",
+    "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+  ],
+  "contract_name": "chummer.windows_installer_proof_generation.v2",
+  "exact_public_relative_paths": [
+    "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+    "visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260811T050940Z.png",
+    "visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260811T050950Z.png",
+    "visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260811T050920Z.png",
+    "visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260811T050921Z.png",
+    "visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+  ],
+  "files": [
+    {
+      "public_basename": "startup-smoke-avalonia-win-x64.receipt.json",
+      "public_relative_path": "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+      "role": "startup_receipt",
+      "sha256": "60e98054c966cf1b56da6b7208c461ef9becc4492d3b6c323127e44347ffbac3",
+      "size_bytes": 1383
+    },
+    {
+      "image": {
+        "format": "png",
+        "height": 292,
+        "size_bytes": 18138,
+        "width": 426
+      },
+      "public_basename": "windows-installer-completion-dpi-1.0-20260811T050940Z.png",
+      "public_relative_path": "visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260811T050940Z.png",
+      "role": "screenshot",
+      "sha256": "246667a5ac4f65c06a40c0cc2f0de9ded369ed22a6c9e903ba2d254d45a2f46a",
+      "size_bytes": 18138
+    },
+    {
+      "image": {
+        "format": "png",
+        "height": 292,
+        "size_bytes": 15550,
+        "width": 426
+      },
+      "public_basename": "windows-installer-completion-dpi-1.5-20260811T050950Z.png",
+      "public_relative_path": "visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260811T050950Z.png",
+      "role": "screenshot",
+      "sha256": "dc3b81e11a3dc13ab91be4abd4e6023350fde19b0228b944aa05ef2265dd74c4",
+      "size_bytes": 15550
+    },
+    {
+      "image": {
+        "format": "png",
+        "height": 292,
+        "size_bytes": 13062,
+        "width": 426
+      },
+      "public_basename": "windows-installer-install-progress-dpi-1.0-20260811T050920Z.png",
+      "public_relative_path": "visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260811T050920Z.png",
+      "role": "screenshot",
+      "sha256": "d03e58bc29f94153110678193bb3a2bd67d42245b03095491b3279bd36abb399",
+      "size_bytes": 13062
+    },
+    {
+      "image": {
+        "format": "png",
+        "height": 292,
+        "size_bytes": 13046,
+        "width": 426
+      },
+      "public_basename": "windows-installer-install-progress-dpi-1.5-20260811T050921Z.png",
+      "public_relative_path": "visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260811T050921Z.png",
+      "role": "screenshot",
+      "sha256": "246b4de7fe128a4ddde6002c163460b759c863ee2d7868226d9e063e915fd593",
+      "size_bytes": 13046
+    },
+    {
+      "public_basename": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+      "public_relative_path": "visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+      "role": "visual_source",
+      "sha256": "b683ba98175f6556ee27e42b18795a591bcac2001abf527869c7d90f82ea7cbe",
+      "size_bytes": 2983
+    }
+  ],
+  "generation_id": "generation-21a7415a4faedaf193e899b607d0ed94"
+}

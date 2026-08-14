@@ -1,0 +1,95 @@
+{
+  "allowed_visual_public_basenames": [
+    "windows-installer-completion-dpi-1.0-20260811T052402Z.png",
+    "windows-installer-completion-dpi-1.5-20260811T052411Z.png",
+    "windows-installer-install-progress-dpi-1.0-20260811T052341Z.png",
+    "windows-installer-install-progress-dpi-1.5-20260811T052342Z.png",
+    "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+  ],
+  "contract_name": "chummer.windows_installer_proof_generation.v3",
+  "exact_public_relative_paths": [
+    "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+    "startup-smoke/windows-installer-progress-avalonia-win-x64.log",
+    "visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260811T052402Z.png",
+    "visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260811T052411Z.png",
+    "visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260811T052341Z.png",
+    "visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260811T052342Z.png",
+    "visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+  ],
+  "files": [
+    {
+      "public_basename": "startup-smoke-avalonia-win-x64.receipt.json",
+      "public_relative_path": "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+      "role": "startup_receipt",
+      "sha256": "a194b01a59be32afe737c0e4593ba5a66713f5b6486e77eea7991c50061f1ba4",
+      "size_bytes": 1383
+    },
+    {
+      "public_basename": "windows-installer-progress-avalonia-win-x64.log",
+      "public_relative_path": "startup-smoke/windows-installer-progress-avalonia-win-x64.log",
+      "role": "installer_progress_trace",
+      "sha256": "aa2f47ebfd46925e4e0a501f825fd2d701c4bb187b3fbae0f318f3c6c35b3775",
+      "size_bytes": 495
+    },
+    {
+      "image": {
+        "format": "png",
+        "height": 292,
+        "size_bytes": 18063,
+        "width": 426
+      },
+      "public_basename": "windows-installer-completion-dpi-1.0-20260811T052402Z.png",
+      "public_relative_path": "visual-audit/windows-installer/windows-installer-completion-dpi-1.0-20260811T052402Z.png",
+      "role": "screenshot",
+      "sha256": "86e98b647ecbf48d1ba65b82fbda93846904831bd0aba61ce9bb482ee3321aa2",
+      "size_bytes": 18063
+    },
+    {
+      "image": {
+        "format": "png",
+        "height": 292,
+        "size_bytes": 15525,
+        "width": 426
+      },
+      "public_basename": "windows-installer-completion-dpi-1.5-20260811T052411Z.png",
+      "public_relative_path": "visual-audit/windows-installer/windows-installer-completion-dpi-1.5-20260811T052411Z.png",
+      "role": "screenshot",
+      "sha256": "ed0180e63b4dae6b4d2c442e874d8b272a8d7b998e1b1dcd57e65993dde9aaae",
+      "size_bytes": 15525
+    },
+    {
+      "image": {
+        "format": "png",
+        "height": 292,
+        "size_bytes": 12809,
+        "width": 426
+      },
+      "public_basename": "windows-installer-install-progress-dpi-1.0-20260811T052341Z.png",
+      "public_relative_path": "visual-audit/windows-installer/windows-installer-install-progress-dpi-1.0-20260811T052341Z.png",
+      "role": "screenshot",
+      "sha256": "a15cbd231c1d80bb2590727983347cec25a213008bf32f97925466c032828f8b",
+      "size_bytes": 12809
+    },
+    {
+      "image": {
+        "format": "png",
+        "height": 292,
+        "size_bytes": 13034,
+        "width": 426
+      },
+      "public_basename": "windows-installer-install-progress-dpi-1.5-20260811T052342Z.png",
+      "public_relative_path": "visual-audit/windows-installer/windows-installer-install-progress-dpi-1.5-20260811T052342Z.png",
+      "role": "screenshot",
+      "sha256": "a4ec3347b3650e79c9b01e408666ecc2ed98d565625698a803c496c2e1b80606",
+      "size_bytes": 13034
+    },
+    {
+      "public_basename": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+      "public_relative_path": "visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+      "role": "visual_source",
+      "sha256": "7dc5dc01add12217cc643e4c1acd60e2031a01ad7e871eabd43dd33ac31462e6",
+      "size_bytes": 2983
+    }
+  ],
+  "generation_id": "generation-69b466b023fd7b2599a4194523d8692d"
+}
