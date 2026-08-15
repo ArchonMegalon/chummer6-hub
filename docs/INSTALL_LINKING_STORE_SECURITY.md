@@ -56,7 +56,11 @@ Configure host paths, not secret contents:
 - `CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME` must exactly match a server-certificate SAN and the
   `Host` in both connection files. `CHUMMER_INSTALL_LINKING_POSTGRES_IP` is the separately reviewed
   address mapped to that name inside each container; the runtime and migrator enforce the expected
-  host independently, and raw-IP `Host` values are not acceptable.
+  host independently, and raw-IP `Host` values are not acceptable. That reviewed address must be
+  stable across portal and database restarts or recreation. Do not bind it to an automatically
+  assigned container address. If the provider address changes, review the replacement, update the
+  deployment input, and rerun the complete Compose attestation and guarded portal deployment before
+  returning the public edge to service.
 - Prepare/validate and import use the separate `install-linking-postgres-tool-final` image target.
   The long-running public API image does not contain the migration/import executable.
 - Snapshot, envelope, digest, and compare-exchange request byte buffers are cleared after each
