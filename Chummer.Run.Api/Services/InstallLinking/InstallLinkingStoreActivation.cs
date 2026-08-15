@@ -154,8 +154,14 @@ public sealed class InstallLinkingStoreActivation : IInstallLinkingStoreReadines
 
             return new ActivationResult(store, new InstallLinkingStoreReadiness(true, "store_activated"));
         }
-        catch
+        catch (Exception exception)
         {
+            _loggerFactory
+                .CreateLogger<InstallLinkingStoreActivation>()
+                .LogError(
+                    "Install-linking store activation failed with exception type {ExceptionType} at {FailureSite}; exception details are intentionally omitted.",
+                    exception.GetType().Name,
+                    exception.TargetSite?.Name ?? "unknown");
             return Failure("store_activation_failed");
         }
     }
