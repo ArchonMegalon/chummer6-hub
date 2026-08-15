@@ -8,6 +8,7 @@
     var recommended = release.Recommended;
     var requestedPlatformUnavailable = !release.RequestedPlatformHasPublicDownload
         && !string.IsNullOrWhiteSpace(release.RequestedPlatformLabel);
+    var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;
     var isStableRelease = Model.ReleaseTruthProjection?.StableClaimsAllowed == true;
     var releaseNeedsReview = Model.ReleaseTruthProjection?.ReviewBannerRequired != false || !isStableRelease;
     var stable = isStableRelease && !requestedPlatformUnavailable ? recommended : null;
@@ -28,6 +29,7 @@
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
     var showLinuxSourcePrimary = !string.IsNullOrWhiteSpace(sourceScriptHref);
     var hasOtherDownloads = showLinuxSourcePrimary || otherPlatformOptions.Length > 0;
+    var publicDownloadCount = availabilityClaimsAllowed ? Model.Manifest.Downloads.Count : 0;
     var emptyDownloadMessage = requestedPlatformUnavailable
         ? $"A current {release.RequestedPlatformLabel} build has not passed release verification yet. Nothing stale will be offered as a substitute."
         : "No current build has passed release verification yet. Please check again later.";
@@ -138,7 +140,9 @@
 <section class="minimal-page-hero downloads-simple-hero">
     <div>
         <h1>Downloads</h1>
-        <p>Download Chummer from the current release page. Chummer selects the best installer when it can. Other downloads stay below.</p>
+        <p>@(availabilityClaimsAllowed
+            ? "Download Chummer from the current release page. Chummer selects the best installer when it can. Other downloads stay below."
+            : "Review the current release metadata. Installer handoffs remain unavailable until immutable release authority permits availability claims.")</p>
         <p class="muted-copy">@(Model.Manifest.Downloads.Count == 0
             ? "No public installer listed"
             : Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true
@@ -147,8 +151,9 @@
         <p class="muted-copy downloads-version">@VersionText(recommended, Model.Manifest, isStableRelease)</p>
         <span data-downloads-release-version="@ManifestVersionText(Model.Manifest)"
               data-downloads-release-generation="@ManifestGenerationId(Model.Manifest)"
-              data-downloads-public-count="@Model.Manifest.Downloads.Count"
-              hidden>@ManifestVersionText(Model.Manifest) | Generation @ManifestGenerationId(Model.Manifest) | Public downloads @Model.Manifest.Downloads.Count</span>
+              data-downloads-public-count="@publicDownloadCount"
+              data-downloads-listed-count="@Model.Manifest.Downloads.Count"
+              hidden>@ManifestVersionText(Model.Manifest) | Generation @ManifestGenerationId(Model.Manifest) | Public downloads @publicDownloadCount | Listed installers @Model.Manifest.Downloads.Count</span>
         <p class="muted-copy"><a class="inline-link" href="/now">Release notes and known issues</a></p>
         <p class="muted-copy">
             Claim your copy only if you want this install attached to your account.
@@ -157,7 +162,14 @@
     </div>
 </section>
 
-@if (Model.Manifest.Downloads.Count == 0)
+@if (!availabilityClaimsAllowed)
+{
+    <section class="minimal-empty" data-downloads-review-withheld="true">
+        <h2>Installer handoffs unavailable</h2>
+        <p>Windows and Linux installer metadata remains listed for review. No download or setup command is started from this page until immutable release authority permits availability claims.</p>
+    </section>
+}
+else if (Model.Manifest.Downloads.Count == 0)
 {
     <section class="minimal-empty">
         <h2>No public build is available right now</h2>

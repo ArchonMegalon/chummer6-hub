@@ -42,11 +42,20 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("<h1>Downloads</h1>", view, StringComparison.Ordinal);
+        Assert.Contains("var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;", view, StringComparison.Ordinal);
         Assert.Contains("Download Chummer from the current release page.", view, StringComparison.Ordinal);
         Assert.Contains("Chummer selects the best installer when it can.", view, StringComparison.Ordinal);
+        Assert.Contains("Review the current release metadata. Installer handoffs remain unavailable", view, StringComparison.Ordinal);
         Assert.Contains("var releaseNeedsReview = Model.ReleaseTruthProjection?.ReviewBannerRequired != false || !isStableRelease;", view, StringComparison.Ordinal);
         Assert.Contains("var stable = isStableRelease && !requestedPlatformUnavailable ? recommended : null;", view, StringComparison.Ordinal);
         Assert.Contains("Installer listed for review", view, StringComparison.Ordinal);
+        Assert.Contains("@if (!availabilityClaimsAllowed)", view, StringComparison.Ordinal);
+        Assert.Contains("data-downloads-review-withheld=\"true\"", view, StringComparison.Ordinal);
+        Assert.Contains("Installer handoffs unavailable", view, StringComparison.Ordinal);
+        Assert.Contains("No download or setup command is started from this page", view, StringComparison.Ordinal);
+        Assert.Contains("var publicDownloadCount = availabilityClaimsAllowed ? Model.Manifest.Downloads.Count : 0;", view, StringComparison.Ordinal);
+        Assert.Contains("data-downloads-public-count=\"@publicDownloadCount\"", view, StringComparison.Ordinal);
+        Assert.Contains("data-downloads-listed-count=\"@Model.Manifest.Downloads.Count\"", view, StringComparison.Ordinal);
         Assert.Contains("attach this installed copy to your account", view, StringComparison.Ordinal);
         Assert.Contains("data-downloads-release-version", view, StringComparison.Ordinal);
         Assert.Contains("downloads-version", view, StringComparison.Ordinal);

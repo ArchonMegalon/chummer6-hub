@@ -43,6 +43,9 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Download Chummer from the current release page.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Chummer selects the best installer when it can. Other downloads stay below.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("@if (!availabilityClaimsAllowed)", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("No download or setup command is started from this page", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("data-downloads-review-withheld=\"true\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Nothing stale will be offered as a substitute.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("No current build has passed release verification yet.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("attach this installed copy to your account", downloadsView, StringComparison.Ordinal);
