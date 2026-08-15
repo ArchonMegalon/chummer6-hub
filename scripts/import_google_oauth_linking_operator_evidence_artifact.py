@@ -5,6 +5,7 @@ import argparse
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 from datetime import UTC, datetime
@@ -14,7 +15,13 @@ from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parents[0]
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import google_oauth_linking_evidence_v2 as evidence_v2
+
 DEFAULT_IMPORTED_SCREENSHOT_ROOT = ROOT / ".state" / "google_oauth_linking_operator_evidence" / "imported"
+DEFAULT_INTAKE_REQUEST_PATH = evidence_v2.DEFAULT_REQUEST_PATH
 VERIFY_MATERIALIZER = ROOT / "scripts" / "materialize_google_oauth_linking_proof.py"
 EVIDENCE_FILENAMES = (
     "GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json",
@@ -29,15 +36,87 @@ try:
         OPERATOR_EVIDENCE_CONTRACT_NAME,
     )
 except ModuleNotFoundError:
-    import sys
-
-    if str(SCRIPT_DIR) not in sys.path:
-        sys.path.insert(0, str(SCRIPT_DIR))
     from materialize_google_oauth_linking_proof import (  # type: ignore[no-redef]
         DEFAULT_BASE_URL,
         DEFAULT_OPERATOR_EVIDENCE_PATH,
         OPERATOR_EVIDENCE_CONTRACT_NAME,
     )
+
+
+def _release_manifest_paths_from_request(payload: dict[str, Any]) -> tuple[Path, Path]:
+    release = payload.get("release") if isinstance(payload.get("release"), dict) else {}
+    portal = release.get("portal") if isinstance(release.get("portal"), dict) else {}
+    hub = release.get("hub_registry") if isinstance(release.get("hub_registry"), dict) else {}
+    portal_path = str(portal.get("manifest_path") or "").strip()
+    hub_path = str(hub.get("manifest_path") or "").strip()
+    if not portal_path or not hub_path:
+        raise SystemExit("Google OAuth intake request is not current/actionable")
+    return Path(portal_path), Path(hub_path)
+
+
+def load_intake_payload_for_import(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise SystemExit(f"Google OAuth intake request not found: {path}")
+    try:
+        payload = read_json(path)
+    except (OSError, SystemExit) as exc:
+        raise SystemExit("Google OAuth intake request is not current/actionable") from exc
+    if payload.get("contract_name") != evidence_v2.REQUEST_CONTRACT_NAME:
+        raise SystemExit("Google OAuth intake request is not current/actionable")
+    portal_path, hub_path = _release_manifest_paths_from_request(payload)
+    _payload, _summary, _raw, failures = evidence_v2.verify_request_file(
+        path,
+        portal_release_manifest_path=portal_path,
+        hub_release_manifest_path=hub_path,
+    )
+    if failures or payload.get("status") != "operator_action_required":
+        raise SystemExit(
+            "Google OAuth intake request is not current/actionable"
+            + (f": {'; '.join(failures)}" if failures else "")
+        )
+    return payload
+
+
+def post_import_argv_plan(
+    request_path: Path,
+    base_url: str,
+    *,
+    evidence_path: Path = DEFAULT_OPERATOR_EVIDENCE_PATH,
+    proof_path: Path = evidence_v2.DEFAULT_PROOF_PATH,
+) -> list[list[str]]:
+    return evidence_v2.fixed_post_import_argv_plan(
+        base_url=base_url,
+        request_path=request_path,
+        evidence_path=evidence_path,
+        proof_path=proof_path,
+    )
+
+
+def post_import_commands(request_path: Path, base_url: str) -> list[list[str]]:
+    """Compatibility name for callers; commands are always code-owned argv."""
+    return post_import_argv_plan(request_path, base_url)
+
+
+def run_command(argv: list[str], cwd: Path) -> dict[str, Any]:
+    completed = subprocess.run(
+        argv,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+        shell=False,
+    )
+    return {
+        "argv": list(argv),
+        "returncode": int(completed.returncode),
+        "stdout_tail": completed.stdout.splitlines()[-20:],
+        "stderr_tail": completed.stderr.splitlines()[-20:],
+    }
+
+
+def run_post_import_chain(request_path: Path, base_url: str) -> tuple[int, list[dict[str, Any]]]:
+    results = [run_command(argv, ROOT) for argv in post_import_argv_plan(request_path, base_url)]
+    return (0 if all(result["returncode"] == 0 for result in results) else 1), results
 
 
 def now_iso() -> str:
@@ -166,7 +245,11 @@ def import_artifact(
     *,
     evidence_path: Path = DEFAULT_OPERATOR_EVIDENCE_PATH,
     imported_screenshot_root: Path = DEFAULT_IMPORTED_SCREENSHOT_ROOT,
+    intake_request: Path = DEFAULT_INTAKE_REQUEST_PATH,
 ) -> dict[str, Any]:
+    load_intake_payload_for_import(intake_request)
+    if evidence_v2.is_test_provenance_path(source):
+        raise SystemExit("pytest/test-fixture artifact provenance is rejected")
     with tempfile.TemporaryDirectory(prefix="google-oauth-linking-evidence-import-") as temp_dir:
         explicit_json_source = source if source.is_file() and source.suffix.lower() == ".json" else None
         artifact_root, artifact_kind = extracted_or_directory(source, Path(temp_dir))
@@ -231,6 +314,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("artifact", type=Path, help="Operator evidence bundle directory, JSON receipt, or zip.")
     parser.add_argument("--evidence-path", type=Path, default=DEFAULT_OPERATOR_EVIDENCE_PATH)
     parser.add_argument("--imported-screenshot-root", type=Path, default=DEFAULT_IMPORTED_SCREENSHOT_ROOT)
+    parser.add_argument("--intake-request", type=Path, default=DEFAULT_INTAKE_REQUEST_PATH)
     parser.add_argument("--verify", action="store_true", help="Rerun the Google OAuth proof materializer after import.")
     return parser.parse_args()
 
@@ -241,10 +325,11 @@ def main() -> int:
         args.artifact,
         evidence_path=args.evidence_path,
         imported_screenshot_root=args.imported_screenshot_root,
+        intake_request=args.intake_request,
     )
     print(json.dumps(summary, indent=2))
     if args.verify:
-        return run_verifier(summary.get("base_url") or DEFAULT_BASE_URL)
+        return run_post_import_chain(args.intake_request, summary.get("base_url") or DEFAULT_BASE_URL)[0]
     return 0
 
 
