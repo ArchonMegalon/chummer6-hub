@@ -14,6 +14,7 @@ import hashlib
 import json
 import shutil
 import stat
+import sys
 import tempfile
 import zipfile
 from datetime import UTC, datetime
@@ -21,6 +22,10 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import requests
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 import google_oauth_linking_evidence_v2 as contract
 from materialize_google_oauth_linking_proof import (
@@ -30,7 +35,6 @@ from materialize_google_oauth_linking_proof import (
 )
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent
 DEFAULT_TEMPLATE_PATH = (
     ROOT
