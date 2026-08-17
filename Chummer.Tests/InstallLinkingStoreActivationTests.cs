@@ -131,9 +131,10 @@ public sealed class InstallLinkingStoreActivationTests
     public void Repeated_readiness_and_resolution_reuse_one_cached_failed_activation()
     {
         using Fixture fixture = new(environmentName: Environments.Development);
+        const string sensitiveInvalidPayload = "secret-invalid-payload-must-not-be-logged";
         File.WriteAllText(
             fixture.StorePath,
-            "{\"format\":\"chummer.install-linking-store\",\"version\":1,\"protectedPayload\":\"not-protected\"}");
+            $"{{\"format\":\"chummer.install-linking-store\",\"version\":1,\"protectedPayload\":\"{sensitiveInvalidPayload}\"}}");
         using InstallLinkingStoreActivation activation = fixture.CreateActivation();
 
         InstallLinkingStoreReadiness first = activation.Evaluate();
@@ -146,6 +147,16 @@ public sealed class InstallLinkingStoreActivationTests
         Assert.Equal("Install-linking durable store is unavailable.", resolutionOne.Message);
         Assert.Equal(resolutionOne.Message, resolutionTwo.Message);
         Assert.Single(Directory.GetFiles(fixture.Root, ".install-linking-store.json.quarantine-*.json"));
+        Assert.Contains(
+            fixture.LogMessages,
+            static message =>
+                message.Contains("Install-linking store activation failed", StringComparison.Ordinal)
+                && message.Contains("exception type ", StringComparison.Ordinal)
+                && message.Contains(" at ", StringComparison.Ordinal)
+                && message.Contains("details are intentionally omitted", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            fixture.LogMessages,
+            message => message.Contains(sensitiveInvalidPayload, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -187,6 +198,8 @@ public sealed class InstallLinkingStoreActivationTests
     {
         private readonly TestHostEnvironment _environment;
         private readonly IDataProtectionProvider _dataProtection;
+        private readonly CapturingLoggerProvider _loggerProvider = new();
+        private readonly ILoggerFactory _loggerFactory;
 
         public Fixture(string environmentName)
         {
@@ -206,26 +219,71 @@ public sealed class InstallLinkingStoreActivationTests
                 ContentRootPath = Root
             };
             _dataProtection = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(Root, "keys")));
+            _loggerFactory = LoggerFactory.Create(builder => builder.AddProvider(_loggerProvider));
         }
 
         public string Root { get; }
         public string StorePath { get; }
         public IConfiguration Configuration { get; }
+        public IReadOnlyList<string> LogMessages => _loggerProvider.Messages;
 
         public InstallLinkingStoreActivation CreateActivation(DataProtectionKeyProtectionStatus? keyProtection = null)
             => new(
                 Configuration,
                 _dataProtection,
                 _environment,
-                LoggerFactory.Create(static _ => { }),
+                _loggerFactory,
                 [new UnavailableInstallLinkingRollbackAuthorityReadinessProbe()],
                 keyProtection ?? new DataProtectionKeyProtectionStatus(true, "test_key_encryptor"));
 
         public void Dispose()
         {
+            _loggerFactory.Dispose();
             if (Directory.Exists(Root))
             {
                 Directory.Delete(Root, recursive: true);
+            }
+        }
+    }
+
+    private sealed class CapturingLoggerProvider : ILoggerProvider
+    {
+        private readonly List<string> _messages = [];
+
+        public IReadOnlyList<string> Messages
+        {
+            get
+            {
+                lock (_messages)
+                {
+                    return _messages.ToArray();
+                }
+            }
+        }
+
+        public ILogger CreateLogger(string categoryName) => new CapturingLogger(_messages);
+
+        public void Dispose()
+        {
+        }
+
+        private sealed class CapturingLogger(List<string> messages) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(
+                LogLevel logLevel,
+                EventId eventId,
+                TState state,
+                Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                lock (messages)
+                {
+                    messages.Add(formatter(state, exception));
+                }
             }
         }
     }

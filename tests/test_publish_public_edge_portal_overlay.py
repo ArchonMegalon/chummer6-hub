@@ -320,6 +320,39 @@ def test_full_deployment_digest_binds_source_closure_and_staged_payload() -> Non
     )["sha256"]
 
 
+def test_staged_release_channel_binding_replaces_static_manifest_atomically(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    staging_root = tmp_path / "overlay" / "app"
+    target = staging_root / module.STAGED_RELEASE_CHANNEL_RELATIVE_PATH
+    target.parent.mkdir(parents=True)
+    previous_bytes = b'{"rolloutState":"older-local-shelf"}\n'
+    target.write_bytes(previous_bytes)
+    selected_bytes = b'{"rolloutState":"coverage_incomplete"}\n'
+    selected_sha256 = hashlib.sha256(selected_bytes).hexdigest()
+
+    receipt = module.bind_release_channel_into_staged_overlay(
+        staging_root,
+        selected_bytes,
+        selected_sha256,
+    )
+
+    assert target.read_bytes() == selected_bytes
+    assert target.stat().st_mode & 0o777 == 0o644
+    assert receipt == {
+        "status": "pass",
+        "relativePath": "wwwroot/downloads/RELEASE_CHANNEL.generated.json",
+        "path": str(target),
+        "sha256Expected": selected_sha256,
+        "sha256Before": hashlib.sha256(previous_bytes).hexdigest(),
+        "sha256After": selected_sha256,
+        "byteLength": len(selected_bytes),
+        "mode": "0644",
+        "replacedDifferentBytes": True,
+    }
+
+
 def test_full_deployment_digest_matches_runtime_unicode_and_astral_vector() -> None:
     module = load_module()
     source_fingerprint = {

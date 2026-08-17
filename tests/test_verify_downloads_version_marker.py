@@ -2731,6 +2731,79 @@ def test_monotonic_review_blocker_is_opt_in_and_rejects_unknown_or_optimistic_st
     assert unknown["rollout_compatible"] is False
 
 
+def test_runtime_review_floor_projection_requires_bound_recomputed_coverage_and_stale_proof() -> None:
+    module = load_module()
+
+    def posture(*, proof_status: str = "stale", complete: bool = True) -> dict[str, Any]:
+        gaps = [] if complete else ["macos"]
+        return {
+            "supportabilityState": "review_required",
+            "rolloutState": "public_release_review_required",
+            "desktopTupleCoverage": {
+                "complete": complete,
+                "missingRequiredPlatforms": gaps,
+                "missingRequiredHeads": [],
+                "missingRequiredPlatformHeadPairs": gaps,
+                "missingRequiredPlatformHeadRidTuples": gaps,
+            },
+            "publicTrustMetrics": {
+                "proofFreshness": {"status": proof_status},
+                "releaseChannel": {
+                    "supportabilityState": "review_required",
+                    "rolloutState": "public_release_review_required",
+                },
+            },
+            "registryBoundaryCoverage": {
+                "releaseChannel": {
+                    "supportabilityState": "review_required",
+                    "rolloutState": "public_release_review_required",
+                },
+            },
+        }
+
+    expected = {
+        "supportability_state": "review_required",
+        "rollout_state": "coverage_incomplete",
+        "proof_freshness_status": "stale",
+        "public_trust_supportability_state": "review_required",
+        "public_trust_rollout_state": "coverage_incomplete",
+        "registry_supportability_state": "review_required",
+        "registry_rollout_state": "coverage_incomplete",
+        "desktop_tuple_coverage_complete": False,
+    }
+    compatible = module.served_posture_compatibility(
+        posture(),
+        expected,
+        release_channel_receipt_sha256_bound=True,
+        allow_monotonic_review_blocker=True,
+    )
+    unbound = module.served_posture_compatibility(
+        posture(),
+        expected,
+        release_channel_receipt_sha256_bound=False,
+        allow_monotonic_review_blocker=True,
+    )
+    not_recomputed = module.served_posture_compatibility(
+        posture(complete=False),
+        expected,
+        release_channel_receipt_sha256_bound=True,
+        allow_monotonic_review_blocker=True,
+    )
+    fresh = module.served_posture_compatibility(
+        posture(proof_status="fresh"),
+        {**expected, "proof_freshness_status": "fresh"},
+        release_channel_receipt_sha256_bound=True,
+        allow_monotonic_review_blocker=True,
+    )
+
+    assert compatible["rollout_compatible"] is True
+    assert compatible["runtime_review_floor_projection_valid"] is True
+    assert compatible["conservative_review_floor_applied"] is True
+    assert unbound["rollout_compatible"] is False
+    assert not_recomputed["rollout_compatible"] is False
+    assert fresh["rollout_compatible"] is False
+
+
 def test_sha_bound_static_public_manifest_requires_authority_identity_and_consistent_aliases(
     tmp_path: Path,
 ) -> None:

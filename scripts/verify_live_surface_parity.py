@@ -48,6 +48,19 @@ SPECIFIC_BLOCKING_ROLLOUT_STATES = {
     "revoked",
     "unpublished",
 }
+RUNTIME_REVIEW_FLOOR_ROLLOUT_STATES = {
+    "public_release_review_required",
+    "release_review_required",
+}
+NONFRESH_PROOF_STATES = {
+    "blocked",
+    "fail",
+    "failed",
+    "incomplete",
+    "missing",
+    "review_required",
+    "stale",
+}
 
 def truthy_env(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
@@ -801,6 +814,69 @@ def downloads_under_review(payload: dict[str, Any], artifact_available: bool) ->
     )
 
 
+def public_download_runtime_review_floor_valid(
+    payload: dict[str, Any],
+    expected: dict[str, Any],
+    *,
+    surface_profile: str,
+    live_rollout: str,
+    expected_rollout: str,
+) -> bool:
+    """Recognize the API's fail-closed projection of obsolete coverage gaps.
+
+    The immutable Registry receipt can retain ``coverage_incomplete`` while the
+    runtime removes a retired desktop requirement and recomputes coverage as
+    complete. The API must still floor that response to review-required when
+    proof freshness or privacy readiness blocks supportability. Accept only
+    that fully evidenced, non-optimistic transform on the public-download lane.
+    """
+    if (
+        surface_profile != SURFACE_PROFILE_PUBLIC_DOWNLOAD
+        or expected_rollout != "coverage_incomplete"
+        or live_rollout not in RUNTIME_REVIEW_FLOOR_ROLLOUT_STATES
+    ):
+        return False
+
+    expected_coverage = expected.get("desktopTupleCoverage")
+    live_coverage = payload.get("desktopTupleCoverage")
+    if (
+        not isinstance(expected_coverage, dict)
+        or expected_coverage.get("complete") is not False
+        or not isinstance(live_coverage, dict)
+        or live_coverage.get("complete") is not True
+    ):
+        return False
+
+    for gap_key in (
+        "missingRequiredPlatforms",
+        "missingRequiredHeads",
+        "missingRequiredPlatformHeadPairs",
+        "missingRequiredPlatformHeadRidTuples",
+    ):
+        gaps = live_coverage.get(gap_key)
+        if gaps not in (None, []):
+            return False
+
+    public_trust_metrics = payload.get("publicTrustMetrics")
+    if not isinstance(public_trust_metrics, dict):
+        return False
+    proof_freshness = public_trust_metrics.get("proofFreshness")
+    privacy_readiness = public_trust_metrics.get("privacyReadiness")
+    proof_blocks = bool(
+        isinstance(proof_freshness, dict)
+        and normalize_token(proof_freshness.get("status")) in NONFRESH_PROOF_STATES
+    )
+    privacy_blocks = bool(
+        isinstance(privacy_readiness, dict)
+        and (
+            privacy_readiness.get("blocksLaunch") is True
+            or normalize_token(privacy_readiness.get("status"))
+            in {"blocked", "review_required"}
+        )
+    )
+    return proof_blocks or privacy_blocks
+
+
 def release_posture_expected_failures(
     payload: dict[str, Any],
     expected: dict[str, Any],
@@ -828,6 +904,16 @@ def release_posture_expected_failures(
         and expected_rollout in GENERIC_REVIEW_ROLLOUT_STATES
         and live_rollout in SPECIFIC_BLOCKING_ROLLOUT_STATES
     )
+    runtime_review_floor_projection_valid = bool(
+        expected_supportability == live_supportability == "review_required"
+        and public_download_runtime_review_floor_valid(
+            payload,
+            expected,
+            surface_profile=surface_profile,
+            live_rollout=live_rollout,
+            expected_rollout=expected_rollout,
+        )
+    )
     fields = {
         "expected_status": expected_status,
         "expected_version": expected_version,
@@ -840,9 +926,14 @@ def release_posture_expected_failures(
         "supportability_matches_expected": live_supportability == expected_supportability if expected_supportability else None,
         "rollout_matches_expected": rollout_matches,
         "rollout_compatible_with_expected": (
-            rollout_matches is not False or monotonic_review_blocker_valid
+            rollout_matches is not False
+            or monotonic_review_blocker_valid
+            or runtime_review_floor_projection_valid
         ),
         "monotonic_review_blocker_valid": monotonic_review_blocker_valid,
+        "runtime_review_floor_projection_valid": (
+            runtime_review_floor_projection_valid
+        ),
     }
     failures: list[str] = []
     for key, label in (
