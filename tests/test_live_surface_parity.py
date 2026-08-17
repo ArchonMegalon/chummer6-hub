@@ -633,6 +633,84 @@ class LiveSurfaceParityTests(unittest.TestCase):
         )
         self.assertFalse(flagship_fields["monotonic_review_blocker_valid"])
 
+    def test_public_download_profile_accepts_evidenced_runtime_review_floor_projection(self) -> None:
+        module = load_module()
+        expected = {
+            "status": "published",
+            "version": "run-test",
+            "channel": "preview",
+            "supportabilityState": "review_required",
+            "rolloutState": "coverage_incomplete",
+            "desktopTupleCoverage": {
+                "complete": False,
+                "missingRequiredPlatforms": ["macos"],
+            },
+        }
+        live = {
+            **expected,
+            "rolloutState": "public_release_review_required",
+            "desktopTupleCoverage": {
+                "complete": True,
+                "missingRequiredPlatforms": [],
+                "missingRequiredHeads": [],
+                "missingRequiredPlatformHeadPairs": [],
+                "missingRequiredPlatformHeadRidTuples": [],
+            },
+            "publicTrustMetrics": {
+                "proofFreshness": {"status": "stale"},
+                "privacyReadiness": {
+                    "status": "review_required",
+                    "blocksLaunch": True,
+                },
+            },
+        }
+
+        fields, failures = module.release_posture_expected_failures(
+            live,
+            expected,
+            surface_profile=module.SURFACE_PROFILE_PUBLIC_DOWNLOAD,
+        )
+
+        self.assertEqual([], failures)
+        self.assertFalse(fields["rollout_matches_expected"])
+        self.assertTrue(fields["runtime_review_floor_projection_valid"])
+        self.assertTrue(fields["rollout_compatible_with_expected"])
+
+    def test_public_download_profile_rejects_unevidenced_runtime_review_floor_projection(self) -> None:
+        module = load_module()
+        expected = {
+            "status": "published",
+            "version": "run-test",
+            "channel": "preview",
+            "supportabilityState": "review_required",
+            "rolloutState": "coverage_incomplete",
+            "desktopTupleCoverage": {"complete": False},
+        }
+        live = {
+            **expected,
+            "rolloutState": "public_release_review_required",
+            "desktopTupleCoverage": {"complete": True},
+            "publicTrustMetrics": {
+                "proofFreshness": {"status": "fresh"},
+                "privacyReadiness": {
+                    "status": "pass",
+                    "blocksLaunch": False,
+                },
+            },
+        }
+
+        fields, failures = module.release_posture_expected_failures(
+            live,
+            expected,
+            surface_profile=module.SURFACE_PROFILE_PUBLIC_DOWNLOAD,
+        )
+
+        self.assertFalse(fields["runtime_review_floor_projection_valid"])
+        self.assertIn(
+            "live release manifest rolloutState does not match expected release channel",
+            failures,
+        )
+
     def test_verify_allows_stable_copy_only_when_release_manifest_is_gold_supported(self) -> None:
         module = load_module()
         _SurfaceHandler.downloads_mode = "gold"

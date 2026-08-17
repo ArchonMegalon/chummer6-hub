@@ -132,6 +132,9 @@ ACTIVATION_TRANSACTION_CONTRACT_NAME = "chummer.public_edge_portal_overlay_activ
 RENAME_NOREPLACE = 1
 RENAME_EXCHANGE = 2
 OVERLAY_BUILD_INFO_RELATIVE_PATH = Path(".codex-studio") / "runtime" / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
+STAGED_RELEASE_CHANNEL_RELATIVE_PATH = (
+    Path("wwwroot") / "downloads" / "RELEASE_CHANNEL.generated.json"
+)
 LIVE_SURFACE_PARITY_SCRIPT_PATH = RUN_SERVICES_ROOT / "scripts" / "verify_live_surface_parity.py"
 DOWNLOADS_VERSION_MARKER_SCRIPT_PATH = RUN_SERVICES_ROOT / "scripts" / "verify_downloads_version_marker.py"
 VERIFICATION_PROGRAM_AUTHORITY_DIRECTORY_NAME = ".verification-program-authority"
@@ -1023,6 +1026,58 @@ def snapshot_bound_release_channel_receipt(
         raise RuntimeError("release-channel receipt snapshot digest changed after atomic write")
     binding["snapshotPath"] = str(snapshot_path)
     return snapshot_path
+
+
+def bind_release_channel_into_staged_overlay(
+    staging_root: Path,
+    raw_bytes: bytes,
+    expected_sha256: str,
+) -> dict[str, Any]:
+    actual_sha256 = hashlib.sha256(raw_bytes).hexdigest()
+    if actual_sha256 != expected_sha256:
+        raise RuntimeError(
+            "staged release-channel binding bytes do not match the selected receipt"
+        )
+
+    target = staging_root / STAGED_RELEASE_CHANNEL_RELATIVE_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    assert_no_symlink_components(
+        target.parent,
+        label="staged release-channel binding parent",
+    )
+    before_sha256 = ""
+    if target.exists() or target.is_symlink():
+        before_bytes, _before_metadata = read_stable_regular_bytes(
+            target,
+            label="pre-binding staged release channel",
+        )
+        before_sha256 = hashlib.sha256(before_bytes).hexdigest()
+
+    atomic_write_bytes(target, raw_bytes)
+    os.chmod(target, 0o644, follow_symlinks=False)
+    after_bytes, after_metadata = read_stable_regular_bytes(
+        target,
+        label="bound staged release channel",
+    )
+    after_sha256 = hashlib.sha256(after_bytes).hexdigest()
+    if after_sha256 != expected_sha256 or after_bytes != raw_bytes:
+        raise RuntimeError("staged release-channel binding drifted after atomic write")
+    if stat.S_IMODE(after_metadata.st_mode) != 0o644:
+        raise RuntimeError("staged release-channel binding mode is not 0644")
+
+    return {
+        "status": "pass",
+        "relativePath": str(STAGED_RELEASE_CHANNEL_RELATIVE_PATH),
+        "path": str(target),
+        "sha256Expected": expected_sha256,
+        "sha256Before": before_sha256,
+        "sha256After": after_sha256,
+        "byteLength": len(after_bytes),
+        "mode": "0644",
+        "replacedDifferentBytes": bool(
+            before_sha256 and before_sha256 != after_sha256
+        ),
+    }
 
 
 def _renameat2(left: Path, right: Path, flags: int) -> None:
@@ -6386,6 +6441,9 @@ def materialize(
     payload_mode_integrity_check: dict[str, Any] = {
         "status": "not_checked",
     }
+    staged_release_channel_binding: dict[str, Any] = {
+        "status": "not_checked",
+    }
 
     if publish.returncode == 0:
         overlay_payload_workspace_root = overlay_payload_source_root.parent
@@ -6402,6 +6460,11 @@ def materialize(
                 relative_path.relative_to("wwwroot")
                 for relative_path in RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS
             ),
+        )
+        staged_release_channel_binding = bind_release_channel_into_staged_overlay(
+            staging_root,
+            release_channel_raw_bytes,
+            normalized_release_channel_sha256,
         )
         copied_codex_design = copy_optional_tree(codex_design_source, staging_root / ".codex-design")
         copied_black_ledger = copy_optional_tree(black_ledger_source, staging_root / "black-ledger")
@@ -6793,6 +6856,7 @@ def materialize(
         "surfaceProfile": surface_profile,
         "deliveryPhase": delivery_phase,
         "releaseChannelReceipt": release_channel_binding,
+        "stagedReleaseChannelBinding": staged_release_channel_binding,
         "verificationPrograms": verification.get("verificationPrograms") or {},
         "verificationProgramsMatch": bool(
             verification.get("verificationProgramsMatch")

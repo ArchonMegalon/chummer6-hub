@@ -389,6 +389,27 @@ def release_manifest_posture(payload: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def desktop_tuple_coverage_posture(payload: dict[str, Any]) -> dict[str, Any]:
+    coverage = payload.get("desktopTupleCoverage")
+    if not isinstance(coverage, dict):
+        return {"complete": None, "gap_free": False}
+
+    complete = coverage.get("complete")
+    if not isinstance(complete, bool):
+        complete = None
+    gap_free = complete is True
+    for gap_key in (
+        "missingRequiredPlatforms",
+        "missingRequiredHeads",
+        "missingRequiredPlatformHeadPairs",
+        "missingRequiredPlatformHeadRidTuples",
+    ):
+        gaps = coverage.get(gap_key)
+        if gaps not in (None, []):
+            gap_free = False
+    return {"complete": complete, "gap_free": gap_free}
+
+
 def bound_release_manifest_authority_contract(
     payload: dict[str, Any],
     prefix: str,
@@ -530,6 +551,7 @@ def served_posture_compatibility(
     allow_monotonic_review_blocker: bool = False,
 ) -> dict[str, Any]:
     posture = release_manifest_posture(manifest)
+    served_desktop_coverage = desktop_tuple_coverage_posture(manifest)
     served_supportability_state = release_text(
         manifest,
         "supportabilityState",
@@ -553,6 +575,9 @@ def served_posture_compatibility(
     expected_registry_rollout_state = str(
         expected.get("registry_rollout_state") or ""
     ).strip().lower()
+    expected_desktop_coverage_complete = expected.get(
+        "desktop_tuple_coverage_complete"
+    )
     expected_internal_supportability_consistent = bool(
         expected_supportability_state
         and expected_supportability_state
@@ -588,7 +613,7 @@ def served_posture_compatibility(
         expected_registry_rollout_state,
         effective_review_rollout,
     )
-    conservative_floor_valid = bool(
+    direct_conservative_floor_valid = bool(
         release_channel_receipt_sha256_bound
         and expected_supportability_state
         in {
@@ -643,6 +668,38 @@ def served_posture_compatibility(
         and served_rollout_state
         in RELEASE_CHANNEL_SPECIFIC_BLOCKING_ROLLOUT_STATES
     )
+    runtime_review_floor_projection_valid = bool(
+        allow_monotonic_review_blocker
+        and release_channel_receipt_sha256_bound
+        and expected_desktop_coverage_complete is False
+        and served_desktop_coverage["complete"] is True
+        and served_desktop_coverage["gap_free"] is True
+        and expected_supportability_state
+        == expected_public_trust_supportability_state
+        == expected_registry_supportability_state
+        == RELEASE_CHANNEL_REVIEW_SUPPORTABILITY_STATE
+        and served_supportability_state
+        == posture["public_trust_supportability_state"]
+        == posture["registry_supportability_state"]
+        == RELEASE_CHANNEL_REVIEW_SUPPORTABILITY_STATE
+        and expected_proof_freshness_status
+        == posture["proof_freshness_status"]
+        and expected_proof_freshness_status
+        in RELEASE_CHANNEL_CONSERVATIVE_PROOF_STATUSES
+        and expected_rollout_state
+        == expected_public_trust_rollout_state
+        == expected_registry_rollout_state
+        == "coverage_incomplete"
+        and served_rollout_state
+        == posture["public_trust_rollout_state"]
+        == posture["registry_rollout_state"]
+        and served_rollout_state
+        in RELEASE_CHANNEL_GENERIC_REVIEW_ROLLOUT_STATES
+    )
+    conservative_floor_valid = bool(
+        direct_conservative_floor_valid
+        or runtime_review_floor_projection_valid
+    )
     conservative_floor_applied = bool(
         conservative_floor_valid
         and (supportability_exact is False or rollout_exact is False)
@@ -660,6 +717,18 @@ def served_posture_compatibility(
         "conservative_review_floor_valid": conservative_floor_valid,
         "conservative_review_floor_applied": conservative_floor_applied,
         "monotonic_review_blocker_valid": monotonic_review_blocker_valid,
+        "runtime_review_floor_projection_valid": (
+            runtime_review_floor_projection_valid
+        ),
+        "served_desktop_tuple_coverage_complete": (
+            served_desktop_coverage["complete"]
+        ),
+        "served_desktop_tuple_coverage_gap_free": (
+            served_desktop_coverage["gap_free"]
+        ),
+        "expected_desktop_tuple_coverage_complete": (
+            expected_desktop_coverage_complete
+        ),
         "internal_supportability_consistent": (
             served_supportability_state
             == posture["public_trust_supportability_state"]
@@ -1267,6 +1336,7 @@ def release_channel_expectations(
     supportability_state = release_text(release_channel, "supportabilityState", "supportability_state").lower()
     rollout_state = release_text(release_channel, "rolloutState", "rollout_state").lower()
     posture = release_manifest_posture(release_channel)
+    desktop_coverage = desktop_tuple_coverage_posture(release_channel)
     installer_available = public_installer_available(release_channel) if release_channel else None
     failures: list[str] = []
 
@@ -1376,6 +1446,8 @@ def release_channel_expectations(
         "supportability_state": supportability_state,
         "rollout_state": rollout_state,
         **posture,
+        "desktop_tuple_coverage_complete": desktop_coverage["complete"],
+        "desktop_tuple_coverage_gap_free": desktop_coverage["gap_free"],
         "public_installer_available": installer_available,
         "status_heading_expected": status_heading_expected,
     }, failures
@@ -1599,6 +1671,7 @@ def verify_live(
     expected_registry_supportability_state: str | None = None,
     expected_registry_rollout_state: str | None = None,
     expected_contract_name: str | None = None,
+    expected_desktop_tuple_coverage_complete: bool | None = None,
     release_channel_receipt_sha256_bound: bool = False,
     allow_monotonic_review_blocker: bool = False,
 ) -> tuple[dict[str, Any], list[str]]:
@@ -1930,6 +2003,9 @@ def verify_live(
                 "public_trust_rollout_state": expected_public_trust_rollout_state,
                 "registry_supportability_state": expected_registry_supportability_state,
                 "registry_rollout_state": expected_registry_rollout_state,
+                "desktop_tuple_coverage_complete": (
+                    expected_desktop_tuple_coverage_complete
+                ),
             },
             release_channel_receipt_sha256_bound=release_channel_receipt_sha256_bound,
             allow_monotonic_review_blocker=allow_monotonic_review_blocker,
@@ -2764,6 +2840,9 @@ def main(argv: list[str] | None = None) -> int:
                 expected_registry_supportability_state=release_expectations.get("registry_supportability_state", ""),
                 expected_registry_rollout_state=release_expectations.get("registry_rollout_state", ""),
                 expected_contract_name=release_expectations.get("contract_name", ""),
+                expected_desktop_tuple_coverage_complete=(
+                    release_expectations.get("desktop_tuple_coverage_complete")
+                ),
                 release_channel_receipt_sha256_bound=release_channel_receipt_sha256_bound,
                 allow_monotonic_review_blocker=args.allow_monotonic_review_blocker,
             )
