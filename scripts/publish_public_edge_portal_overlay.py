@@ -1588,8 +1588,13 @@ def build_input_rows(source_root: Path) -> list[dict[str, Any]]:
     workspace_root = source_root.parent.resolve()
     source_relative_root = relative_source_root(source_root.resolve(), workspace_root)
     copy_plan: list[tuple[Path, tuple[Path, ...]]] = []
-    if source_relative_root == Path("chummer.run-services"):
-        for relative_root, include_paths in ISOLATED_BUILD_WORKSPACE_COPY_MAP.items():
+    if is_run_services_source_root(source_root):
+        for canonical_root, include_paths in ISOLATED_BUILD_WORKSPACE_COPY_MAP.items():
+            relative_root = (
+                source_relative_root
+                if canonical_root == Path("chummer.run-services")
+                else canonical_root
+            )
             if (workspace_root / relative_root).exists():
                 copy_plan.append((relative_root, include_paths))
     else:
@@ -2622,6 +2627,23 @@ def relative_source_root(source_root: Path, workspace_root: Path) -> Path:
         return Path(source_root.name)
 
 
+def is_run_services_source_root(source_root: Path) -> bool:
+    required_markers = (
+        Path("Chummer.Run.Api") / "Chummer.Run.Api.csproj",
+        Path("docker-compose.public-edge.yml"),
+        Path("package-lock.json"),
+    )
+    for relative_path in required_markers:
+        marker = source_root / relative_path
+        try:
+            metadata = marker.lstat()
+        except OSError:
+            return False
+        if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+            return False
+    return True
+
+
 def paths_overlap(left: Path, right: Path) -> bool:
     return left == right or left in right.parents or right in left.parents
 
@@ -2968,7 +2990,7 @@ def materialize_isolated_build_workspace(source_root: Path, build_root: Path) ->
     ignore_build_entry = isolated_build_ignore(source_root)
     copied_roots: list[str] = []
     copy_plan: list[tuple[Path, tuple[Path, ...]]] = []
-    if source_relative_root == Path("chummer.run-services"):
+    if is_run_services_source_root(source_root):
         merged_copy_map: dict[Path, list[Path]] = {}
         for copy_map in (
             ISOLATED_BUILD_WORKSPACE_COPY_MAP,
@@ -2979,7 +3001,12 @@ def materialize_isolated_build_workspace(source_root: Path, build_root: Path) ->
                 for include_path in include_paths:
                     if include_path not in merged_copy_map[relative_root]:
                         merged_copy_map[relative_root].append(include_path)
-        for relative_root, include_paths in merged_copy_map.items():
+        for canonical_root, include_paths in merged_copy_map.items():
+            relative_root = (
+                source_relative_root
+                if canonical_root == Path("chummer.run-services")
+                else canonical_root
+            )
             if (workspace_root / relative_root).exists():
                 copy_plan.append((relative_root, tuple(include_paths)))
     else:
