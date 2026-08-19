@@ -33,7 +33,9 @@ public sealed record BuildGhostConciergeProjection(
     IReadOnlyList<BuildGhostConciergeInsightProjection> Insights,
     string ClientReportHref,
     string PublicFeedbackHref,
-    IReadOnlyList<BuildGhostConciergeActionProjection> Actions);
+    IReadOnlyList<BuildGhostConciergeActionProjection> Actions,
+    string ToughTongueStatus,
+    IReadOnlyList<string> ToughTongueResponsibilities);
 
 public sealed class BuildGhostConciergeService
 {
@@ -84,6 +86,16 @@ public sealed class BuildGhostConciergeService
         string answerlyStatus = _answerlyPolicy.CanUseHumanizer
             ? "Limited explainer fail-closed"
             : "Fallback explainer only";
+        bool toughTongueRemoteEnabled = bool.TryParse(
+            _configuration["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_ENABLED"],
+            out bool parsedRemoteEnabled) && parsedRemoteEnabled;
+        int configuredToughTongueSlots = Enumerable.Range(1, 3).Count(index =>
+            !string.IsNullOrWhiteSpace(_configuration[$"CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_{index}"]));
+        string toughTongueStatus = !toughTongueRemoteEnabled
+            ? "Deterministic fallback active; remote explanation is disabled"
+            : configuredToughTongueSlots == 3
+                ? "Three credential slots configured; health is evaluated per request"
+                : $"Fail-closed: {configuredToughTongueSlots}/3 credential slots configured";
         const string clientReportHref = "/contact?kind=bug_report&title=Character%20helper%20report&summary=Character%20helper%20compare%20or%20apply%20did%20not%20behave%20as%20expected.&runtime=character_helper&bundle=character_helper&sceneId=character-helper";
         const string publicFeedbackHref = "/feedback?topic=character-helper";
         BuildGhostConciergeInsightProjection[] insights = BuildChartBrickInsights();
@@ -94,8 +106,8 @@ public sealed class BuildGhostConciergeService
             AnswerlyStatus: answerlyStatus,
             EngineStatus: "First-party compare/apply only",
             HumanizedSummary: packet.FallbackMessage,
-            CanonicalLane: "Short intake -> plain-language explanation -> Chummer character compare bench",
-            RuntimeBoundary: "Neither the public concierge nor the bounded explainer may compute legality, mutate the runner, or become apply truth.",
+            CanonicalLane: "Short intake -> digest-bound Tough Tongue explanation -> Chummer character compare bench",
+            RuntimeBoundary: "Neither the public concierge nor any bounded explainer may compute legality, mutate the runner, or become apply truth. Tough Tongue receives only an already-grounded packet and its response is validated again.",
             FacePopResponsibilities:
             [
                 "Greet the builder and ask which runner decision needs comparison.",
@@ -145,6 +157,13 @@ public sealed class BuildGhostConciergeService
                     clientReportHref,
                     "secondary",
                     "Open support with the character-helper context already attached.")
+            ],
+            ToughTongueStatus: toughTongueStatus,
+            ToughTongueResponsibilities:
+            [
+                "Explain only facts, variants, sources, actions, and links present in the digest-bound Chummer packet.",
+                "Use one healthy credential slot per idempotent request and emit a redacted receipt.",
+                "Return Chummer's locale-matched deterministic fallback when remote execution, quota, circuit, or validation is unavailable."
             ]);
     }
 

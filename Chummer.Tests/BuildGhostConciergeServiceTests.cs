@@ -30,6 +30,7 @@ public sealed class BuildGhostConciergeServiceTests
         Assert.Contains(projection.Actions, item =>
             string.Equals(item.Label, "Open public concierge", StringComparison.Ordinal)
             && string.Equals(item.Href, "/facepop/build-ghosts", StringComparison.Ordinal));
+        Assert.Contains("disabled", projection.ToughTongueStatus, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -46,6 +47,7 @@ public sealed class BuildGhostConciergeServiceTests
         Assert.Equal("Fallback explainer only", projection.AnswerlyStatus);
         Assert.Contains("A short intake can", projection.HumanizedSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("legality", projection.RuntimeBoundary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Tough Tongue", projection.CanonicalLane, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -62,6 +64,25 @@ public sealed class BuildGhostConciergeServiceTests
         BuildGhostConciergeProjection projection = service.Build();
 
         Assert.Equal("/facepop/build-ghosts", projection.FacePopEntryHref);
+    }
+
+    [Fact]
+    public void Build_Reports_three_configured_Tough_Tongue_slots_without_exposing_secrets()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_ENABLED"] = "true",
+                ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_1"] = "secret-one",
+                ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_2"] = "secret-two",
+                ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_3"] = "secret-three"
+            })
+            .Build();
+
+        BuildGhostConciergeProjection projection = CreateService(configuration).Build();
+
+        Assert.Contains("Three credential slots configured", projection.ToughTongueStatus, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-", System.Text.Json.JsonSerializer.Serialize(projection), StringComparison.Ordinal);
     }
 
     private static BuildGhostConciergeService CreateService(IConfiguration configuration)
