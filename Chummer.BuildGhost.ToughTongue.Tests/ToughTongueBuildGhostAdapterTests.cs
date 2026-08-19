@@ -11,6 +11,10 @@ namespace Chummer.BuildGhost.ToughTongue.Tests;
 [TestClass]
 public sealed class ToughTongueBuildGhostAdapterTests
 {
+    private const string AccountOne = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+    private const string AccountTwo = "sha256:2222222222222222222222222222222222222222222222222222222222222222";
+    private const string AccountThree = "sha256:3333333333333333333333333333333333333333333333333333333333333333";
+
     [TestMethod]
     public async Task Remote_execution_is_disabled_by_default_and_returns_audited_deterministic_fallback()
     {
@@ -39,7 +43,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
 
         CollectionAssert.AreEqual(new[] { "secret-one", "secret-two", "secret-three" }, transport.Credentials.ToArray());
         CollectionAssert.AreEqual(
-            new[] { "sha256:account-one", "sha256:account-two", "sha256:account-three" },
+            new[] { AccountOne, AccountTwo, AccountThree },
             new[] { first.Receipt.AccountSlotId, second.Receipt.AccountSlotId, third.Receipt.AccountSlotId });
         Assert.IsFalse(JsonSerializer.Serialize(new[] { first.Receipt, second.Receipt, third.Receipt }).Contains("secret-", StringComparison.Ordinal));
         Assert.IsTrue(new[] { first, second, third }.All(static result => !result.UsedDeterministicFallback));
@@ -57,6 +61,54 @@ public sealed class ToughTongueBuildGhostAdapterTests
 
         Assert.AreSame(first, second);
         Assert.HasCount(1, transport.Credentials);
+    }
+
+    [TestMethod]
+    public async Task Idempotency_cache_is_scoped_to_the_opaque_owner_binding()
+    {
+        FakeTransport transport = new(request => Success(request));
+        ToughTongueBuildGhostAdapter adapter = CreateAdapter(RemoteConfiguration(), transport);
+        ToughTongueBuildGhostRequest firstOwner = CreateRequest("request-owner", "shared-idempotency");
+        ToughTongueBuildGhostRequest secondOwner = firstOwner with
+        {
+            OwnerScopeHash = $"sha256:{new string('b', 64)}"
+        };
+
+        ToughTongueBuildGhostResult first = await adapter.ExplainAsync(firstOwner, CancellationToken.None);
+        ToughTongueBuildGhostResult second = await adapter.ExplainAsync(secondOwner, CancellationToken.None);
+
+        Assert.AreNotSame(first, second);
+        Assert.HasCount(2, transport.Credentials);
+    }
+
+    [TestMethod]
+    public async Task Remote_execution_requires_exactly_three_distinct_credentials_and_opaque_account_refs()
+    {
+        Dictionary<string, string?>[] invalidConfigurations =
+        [
+            WithSlotConfiguration("secret-one;secret-two", $"{AccountOne};{AccountTwo}"),
+            WithSlotConfiguration("secret-one;secret-two;secret-three;secret-four", $"{AccountOne};{AccountTwo};{AccountThree};sha256:{new string('4', 64)}"),
+            WithSlotConfiguration("secret-one;secret-one;secret-three", $"{AccountOne};{AccountTwo};{AccountThree}"),
+            WithSlotConfiguration("secret-one;secret-two;secret-three", "account-one;account-two;account-three"),
+            WithSlotConfiguration("secret-one;secret-two;secret-three", $"{AccountOne};{AccountOne};{AccountThree}")
+        ];
+
+        foreach (Dictionary<string, string?> configuration in invalidConfigurations)
+        {
+            FakeTransport transport = new(request => Success(request));
+            ToughTongueBuildGhostAdapter adapter = CreateAdapter(configuration, transport);
+
+            ToughTongueBuildGhostResult result = await adapter.ExplainAsync(CreateRequest(), CancellationToken.None);
+
+            Assert.AreEqual("credential-slot-configuration-invalid", result.OutcomeStatus);
+            Assert.IsTrue(result.UsedDeterministicFallback);
+            Assert.IsFalse(result.Receipt.RemoteAttempted);
+            Assert.AreEqual(0, result.Receipt.HealthySlotCount);
+            CollectionAssert.Contains(
+                result.Receipt.ValidationReasons.ToArray(),
+                "exactly-three-distinct-credentials-and-opaque-account-refs-required");
+            Assert.IsEmpty(transport.Credentials);
+        }
     }
 
     [TestMethod]
@@ -148,6 +200,28 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public async Task Provider_cannot_reference_group_members_without_authorized_visible_scope()
+    {
+        FakeTransport transport = new(request => Success(request));
+        ToughTongueBuildGhostAdapter adapter = CreateAdapter(RemoteConfiguration(), transport);
+        ToughTongueBuildGhostRequest request = CreateRequest();
+        JsonObject packet = JsonNode.Parse(request.AnalysisPacketJson)!.AsObject();
+        packet["groupCapabilityPosture"]!.AsObject()["visibilityPosture"] = "consent-required";
+        string digest = ComputePacketDigest(packet);
+        packet["packetDigest"] = digest;
+        request = request with
+        {
+            PacketDigest = digest,
+            AnalysisPacketJson = packet.ToJsonString()
+        };
+
+        ToughTongueBuildGhostResult result = await adapter.ExplainAsync(request, CancellationToken.None);
+
+        Assert.AreEqual("provider-answer-rejected", result.OutcomeStatus);
+        CollectionAssert.Contains(result.Receipt.ValidationReasons.ToArray(), "unsupported-member:member:visible");
+    }
+
+    [TestMethod]
     public async Task Packet_digest_tampering_is_rejected_before_any_remote_call()
     {
         FakeTransport transport = new(request => Success(request));
@@ -221,10 +295,18 @@ public sealed class ToughTongueBuildGhostAdapterTests
         {
             ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED"] = "true",
             ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS"] = "secret-one;secret-two;secret-three",
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS"] = "sha256:account-one;sha256:account-two;sha256:account-three",
+            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS"] = $"{AccountOne};{AccountTwo};{AccountThree}",
             ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID"] = "rook-private-scenario",
             ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID"] = ToughTongueBuildGhostPersonaIds.RookVoice
         };
+
+    private static Dictionary<string, string?> WithSlotConfiguration(string credentials, string accountRefs)
+    {
+        Dictionary<string, string?> values = RemoteConfiguration();
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS"] = credentials;
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS"] = accountRefs;
+        return values;
+    }
 
     private static ToughTongueBuildGhostRequest CreateRequest(
         string requestId = "request-1",
@@ -272,6 +354,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ["allowedSuggestedActions"] = new JsonArray(new JsonObject { ["actionId"] = "preview:balanced" }),
             ["groupCapabilityPosture"] = new JsonObject
             {
+                ["visibilityPosture"] = "authorized-visible-scope",
                 ["visibleMembers"] = new JsonArray(new JsonObject { ["memberRef"] = "member:visible" })
             }
         };

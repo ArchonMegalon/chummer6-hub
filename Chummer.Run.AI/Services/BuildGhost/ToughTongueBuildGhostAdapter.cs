@@ -56,6 +56,7 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
     private readonly TimeSpan _cooldown;
     private readonly string _agentId;
     private readonly string _voiceId;
+    private readonly bool _slotConfigurationValid;
     private readonly CredentialSlotState[] _slots;
     private readonly Dictionary<string, ToughTongueBuildGhostResult> _idempotencyCache = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -77,6 +78,11 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         _voiceId = NormalizeIdentifier(configuration[VoiceIdKey]);
         string[] credentials = SplitConfiguredList(configuration[ApiKeysKey]);
         string[] accountRefs = SplitConfiguredList(configuration[AccountRefsKey]);
+        _slotConfigurationValid = credentials.Length == 3
+            && accountRefs.Length == 3
+            && credentials.Distinct(StringComparer.Ordinal).Count() == 3
+            && accountRefs.All(IsSha256)
+            && accountRefs.Distinct(StringComparer.Ordinal).Count() == 3;
         _slots = Enumerable.Range(0, 3).Select(index => new CredentialSlotState(
                 index < accountRefs.Length ? accountRefs[index] : string.Empty,
                 index < credentials.Length ? NormalizeSecret(credentials[index]) : null,
@@ -91,7 +97,7 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
         PacketAuthority authority = ValidateRequest(request);
-        string cacheKey = $"{request.IdempotencyKey}\u001f{request.PacketDigest}";
+        string cacheKey = $"{request.OwnerScopeHash}\u001f{request.IdempotencyKey}\u001f{request.PacketDigest}";
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -112,6 +118,17 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                     remoteAttempted: false,
                     slot: null,
                     ["remote-execution-disabled-by-default"]));
+            }
+
+            if (!_slotConfigurationValid)
+            {
+                return Cache(cacheKey, Fallback(
+                    request,
+                    now,
+                    "credential-slot-configuration-invalid",
+                    remoteAttempted: false,
+                    slot: null,
+                    ["exactly-three-distinct-credentials-and-opaque-account-refs-required"]));
             }
 
             if (string.IsNullOrWhiteSpace(_agentId) || string.IsNullOrWhiteSpace(_voiceId))
@@ -337,7 +354,7 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
     {
         DateTimeOffset completedAt = _clock.UtcNow;
         int configured = _slots.Count(static candidate => candidate.Credential is not null
-            && !string.IsNullOrWhiteSpace(candidate.AccountRef));
+            && IsSha256(candidate.AccountRef));
         int healthy = _slots.Count(candidate => IsHealthy(candidate, now));
         return new ToughTongueBuildGhostReceipt(
             ToughTongueBuildGhostContractVersions.ReceiptV1,
@@ -386,8 +403,9 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
     }
 
     private bool IsHealthy(CredentialSlotState slot, DateTimeOffset now)
-        => slot.Credential is not null
-            && !string.IsNullOrWhiteSpace(slot.AccountRef)
+        => _slotConfigurationValid
+            && slot.Credential is not null
+            && IsSha256(slot.AccountRef)
             && slot.AttemptsToday < _dailyQuota
             && (slot.CooldownUntilUtc is null || slot.CooldownUntilUtc <= now);
 
@@ -455,7 +473,6 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         => (value ?? string.Empty)
             .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(static item => item.Length > 0)
-            .Take(3)
             .ToArray();
 
     private static string NormalizeOutcomeCode(string? value)
@@ -559,9 +576,17 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                 Objects(packet, "optimizationStrategies").Select(static value => Text(value, "strategyId")).ToHashSet(StringComparer.Ordinal),
                 Objects(packet, "ruleExplanations").Select(static value => Text(value, "explanationId")).ToHashSet(StringComparer.Ordinal),
                 Objects(packet, "variants").Select(static value => Text(value, "variantId")).ToHashSet(StringComparer.Ordinal),
-                Objects(Find(packet, "groupCapabilityPosture") as JsonObject, "visibleMembers").Select(static value => Text(value, "memberRef")).ToHashSet(StringComparer.Ordinal),
+                AuthorizedMemberRefs(packet),
                 Objects(packet, "sourceAnchors").Select(static value => Text(value, "anchorId")).ToHashSet(StringComparer.Ordinal),
                 Objects(packet, "allowedSuggestedActions").Select(static value => Text(value, "actionId")).ToHashSet(StringComparer.Ordinal),
                 Objects(packet, "ruleExplanations").Select(static value => Text(value, "sourceLookupRoute")).Where(static value => !string.IsNullOrWhiteSpace(value)).ToHashSet(StringComparer.Ordinal));
+
+        private static IReadOnlySet<string> AuthorizedMemberRefs(JsonObject packet)
+        {
+            JsonObject? group = Find(packet, "groupCapabilityPosture") as JsonObject;
+            return string.Equals(Text(group, "visibilityPosture"), "authorized-visible-scope", StringComparison.Ordinal)
+                ? Objects(group, "visibleMembers").Select(static value => Text(value, "memberRef")).ToHashSet(StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
+        }
     }
 }
