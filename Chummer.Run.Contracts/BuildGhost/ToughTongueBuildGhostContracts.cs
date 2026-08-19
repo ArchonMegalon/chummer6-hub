@@ -50,14 +50,24 @@ public sealed record ToughTongueBuildGhostReceipt(
     string Locale,
     string IdempotencyDigest,
     string OutcomeStatus,
+    string ProviderId,
+    string ModelId,
+    string AgentId,
+    string VoiceId,
     bool RemoteExecutionEnabled,
     bool RemoteAttempted,
-    string? CredentialSlotId,
+    string? AccountSlotId,
     string CircuitPosture,
     int ConfiguredSlotCount,
     int HealthySlotCount,
+    long? InputTokens,
+    long? OutputTokens,
+    decimal? MinutesUsed,
+    string? FallbackReason,
     IReadOnlyList<string> ValidationReasons,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset CompletedAtUtc,
+    long DurationMilliseconds);
 
 public sealed record ToughTongueBuildGhostResult(
     string OutcomeStatus,
@@ -79,7 +89,10 @@ public sealed record ToughTongueBuildGhostTransportResult(
     string OutcomeCode,
     string? ResponseJson,
     bool QuotaExhausted = false,
-    bool Retryable = false);
+    bool Retryable = false,
+    long? InputTokens = null,
+    long? OutputTokens = null,
+    decimal? MinutesUsed = null);
 
 public sealed record BuildGhostPersonaMediaRelease(
     string Schema,

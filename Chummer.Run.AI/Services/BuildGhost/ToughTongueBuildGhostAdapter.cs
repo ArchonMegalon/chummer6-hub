@@ -34,22 +34,14 @@ public sealed class SystemBuildGhostClock : IBuildGhostClock
 
 public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
 {
-    private const string RemoteEnabledKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_ENABLED";
+    private const string RemoteEnabledKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED";
+    private const string ApiKeysKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS";
+    private const string AccountRefsKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS";
+    private const string AgentIdKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID";
+    private const string VoiceIdKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID";
     private const string DailyQuotaKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_DAILY_QUOTA_PER_SLOT";
     private const string FailureThresholdKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CIRCUIT_FAILURE_THRESHOLD";
     private const string CooldownSecondsKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_COOLDOWN_SECONDS";
-
-    private static readonly string[] CredentialKeys =
-    [
-        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_1",
-        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_2",
-        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_3"
-    ];
-
-    private static readonly HashSet<string> SupportedLocales = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "en-US", "de-DE", "fr-FR", "ja-JP", "pt-BR", "zh-CN"
-    };
 
     private static readonly JsonSerializerOptions ProviderSerializerOptions = new()
     {
@@ -62,6 +54,8 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
     private readonly int _dailyQuota;
     private readonly int _failureThreshold;
     private readonly TimeSpan _cooldown;
+    private readonly string _agentId;
+    private readonly string _voiceId;
     private readonly CredentialSlotState[] _slots;
     private readonly Dictionary<string, ToughTongueBuildGhostResult> _idempotencyCache = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -79,10 +73,14 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         _dailyQuota = ReadBoundedInt(configuration[DailyQuotaKey], 100, 1, 100_000);
         _failureThreshold = ReadBoundedInt(configuration[FailureThresholdKey], 3, 1, 100);
         _cooldown = TimeSpan.FromSeconds(ReadBoundedInt(configuration[CooldownSecondsKey], 300, 1, 86_400));
-        _slots = CredentialKeys.Select((key, index) => new CredentialSlotState(
-            $"tough-tongue-slot-{index + 1}",
-            NormalizeSecret(configuration[key]),
-            _clock.UtcNow.UtcDateTime.Date))
+        _agentId = NormalizeIdentifier(configuration[AgentIdKey]);
+        _voiceId = NormalizeIdentifier(configuration[VoiceIdKey]);
+        string[] credentials = SplitConfiguredList(configuration[ApiKeysKey]);
+        string[] accountRefs = SplitConfiguredList(configuration[AccountRefsKey]);
+        _slots = Enumerable.Range(0, 3).Select(index => new CredentialSlotState(
+                index < accountRefs.Length ? accountRefs[index] : string.Empty,
+                index < credentials.Length ? NormalizeSecret(credentials[index]) : null,
+                _clock.UtcNow.UtcDateTime.Date))
             .ToArray();
     }
 
@@ -114,6 +112,17 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                     remoteAttempted: false,
                     slot: null,
                     ["remote-execution-disabled-by-default"]));
+            }
+
+            if (string.IsNullOrWhiteSpace(_agentId) || string.IsNullOrWhiteSpace(_voiceId))
+            {
+                return Cache(cacheKey, Fallback(
+                    request,
+                    now,
+                    "provider-binding-unavailable",
+                    remoteAttempted: false,
+                    slot: null,
+                    ["agent-or-voice-binding-missing"]));
             }
 
             CredentialSlotState? slot = SelectHealthySlot(now);
@@ -168,7 +177,8 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                     transportResult.QuotaExhausted ? "provider-quota-exhausted" : "provider-transport-failed",
                     remoteAttempted: true,
                     slot,
-                    [NormalizeOutcomeCode(transportResult.OutcomeCode)]));
+                    [NormalizeOutcomeCode(transportResult.OutcomeCode)],
+                    transportResult));
             }
 
             ToughTongueBuildGhostProviderAnswer? answer;
@@ -193,7 +203,8 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                     "provider-answer-rejected",
                     remoteAttempted: true,
                     slot,
-                    validationReasons));
+                    validationReasons,
+                    transportResult));
             }
 
             slot.ConsecutiveFailures = 0;
@@ -204,7 +215,8 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                 "validated-provider-answer",
                 remoteAttempted: true,
                 slot,
-                []);
+                [],
+                transportResult);
             return Cache(cacheKey, new ToughTongueBuildGhostResult(
                 "validated-provider-answer",
                 answer!.Text,
@@ -228,8 +240,6 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         if (string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.IdempotencyKey.Length > 256) failures.Add("idempotency-key-invalid");
         if (string.IsNullOrWhiteSpace(request.DeterministicFallbackText) || request.DeterministicFallbackText.Length > 32_768) failures.Add("deterministic-fallback-invalid");
         if (string.IsNullOrWhiteSpace(request.AnalysisPacketJson) || request.AnalysisPacketJson.Length > 2 * 1024 * 1024) failures.Add("analysis-packet-size-invalid");
-        if (!SupportedLocales.Contains(request.Locale)) failures.Add("locale-not-materialized");
-
         JsonObject? packet = null;
         try
         {
@@ -254,6 +264,10 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                 Require(Text(packet, "voiceId"), ToughTongueBuildGhostPersonaIds.RookVoice, "voice-id-mismatch", failures);
                 Require(Text(packet, "packetDigest"), request.PacketDigest, "packet-digest-binding-mismatch", failures);
                 if (!string.Equals(Text(packet, "locale"), request.Locale, StringComparison.OrdinalIgnoreCase)) failures.Add("packet-locale-mismatch");
+                string[] supportedLocales = Strings(packet, "supportedLocales").ToArray();
+                string[] fallbackChain = Strings(packet, "localeFallbackChain").ToArray();
+                if (!supportedLocales.Contains(request.Locale, StringComparer.OrdinalIgnoreCase)) failures.Add("locale-not-materialized");
+                if (fallbackChain.Length == 0 || !string.Equals(fallbackChain[0], request.Locale, StringComparison.OrdinalIgnoreCase)) failures.Add("locale-fallback-chain-invalid");
                 if (!string.Equals(ComputePacketDigest(packet), request.PacketDigest, StringComparison.Ordinal)) failures.Add("packet-digest-verification-failed");
             }
             catch (Exception exception) when (exception is InvalidOperationException or FormatException or ArgumentException)
@@ -303,13 +317,14 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         string status,
         bool remoteAttempted,
         CredentialSlotState? slot,
-        IReadOnlyList<string> reasons)
+        IReadOnlyList<string> reasons,
+        ToughTongueBuildGhostTransportResult? transportResult = null)
         => new(
             status,
             request.DeterministicFallbackText,
             UsedDeterministicFallback: true,
             ProviderAnswer: null,
-            CreateReceipt(request, now, status, remoteAttempted, slot, reasons));
+            CreateReceipt(request, now, status, remoteAttempted, slot, reasons, transportResult));
 
     private ToughTongueBuildGhostReceipt CreateReceipt(
         ToughTongueBuildGhostRequest request,
@@ -317,9 +332,12 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         string status,
         bool remoteAttempted,
         CredentialSlotState? slot,
-        IReadOnlyList<string> reasons)
+        IReadOnlyList<string> reasons,
+        ToughTongueBuildGhostTransportResult? transportResult = null)
     {
-        int configured = _slots.Count(static candidate => candidate.Credential is not null);
+        DateTimeOffset completedAt = _clock.UtcNow;
+        int configured = _slots.Count(static candidate => candidate.Credential is not null
+            && !string.IsNullOrWhiteSpace(candidate.AccountRef));
         int healthy = _slots.Count(candidate => IsHealthy(candidate, now));
         return new ToughTongueBuildGhostReceipt(
             ToughTongueBuildGhostContractVersions.ReceiptV1,
@@ -329,14 +347,24 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
             request.Locale,
             $"sha256:{Digest(request.IdempotencyKey)}",
             status,
+            "tough-tongue",
+            "not-applicable-session-orchestrator",
+            _agentId,
+            _voiceId,
             _remoteEnabled,
             remoteAttempted,
-            slot?.SlotId,
+            slot?.AccountRef,
             slot is null ? "not-selected" : CircuitPosture(slot, now),
             configured,
             healthy,
+            transportResult?.InputTokens,
+            transportResult?.OutputTokens,
+            transportResult?.MinutesUsed,
+            status == "validated-provider-answer" ? null : status,
             reasons.Distinct(StringComparer.Ordinal).OrderBy(static value => value, StringComparer.Ordinal).ToArray(),
-            now);
+            now,
+            completedAt,
+            Math.Max(0, (long)(completedAt - now).TotalMilliseconds));
     }
 
     private CredentialSlotState? SelectHealthySlot(DateTimeOffset now)
@@ -359,6 +387,7 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
 
     private bool IsHealthy(CredentialSlotState slot, DateTimeOffset now)
         => slot.Credential is not null
+            && !string.IsNullOrWhiteSpace(slot.AccountRef)
             && slot.AttemptsToday < _dailyQuota
             && (slot.CooldownUntilUtc is null || slot.CooldownUntilUtc <= now);
 
@@ -418,6 +447,16 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
 
     private static string? NormalizeSecret(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string NormalizeIdentifier(string? value)
+        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
+    private static string[] SplitConfiguredList(string? value)
+        => (value ?? string.Empty)
+            .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(static item => item.Length > 0)
+            .Take(3)
+            .ToArray();
 
     private static string NormalizeOutcomeCode(string? value)
     {
@@ -489,9 +528,14 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
     private static IEnumerable<JsonObject> Objects(JsonObject? value, string property)
         => (Find(value, property) as JsonArray ?? []).OfType<JsonObject>();
 
-    private sealed class CredentialSlotState(string slotId, string? credential, DateTime quotaDate)
+    private static IEnumerable<string> Strings(JsonObject? value, string property)
+        => (Find(value, property) as JsonArray ?? [])
+            .Select(static item => item?.GetValue<string>() ?? string.Empty)
+            .Where(static item => item.Length > 0);
+
+    private sealed class CredentialSlotState(string accountRef, string? credential, DateTime quotaDate)
     {
-        public string SlotId { get; } = slotId;
+        public string AccountRef { get; } = accountRef;
         public string? Credential { get; } = credential;
         public DateTime QuotaDate { get; set; } = quotaDate;
         public int AttemptsToday { get; set; }

@@ -39,8 +39,8 @@ public sealed class ToughTongueBuildGhostAdapterTests
 
         CollectionAssert.AreEqual(new[] { "secret-one", "secret-two", "secret-three" }, transport.Credentials.ToArray());
         CollectionAssert.AreEqual(
-            new[] { "tough-tongue-slot-1", "tough-tongue-slot-2", "tough-tongue-slot-3" },
-            new[] { first.Receipt.CredentialSlotId, second.Receipt.CredentialSlotId, third.Receipt.CredentialSlotId });
+            new[] { "sha256:account-one", "sha256:account-two", "sha256:account-three" },
+            new[] { first.Receipt.AccountSlotId, second.Receipt.AccountSlotId, third.Receipt.AccountSlotId });
         Assert.IsFalse(JsonSerializer.Serialize(new[] { first.Receipt, second.Receipt, third.Receipt }).Contains("secret-", StringComparison.Ordinal));
         Assert.IsTrue(new[] { first, second, third }.All(static result => !result.UsedDeterministicFallback));
     }
@@ -162,6 +162,30 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public async Task Documented_public_api_gap_fails_closed_without_calling_an_invented_explanation_route()
+    {
+        HttpClient client = new(new RejectNetworkHandler())
+        {
+            BaseAddress = new Uri("https://api.toughtongueai.com/api/public/")
+        };
+        ToughTongueBuildGhostHttpTransport transport = new(client);
+
+        ToughTongueBuildGhostTransportResult result = await transport.ExplainAsync(
+            new ToughTongueBuildGhostTransportRequest(
+                ToughTongueBuildGhostContractVersions.RequestV1,
+                "request-contract",
+                $"sha256:{new string('a', 64)}",
+                "en-US",
+                "{}",
+                "idem-contract"),
+            "secret-never-sent",
+            CancellationToken.None);
+
+        Assert.IsFalse(result.Success);
+        Assert.AreEqual("provider-grounded-explanation-contract-unverified", result.OutcomeCode);
+    }
+
+    [TestMethod]
     public void Persona_registry_requires_Chummer_owned_verified_releases_and_synthetic_voice_provenance()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-19T12:00:00Z");
@@ -195,10 +219,11 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private static Dictionary<string, string?> RemoteConfiguration()
         => new(StringComparer.Ordinal)
         {
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_ENABLED"] = "true",
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_1"] = "secret-one",
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_2"] = "secret-two",
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_3"] = "secret-three"
+            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED"] = "true",
+            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS"] = "secret-one;secret-two;secret-three",
+            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS"] = "sha256:account-one;sha256:account-two;sha256:account-three",
+            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID"] = "rook-private-scenario",
+            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID"] = ToughTongueBuildGhostPersonaIds.RookVoice
         };
 
     private static ToughTongueBuildGhostRequest CreateRequest(
@@ -229,6 +254,8 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ["avatarId"] = ToughTongueBuildGhostPersonaIds.RookAvatar,
             ["voiceId"] = ToughTongueBuildGhostPersonaIds.RookVoice,
             ["locale"] = locale,
+            ["localeFallbackChain"] = new JsonArray(locale, "en-US"),
+            ["supportedLocales"] = new JsonArray("en-US", "de-DE", "fr-FR", "ja-JP", "pt-BR", "zh-CN"),
             ["packetDigest"] = digest,
             ["runner"] = new JsonObject
             {
@@ -342,5 +369,11 @@ public sealed class ToughTongueBuildGhostAdapterTests
             Credentials.Add(credential);
             return Task.FromResult(_response(request));
         }
+    }
+
+    private sealed class RejectNetworkHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => throw new AssertFailedException($"Unexpected network request to {request.RequestUri}.");
     }
 }
