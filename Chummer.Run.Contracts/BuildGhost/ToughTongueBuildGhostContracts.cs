@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace Chummer.Run.Contracts.BuildGhost;
 
@@ -142,6 +143,21 @@ public sealed record BuildGhostPrivateToolDeploymentValidation(
     bool Accepted,
     BuildGhostPrivateToolDeploymentPackage? Package,
     IReadOnlyList<string> RejectionReasons);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record BuildGhostPrivateToolRequest(
+    [property: JsonPropertyName("packet_access_key")] string PacketAccessKey,
+    [property: JsonPropertyName("packet_digest")] string PacketDigest,
+    [property: JsonPropertyName("locale")] string Locale,
+    [property: JsonPropertyName("request_kind")] string RequestKind,
+    [property: JsonPropertyName("question")] string? Question);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record BuildGhostPrivateToolAuthorityRequest(
+    [property: JsonPropertyName("packet_access_key")] string PacketAccessKey,
+    [property: JsonPropertyName("packet_digest")] string PacketDigest,
+    [property: JsonPropertyName("locale")] string Locale,
+    [property: JsonPropertyName("request_kind")] string RequestKind);
 
 public sealed record BuildGhostCascadePrivateVoiceBinding(
     string Schema,

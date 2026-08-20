@@ -117,6 +117,10 @@ builder.Services.AddHttpClient<IToughTongueBuildGhostScenarioClient, ToughTongue
 });
 builder.Services.AddSingleton<ToughTongueBuildGhostCanaryHarness>();
 builder.Services.AddSingleton<IToughTongueBuildGhostAdapter, ToughTongueBuildGhostAdapter>();
+builder.Services.AddHttpClient<IBuildGhostPrivateToolAuthorityClient, BuildGhostPrivateToolAuthorityClient>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(120);
+});
 builder.Services.AddSingleton<IBuildGhostPersonaReleaseRegistry>(
     static sp => new BuildGhostPersonaReleaseRegistry(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<CanonicalTranscriptionProvider, LocalTranscriptionProvider>();

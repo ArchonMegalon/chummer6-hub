@@ -11,6 +11,7 @@
     <Compile Include="../Chummer.Run.AI/Services/BuildGhost/ToughTongueBuildGhostAdapter.cs" Link="ToughTongueBuildGhostAdapter.cs" />
     <Compile Include="../Chummer.Run.AI/Services/BuildGhost/ToughTongueBuildGhostHttpTransport.cs" Link="ToughTongueBuildGhostHttpTransport.cs" />
     <Compile Include="../Chummer.Run.AI/Services/BuildGhost/ToughTongueBuildGhostScenarioContract.cs" Link="ToughTongueBuildGhostScenarioContract.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/BuildGhost/BuildGhostPrivateToolAuthorityClient.cs" Link="BuildGhostPrivateToolAuthorityClient.cs" />
     <Compile Include="../Chummer.Run.AI/Services/BuildGhost/BuildGhostPersonaReleaseRegistry.cs" Link="BuildGhostPersonaReleaseRegistry.cs" />
     <Compile Include="../Chummer.Run.AI/Controllers/BuildGhostController.cs" Link="BuildGhostController.cs" />
     <Compile Include="../Chummer.Run.Api/Services/KarmaForge/BuildGhostConciergeService.cs" Link="BuildGhostConciergeService.cs" />

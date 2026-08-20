@@ -3,6 +3,7 @@ using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -13,6 +14,8 @@ namespace Chummer.Run.AI.Controllers;
 public sealed class BuildGhostController(
     IToughTongueBuildGhostAdapter adapter,
     IBuildGhostPersonaReleaseRegistry releases,
+    IBuildGhostPrivateToolAuthorityClient privateToolAuthority,
+    ILogger<BuildGhostController> logger,
     IConfiguration configuration) : ControllerBase
 {
     [HttpPost("explain")]
@@ -50,6 +53,66 @@ public sealed class BuildGhostController(
     public ActionResult<BuildGhostPersonaReleaseProjection> RookRelease()
         => Ok(releases.ResolveRook());
 
+    [HttpPost("tool")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(16 * 1024)]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> Tool(
+        [FromBody] BuildGhostPrivateToolRequest? request,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> validationReasons = BuildGhostPrivateToolAuthorityClient.ValidateRequest(request);
+        if (validationReasons.Count != 0 || request is null)
+        {
+            return BadRequest(new { error = "private_tool_request_invalid", reasons = validationReasons });
+        }
+
+        BuildGhostPrivateToolDeploymentValidation deployment =
+            BuildGhostPrivateToolDeploymentContract.FromConfiguration(configuration);
+        if (!deployment.Accepted
+            || deployment.Package is null
+            || !string.Equals(deployment.Package.AuthenticationAudience, "build-ghost-private-tool", StringComparison.Ordinal))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Build Ghost private tool unavailable",
+                detail: "The private tool deployment contract is not active.");
+        }
+
+        string suppliedContract = Request.Headers["X-Chummer-Build-Ghost-Tool-Contract"].ToString().Trim();
+        if (!FixedTimeEquals(suppliedContract, deployment.Package.Tool.ContractDigest)
+            || !EphemeralBearerMatches(request.PacketAccessKey))
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            string packetJson = await privateToolAuthority.ResolveAsync(
+                request,
+                deployment.Package.Tool.ContractDigest,
+                cancellationToken).ConfigureAwait(false);
+            Response.Headers["X-Chummer-Build-Ghost-Packet-Digest"] = request.PacketDigest;
+            Response.Headers.CacheControl = "no-store";
+            return Content(packetJson, "application/json", Encoding.UTF8);
+        }
+        catch (BuildGhostPrivateToolResolutionException exception)
+        {
+            logger.LogWarning(
+                "Build Ghost private tool resolution failed with {Reason}; trace {TraceId}.",
+                exception.Reason,
+                HttpContext.TraceIdentifier);
+            return Problem(
+                statusCode: exception.StatusCode,
+                title: "Build Ghost private tool request failed",
+                detail: exception.Reason);
+        }
+    }
+
     private bool IsInternallyAuthorized()
     {
         string configured = configuration["FLEET_INTERNAL_API_TOKEN"]?.Trim() ?? string.Empty;
@@ -64,5 +127,21 @@ public sealed class BuildGhostController(
         byte[] supplied = Encoding.UTF8.GetBytes(header[prefix.Length..].Trim());
         byte[] expected = Encoding.UTF8.GetBytes(configured);
         return supplied.Length == expected.Length && CryptographicOperations.FixedTimeEquals(supplied, expected);
+    }
+
+    private bool EphemeralBearerMatches(string packetAccessKey)
+    {
+        const string prefix = "Bearer ";
+        string header = Request.Headers.Authorization.ToString();
+        return header.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            && FixedTimeEquals(header[prefix.Length..].Trim(), packetAccessKey);
+    }
+
+    private static bool FixedTimeEquals(string left, string right)
+    {
+        byte[] leftBytes = Encoding.UTF8.GetBytes(left);
+        byte[] rightBytes = Encoding.UTF8.GetBytes(right);
+        return leftBytes.Length == rightBytes.Length
+            && CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
 }
