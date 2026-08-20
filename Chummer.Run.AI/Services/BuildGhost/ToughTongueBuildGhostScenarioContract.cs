@@ -8,6 +8,201 @@ using System.Text.Json.Nodes;
 
 namespace Chummer.Run.AI.Services.BuildGhost;
 
+public static class BuildGhostPrivateToolDeploymentContract
+{
+    public const string EndpointConfigurationKey = "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_ENDPOINT";
+    public const string AudienceConfigurationKey = "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTH_AUDIENCE";
+    public const string RemoteExecutionConfigurationKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED";
+
+    public static BuildGhostPrivateToolDeploymentValidation FromConfiguration(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        List<string> reasons = [];
+        string endpointValue = configuration[EndpointConfigurationKey]?.Trim() ?? string.Empty;
+        string audience = configuration[AudienceConfigurationKey]?.Trim() ?? string.Empty;
+        bool remoteExecutionEnabled = bool.TryParse(configuration[RemoteExecutionConfigurationKey], out bool enabled) && enabled;
+        if (!Uri.TryCreate(endpointValue, UriKind.Absolute, out Uri? endpoint)) reasons.Add("private-tool-endpoint-missing-or-invalid");
+        if (!IsSafeAudience(audience)) reasons.Add("private-tool-auth-audience-missing-or-invalid");
+        if (remoteExecutionEnabled) reasons.Add("remote-execution-must-remain-disabled");
+        if (reasons.Count != 0)
+        {
+            return new BuildGhostPrivateToolDeploymentValidation(false, null, reasons);
+        }
+
+        try
+        {
+            return new BuildGhostPrivateToolDeploymentValidation(true, Create(endpoint!, audience), []);
+        }
+        catch (ArgumentException exception)
+        {
+            return new BuildGhostPrivateToolDeploymentValidation(false, null, [exception.Message]);
+        }
+    }
+
+    public static BuildGhostPrivateToolDeploymentPackage Create(Uri endpoint, string authenticationAudience)
+    {
+        RequireChummerToolEndpoint(endpoint);
+        if (!IsSafeAudience(authenticationAudience))
+        {
+            throw new ArgumentException("A non-secret private tool audience is required.", nameof(authenticationAudience));
+        }
+
+        JsonObject bodySchema = new()
+        {
+            ["type"] = "object",
+            ["additionalProperties"] = false,
+            ["properties"] = new JsonObject
+            {
+                ["packet_access_key"] = Property("string", "Opaque short-lived Chummer packet key. Copy exactly and never disclose."),
+                ["packet_digest"] = Property("string", "Exact sha256 packet digest supplied by Chummer."),
+                ["locale"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray(ToughTongueBuildGhostScenarioContract.CanonicalLocales.Select(static locale => JsonValue.Create(locale)).ToArray())
+                },
+                ["request_kind"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("current-build", "build-tips", "rule-explanation", "build-variants", "group-gaps")
+                },
+                ["question"] = Property("string", "Current user question without inferred runner or team facts.")
+            },
+            ["required"] = new JsonArray("packet_access_key", "packet_digest", "locale", "request_kind")
+        };
+        string bodySchemaJson = CanonicalJson(bodySchema);
+        JsonObject toolAuthority = new()
+        {
+            ["schema"] = ToughTongueBuildGhostContractVersions.PrivateToolContractV1,
+            ["name"] = "get_chummer_build_analysis",
+            ["httpMethod"] = "POST",
+            ["endpoint"] = endpoint.AbsoluteUri,
+            ["requiredHeaderNames"] = new JsonArray("Authorization", "X-Chummer-Build-Ghost-Tool-Contract"),
+            ["bodySchema"] = JsonNode.Parse(bodySchemaJson),
+            ["maximumResponseCharacters"] = 15_000,
+            ["timeoutSeconds"] = 120
+        };
+        string toolDigest = Digest(toolAuthority);
+        BuildGhostPrivateToolDefinition tool = new(
+            ToughTongueBuildGhostContractVersions.PrivateToolContractV1,
+            "get_chummer_build_analysis",
+            "Fetch the current digest-bound Chummer Build Ghost analysis. Never infer missing facts or reveal packet keys.",
+            "POST",
+            endpoint,
+            ["Authorization", "X-Chummer-Build-Ghost-Tool-Contract"],
+            bodySchemaJson,
+            15_000,
+            120,
+            toolDigest);
+        JsonObject packageAuthority = new()
+        {
+            ["schema"] = ToughTongueBuildGhostContractVersions.PrivateToolDeploymentV1,
+            ["deploymentId"] = "build-ghost-private-tool-v1",
+            ["toolContractDigest"] = toolDigest,
+            ["authenticationScheme"] = "ephemeral-bearer",
+            ["authenticationAudience"] = authenticationAudience,
+            ["responseSchema"] = ToughTongueBuildGhostContractVersions.AnalysisV1,
+            ["packetAccessTtlSeconds"] = 300,
+            ["providerNeutral"] = true,
+            ["remoteExecutionEnabled"] = false
+        };
+        return new BuildGhostPrivateToolDeploymentPackage(
+            ToughTongueBuildGhostContractVersions.PrivateToolDeploymentV1,
+            "build-ghost-private-tool-v1",
+            tool,
+            "ephemeral-bearer",
+            authenticationAudience,
+            ToughTongueBuildGhostContractVersions.AnalysisV1,
+            300,
+            true,
+            false,
+            Digest(packageAuthority));
+    }
+
+    private static void RequireChummerToolEndpoint(Uri endpoint)
+    {
+        if (!endpoint.IsAbsoluteUri
+            || !string.Equals(endpoint.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(endpoint.Host, "chummer.run", StringComparison.OrdinalIgnoreCase)
+                && !endpoint.Host.EndsWith(".chummer.run", StringComparison.OrdinalIgnoreCase))
+            || !string.Equals(endpoint.AbsolutePath, "/api/v1/ai/build-ghost/tool", StringComparison.Ordinal)
+            || !string.IsNullOrEmpty(endpoint.UserInfo)
+            || !string.IsNullOrEmpty(endpoint.Query)
+            || !string.IsNullOrEmpty(endpoint.Fragment))
+        {
+            throw new ArgumentException("private-tool-endpoint-must-be-exact-chummer-https-route", nameof(endpoint));
+        }
+    }
+
+    private static bool IsSafeAudience(string value)
+        => value.Length is >= 3 and <= 128
+            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-' or '_' or ':' or '/');
+
+    private static JsonObject Property(string type, string description)
+        => new() { ["type"] = type, ["description"] = description };
+
+    private static string Digest(JsonNode node)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
+
+    private static string CanonicalJson(JsonNode node)
+        => node.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+}
+
+public static class BuildGhostCascadePrivateVoiceBindingContract
+{
+    public static BuildGhostCascadePrivateVoiceBinding Create(
+        string providerVoiceRef,
+        string voiceReleaseDigest,
+        IReadOnlyList<string> supportedLocales)
+    {
+        ArgumentNullException.ThrowIfNull(supportedLocales);
+        string normalizedRef = providerVoiceRef?.Trim() ?? string.Empty;
+        if (!IsOpaqueProviderRef(normalizedRef)) throw new ArgumentException("private-provider-voice-ref-invalid", nameof(providerVoiceRef));
+        if (!IsSha256(voiceReleaseDigest)) throw new ArgumentException("voice-release-digest-invalid", nameof(voiceReleaseDigest));
+        if (!supportedLocales.SequenceEqual(ToughTongueBuildGhostScenarioContract.CanonicalLocales, StringComparer.Ordinal))
+        {
+            throw new ArgumentException("voice-binding-locales-must-match-canonical-authority", nameof(supportedLocales));
+        }
+
+        JsonObject authority = new()
+        {
+            ["schema"] = ToughTongueBuildGhostContractVersions.CascadePrivateVoiceBindingV1,
+            ["modelProvider"] = "Landmass",
+            ["modelId"] = "cascade",
+            ["voiceAlias"] = ToughTongueBuildGhostPersonaIds.RookVoice,
+            ["providerVoiceRef"] = normalizedRef,
+            ["voiceReleaseDigest"] = voiceReleaseDigest,
+            ["private"] = true,
+            ["syntheticOrigin"] = true,
+            ["readVerified"] = true,
+            ["supportedLocales"] = new JsonArray(supportedLocales.Select(static locale => JsonValue.Create(locale)).ToArray())
+        };
+        string digest = $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(authority))).ToLowerInvariant()}";
+        return new BuildGhostCascadePrivateVoiceBinding(
+            ToughTongueBuildGhostContractVersions.CascadePrivateVoiceBindingV1,
+            "Landmass",
+            "cascade",
+            ToughTongueBuildGhostPersonaIds.RookVoice,
+            normalizedRef,
+            voiceReleaseDigest,
+            true,
+            true,
+            true,
+            supportedLocales.ToArray(),
+            digest);
+    }
+
+    private static bool IsOpaqueProviderRef(string value)
+        => value.Length is >= 8 and <= 128
+            && !value.Contains('@', StringComparison.Ordinal)
+            && !value.Contains("://", StringComparison.Ordinal)
+            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or ':' or '.');
+
+    private static bool IsSha256(string value)
+        => value is { Length: 71 }
+            && value.StartsWith("sha256:", StringComparison.Ordinal)
+            && value.AsSpan(7).ToString().All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+}
+
 public interface IToughTongueBuildGhostScenarioClient
 {
     Task<ToughTongueBuildGhostScenarioValidation> VerifyPrivateScenarioAsync(
@@ -33,77 +228,31 @@ public static class ToughTongueBuildGhostScenarioContract
         ["de-DE", "en-US", "fr-FR", "ja-JP", "pt-BR", "zh-CN"];
 
     public static ToughTongueBuildGhostScenarioCandidate CreatePrivateRookCandidate(
-        Uri toolEndpoint,
+        BuildGhostPrivateToolDeploymentPackage deployment,
         Uri avatarUrl,
-        string providerVoiceId)
+        BuildGhostCascadePrivateVoiceBinding runtimeBinding)
     {
-        RequirePublicHttps(toolEndpoint, nameof(toolEndpoint));
+        ArgumentNullException.ThrowIfNull(deployment);
+        ArgumentNullException.ThrowIfNull(runtimeBinding);
+        if (deployment.Schema != ToughTongueBuildGhostContractVersions.PrivateToolDeploymentV1
+            || !deployment.ProviderNeutral
+            || deployment.RemoteExecutionEnabled
+            || deployment.Tool.Schema != ToughTongueBuildGhostContractVersions.PrivateToolContractV1)
+        {
+            throw new ArgumentException("Private tool deployment package is not fail-closed and provider-neutral.", nameof(deployment));
+        }
+        if (runtimeBinding.Schema != ToughTongueBuildGhostContractVersions.CascadePrivateVoiceBindingV1
+            || runtimeBinding.ModelProvider != "Landmass"
+            || runtimeBinding.ModelId != "cascade"
+            || !runtimeBinding.Private
+            || !runtimeBinding.SyntheticOrigin
+            || !runtimeBinding.ReadVerified
+            || !runtimeBinding.SupportedLocales.SequenceEqual(CanonicalLocales, StringComparer.Ordinal))
+        {
+            throw new ArgumentException("Cascade private voice binding is not accepted.", nameof(runtimeBinding));
+        }
         RequirePublicHttps(avatarUrl, nameof(avatarUrl));
-        ArgumentException.ThrowIfNullOrWhiteSpace(providerVoiceId);
-
-        JsonObject bodySchema = new()
-        {
-            ["type"] = "object",
-            ["additionalProperties"] = false,
-            ["properties"] = new JsonObject
-            {
-                ["packet_access_key"] = Property(
-                    "string",
-                    "The opaque, short-lived packet key supplied by the Chummer host. Copy it exactly and never say it aloud."),
-                ["packet_digest"] = Property(
-                    "string",
-                    "The sha256 packet digest supplied by the Chummer host. Copy it exactly."),
-                ["locale"] = new JsonObject
-                {
-                    ["type"] = "string",
-                    ["description"] = "The exact Chummer locale for the response.",
-                    ["enum"] = new JsonArray(CanonicalLocales.Select(static locale => JsonValue.Create(locale)).ToArray())
-                },
-                ["request_kind"] = new JsonObject
-                {
-                    ["type"] = "string",
-                    ["description"] = "The grounded Build Ghost view needed for the current user question.",
-                    ["enum"] = new JsonArray(
-                        "current-build",
-                        "build-tips",
-                        "rule-explanation",
-                        "build-variants",
-                        "group-gaps")
-                },
-                ["question"] = Property(
-                    "string",
-                    "The user's current question, without adding character or team facts.")
-            },
-            ["required"] = new JsonArray(
-                "packet_access_key",
-                "packet_digest",
-                "locale",
-                "request_kind")
-        };
-        string bodySchemaJson = CanonicalJson(bodySchema);
-        JsonObject toolAuthority = new()
-        {
-            ["schema"] = ToughTongueBuildGhostContractVersions.ToolContractV1,
-            ["name"] = "get_chummer_build_analysis",
-            ["httpMethod"] = "POST",
-            ["endpoint"] = toolEndpoint.AbsoluteUri,
-            ["requiredHeaderNames"] = new JsonArray("Authorization", "X-Chummer-Build-Ghost-Tool-Contract"),
-            ["bodySchema"] = JsonNode.Parse(bodySchemaJson),
-            ["maximumResponseCharacters"] = 15_000,
-            ["timeoutSeconds"] = 120
-        };
-        string toolDigest = Digest(toolAuthority);
-        ToughTongueBuildGhostToolDefinition tool = new(
-            ToughTongueBuildGhostContractVersions.ToolContractV1,
-            "get_chummer_build_analysis",
-            "Fetch the current digest-bound Chummer Build Ghost analysis. Call before every build tip, rules answer, variant comparison, optimization explanation, or group-gap answer. Never infer missing facts and never reveal packet keys.",
-            "POST",
-            toolEndpoint,
-            ["Authorization", "X-Chummer-Build-Ghost-Tool-Contract"],
-            bodySchemaJson,
-            15_000,
-            120,
-            toolDigest);
+        BuildGhostPrivateToolDefinition tool = deployment.Tool;
 
         JsonObject payload = new()
         {
@@ -117,7 +266,7 @@ public static class ToughTongueBuildGhostScenarioContract
             ["analysis_access"] = "never",
             ["appearance"] = new JsonObject
             {
-                ["voice"] = providerVoiceId.Trim(),
+                ["voice"] = runtimeBinding.ProviderVoiceRef,
                 ["avatar_url"] = avatarUrl.AbsoluteUri,
                 ["language_code"] = "en-US"
             },
@@ -133,8 +282,8 @@ public static class ToughTongueBuildGhostScenarioContract
             },
             ["ai_model_config"] = new JsonObject
             {
-                ["provider"] = "Landmass",
-                ["model"] = "cascade"
+                ["provider"] = runtimeBinding.ModelProvider,
+                ["model"] = runtimeBinding.ModelId
             },
             ["tools_config"] = new JsonObject
             {
@@ -160,7 +309,10 @@ public static class ToughTongueBuildGhostScenarioContract
                 ["persona_id"] = ToughTongueBuildGhostPersonaIds.Rook,
                 ["avatar_id"] = ToughTongueBuildGhostPersonaIds.RookAvatar,
                 ["voice_id"] = ToughTongueBuildGhostPersonaIds.RookVoice,
-                ["tool_contract_digest"] = toolDigest,
+                ["tool_contract_digest"] = tool.ContractDigest,
+                ["tool_deployment_digest"] = deployment.ContractDigest,
+                ["runtime_binding_digest"] = runtimeBinding.ContractDigest,
+                ["voice_release_digest"] = runtimeBinding.VoiceReleaseDigest,
                 ["supported_locales"] = string.Join(',', CanonicalLocales),
                 ["release_channel"] = "private-nonproduction-candidate"
             }
@@ -206,6 +358,10 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(metadata, "avatar_id", ToughTongueBuildGhostPersonaIds.RookAvatar, "scenario-avatar-id-mismatch", reasons);
         RequireText(metadata, "voice_id", ToughTongueBuildGhostPersonaIds.RookVoice, "scenario-voice-id-mismatch", reasons);
         RequireText(metadata, "tool_contract_digest", expected.Tool.ContractDigest, "tool-contract-digest-mismatch", reasons);
+        JsonObject expectedMetadata = Object(expected.Payload, "user_metadata");
+        RequireText(metadata, "tool_deployment_digest", Text(expectedMetadata, "tool_deployment_digest"), "tool-deployment-digest-mismatch", reasons);
+        RequireText(metadata, "runtime_binding_digest", Text(expectedMetadata, "runtime_binding_digest"), "runtime-binding-digest-mismatch", reasons);
+        RequireText(metadata, "voice_release_digest", Text(expectedMetadata, "voice_release_digest"), "voice-release-digest-mismatch", reasons);
         RequireText(metadata, "scenario_contract_digest", expected.ContractDigest, "scenario-contract-digest-mismatch", reasons);
         RequireText(metadata, "supported_locales", string.Join(',', CanonicalLocales), "scenario-locales-mismatch", reasons);
         RequireText(metadata, "release_channel", "private-nonproduction-candidate", "scenario-release-channel-invalid", reasons);
@@ -414,4 +570,124 @@ public sealed class ToughTongueBuildGhostScenarioClient(
         request.Headers.TryAddWithoutValidation("Accept", "application/json");
         return request;
     }
+}
+
+public sealed class ToughTongueBuildGhostCanaryHarness(
+    IToughTongueBuildGhostScenarioClient scenarios,
+    IBuildGhostClock clock,
+    IConfiguration configuration)
+{
+    public const string ReadOnlyEnabledKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED";
+    public const string AccessGrantEnabledKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED";
+    private readonly IToughTongueBuildGhostScenarioClient _scenarios = scenarios ?? throw new ArgumentNullException(nameof(scenarios));
+    private readonly IBuildGhostClock _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+
+    public async Task<ToughTongueBuildGhostCanaryReceipt> RunAsync(
+        string scenarioId,
+        ToughTongueBuildGhostScenarioCandidate expected,
+        string credential,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        bool readEnabled = Enabled(ReadOnlyEnabledKey);
+        bool accessGrantEnabled = Enabled(AccessGrantEnabledKey);
+        bool remoteExecutionEnabled = Enabled(BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey);
+        List<string> blockers = [];
+        bool readAttempted = false;
+        bool scenarioAccepted = false;
+        bool grantAttempted = false;
+        bool grantCreated = false;
+        DateTimeOffset? grantExpiresAt = null;
+
+        if (!readEnabled) blockers.Add("scenario-read-canary-disabled");
+        if (!IsScenarioId(scenarioId)) blockers.Add("scenario-id-missing-or-invalid");
+        if (string.IsNullOrWhiteSpace(credential)) blockers.Add("fresh-governed-credential-required");
+        if (accessGrantEnabled && !remoteExecutionEnabled) blockers.Add("access-grant-blocked-while-remote-execution-disabled");
+
+        if (blockers.Count == 0 || (blockers.Count == 1 && blockers[0] == "access-grant-blocked-while-remote-execution-disabled"))
+        {
+            readAttempted = true;
+            try
+            {
+                ToughTongueBuildGhostScenarioValidation validation = await _scenarios.VerifyPrivateScenarioAsync(
+                    scenarioId,
+                    expected,
+                    credential,
+                    cancellationToken).ConfigureAwait(false);
+                scenarioAccepted = validation.Accepted;
+                blockers.AddRange(validation.RejectionReasons);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                blockers.Add("scenario-read-canary-failed");
+            }
+        }
+
+        if (accessGrantEnabled && remoteExecutionEnabled && scenarioAccepted && blockers.Count == 0)
+        {
+            grantAttempted = true;
+            try
+            {
+                ToughTongueBuildGhostScenarioAccessGrant grant = await _scenarios.CreateAccessGrantAsync(
+                    scenarioId,
+                    credential,
+                    cancellationToken).ConfigureAwait(false);
+                grantCreated = true;
+                grantExpiresAt = grant.ExpiresAtUtc;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                blockers.Add("access-grant-canary-failed");
+            }
+        }
+
+        string outcome = grantCreated
+            ? "access-grant-pass"
+            : scenarioAccepted && !accessGrantEnabled
+                ? "read-only-pass"
+                : "blocked";
+        JsonObject metadata = Object(expected.Payload, "user_metadata");
+        return new ToughTongueBuildGhostCanaryReceipt(
+            ToughTongueBuildGhostContractVersions.ScenarioCanaryReceiptV1,
+            outcome,
+            IsScenarioId(scenarioId) ? DigestText(scenarioId) : string.Empty,
+            expected.ContractDigest,
+            Text(metadata, "tool_deployment_digest"),
+            Text(metadata, "runtime_binding_digest"),
+            remoteExecutionEnabled,
+            readEnabled,
+            readAttempted,
+            scenarioAccepted,
+            accessGrantEnabled,
+            grantAttempted,
+            grantCreated,
+            grantExpiresAt,
+            blockers.Distinct(StringComparer.Ordinal).OrderBy(static reason => reason, StringComparer.Ordinal).ToArray(),
+            _clock.UtcNow);
+    }
+
+    private bool Enabled(string key)
+        => bool.TryParse(_configuration[key], out bool enabled) && enabled;
+
+    private static bool IsScenarioId(string value)
+        => value is { Length: 24 }
+            && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static JsonObject Object(JsonObject parent, string property)
+        => parent[property] as JsonObject ?? new JsonObject();
+
+    private static string Text(JsonObject parent, string property)
+        => parent[property]?.GetValue<string>()?.Trim() ?? string.Empty;
+
+    private static string DigestText(string value)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
 }

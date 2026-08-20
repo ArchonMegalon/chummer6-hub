@@ -11,6 +11,10 @@ public static class ToughTongueBuildGhostContractVersions
     public const string PersonaReleaseV1 = "chummer.build_ghost_persona_release.v1";
     public const string ScenarioContractV1 = "chummer.tough_tongue.build_ghost_scenario.v1";
     public const string ToolContractV1 = "chummer.tough_tongue.build_ghost_tool.v1";
+    public const string PrivateToolContractV1 = "chummer.build_ghost.private_tool.v1";
+    public const string PrivateToolDeploymentV1 = "chummer.build_ghost.private_tool_deployment.v1";
+    public const string CascadePrivateVoiceBindingV1 = "chummer.build_ghost.cascade_private_voice_binding.v1";
+    public const string ScenarioCanaryReceiptV1 = "chummer.tough_tongue.build_ghost_canary_receipt.v1";
 }
 
 public static class ToughTongueBuildGhostPersonaIds
@@ -110,10 +114,52 @@ public sealed record ToughTongueBuildGhostToolDefinition(
     int TimeoutSeconds,
     string ContractDigest);
 
+public sealed record BuildGhostPrivateToolDefinition(
+    string Schema,
+    string Name,
+    string Description,
+    string HttpMethod,
+    Uri Endpoint,
+    IReadOnlyList<string> RequiredHeaderNames,
+    string BodySchemaJson,
+    int MaximumResponseCharacters,
+    int TimeoutSeconds,
+    string ContractDigest);
+
+public sealed record BuildGhostPrivateToolDeploymentPackage(
+    string Schema,
+    string DeploymentId,
+    BuildGhostPrivateToolDefinition Tool,
+    string AuthenticationScheme,
+    string AuthenticationAudience,
+    string ResponseSchema,
+    int PacketAccessTtlSeconds,
+    bool ProviderNeutral,
+    bool RemoteExecutionEnabled,
+    string ContractDigest);
+
+public sealed record BuildGhostPrivateToolDeploymentValidation(
+    bool Accepted,
+    BuildGhostPrivateToolDeploymentPackage? Package,
+    IReadOnlyList<string> RejectionReasons);
+
+public sealed record BuildGhostCascadePrivateVoiceBinding(
+    string Schema,
+    string ModelProvider,
+    string ModelId,
+    string VoiceAlias,
+    string ProviderVoiceRef,
+    string VoiceReleaseDigest,
+    bool Private,
+    bool SyntheticOrigin,
+    bool ReadVerified,
+    IReadOnlyList<string> SupportedLocales,
+    string ContractDigest);
+
 public sealed record ToughTongueBuildGhostScenarioCandidate(
     string Schema,
     JsonObject Payload,
-    ToughTongueBuildGhostToolDefinition Tool,
+    BuildGhostPrivateToolDefinition Tool,
     IReadOnlyList<string> SupportedLocales,
     string ContractDigest);
 
@@ -126,6 +172,24 @@ public sealed record ToughTongueBuildGhostScenarioAccessGrant(
     string ScenarioId,
     string AccessToken,
     DateTimeOffset ExpiresAtUtc);
+
+public sealed record ToughTongueBuildGhostCanaryReceipt(
+    string Schema,
+    string OutcomeStatus,
+    string ScenarioIdDigest,
+    string ScenarioContractDigest,
+    string ToolDeploymentDigest,
+    string RuntimeBindingDigest,
+    bool RemoteExecutionEnabled,
+    bool ReadOnlyScenarioCheckEnabled,
+    bool ScenarioReadAttempted,
+    bool ScenarioAccepted,
+    bool AccessGrantEnabled,
+    bool AccessGrantAttempted,
+    bool AccessGrantCreated,
+    DateTimeOffset? AccessGrantExpiresAtUtc,
+    IReadOnlyList<string> BlockingReasons,
+    DateTimeOffset ObservedAtUtc);
 
 public sealed record BuildGhostPersonaMediaRelease(
     string Schema,

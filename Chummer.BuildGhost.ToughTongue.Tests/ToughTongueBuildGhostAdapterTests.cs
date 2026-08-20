@@ -14,6 +14,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private const string AccountOne = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
     private const string AccountTwo = "sha256:2222222222222222222222222222222222222222222222222222222222222222";
     private const string AccountThree = "sha256:3333333333333333333333333333333333333333333333333333333333333333";
+    private const string VoiceReleaseDigest = "sha256:05ed9fff46ddb5a447e1d21cfd0f71cfb2a9286460fd112bb7514eb3eaa57e26";
 
     [TestMethod]
     public async Task Remote_execution_is_disabled_by_default_and_returns_audited_deterministic_fallback()
@@ -263,9 +264,9 @@ public sealed class ToughTongueBuildGhostAdapterTests
     public void Private_scenario_candidate_binds_Rook_clone_tool_privacy_and_all_shipping_locales()
     {
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
-            new Uri("https://canary.chummer.run/api/v1/ai/build-ghost/tool"),
+            ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            "provider-rook-clone");
+            RuntimeBinding());
 
         Assert.AreEqual(ToughTongueBuildGhostContractVersions.ScenarioContractV1, candidate.Schema);
         Assert.IsFalse(candidate.Payload["is_public"]!.GetValue<bool>());
@@ -274,7 +275,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.IsFalse(candidate.Payload["memory"]!["is_memory"]!.GetValue<bool>());
         Assert.AreEqual("Landmass", candidate.Payload["ai_model_config"]!["provider"]!.GetValue<string>());
         Assert.AreEqual("cascade", candidate.Payload["ai_model_config"]!["model"]!.GetValue<string>());
-        Assert.AreEqual("provider-rook-clone", candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
+        Assert.AreEqual("private-provider-rook-voice-ref", candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
         CollectionAssert.AreEqual(
             new[] { "de-DE", "en-US", "fr-FR", "ja-JP", "pt-BR", "zh-CN" },
             candidate.SupportedLocales.ToArray());
@@ -286,15 +287,84 @@ public sealed class ToughTongueBuildGhostAdapterTests
         StringAssert.StartsWith(candidate.Tool.ContractDigest, "sha256:");
         StringAssert.StartsWith(candidate.ContractDigest, "sha256:");
         StringAssert.Contains(candidate.Payload["ai_instructions"]!.GetValue<string>(), "never speak");
+        Assert.AreEqual(ToolDeployment().ContractDigest, candidate.Payload["user_metadata"]!["tool_deployment_digest"]!.GetValue<string>());
+        Assert.AreEqual(RuntimeBinding().ContractDigest, candidate.Payload["user_metadata"]!["runtime_binding_digest"]!.GetValue<string>());
+    }
+
+    [TestMethod]
+    public void Private_tool_deployment_package_is_provider_neutral_digest_bound_and_remote_disabled()
+    {
+        BuildGhostPrivateToolDeploymentPackage package = ToolDeployment();
+
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.PrivateToolDeploymentV1, package.Schema);
+        Assert.IsTrue(package.ProviderNeutral);
+        Assert.IsFalse(package.RemoteExecutionEnabled);
+        Assert.AreEqual("ephemeral-bearer", package.AuthenticationScheme);
+        Assert.AreEqual(300, package.PacketAccessTtlSeconds);
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.AnalysisV1, package.ResponseSchema);
+        Assert.AreEqual("https://canary.chummer.run/api/v1/ai/build-ghost/tool", package.Tool.Endpoint.AbsoluteUri);
+        StringAssert.StartsWith(package.ContractDigest, "sha256:");
+        Assert.ThrowsExactly<ArgumentException>(() => BuildGhostPrivateToolDeploymentContract.Create(
+            new Uri("https://provider.invalid/api/v1/ai/build-ghost/tool"),
+            "build-ghost-private-tool"));
+
+        IConfiguration enabled = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = package.Tool.Endpoint.AbsoluteUri,
+            [BuildGhostPrivateToolDeploymentContract.AudienceConfigurationKey] = package.AuthenticationAudience,
+            [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "true"
+        }).Build();
+        BuildGhostPrivateToolDeploymentValidation blocked = BuildGhostPrivateToolDeploymentContract.FromConfiguration(enabled);
+        Assert.IsFalse(blocked.Accepted);
+        CollectionAssert.Contains(blocked.RejectionReasons.ToArray(), "remote-execution-must-remain-disabled");
+    }
+
+    [TestMethod]
+    public void Cascade_private_voice_binding_rejects_unverified_or_nonopaque_authority()
+    {
+        BuildGhostCascadePrivateVoiceBinding binding = RuntimeBinding();
+        Assert.AreEqual("Landmass", binding.ModelProvider);
+        Assert.AreEqual("cascade", binding.ModelId);
+        Assert.IsTrue(binding.Private);
+        Assert.IsTrue(binding.SyntheticOrigin);
+        Assert.IsTrue(binding.ReadVerified);
+        StringAssert.StartsWith(binding.ContractDigest, "sha256:");
+
+        Assert.ThrowsExactly<ArgumentException>(() => BuildGhostCascadePrivateVoiceBindingContract.Create(
+            "https://provider.invalid/voice",
+            VoiceReleaseDigest,
+            ToughTongueBuildGhostScenarioContract.CanonicalLocales));
+        Assert.ThrowsExactly<ArgumentException>(() => BuildGhostCascadePrivateVoiceBindingContract.Create(
+            "private-provider-rook-voice-ref",
+            "sha256:not-a-release-digest",
+            ToughTongueBuildGhostScenarioContract.CanonicalLocales));
+    }
+
+    [TestMethod]
+    public void Scenario_validation_rejects_Cascade_or_private_voice_binding_drift()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        JsonObject drifted = (JsonObject)candidate.Payload.DeepClone();
+        drifted["id"] = "0123456789abcdef01234567";
+        drifted["ai_model_config"]!["model"] = "other-model";
+        drifted["user_metadata"]!["runtime_binding_digest"] = $"sha256:{new string('0', 64)}";
+        drifted["user_metadata"]!["voice_release_digest"] = $"sha256:{new string('1', 64)}";
+
+        ToughTongueBuildGhostScenarioValidation validation = ToughTongueBuildGhostScenarioContract.Validate(drifted, candidate);
+
+        Assert.IsFalse(validation.Accepted);
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-model-invalid");
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "runtime-binding-digest-mismatch");
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "voice-release-digest-mismatch");
     }
 
     [TestMethod]
     public async Task Documented_scenario_create_and_read_contract_use_only_the_official_private_API_boundary()
     {
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
-            new Uri("https://canary.chummer.run/api/v1/ai/build-ghost/tool"),
+            ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            "provider-rook-clone");
+            RuntimeBinding());
         JsonObject providerScenario = (JsonObject)candidate.Payload.DeepClone();
         providerScenario["id"] = "0123456789abcdef01234567";
         RecordingHttpHandler handler = new(
@@ -373,9 +443,9 @@ public sealed class ToughTongueBuildGhostAdapterTests
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.VerifyPrivateScenarioAsync(
             "0123456789abcdef01234567",
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
-                new Uri("https://canary.chummer.run/api/v1/ai/build-ghost/tool"),
+                ToolDeployment(),
                 new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-                "provider-rook-clone"),
+                RuntimeBinding()),
             "must-not-leave-process",
             CancellationToken.None));
         Assert.IsEmpty(handler.Requests);
@@ -390,9 +460,9 @@ public sealed class ToughTongueBuildGhostAdapterTests
             new FixedClock(),
             ScenarioConfiguration(mutationsEnabled: false));
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
-            new Uri("https://canary.chummer.run/api/v1/ai/build-ghost/tool"),
+            ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            "provider-rook-clone");
+            RuntimeBinding());
 
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.CreatePrivateCandidateAsync(
             candidate,
@@ -403,6 +473,60 @@ public sealed class ToughTongueBuildGhostAdapterTests
             "must-not-leave-process",
             CancellationToken.None));
         Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Canary_harness_defaults_closed_without_reading_a_scenario_or_creating_a_grant()
+    {
+        FakeScenarioClient scenarios = new();
+        ToughTongueBuildGhostCanaryHarness harness = new(
+            scenarios,
+            new FixedClock(),
+            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build());
+
+        ToughTongueBuildGhostCanaryReceipt receipt = await harness.RunAsync(
+            "0123456789abcdef01234567",
+            ScenarioCandidate(),
+            "fresh-governed-test-credential",
+            CancellationToken.None);
+
+        Assert.AreEqual("blocked", receipt.OutcomeStatus);
+        Assert.IsFalse(receipt.RemoteExecutionEnabled);
+        Assert.IsFalse(receipt.ScenarioReadAttempted);
+        Assert.IsFalse(receipt.AccessGrantAttempted);
+        CollectionAssert.Contains(receipt.BlockingReasons.ToArray(), "scenario-read-canary-disabled");
+        Assert.AreEqual(0, scenarios.VerifyCalls);
+        Assert.AreEqual(0, scenarios.AccessGrantCalls);
+        string rendered = JsonSerializer.Serialize(receipt);
+        Assert.IsFalse(rendered.Contains("0123456789abcdef01234567", StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Contains("fresh-governed-test-credential", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task Canary_harness_allows_read_only_validation_but_blocks_access_grant_while_remote_execution_is_disabled()
+    {
+        FakeScenarioClient scenarios = new();
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [ToughTongueBuildGhostCanaryHarness.ReadOnlyEnabledKey] = "true",
+            [ToughTongueBuildGhostCanaryHarness.AccessGrantEnabledKey] = "true",
+            [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "false"
+        }).Build();
+        ToughTongueBuildGhostCanaryHarness harness = new(scenarios, new FixedClock(), configuration);
+
+        ToughTongueBuildGhostCanaryReceipt receipt = await harness.RunAsync(
+            "0123456789abcdef01234567",
+            ScenarioCandidate(),
+            "fresh-governed-test-credential",
+            CancellationToken.None);
+
+        Assert.IsTrue(receipt.ScenarioReadAttempted);
+        Assert.IsTrue(receipt.ScenarioAccepted);
+        Assert.IsFalse(receipt.AccessGrantAttempted);
+        Assert.IsFalse(receipt.AccessGrantCreated);
+        CollectionAssert.Contains(receipt.BlockingReasons.ToArray(), "access-grant-blocked-while-remote-execution-disabled");
+        Assert.AreEqual(1, scenarios.VerifyCalls);
+        Assert.AreEqual(0, scenarios.AccessGrantCalls);
     }
 
     [TestMethod]
@@ -435,6 +559,23 @@ public sealed class ToughTongueBuildGhostAdapterTests
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         return new ToughTongueBuildGhostAdapter(configuration, transport, new FixedClock());
     }
+
+    private static BuildGhostPrivateToolDeploymentPackage ToolDeployment()
+        => BuildGhostPrivateToolDeploymentContract.Create(
+            new Uri("https://canary.chummer.run/api/v1/ai/build-ghost/tool"),
+            "build-ghost-private-tool");
+
+    private static BuildGhostCascadePrivateVoiceBinding RuntimeBinding()
+        => BuildGhostCascadePrivateVoiceBindingContract.Create(
+            "private-provider-rook-voice-ref",
+            VoiceReleaseDigest,
+            ToughTongueBuildGhostScenarioContract.CanonicalLocales);
+
+    private static ToughTongueBuildGhostScenarioCandidate ScenarioCandidate()
+        => ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+            ToolDeployment(),
+            new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+            RuntimeBinding());
 
     private static IConfiguration ScenarioConfiguration(bool mutationsEnabled)
         => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -610,6 +751,38 @@ public sealed class ToughTongueBuildGhostAdapterTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => throw new AssertFailedException($"Unexpected network request to {request.RequestUri}.");
+    }
+
+    private sealed class FakeScenarioClient : IToughTongueBuildGhostScenarioClient
+    {
+        public int VerifyCalls { get; private set; }
+        public int AccessGrantCalls { get; private set; }
+
+        public Task<ToughTongueBuildGhostScenarioValidation> VerifyPrivateScenarioAsync(
+            string scenarioId,
+            ToughTongueBuildGhostScenarioCandidate expected,
+            string credential,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            VerifyCalls++;
+            return Task.FromResult(new ToughTongueBuildGhostScenarioValidation(true, scenarioId, []));
+        }
+
+        public Task<(ToughTongueBuildGhostScenarioValidation Validation, string? ScenarioId)> CreatePrivateCandidateAsync(
+            ToughTongueBuildGhostScenarioCandidate candidate,
+            string credential,
+            CancellationToken cancellationToken)
+            => throw new AssertFailedException("Canary harness must never create a scenario candidate.");
+
+        public Task<ToughTongueBuildGhostScenarioAccessGrant> CreateAccessGrantAsync(
+            string scenarioId,
+            string credential,
+            CancellationToken cancellationToken)
+        {
+            AccessGrantCalls++;
+            throw new AssertFailedException("Access grant must remain fail-closed in this test.");
+        }
     }
 
     private static HttpResponseMessage JsonResponse(JsonObject payload)

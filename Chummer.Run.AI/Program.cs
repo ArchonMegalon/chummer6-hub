@@ -115,6 +115,7 @@ builder.Services.AddHttpClient<IToughTongueBuildGhostScenarioClient, ToughTongue
     client.BaseAddress = new Uri("https://app.toughtongueai.com/api/public/", UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddSingleton<ToughTongueBuildGhostCanaryHarness>();
 builder.Services.AddSingleton<IToughTongueBuildGhostAdapter, ToughTongueBuildGhostAdapter>();
 builder.Services.AddSingleton<IBuildGhostPersonaReleaseRegistry>(
     static sp => new BuildGhostPersonaReleaseRegistry(sp.GetRequiredService<IConfiguration>()));
