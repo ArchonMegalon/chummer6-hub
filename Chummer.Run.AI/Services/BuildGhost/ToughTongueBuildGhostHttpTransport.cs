@@ -16,7 +16,7 @@ public sealed class ToughTongueBuildGhostHttpTransport(HttpClient httpClient) : 
         _ = _httpClient.BaseAddress;
         return Task.FromResult(new ToughTongueBuildGhostTransportResult(
             false,
-            "provider-grounded-explanation-contract-unverified",
+            "provider-interactive-session-required",
             null));
     }
 }

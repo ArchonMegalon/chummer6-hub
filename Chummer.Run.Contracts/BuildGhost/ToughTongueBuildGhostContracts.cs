@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace Chummer.Run.Contracts.BuildGhost;
 
 public static class ToughTongueBuildGhostContractVersions
@@ -7,6 +9,8 @@ public static class ToughTongueBuildGhostContractVersions
     public const string RequestV1 = "chummer.tough_tongue.build_ghost_request.v1";
     public const string ReceiptV1 = "chummer.tough_tongue.build_ghost_receipt.v1";
     public const string PersonaReleaseV1 = "chummer.build_ghost_persona_release.v1";
+    public const string ScenarioContractV1 = "chummer.tough_tongue.build_ghost_scenario.v1";
+    public const string ToolContractV1 = "chummer.tough_tongue.build_ghost_tool.v1";
 }
 
 public static class ToughTongueBuildGhostPersonaIds
@@ -93,6 +97,35 @@ public sealed record ToughTongueBuildGhostTransportResult(
     long? InputTokens = null,
     long? OutputTokens = null,
     decimal? MinutesUsed = null);
+
+public sealed record ToughTongueBuildGhostToolDefinition(
+    string Schema,
+    string Name,
+    string Description,
+    string HttpMethod,
+    Uri Endpoint,
+    IReadOnlyList<string> RequiredHeaderNames,
+    string BodySchemaJson,
+    int MaximumResponseCharacters,
+    int TimeoutSeconds,
+    string ContractDigest);
+
+public sealed record ToughTongueBuildGhostScenarioCandidate(
+    string Schema,
+    JsonObject Payload,
+    ToughTongueBuildGhostToolDefinition Tool,
+    IReadOnlyList<string> SupportedLocales,
+    string ContractDigest);
+
+public sealed record ToughTongueBuildGhostScenarioValidation(
+    bool Accepted,
+    string? ScenarioId,
+    IReadOnlyList<string> RejectionReasons);
+
+public sealed record ToughTongueBuildGhostScenarioAccessGrant(
+    string ScenarioId,
+    string AccessToken,
+    DateTimeOffset ExpiresAtUtc);
 
 public sealed record BuildGhostPersonaMediaRelease(
     string Schema,
