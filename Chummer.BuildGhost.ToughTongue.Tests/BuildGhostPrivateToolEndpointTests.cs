@@ -131,6 +131,73 @@ public sealed class BuildGhostPrivateToolEndpointTests
         Assert.AreEqual("private-tool-response-too-large", size.Reason);
     }
 
+    [TestMethod]
+    public async Task Authority_budget_covers_slow_body_streaming_and_preserves_caller_cancellation()
+    {
+        HttpResponseMessage slowResponse = new(HttpStatusCode.OK)
+        {
+            Content = new StreamContent(new SlowReadStream(TimeSpan.FromSeconds(5)))
+        };
+        slowResponse.Headers.TryAddWithoutValidation("X-Chummer-Build-Ghost-Packet-Digest", PacketDigest);
+        BuildGhostPrivateToolAuthorityClient budgeted = new(
+            new HttpClient(new RecordingHandler(slowResponse)) { Timeout = Timeout.InfiniteTimeSpan },
+            Configuration(),
+            TimeSpan.FromMilliseconds(25));
+
+        BuildGhostPrivateToolResolutionException timeout = await Assert.ThrowsExactlyAsync<BuildGhostPrivateToolResolutionException>(
+            () => budgeted.ResolveAsync(Request(), ContractDigest(), CancellationToken.None));
+        Assert.AreEqual("private-tool-authority-timeout", timeout.Reason);
+        Assert.AreEqual(StatusCodes.Status504GatewayTimeout, timeout.StatusCode);
+
+        HttpResponseMessage callerCancelledResponse = new(HttpStatusCode.OK)
+        {
+            Content = new StreamContent(new SlowReadStream(TimeSpan.FromSeconds(5)))
+        };
+        callerCancelledResponse.Headers.TryAddWithoutValidation("X-Chummer-Build-Ghost-Packet-Digest", PacketDigest);
+        BuildGhostPrivateToolAuthorityClient callerCancelled = new(
+            new HttpClient(new RecordingHandler(callerCancelledResponse)) { Timeout = Timeout.InfiniteTimeSpan },
+            Configuration(),
+            TimeSpan.FromSeconds(1));
+        using CancellationTokenSource caller = new(TimeSpan.FromMilliseconds(25));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => callerCancelled.ResolveAsync(Request(), ContractDigest(), caller.Token));
+    }
+
+    [TestMethod]
+    public async Task Authority_client_rejects_duplicate_digest_headers_without_throwing_sequence_errors()
+    {
+        HttpResponseMessage response = new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(PacketJson(), Encoding.UTF8, "application/json")
+        };
+        response.Headers.TryAddWithoutValidation(
+            "X-Chummer-Build-Ghost-Packet-Digest",
+            new[] { PacketDigest, PacketDigest });
+        BuildGhostPrivateToolAuthorityClient client = Client(new RecordingHandler(response));
+
+        BuildGhostPrivateToolResolutionException exception = await Assert.ThrowsExactlyAsync<BuildGhostPrivateToolResolutionException>(
+            () => client.ResolveAsync(Request(), ContractDigest(), CancellationToken.None));
+
+        Assert.AreEqual("private-tool-packet-digest-header-invalid", exception.Reason);
+        Assert.AreEqual(StatusCodes.Status502BadGateway, exception.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task Authority_gone_maps_to_external_gone()
+    {
+        BuildGhostPrivateToolAuthorityClient client = Client(new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Gone)));
+        BuildGhostPrivateToolResolutionException gone = await Assert.ThrowsExactlyAsync<BuildGhostPrivateToolResolutionException>(
+            () => client.ResolveAsync(Request(), ContractDigest(), CancellationToken.None));
+        Assert.AreEqual(StatusCodes.Status410Gone, gone.StatusCode);
+
+        BuildGhostController controller = Controller(new ThrowingAuthority(gone));
+        Authorize(controller);
+        IActionResult result = await controller.Tool(Request(), CancellationToken.None);
+        ObjectResult problem = Assert.IsInstanceOfType<ObjectResult>(result);
+        Assert.AreEqual(StatusCodes.Status410Gone, problem.StatusCode);
+    }
+
     private static BuildGhostController Controller(IBuildGhostPrivateToolAuthorityClient authority)
     {
         BuildGhostController controller = new(
@@ -197,6 +264,12 @@ public sealed class BuildGhostPrivateToolEndpointTests
         }
     }
 
+    private sealed class ThrowingAuthority(BuildGhostPrivateToolResolutionException exception) : IBuildGhostPrivateToolAuthorityClient
+    {
+        public Task<string> ResolveAsync(BuildGhostPrivateToolRequest request, string toolContractDigest, CancellationToken cancellationToken)
+            => throw exception;
+    }
+
     private sealed class NeverRemoteAdapter : IToughTongueBuildGhostAdapter
     {
         public Task<ToughTongueBuildGhostResult> ExplainAsync(ToughTongueBuildGhostRequest request, CancellationToken cancellationToken)
@@ -232,6 +305,27 @@ public sealed class BuildGhostPrivateToolEndpointTests
                 : string.Empty;
             Body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
             return response(request);
+        }
+    }
+
+    private sealed class SlowReadStream(TimeSpan delay) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(delay, cancellationToken);
+            return 0;
         }
     }
 }

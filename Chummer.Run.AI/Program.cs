@@ -119,7 +119,7 @@ builder.Services.AddSingleton<ToughTongueBuildGhostCanaryHarness>();
 builder.Services.AddSingleton<IToughTongueBuildGhostAdapter, ToughTongueBuildGhostAdapter>();
 builder.Services.AddHttpClient<IBuildGhostPrivateToolAuthorityClient, BuildGhostPrivateToolAuthorityClient>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(120);
+    client.Timeout = TimeSpan.FromSeconds(BuildGhostPrivateToolAuthorityClient.TimeoutSeconds);
 });
 builder.Services.AddSingleton<IBuildGhostPersonaReleaseRegistry>(
     static sp => new BuildGhostPersonaReleaseRegistry(sp.GetRequiredService<IConfiguration>()));

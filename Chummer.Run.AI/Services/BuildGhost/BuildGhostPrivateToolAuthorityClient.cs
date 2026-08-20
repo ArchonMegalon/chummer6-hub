@@ -24,13 +24,16 @@ public sealed class BuildGhostPrivateToolResolutionException(
     public int StatusCode { get; } = statusCode;
 }
 
-public sealed class BuildGhostPrivateToolAuthorityClient(
-    HttpClient httpClient,
-    IConfiguration configuration) : IBuildGhostPrivateToolAuthorityClient
+public sealed class BuildGhostPrivateToolAuthorityClient : IBuildGhostPrivateToolAuthorityClient
 {
     public const string AuthorityEndpointConfigurationKey = "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTHORITY_ENDPOINT";
     public const string ServiceTokenConfigurationKey = "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN";
     public const int MaximumResponseCharacters = 15_000;
+    public const int TimeoutSeconds = 120;
+
+    private readonly HttpClient httpClient;
+    private readonly IConfiguration configuration;
+    private readonly TimeSpan requestBudget;
 
     private static readonly HashSet<string> AllowedRequestKinds =
         ["current-build", "build-tips", "rule-explanation", "build-variants", "group-gaps"];
@@ -45,6 +48,30 @@ public sealed class BuildGhostPrivateToolAuthorityClient(
         "providerCredentials",
         "packetAccessKey"
     };
+
+    public BuildGhostPrivateToolAuthorityClient(
+        HttpClient httpClient,
+        IConfiguration configuration)
+        : this(httpClient, configuration, TimeSpan.FromSeconds(TimeoutSeconds))
+    {
+    }
+
+    public BuildGhostPrivateToolAuthorityClient(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        TimeSpan requestBudget)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(configuration);
+        if (requestBudget <= TimeSpan.Zero || requestBudget > TimeSpan.FromSeconds(TimeoutSeconds))
+        {
+            throw new ArgumentOutOfRangeException(nameof(requestBudget), "Private tool request budget must be positive and no greater than 120 seconds.");
+        }
+
+        this.httpClient = httpClient;
+        this.configuration = configuration;
+        this.requestBudget = requestBudget;
+    }
 
     public async Task<string> ResolveAsync(
         BuildGhostPrivateToolRequest request,
@@ -72,13 +99,33 @@ public sealed class BuildGhostPrivateToolAuthorityClient(
         upstream.Headers.Authorization = new AuthenticationHeaderValue("Bearer", serviceToken);
         upstream.Headers.TryAddWithoutValidation("X-Chummer-Build-Ghost-Tool-Contract", toolContractDigest);
 
-        HttpResponseMessage response;
+        using CancellationTokenSource budgetCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budgetCancellation.CancelAfter(requestBudget);
         try
         {
-            response = await httpClient.SendAsync(
+            using HttpResponseMessage response = await httpClient.SendAsync(
                 upstream,
                 HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
+                budgetCancellation.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                int status = response.StatusCode is HttpStatusCode.Unauthorized
+                    or HttpStatusCode.Forbidden
+                    or HttpStatusCode.NotFound
+                    ? StatusCodes.Status401Unauthorized
+                    : response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed
+                        ? StatusCodes.Status409Conflict
+                        : response.StatusCode is HttpStatusCode.Gone
+                            ? StatusCodes.Status410Gone
+                        : StatusCodes.Status502BadGateway;
+                throw new BuildGhostPrivateToolResolutionException("private-tool-authority-rejected", status);
+            }
+
+            string responseDigest = ReadSingleDigestHeader(response);
+            string packetJson = await ReadBoundedAsync(response.Content, budgetCancellation.Token).ConfigureAwait(false);
+            ValidatePacket(packetJson, responseDigest, request);
+            return packetJson;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -89,30 +136,6 @@ public sealed class BuildGhostPrivateToolAuthorityClient(
         catch (HttpRequestException)
         {
             throw new BuildGhostPrivateToolResolutionException("private-tool-authority-unavailable");
-        }
-
-        using (response)
-        {
-            if (!response.IsSuccessStatusCode)
-            {
-                int status = response.StatusCode is HttpStatusCode.Unauthorized
-                    or HttpStatusCode.Forbidden
-                    or HttpStatusCode.NotFound
-                    ? StatusCodes.Status401Unauthorized
-                    : response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed
-                        ? StatusCodes.Status409Conflict
-                        : StatusCodes.Status502BadGateway;
-                throw new BuildGhostPrivateToolResolutionException("private-tool-authority-rejected", status);
-            }
-
-            string responseDigest = response.Headers.TryGetValues(
-                "X-Chummer-Build-Ghost-Packet-Digest",
-                out IEnumerable<string>? values)
-                ? values.SingleOrDefault()?.Trim() ?? string.Empty
-                : string.Empty;
-            string packetJson = await ReadBoundedAsync(response.Content, cancellationToken).ConfigureAwait(false);
-            ValidatePacket(packetJson, responseDigest, request);
-            return packetJson;
         }
     }
 
@@ -179,6 +202,23 @@ public sealed class BuildGhostPrivateToolAuthorityClient(
             throw new BuildGhostPrivateToolResolutionException("private-tool-response-too-large");
         }
         return new string(buffer, 0, total);
+    }
+
+    private static string ReadSingleDigestHeader(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues(
+                "X-Chummer-Build-Ghost-Packet-Digest",
+                out IEnumerable<string>? values))
+        {
+            return string.Empty;
+        }
+
+        string[] digests = values.Select(static value => value.Trim()).ToArray();
+        if (digests.Length != 1 || string.IsNullOrEmpty(digests[0]))
+        {
+            throw new BuildGhostPrivateToolResolutionException("private-tool-packet-digest-header-invalid");
+        }
+        return digests[0];
     }
 
     private static void ValidatePacket(
