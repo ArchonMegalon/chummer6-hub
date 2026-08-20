@@ -7,6 +7,7 @@ namespace Chummer.Run.AI.Security;
 
 public sealed class AiMutationAuthorizationMiddleware
 {
+    public const string BuildGhostPrivateToolPath = "/api/v1/ai/build-ghost/tool";
     public const string PrimaryTokenConfigurationKey = "CHUMMER_AI_INTERNAL_API_TOKEN";
     public const string FallbackTokenConfigurationKey = "FLEET_INTERNAL_API_TOKEN";
     internal static readonly object AuthorizationMarker = new();
@@ -58,6 +59,15 @@ public sealed class AiMutationAuthorizationMiddleware
     private static bool IsAnonymousRequest(HttpRequest request)
     {
         if (HttpMethods.IsOptions(request.Method))
+        {
+            return true;
+        }
+
+        // This exact route owns a separate, short-lived bearer boundary that is
+        // digest-bound to the request body. All other mutations stay behind the
+        // service-wide internal bearer enforced by this middleware.
+        if (HttpMethods.IsPost(request.Method)
+            && string.Equals(request.Path.Value, BuildGhostPrivateToolPath, StringComparison.Ordinal))
         {
             return true;
         }

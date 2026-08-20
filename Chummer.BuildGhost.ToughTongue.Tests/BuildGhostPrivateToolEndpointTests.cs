@@ -4,6 +4,7 @@ using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Net;
@@ -84,6 +85,19 @@ public sealed class BuildGhostPrivateToolEndpointTests
         Assert.AreEqual(ContractDigest(), handler.ContractHeader);
         Assert.IsFalse(handler.Body.Contains("question", StringComparison.OrdinalIgnoreCase));
         StringAssert.Contains(handler.Body, "packet_access_key", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public void Authority_client_typed_http_registration_resolves_the_production_constructor()
+    {
+        ServiceCollection services = new();
+        services.AddSingleton<IConfiguration>(Configuration());
+        services.AddHttpClient<IBuildGhostPrivateToolAuthorityClient, BuildGhostPrivateToolAuthorityClient>();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        Assert.IsInstanceOfType<BuildGhostPrivateToolAuthorityClient>(
+            provider.GetRequiredService<IBuildGhostPrivateToolAuthorityClient>());
     }
 
     [TestMethod]

@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1.7
+FROM mcr.microsoft.com/dotnet/sdk:10.0.103 AS build
+ARG CHUMMER_BUILD_CONCURRENCY=1
+WORKDIR /src
+
+COPY --from=run-services-source . chummer.run-services/
+COPY --from=core-engine-source . chummer-core-engine/
+COPY --from=hub-registry-source . chummer-hub-registry/
+COPY --from=media-factory-source . fleet/repos/chummer-media-factory/
+
+RUN mkdir -p fleet/repos/chummer-media-factory/.tmp/package-feed \
+ && dotnet pack chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj \
+      -c Release -o fleet/repos/chummer-media-factory/.tmp/package-feed --nologo \
+      -p:PackageVersion=0.0.0-packageplane.20260718.2 \
+ && dotnet build chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj \
+      -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+ && dotnet build fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj \
+      -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+ && rm fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/packages.lock.json \
+       fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/packages.lock.json \
+ && dotnet build fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/Chummer.Media.Factory.Runtime.csproj \
+      -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+      -p:RestoreLockedMode=false -p:RestorePackagesWithLockFile=false \
+ && dotnet publish chummer.run-services/Chummer.Run.AI/Chummer.Run.AI.csproj \
+      -c Release -o /app/publish --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+      -p:ChummerUseLocalCompatibilityTree=true \
+      -p:ChummerWorkspaceRoot=/src \
+      -p:ChummerCoreEngineRoot=/src/chummer-core-engine \
+      -p:ChummerHubRegistryRoot=/src/chummer-hub-registry \
+      -p:ChummerFleetRoot=/src/fleet
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app/publish .
+RUN find /app -xdev -type d -exec chmod 0755 {} + \
+ && find /app -xdev -type f -exec chmod 0644 {} +
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+USER $APP_UID:$APP_UID
+ENTRYPOINT ["dotnet", "Chummer.Run.AI.dll"]

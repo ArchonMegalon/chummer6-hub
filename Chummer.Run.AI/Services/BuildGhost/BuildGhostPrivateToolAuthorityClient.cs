@@ -1,6 +1,7 @@
 using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -49,6 +50,7 @@ public sealed class BuildGhostPrivateToolAuthorityClient : IBuildGhostPrivateToo
         "packetAccessKey"
     };
 
+    [ActivatorUtilitiesConstructor]
     public BuildGhostPrivateToolAuthorityClient(
         HttpClient httpClient,
         IConfiguration configuration)
