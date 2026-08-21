@@ -269,76 +269,62 @@ public static class BuildGhostCascadePrivateVoiceBindingContract
         => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
 }
 
-public static class BuildGhostToughTongueCartesiaScenarioFieldContract
+public static class BuildGhostToughTongueCartesiaScenarioSchemaContract
 {
-    public const string MissingOrUnverifiedBlocker = "cartesia-tts-provider-scenario-field-contract-not-configured-or-read-verified";
+    public const string MissingOrUnverifiedBlocker = "cartesia-scenario-bundle-schema-receipt-missing-or-invalid";
+    public const string VerifiedDeploymentId = "dpl_DKFDJRMr7tN6xHLYuhLbBaEVDZi8";
+    public const string VerifiedScenarioReadBundleUrl = "https://app.toughtongueai.com/_next/static/chunks/10w5gkzd~f23z.js?dpl=dpl_DKFDJRMr7tN6xHLYuhLbBaEVDZi8";
+    public const string VerifiedScenarioReadBundleDigest = "sha256:8a3427924a4eae6f5c7d97c10124178272db17d7c6b6b6189c0bdec78e0dfd14";
+    public const long VerifiedScenarioReadBundleBytes = 219_531;
+    public const string VerifiedScenarioCreateBundleUrl = "https://app.toughtongueai.com/_next/static/chunks/04i2xipv9rrh-.js?dpl=dpl_DKFDJRMr7tN6xHLYuhLbBaEVDZi8";
+    public const string VerifiedScenarioCreateBundleDigest = "sha256:01c2f887b5970283734c086bdbf1c3ec1e6af8f6e07a62e229c0f8cd96f5c1eb";
+    public const long VerifiedScenarioCreateBundleBytes = 166_081;
+    public const string CreateTtsProviderFieldPath = "tts_provider";
+    public const string CreateTtsVoiceIdFieldPath = "tts_voice_id";
+    public const string ReadTtsProviderFieldPath = "ai_model_config.tts_provider";
+    public const string ReadTtsVoiceIdFieldPath = "ai_model_config.tts_voice_id";
 
-    public static IReadOnlyList<string> Validate(BuildGhostToughTongueCartesiaScenarioFieldReceipt? receipt)
+    public static IReadOnlyList<string> Validate(BuildGhostToughTongueCartesiaScenarioSchemaReceipt? receipt)
     {
         if (receipt is null) return [MissingOrUnverifiedBlocker];
         List<string> failures = [];
-        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CartesiaScenarioFieldReceiptV1) failures.Add("cartesia-scenario-field-receipt-schema-invalid");
-        if (receipt.ProviderNamespace != ToughTongueBuildGhostVoiceProviders.CartesiaNamespace) failures.Add("cartesia-scenario-field-provider-namespace-invalid");
-        if (receipt.TtsProvider != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider) failures.Add("cartesia-scenario-field-provider-value-invalid");
-        if (!IsSafeFieldPath(receipt.ConfiguredFieldPath) || !IsSafeFieldPath(receipt.ReturnedFieldPath)) failures.Add("cartesia-scenario-field-path-invalid");
-        if (!string.Equals(receipt.ConfiguredFieldPath, receipt.ReturnedFieldPath, StringComparison.Ordinal)) failures.Add("cartesia-scenario-field-read-mismatch");
-        if (receipt.ReturnedValue != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider) failures.Add("cartesia-scenario-field-read-value-invalid");
-        if (receipt.ReadHttpStatus != 200) failures.Add("cartesia-scenario-field-read-http-status-invalid");
-        if (!IsSha256(receipt.ProviderSchemaDigest)) failures.Add("cartesia-scenario-field-provider-schema-digest-invalid");
-        if (!IsSha256(receipt.ProviderResponseDigest)) failures.Add("cartesia-scenario-field-provider-response-digest-invalid");
-        if (receipt.ObservedAtUtc == default) failures.Add("cartesia-scenario-field-observed-at-invalid");
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CartesiaScenarioSchemaReceiptV1) failures.Add("cartesia-scenario-schema-receipt-version-invalid");
+        if (receipt.ProviderNamespace != ToughTongueBuildGhostVoiceProviders.CartesiaNamespace) failures.Add("cartesia-scenario-schema-provider-namespace-invalid");
+        if (receipt.TtsProvider != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider) failures.Add("cartesia-scenario-schema-provider-value-invalid");
+        if (receipt.DeploymentId != VerifiedDeploymentId) failures.Add("cartesia-scenario-schema-deployment-drift");
+        if (receipt.ScenarioReadBundleUrl?.AbsoluteUri != VerifiedScenarioReadBundleUrl) failures.Add("cartesia-scenario-read-bundle-url-drift");
+        if (receipt.ScenarioReadBundleDigest != VerifiedScenarioReadBundleDigest) failures.Add("cartesia-scenario-read-bundle-digest-drift");
+        if (receipt.ScenarioReadBundleBytes != VerifiedScenarioReadBundleBytes) failures.Add("cartesia-scenario-read-bundle-size-drift");
+        if (receipt.ScenarioCreateBundleUrl?.AbsoluteUri != VerifiedScenarioCreateBundleUrl) failures.Add("cartesia-scenario-create-bundle-url-drift");
+        if (receipt.ScenarioCreateBundleDigest != VerifiedScenarioCreateBundleDigest) failures.Add("cartesia-scenario-create-bundle-digest-drift");
+        if (receipt.ScenarioCreateBundleBytes != VerifiedScenarioCreateBundleBytes) failures.Add("cartesia-scenario-create-bundle-size-drift");
+        if (receipt.CreateTtsProviderFieldPath != CreateTtsProviderFieldPath) failures.Add("cartesia-scenario-create-provider-field-drift");
+        if (receipt.CreateTtsVoiceIdFieldPath != CreateTtsVoiceIdFieldPath) failures.Add("cartesia-scenario-create-voice-field-drift");
+        if (receipt.ReadTtsProviderFieldPath != ReadTtsProviderFieldPath) failures.Add("cartesia-scenario-read-provider-field-drift");
+        if (receipt.ReadTtsVoiceIdFieldPath != ReadTtsVoiceIdFieldPath) failures.Add("cartesia-scenario-read-voice-field-drift");
+        if (receipt.ObservedAtUtc == default) failures.Add("cartesia-scenario-schema-observed-at-invalid");
         return failures;
     }
 
-    public static string DigestReceipt(BuildGhostToughTongueCartesiaScenarioFieldReceipt receipt)
+    public static string DigestReceipt(BuildGhostToughTongueCartesiaScenarioSchemaReceipt receipt)
         => Digest(new JsonObject
         {
             ["schema"] = receipt.Schema,
             ["providerNamespace"] = receipt.ProviderNamespace,
+            ["deploymentId"] = receipt.DeploymentId,
+            ["scenarioReadBundleUrl"] = receipt.ScenarioReadBundleUrl.AbsoluteUri,
+            ["scenarioReadBundleDigest"] = receipt.ScenarioReadBundleDigest,
+            ["scenarioReadBundleBytes"] = receipt.ScenarioReadBundleBytes,
+            ["scenarioCreateBundleUrl"] = receipt.ScenarioCreateBundleUrl.AbsoluteUri,
+            ["scenarioCreateBundleDigest"] = receipt.ScenarioCreateBundleDigest,
+            ["scenarioCreateBundleBytes"] = receipt.ScenarioCreateBundleBytes,
+            ["createTtsProviderFieldPath"] = receipt.CreateTtsProviderFieldPath,
+            ["createTtsVoiceIdFieldPath"] = receipt.CreateTtsVoiceIdFieldPath,
+            ["readTtsProviderFieldPath"] = receipt.ReadTtsProviderFieldPath,
+            ["readTtsVoiceIdFieldPath"] = receipt.ReadTtsVoiceIdFieldPath,
             ["ttsProvider"] = receipt.TtsProvider,
-            ["configuredFieldPath"] = receipt.ConfiguredFieldPath,
-            ["returnedFieldPath"] = receipt.ReturnedFieldPath,
-            ["returnedValue"] = receipt.ReturnedValue,
-            ["readHttpStatus"] = receipt.ReadHttpStatus,
-            ["providerSchemaDigest"] = receipt.ProviderSchemaDigest,
-            ["providerResponseDigest"] = receipt.ProviderResponseDigest,
             ["observedAtUtc"] = receipt.ObservedAtUtc.ToUniversalTime().ToString("O")
         });
-
-    public static void Apply(JsonObject payload, string fieldPath, string value)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        if (!IsSafeFieldPath(fieldPath))
-        {
-            throw new ArgumentException("cartesia-scenario-field-path-invalid", nameof(fieldPath));
-        }
-        string[] segments = Segments(fieldPath);
-        JsonObject current = payload;
-        for (int index = 0; index < segments.Length - 1; index++)
-        {
-            JsonNode? existing = current[segments[index]];
-            if (existing is null)
-            {
-                JsonObject child = new();
-                current[segments[index]] = child;
-                current = child;
-            }
-            else if (existing is JsonObject child)
-            {
-                current = child;
-            }
-            else
-            {
-                throw new ArgumentException("cartesia-scenario-field-path-collides-with-contract", nameof(fieldPath));
-            }
-        }
-        string leaf = segments[^1];
-        if (current.ContainsKey(leaf))
-        {
-            throw new ArgumentException("cartesia-scenario-field-path-collides-with-contract", nameof(fieldPath));
-        }
-        current[leaf] = value;
-    }
 
     public static string Read(JsonObject payload, string fieldPath)
     {
@@ -361,11 +347,6 @@ public static class BuildGhostToughTongueCartesiaScenarioFieldContract
             && segments.All(static segment => segment.Length is >= 1 and <= 64
                 && segment.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-'));
     }
-
-    private static bool IsSha256(string? value)
-        => value is { Length: 71 }
-            && value.StartsWith("sha256:", StringComparison.Ordinal)
-            && value.AsSpan(7).ToString().All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     private static string Digest(JsonNode node)
         => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
@@ -399,7 +380,7 @@ public static class ToughTongueBuildGhostScenarioContract
         BuildGhostPrivateToolDeploymentPackage deployment,
         Uri avatarUrl,
         BuildGhostCascadePrivateVoiceBinding runtimeBinding,
-        BuildGhostToughTongueCartesiaScenarioFieldReceipt? ttsProviderFieldReceipt = null)
+        BuildGhostToughTongueCartesiaScenarioSchemaReceipt? scenarioSchemaReceipt = null)
     {
         ArgumentNullException.ThrowIfNull(deployment);
         ArgumentNullException.ThrowIfNull(runtimeBinding);
@@ -417,14 +398,17 @@ public static class ToughTongueBuildGhostScenarioContract
         }
         RequirePublicHttps(avatarUrl, nameof(avatarUrl));
         BuildGhostPrivateToolDefinition tool = deployment.Tool;
-        IReadOnlyList<string> scenarioFieldFailures =
-            BuildGhostToughTongueCartesiaScenarioFieldContract.Validate(ttsProviderFieldReceipt);
-        bool providerSchemaReadVerified = scenarioFieldFailures.Count == 0;
+        IReadOnlyList<string> scenarioSchemaFailures =
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.Validate(scenarioSchemaReceipt);
+        bool providerSchemaReadVerified = scenarioSchemaFailures.Count == 0;
         string? ttsProviderFieldPath = providerSchemaReadVerified
-            ? ttsProviderFieldReceipt!.ConfiguredFieldPath
+            ? scenarioSchemaReceipt!.ReadTtsProviderFieldPath
             : null;
-        string scenarioFieldReceiptDigest = providerSchemaReadVerified
-            ? BuildGhostToughTongueCartesiaScenarioFieldContract.DigestReceipt(ttsProviderFieldReceipt!)
+        string? ttsVoiceIdFieldPath = providerSchemaReadVerified
+            ? scenarioSchemaReceipt!.ReadTtsVoiceIdFieldPath
+            : null;
+        string scenarioSchemaReceiptDigest = providerSchemaReadVerified
+            ? BuildGhostToughTongueCartesiaScenarioSchemaContract.DigestReceipt(scenarioSchemaReceipt!)
             : string.Empty;
 
         JsonObject payload = new()
@@ -489,17 +473,17 @@ public static class ToughTongueBuildGhostScenarioContract
                 ["voice_read_receipt_digest"] = runtimeBinding.VoiceReadReceiptDigest,
                 ["tts_provider"] = runtimeBinding.TtsProvider,
                 ["provider_namespace"] = runtimeBinding.ProviderNamespace,
-                ["tts_provider_field_receipt_digest"] = scenarioFieldReceiptDigest,
+                ["tts_provider_schema_receipt_digest"] = scenarioSchemaReceiptDigest,
                 ["supported_locales"] = string.Join(',', CanonicalLocales),
                 ["release_channel"] = "private-nonproduction-candidate"
             }
         };
         if (providerSchemaReadVerified)
         {
-            BuildGhostToughTongueCartesiaScenarioFieldContract.Apply(
-                payload,
-                ttsProviderFieldPath!,
-                ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider);
+            payload[BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsProviderFieldPath] =
+                ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider;
+            payload[BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsVoiceIdFieldPath] =
+                runtimeBinding.ProviderVoiceRef;
         }
         string contractDigest = Digest(payload);
         payload["user_metadata"]!["scenario_contract_digest"] = contractDigest;
@@ -509,8 +493,9 @@ public static class ToughTongueBuildGhostScenarioContract
             tool,
             CanonicalLocales,
             ttsProviderFieldPath,
+            ttsVoiceIdFieldPath,
             providerSchemaReadVerified,
-            scenarioFieldFailures,
+            scenarioSchemaFailures,
             contractDigest);
     }
 
@@ -522,7 +507,7 @@ public static class ToughTongueBuildGhostScenarioContract
         if (!expected.ProviderSchemaReadVerified || expected.BlockingReasons.Count != 0)
         {
             IReadOnlyList<string> blockers = expected.BlockingReasons.Count == 0
-                ? [BuildGhostToughTongueCartesiaScenarioFieldContract.MissingOrUnverifiedBlocker]
+                ? [BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker]
                 : expected.BlockingReasons;
             return new ToughTongueBuildGhostScenarioValidation(
                 false,
@@ -546,10 +531,16 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(Object(scenario, "ai_model_config"), "provider", "Landmass", "scenario-model-provider-invalid", reasons);
         RequireText(Object(scenario, "ai_model_config"), "model", "cascade", "scenario-model-invalid", reasons);
         if (expected.TtsProviderFieldPath is null
-            || BuildGhostToughTongueCartesiaScenarioFieldContract.Read(scenario, expected.TtsProviderFieldPath)
+            || BuildGhostToughTongueCartesiaScenarioSchemaContract.Read(scenario, expected.TtsProviderFieldPath)
                 != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider)
         {
             reasons.Add("scenario-tts-provider-mismatch");
+        }
+        if (expected.TtsVoiceIdFieldPath is null
+            || BuildGhostToughTongueCartesiaScenarioSchemaContract.Read(scenario, expected.TtsVoiceIdFieldPath)
+                != Text(expected.Payload, BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsVoiceIdFieldPath))
+        {
+            reasons.Add("scenario-tts-voice-id-mismatch");
         }
         RequireBoolean(Object(scenario, "memory"), "is_memory", expected: false, "scenario-memory-must-be-disabled", reasons);
         JsonObject customFunction = Object(Object(Object(scenario, "tools_config"), "tools"), "custom_function");
@@ -568,7 +559,7 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(metadata, "voice_read_receipt_digest", Text(expectedMetadata, "voice_read_receipt_digest"), "voice-read-receipt-digest-mismatch", reasons);
         RequireText(metadata, "tts_provider", ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider, "scenario-tts-provider-metadata-mismatch", reasons);
         RequireText(metadata, "provider_namespace", ToughTongueBuildGhostVoiceProviders.CartesiaNamespace, "scenario-provider-namespace-mismatch", reasons);
-        RequireText(metadata, "tts_provider_field_receipt_digest", Text(expectedMetadata, "tts_provider_field_receipt_digest"), "scenario-tts-provider-field-receipt-digest-mismatch", reasons);
+        RequireText(metadata, "tts_provider_schema_receipt_digest", Text(expectedMetadata, "tts_provider_schema_receipt_digest"), "scenario-tts-provider-schema-receipt-digest-mismatch", reasons);
         RequireText(metadata, "scenario_contract_digest", expected.ContractDigest, "scenario-contract-digest-mismatch", reasons);
         RequireText(metadata, "supported_locales", string.Join(',', CanonicalLocales), "scenario-locales-mismatch", reasons);
         RequireText(metadata, "release_channel", "private-nonproduction-candidate", "scenario-release-channel-invalid", reasons);
@@ -789,7 +780,7 @@ public sealed class ToughTongueBuildGhostScenarioClient(
     {
         if (candidate.ProviderSchemaReadVerified && candidate.BlockingReasons.Count == 0) return null;
         IReadOnlyList<string> blockers = candidate.BlockingReasons.Count == 0
-            ? [BuildGhostToughTongueCartesiaScenarioFieldContract.MissingOrUnverifiedBlocker]
+            ? [BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker]
             : candidate.BlockingReasons;
         return new ToughTongueBuildGhostScenarioValidation(
             false,
@@ -837,7 +828,7 @@ public sealed class ToughTongueBuildGhostCanaryHarness(
         if (!expected.ProviderSchemaReadVerified || expected.BlockingReasons.Count != 0)
         {
             blockers.AddRange(expected.BlockingReasons.Count == 0
-                ? [BuildGhostToughTongueCartesiaScenarioFieldContract.MissingOrUnverifiedBlocker]
+                ? [BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker]
                 : expected.BlockingReasons);
         }
         if (!readEnabled) blockers.Add("scenario-read-canary-disabled");

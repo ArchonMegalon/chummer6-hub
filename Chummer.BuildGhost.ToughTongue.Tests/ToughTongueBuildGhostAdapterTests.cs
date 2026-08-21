@@ -14,12 +14,11 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private const string AccountOne = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
     private const string AccountTwo = "sha256:2222222222222222222222222222222222222222222222222222222222222222";
     private const string AccountThree = "sha256:3333333333333333333333333333333333333333333333333333333333333333";
+    private const string AccountFour = "sha256:4444444444444444444444444444444444444444444444444444444444444444";
     private const string VoiceReleaseDigest = "sha256:05ed9fff46ddb5a447e1d21cfd0f71cfb2a9286460fd112bb7514eb3eaa57e26";
     private const string CartesiaVoiceId = "f161df88-b5a0-4ea8-aa21-6be12859f761";
     private const string OtherCartesiaVoiceId = "86c6b891-3195-4e85-8be9-74f889d80620";
     private const string ProviderResponseDigest = "sha256:4e6db0b62942d0ca42575d86ac47599458190e29210e86cb503635e1f86204df";
-    private const string ProviderSchemaDigest = "sha256:fe5490a49292fc33d0a8c5c52a08127c5c95f5920d8023f8d8472319e725c2dc";
-    private const string VerifiedScenarioFieldPath = "provider_verified.cartesia_tts_provider";
 
     [TestMethod]
     public async Task Remote_execution_is_disabled_by_default_and_returns_audited_deterministic_fallback()
@@ -52,7 +51,124 @@ public sealed class ToughTongueBuildGhostAdapterTests
             new[] { AccountOne, AccountTwo, AccountThree },
             new[] { first.Receipt.AccountSlotId, second.Receipt.AccountSlotId, third.Receipt.AccountSlotId });
         Assert.IsFalse(JsonSerializer.Serialize(new[] { first.Receipt, second.Receipt, third.Receipt }).Contains("secret-", StringComparison.Ordinal));
+        Assert.IsTrue(new[] { first, second, third }.All(static result => result.Receipt.AccountSelectionPosture == "round-robin"));
         Assert.IsTrue(new[] { first, second, third }.All(static result => !result.UsedDeterministicFallback));
+    }
+
+    [TestMethod]
+    public async Task Exact_preferred_account_pin_selects_one_aligned_governed_slot()
+    {
+        Dictionary<string, string?> values = WithSlotConfiguration(
+            "secret-one;secret-two;secret-three;secret-four",
+            $"{AccountOne};{AccountTwo};{AccountThree};{AccountFour}");
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountFour;
+        FakeTransport transport = new(request => Success(request));
+        ToughTongueBuildGhostAdapter adapter = CreateAdapter(values, transport);
+
+        ToughTongueBuildGhostResult result = await adapter.ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "secret-four" }, transport.Credentials.ToArray());
+        Assert.AreEqual(AccountFour, result.Receipt.AccountSlotId);
+        Assert.AreEqual("exact-pin", result.Receipt.AccountSelectionPosture);
+        string serialized = JsonSerializer.Serialize(result.Receipt);
+        Assert.IsFalse(serialized.Contains("secret-four", StringComparison.Ordinal));
+        Assert.IsFalse(serialized.Contains("@", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task Preferred_account_pin_rejects_email_ordinal_credential_and_malformed_values()
+    {
+        string[] invalidSelectors =
+        [
+            "private-account@example.test",
+            "team-slot-2",
+            "secret-two",
+            $"sha256:{new string('A', 64)}",
+            $"sha256:{new string('a', 63)}"
+        ];
+        foreach (string selector in invalidSelectors)
+        {
+            Dictionary<string, string?> values = RemoteConfiguration();
+            values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = selector;
+            FakeTransport transport = new(request => Success(request));
+            ToughTongueBuildGhostAdapter adapter = CreateAdapter(values, transport);
+
+            ToughTongueBuildGhostResult result = await adapter.ExplainAsync(CreateRequest(), CancellationToken.None);
+
+            Assert.AreEqual("preferred-account-ref-invalid", result.OutcomeStatus);
+            Assert.AreEqual("exact-pin-invalid", result.Receipt.AccountSelectionPosture);
+            Assert.IsFalse(result.Receipt.RemoteAttempted);
+            Assert.IsEmpty(transport.Credentials);
+            Assert.IsFalse(JsonSerializer.Serialize(result.Receipt).Contains(selector, StringComparison.Ordinal));
+        }
+    }
+
+    [TestMethod]
+    public async Task Preferred_account_pin_rejects_zero_and_duplicate_matches()
+    {
+        Dictionary<string, string?> unmatchedValues = RemoteConfiguration();
+        unmatchedValues["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountFour;
+        FakeTransport unmatchedTransport = new(request => Success(request));
+        ToughTongueBuildGhostResult unmatched = await CreateAdapter(unmatchedValues, unmatchedTransport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.AreEqual("preferred-account-ref-unmatched", unmatched.OutcomeStatus);
+        Assert.AreEqual("exact-pin-unmatched", unmatched.Receipt.AccountSelectionPosture);
+        Assert.IsEmpty(unmatchedTransport.Credentials);
+
+        Dictionary<string, string?> ambiguousValues = WithSlotConfiguration(
+            "secret-one;secret-two;secret-three",
+            $"{AccountOne};{AccountTwo};{AccountTwo}");
+        ambiguousValues["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountTwo;
+        FakeTransport ambiguousTransport = new(request => Success(request));
+        ToughTongueBuildGhostResult ambiguous = await CreateAdapter(ambiguousValues, ambiguousTransport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.AreEqual("preferred-account-ref-ambiguous", ambiguous.OutcomeStatus);
+        Assert.AreEqual("exact-pin-ambiguous", ambiguous.Receipt.AccountSelectionPosture);
+        Assert.IsEmpty(ambiguousTransport.Credentials);
+    }
+
+    [TestMethod]
+    public async Task Remote_disabled_keeps_exact_pin_from_calling_provider_transport()
+    {
+        Dictionary<string, string?> values = RemoteConfiguration();
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED"] = "false";
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountTwo;
+        FakeTransport transport = new(request => Success(request));
+
+        ToughTongueBuildGhostResult result = await CreateAdapter(values, transport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.AreEqual("remote-disabled", result.OutcomeStatus);
+        Assert.AreEqual("exact-pin", result.Receipt.AccountSelectionPosture);
+        Assert.IsFalse(result.Receipt.RemoteAttempted);
+        Assert.IsEmpty(transport.Credentials);
+    }
+
+    [TestMethod]
+    public async Task Unhealthy_exact_pin_fails_closed_without_falling_back_to_other_slots()
+    {
+        Dictionary<string, string?> values = RemoteConfiguration();
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountTwo;
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_DAILY_QUOTA_PER_SLOT"] = "1";
+        FakeTransport transport = new(request => Success(request));
+        ToughTongueBuildGhostAdapter adapter = CreateAdapter(values, transport);
+
+        ToughTongueBuildGhostResult first = await adapter.ExplainAsync(
+            CreateRequest("preferred-first", "preferred-idem-first"),
+            CancellationToken.None);
+        ToughTongueBuildGhostResult blocked = await adapter.ExplainAsync(
+            CreateRequest("preferred-blocked", "preferred-idem-blocked"),
+            CancellationToken.None);
+
+        Assert.IsFalse(first.UsedDeterministicFallback);
+        Assert.AreEqual("preferred-account-slot-unhealthy", blocked.OutcomeStatus);
+        Assert.AreEqual(AccountTwo, blocked.Receipt.AccountSlotId);
+        Assert.AreEqual("exact-pin", blocked.Receipt.AccountSelectionPosture);
+        Assert.AreEqual("quota-exhausted", blocked.Receipt.CircuitPosture);
+        Assert.IsFalse(blocked.Receipt.RemoteAttempted);
+        CollectionAssert.AreEqual(new[] { "secret-two" }, transport.Credentials.ToArray());
     }
 
     [TestMethod]
@@ -88,12 +204,13 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
-    public async Task Remote_execution_requires_exactly_three_distinct_credentials_and_opaque_account_refs()
+    public async Task Remote_execution_requires_aligned_bounded_distinct_credentials_and_opaque_account_refs()
     {
         Dictionary<string, string?>[] invalidConfigurations =
         [
+            WithSlotConfiguration("", ""),
             WithSlotConfiguration("secret-one;secret-two", $"{AccountOne};{AccountTwo}"),
-            WithSlotConfiguration("secret-one;secret-two;secret-three;secret-four", $"{AccountOne};{AccountTwo};{AccountThree};sha256:{new string('4', 64)}"),
+            WithSlotConfiguration("secret-one;secret-two", $"{AccountOne};{AccountTwo};{AccountThree}"),
             WithSlotConfiguration("secret-one;secret-one;secret-three", $"{AccountOne};{AccountTwo};{AccountThree}"),
             WithSlotConfiguration("secret-one;secret-two;secret-three", "account-one;account-two;account-three"),
             WithSlotConfiguration("secret-one;secret-two;secret-three", $"{AccountOne};{AccountOne};{AccountThree}")
@@ -112,7 +229,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             Assert.AreEqual(0, result.Receipt.HealthySlotCount);
             CollectionAssert.Contains(
                 result.Receipt.ValidationReasons.ToArray(),
-                "exactly-three-distinct-credentials-and-opaque-account-refs-required");
+                "three-to-thirty-two-aligned-distinct-credentials-and-opaque-account-refs-required");
             Assert.IsEmpty(transport.Credentials);
         }
     }
@@ -272,7 +389,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
             RuntimeBinding(),
-            ScenarioFieldReceipt());
+            ScenarioSchemaReceipt());
 
         Assert.AreEqual(ToughTongueBuildGhostContractVersions.ScenarioContractV1, candidate.Schema);
         Assert.IsFalse(candidate.Payload["is_public"]!.GetValue<bool>());
@@ -282,8 +399,10 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.AreEqual("Landmass", candidate.Payload["ai_model_config"]!["provider"]!.GetValue<string>());
         Assert.AreEqual("cascade", candidate.Payload["ai_model_config"]!["model"]!.GetValue<string>());
         Assert.AreEqual(CartesiaVoiceId, candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
-        Assert.AreEqual("Cartesia", candidate.Payload["provider_verified"]!["cartesia_tts_provider"]!.GetValue<string>());
-        Assert.AreEqual(VerifiedScenarioFieldPath, candidate.TtsProviderFieldPath);
+        Assert.AreEqual("Cartesia", candidate.Payload["tts_provider"]!.GetValue<string>());
+        Assert.AreEqual(CartesiaVoiceId, candidate.Payload["tts_voice_id"]!.GetValue<string>());
+        Assert.AreEqual(BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsProviderFieldPath, candidate.TtsProviderFieldPath);
+        Assert.AreEqual(BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsVoiceIdFieldPath, candidate.TtsVoiceIdFieldPath);
         Assert.IsTrue(candidate.ProviderSchemaReadVerified);
         Assert.IsEmpty(candidate.BlockingReasons);
         CollectionAssert.AreEqual(
@@ -389,10 +508,10 @@ public sealed class ToughTongueBuildGhostAdapterTests
     public void Scenario_validation_rejects_Cascade_or_private_voice_binding_drift()
     {
         ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
-        JsonObject drifted = (JsonObject)candidate.Payload.DeepClone();
-        drifted["id"] = "0123456789abcdef01234567";
+        JsonObject drifted = ProviderScenario(candidate);
         drifted["ai_model_config"]!["model"] = "other-model";
-        drifted["provider_verified"]!["cartesia_tts_provider"] = "Unmixr";
+        drifted["ai_model_config"]!["tts_provider"] = "Unmixr";
+        drifted["ai_model_config"]!["tts_voice_id"] = OtherCartesiaVoiceId;
         drifted["user_metadata"]!["runtime_binding_digest"] = $"sha256:{new string('0', 64)}";
         drifted["user_metadata"]!["voice_release_digest"] = $"sha256:{new string('1', 64)}";
 
@@ -401,6 +520,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.IsFalse(validation.Accepted);
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-model-invalid");
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-tts-provider-mismatch");
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-tts-voice-id-mismatch");
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "runtime-binding-digest-mismatch");
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "voice-release-digest-mismatch");
     }
@@ -412,9 +532,8 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
             RuntimeBinding(),
-            ScenarioFieldReceipt());
-        JsonObject providerScenario = (JsonObject)candidate.Payload.DeepClone();
-        providerScenario["id"] = "0123456789abcdef01234567";
+            ScenarioSchemaReceipt());
+        JsonObject providerScenario = ProviderScenario(candidate);
         RecordingHttpHandler handler = new(
             JsonResponse(providerScenario),
             JsonResponse(providerScenario));
@@ -446,6 +565,10 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.IsTrue(handler.Requests.All(static request => request.HasBearerCredential));
         JsonObject posted = JsonNode.Parse(handler.Requests[0].Body!)!.AsObject();
         Assert.IsFalse(posted["is_public"]!.GetValue<bool>());
+        Assert.AreEqual("Cartesia", posted["tts_provider"]!.GetValue<string>());
+        Assert.AreEqual(CartesiaVoiceId, posted["tts_voice_id"]!.GetValue<string>());
+        Assert.IsNull(posted["ai_model_config"]!["tts_provider"]);
+        Assert.IsNull(posted["ai_model_config"]!["tts_voice_id"]);
         Assert.AreEqual(candidate.ContractDigest, posted["user_metadata"]!["scenario_contract_digest"]!.GetValue<string>());
     }
 
@@ -475,7 +598,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ToughTongueBuildGhostContractVersions.ReceiptV1,
             "receipt", "request", $"sha256:{new string('a', 64)}", "en-US", $"sha256:{new string('b', 64)}",
             "remote-disabled", "tough-tongue", "interactive-session", "scenario", "voice", false, false,
-            null, "not-selected", 3, 3, null, null, null, "remote-disabled", [], clock.UtcNow, clock.UtcNow, 0))
+            null, "round-robin", "not-selected", 3, 3, null, null, null, "remote-disabled", [], clock.UtcNow, clock.UtcNow, 0))
             .Contains(grant.AccessToken, StringComparison.Ordinal));
     }
 
@@ -494,7 +617,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 ToolDeployment(),
                 new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
                 RuntimeBinding(),
-                ScenarioFieldReceipt()),
+                ScenarioSchemaReceipt()),
             "must-not-leave-process",
             CancellationToken.None));
         Assert.IsEmpty(handler.Requests);
@@ -532,7 +655,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
-    public async Task Scenario_creation_is_blocked_without_a_provider_schema_backed_Cartesia_field_receipt()
+    public async Task Scenario_creation_is_blocked_without_a_provider_schema_backed_Cartesia_bundle_receipt()
     {
         RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
         ToughTongueBuildGhostScenarioClient scenarios = new(
@@ -555,8 +678,45 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.IsNull(scenarioId);
         CollectionAssert.Contains(
             validation.RejectionReasons.ToArray(),
-            BuildGhostToughTongueCartesiaScenarioFieldContract.MissingOrUnverifiedBlocker);
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker);
         Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Scenario_creation_rejects_bundle_deployment_digest_url_size_and_field_drift_before_transport()
+    {
+        BuildGhostToughTongueCartesiaScenarioSchemaReceipt receipt = ScenarioSchemaReceipt();
+        BuildGhostToughTongueCartesiaScenarioSchemaReceipt[] driftedReceipts =
+        [
+            receipt with { DeploymentId = "dpl_other" },
+            receipt with { ScenarioReadBundleDigest = $"sha256:{new string('0', 64)}" },
+            receipt with { ScenarioCreateBundleDigest = $"sha256:{new string('1', 64)}" },
+            receipt with { ScenarioReadBundleUrl = new Uri("https://app.toughtongueai.com/_next/static/chunks/other.js") },
+            receipt with { ScenarioCreateBundleBytes = receipt.ScenarioCreateBundleBytes + 1 },
+            receipt with { CreateTtsProviderFieldPath = "ai_model_config.tts_provider" },
+            receipt with { ReadTtsVoiceIdFieldPath = "tts_voice_id" }
+        ];
+        foreach (BuildGhostToughTongueCartesiaScenarioSchemaReceipt driftedReceipt in driftedReceipts)
+        {
+            RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+            ToughTongueBuildGhostScenarioClient scenarios = new(
+                new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
+                new FixedClock(),
+                ScenarioConfiguration(mutationsEnabled: true));
+            ToughTongueBuildGhostScenarioCandidate blocked = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                ToolDeployment(),
+                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                RuntimeBinding(),
+                driftedReceipt);
+
+            (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
+                await scenarios.CreatePrivateCandidateAsync(blocked, "must-not-leave-process", CancellationToken.None);
+
+            Assert.IsFalse(validation.Accepted);
+            Assert.IsNull(scenarioId);
+            Assert.IsNotEmpty(validation.RejectionReasons);
+            Assert.IsEmpty(handler.Requests);
+        }
     }
 
     [TestMethod]
@@ -571,7 +731,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
             RuntimeBinding(),
-            ScenarioFieldReceipt());
+            ScenarioSchemaReceipt());
 
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.CreatePrivateCandidateAsync(
             candidate,
@@ -694,25 +854,43 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ProviderResponseDigest,
             DateTimeOffset.Parse("2026-08-21T08:00:00Z"));
 
-    private static BuildGhostToughTongueCartesiaScenarioFieldReceipt ScenarioFieldReceipt()
+    private static BuildGhostToughTongueCartesiaScenarioSchemaReceipt ScenarioSchemaReceipt()
         => new(
-            ToughTongueBuildGhostContractVersions.CartesiaScenarioFieldReceiptV1,
+            ToughTongueBuildGhostContractVersions.CartesiaScenarioSchemaReceiptV1,
             ToughTongueBuildGhostVoiceProviders.CartesiaNamespace,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedDeploymentId,
+            new Uri(BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioReadBundleUrl),
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioReadBundleDigest,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioReadBundleBytes,
+            new Uri(BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioCreateBundleUrl),
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioCreateBundleDigest,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioCreateBundleBytes,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsProviderFieldPath,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsVoiceIdFieldPath,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsProviderFieldPath,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsVoiceIdFieldPath,
             ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider,
-            VerifiedScenarioFieldPath,
-            VerifiedScenarioFieldPath,
-            ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider,
-            200,
-            ProviderSchemaDigest,
-            ProviderResponseDigest,
-            DateTimeOffset.Parse("2026-08-21T08:05:00Z"));
+            DateTimeOffset.Parse("2026-08-21T17:21:00Z"));
 
     private static ToughTongueBuildGhostScenarioCandidate ScenarioCandidate()
         => ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
             RuntimeBinding(),
-            ScenarioFieldReceipt());
+            ScenarioSchemaReceipt());
+
+    private static JsonObject ProviderScenario(ToughTongueBuildGhostScenarioCandidate candidate)
+    {
+        JsonObject scenario = (JsonObject)candidate.Payload.DeepClone();
+        string ttsProvider = scenario[BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsProviderFieldPath]!.GetValue<string>();
+        string ttsVoiceId = scenario[BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsVoiceIdFieldPath]!.GetValue<string>();
+        scenario.Remove(BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsProviderFieldPath);
+        scenario.Remove(BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsVoiceIdFieldPath);
+        scenario["ai_model_config"]!["tts_provider"] = ttsProvider;
+        scenario["ai_model_config"]!["tts_voice_id"] = ttsVoiceId;
+        scenario["id"] = "0123456789abcdef01234567";
+        return scenario;
+    }
 
     private static void AssertVoiceReceiptRejected(
         BuildGhostCartesiaPrivateVoiceReadReceipt receipt,

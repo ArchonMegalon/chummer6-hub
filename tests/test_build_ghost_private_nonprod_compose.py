@@ -28,10 +28,12 @@ def test_governed_provider_slots_are_runtime_only_and_cannot_enable_remote_execu
     ai = service_block("chummer-build-ghost-ai", "build-ghost-private-edge")
     assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS:-}" in ai
     assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS:-}" in ai
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF:-}" in ai
     assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID:-}" in ai
     assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID:-}" in ai
     assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"' in ai
     assert "toughtongue@" not in COMPOSE
+    assert "PREFERRED_ACCOUNT_REF: sha256:" not in ai
 
 
 def test_runtime_secret_is_required_but_never_defaulted_or_committed():

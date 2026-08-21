@@ -18,11 +18,16 @@ docker compose -f docker-compose.build-ghost-private-nonprod.yml up --build -d
 ```
 
 Governed Tough Tongue credentials and opaque SHA-256 account references may be
-injected only through the four `CHUMMER_BUILD_GHOST_TOUGH_TONGUE_*` runtime
+injected only through the five `CHUMMER_BUILD_GHOST_TOUGH_TONGUE_*` runtime
 variables declared by the Compose service. Never put their values in this file
 or Compose source. Supplying credentials does not activate provider use: remote
 execution and all three canary gates remain literal `false`, while agent and
 voice identifiers remain empty until their separate read-verification gates pass.
+The optional `CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF` is a
+non-secret exact pin and accepts only lowercase `sha256:` plus 64 hexadecimal
+characters. It must match exactly one aligned account reference. Invalid,
+missing, duplicate, cooling-down, or quota-exhausted pins fail closed without
+falling back to a different account.
 
 Health proof:
 

@@ -37,6 +37,7 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
     private const string RemoteEnabledKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED";
     private const string ApiKeysKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS";
     private const string AccountRefsKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS";
+    private const string PreferredAccountRefKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF";
     private const string AgentIdKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID";
     private const string VoiceIdKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID";
     private const string DailyQuotaKey = "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_DAILY_QUOTA_PER_SLOT";
@@ -58,6 +59,10 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
     private readonly string _voiceId;
     private readonly bool _slotConfigurationValid;
     private readonly CredentialSlotState[] _slots;
+    private readonly bool _preferredAccountRefConfigured;
+    private readonly bool _preferredAccountRefFormatValid;
+    private readonly int _preferredAccountRefMatchCount;
+    private readonly CredentialSlotState? _preferredSlot;
     private readonly Dictionary<string, ToughTongueBuildGhostResult> _idempotencyCache = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private int _nextSlotIndex;
@@ -78,16 +83,25 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         _voiceId = NormalizeIdentifier(configuration[VoiceIdKey]);
         string[] credentials = SplitConfiguredList(configuration[ApiKeysKey]);
         string[] accountRefs = SplitConfiguredList(configuration[AccountRefsKey]);
-        _slotConfigurationValid = credentials.Length == 3
-            && accountRefs.Length == 3
-            && credentials.Distinct(StringComparer.Ordinal).Count() == 3
+        _slotConfigurationValid = credentials.Length is >= 3 and <= 32
+            && accountRefs.Length == credentials.Length
+            && credentials.Distinct(StringComparer.Ordinal).Count() == credentials.Length
             && accountRefs.All(IsSha256)
-            && accountRefs.Distinct(StringComparer.Ordinal).Count() == 3;
-        _slots = Enumerable.Range(0, 3).Select(index => new CredentialSlotState(
+            && accountRefs.Distinct(StringComparer.Ordinal).Count() == accountRefs.Length;
+        _slots = Enumerable.Range(0, Math.Max(credentials.Length, accountRefs.Length)).Select(index => new CredentialSlotState(
                 index < accountRefs.Length ? accountRefs[index] : string.Empty,
                 index < credentials.Length ? NormalizeSecret(credentials[index]) : null,
                 _clock.UtcNow.UtcDateTime.Date))
             .ToArray();
+        string? preferredAccountRef = configuration[PreferredAccountRefKey];
+        _preferredAccountRefConfigured = !string.IsNullOrEmpty(preferredAccountRef);
+        _preferredAccountRefFormatValid = _preferredAccountRefConfigured
+            && IsLowercaseSha256(preferredAccountRef);
+        CredentialSlotState[] preferredMatches = _preferredAccountRefFormatValid
+            ? _slots.Where(slot => string.Equals(slot.AccountRef, preferredAccountRef, StringComparison.Ordinal)).ToArray()
+            : [];
+        _preferredAccountRefMatchCount = preferredMatches.Length;
+        _preferredSlot = preferredMatches.Length == 1 ? preferredMatches[0] : null;
     }
 
     public async Task<ToughTongueBuildGhostResult> ExplainAsync(
@@ -120,6 +134,31 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                     ["remote-execution-disabled-by-default"]));
             }
 
+            if (_preferredAccountRefConfigured && !_preferredAccountRefFormatValid)
+            {
+                return Cache(cacheKey, Fallback(
+                    request,
+                    now,
+                    "preferred-account-ref-invalid",
+                    remoteAttempted: false,
+                    slot: null,
+                    ["preferred-account-ref-must-be-exact-lowercase-sha256"]));
+            }
+
+            if (_preferredAccountRefConfigured && _preferredAccountRefMatchCount != 1)
+            {
+                string status = _preferredAccountRefMatchCount == 0
+                    ? "preferred-account-ref-unmatched"
+                    : "preferred-account-ref-ambiguous";
+                return Cache(cacheKey, Fallback(
+                    request,
+                    now,
+                    status,
+                    remoteAttempted: false,
+                    slot: null,
+                    [status]));
+            }
+
             if (!_slotConfigurationValid)
             {
                 return Cache(cacheKey, Fallback(
@@ -128,7 +167,7 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                     "credential-slot-configuration-invalid",
                     remoteAttempted: false,
                     slot: null,
-                    ["exactly-three-distinct-credentials-and-opaque-account-refs-required"]));
+                    ["three-to-thirty-two-aligned-distinct-credentials-and-opaque-account-refs-required"]));
             }
 
             if (string.IsNullOrWhiteSpace(_agentId) || string.IsNullOrWhiteSpace(_voiceId))
@@ -142,7 +181,25 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
                     ["agent-or-voice-binding-missing"]));
             }
 
-            CredentialSlotState? slot = SelectHealthySlot(now);
+            CredentialSlotState? slot;
+            if (_preferredAccountRefConfigured)
+            {
+                slot = _preferredSlot;
+                if (slot is null || !IsHealthy(slot, now))
+                {
+                    return Cache(cacheKey, Fallback(
+                        request,
+                        now,
+                        "preferred-account-slot-unhealthy",
+                        remoteAttempted: false,
+                        slot,
+                        ["preferred-account-exact-pin-unhealthy-no-fallback"]));
+                }
+            }
+            else
+            {
+                slot = SelectHealthySlot(now);
+            }
             if (slot is null)
             {
                 return Cache(cacheKey, Fallback(
@@ -371,6 +428,7 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
             _remoteEnabled,
             remoteAttempted,
             slot?.AccountRef,
+            AccountSelectionPosture(),
             slot is null ? "not-selected" : CircuitPosture(slot, now),
             configured,
             healthy,
@@ -441,6 +499,18 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
     private string CircuitPosture(CredentialSlotState slot, DateTimeOffset now)
         => slot.CooldownUntilUtc > now ? "cooldown" : slot.AttemptsToday >= _dailyQuota ? "quota-exhausted" : "healthy";
 
+    private string AccountSelectionPosture()
+    {
+        if (!_preferredAccountRefConfigured) return "round-robin";
+        if (!_preferredAccountRefFormatValid) return "exact-pin-invalid";
+        return _preferredAccountRefMatchCount switch
+        {
+            0 => "exact-pin-unmatched",
+            1 => "exact-pin",
+            _ => "exact-pin-ambiguous"
+        };
+    }
+
     private ToughTongueBuildGhostResult Cache(string key, ToughTongueBuildGhostResult result)
     {
         _idempotencyCache[key] = result;
@@ -496,6 +566,11 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         => value is { Length: 71 }
             && value.StartsWith("sha256:", StringComparison.Ordinal)
             && value.Skip(7).All(Uri.IsHexDigit);
+
+    private static bool IsLowercaseSha256(string? value)
+        => value is { Length: 71 }
+            && value.StartsWith("sha256:", StringComparison.Ordinal)
+            && value.Skip(7).All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     private static string ComputePacketDigest(JsonObject packet)
     {

@@ -16,7 +16,7 @@ public static class ToughTongueBuildGhostContractVersions
     public const string PrivateToolDeploymentV1 = "chummer.build_ghost.private_tool_deployment.v1";
     public const string CascadePrivateVoiceBindingV1 = "chummer.build_ghost.cascade_private_voice_binding.v1";
     public const string CartesiaPrivateVoiceReadReceiptV1 = "chummer.build_ghost.cartesia_private_voice_read_receipt.v1";
-    public const string CartesiaScenarioFieldReceiptV1 = "chummer.tough_tongue.cartesia_scenario_field_receipt.v1";
+    public const string CartesiaScenarioSchemaReceiptV1 = "chummer.tough_tongue.cartesia_scenario_schema_receipt.v1";
     public const string ScenarioCanaryReceiptV1 = "chummer.tough_tongue.build_ghost_canary_receipt.v1";
 }
 
@@ -75,6 +75,7 @@ public sealed record ToughTongueBuildGhostReceipt(
     bool RemoteExecutionEnabled,
     bool RemoteAttempted,
     string? AccountSlotId,
+    string AccountSelectionPosture,
     string CircuitPosture,
     int ConfiguredSlotCount,
     int HealthySlotCount,
@@ -182,16 +183,21 @@ public sealed record BuildGhostCartesiaPrivateVoiceReadReceipt(
     string ProviderResponseDigest,
     DateTimeOffset ObservedAtUtc);
 
-public sealed record BuildGhostToughTongueCartesiaScenarioFieldReceipt(
+public sealed record BuildGhostToughTongueCartesiaScenarioSchemaReceipt(
     string Schema,
     string ProviderNamespace,
+    string DeploymentId,
+    Uri ScenarioReadBundleUrl,
+    string ScenarioReadBundleDigest,
+    long ScenarioReadBundleBytes,
+    Uri ScenarioCreateBundleUrl,
+    string ScenarioCreateBundleDigest,
+    long ScenarioCreateBundleBytes,
+    string CreateTtsProviderFieldPath,
+    string CreateTtsVoiceIdFieldPath,
+    string ReadTtsProviderFieldPath,
+    string ReadTtsVoiceIdFieldPath,
     string TtsProvider,
-    string ConfiguredFieldPath,
-    string ReturnedFieldPath,
-    string ReturnedValue,
-    int ReadHttpStatus,
-    string ProviderSchemaDigest,
-    string ProviderResponseDigest,
     DateTimeOffset ObservedAtUtc);
 
 public sealed record BuildGhostCascadePrivateVoiceBinding(
@@ -213,6 +219,7 @@ public sealed record ToughTongueBuildGhostScenarioCandidate(
     BuildGhostPrivateToolDefinition Tool,
     IReadOnlyList<string> SupportedLocales,
     string? TtsProviderFieldPath,
+    string? TtsVoiceIdFieldPath,
     bool ProviderSchemaReadVerified,
     IReadOnlyList<string> BlockingReasons,
     string ContractDigest);
