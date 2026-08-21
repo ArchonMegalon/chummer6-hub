@@ -150,57 +150,225 @@ public static class BuildGhostPrivateToolDeploymentContract
 public static class BuildGhostCascadePrivateVoiceBindingContract
 {
     public static BuildGhostCascadePrivateVoiceBinding Create(
-        string providerVoiceRef,
-        string voiceReleaseDigest,
+        BuildGhostCartesiaPrivateVoiceReadReceipt receipt,
         IReadOnlyList<string> supportedLocales)
     {
+        ArgumentNullException.ThrowIfNull(receipt);
         ArgumentNullException.ThrowIfNull(supportedLocales);
-        string normalizedRef = providerVoiceRef?.Trim() ?? string.Empty;
-        if (!IsOpaqueProviderRef(normalizedRef)) throw new ArgumentException("private-provider-voice-ref-invalid", nameof(providerVoiceRef));
-        if (!IsSha256(voiceReleaseDigest)) throw new ArgumentException("voice-release-digest-invalid", nameof(voiceReleaseDigest));
+        IReadOnlyList<string> receiptFailures = ValidateReceipt(receipt);
+        if (receiptFailures.Count != 0)
+        {
+            throw new ArgumentException(string.Join(',', receiptFailures), nameof(receipt));
+        }
         if (!supportedLocales.SequenceEqual(ToughTongueBuildGhostScenarioContract.CanonicalLocales, StringComparer.Ordinal))
         {
             throw new ArgumentException("voice-binding-locales-must-match-canonical-authority", nameof(supportedLocales));
         }
 
-        JsonObject authority = new()
-        {
-            ["schema"] = ToughTongueBuildGhostContractVersions.CascadePrivateVoiceBindingV1,
-            ["modelProvider"] = "Landmass",
-            ["modelId"] = "cascade",
-            ["voiceAlias"] = ToughTongueBuildGhostPersonaIds.RookVoice,
-            ["providerVoiceRef"] = normalizedRef,
-            ["voiceReleaseDigest"] = voiceReleaseDigest,
-            ["private"] = true,
-            ["syntheticOrigin"] = true,
-            ["readVerified"] = true,
-            ["supportedLocales"] = new JsonArray(supportedLocales.Select(static locale => JsonValue.Create(locale)).ToArray())
-        };
-        string digest = $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(authority))).ToLowerInvariant()}";
-        return new BuildGhostCascadePrivateVoiceBinding(
+        string receiptDigest = Digest(ReceiptAuthority(receipt));
+        BuildGhostCascadePrivateVoiceBinding binding = new(
             ToughTongueBuildGhostContractVersions.CascadePrivateVoiceBindingV1,
             "Landmass",
             "cascade",
+            ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider,
+            ToughTongueBuildGhostVoiceProviders.CartesiaNamespace,
             ToughTongueBuildGhostPersonaIds.RookVoice,
-            normalizedRef,
-            voiceReleaseDigest,
-            true,
-            true,
-            true,
+            receipt.ReturnedVoiceId,
+            receipt.SourceVoiceReleaseDigest,
+            receiptDigest,
             supportedLocales.ToArray(),
-            digest);
+            string.Empty);
+        return binding with { ContractDigest = Digest(BindingAuthority(binding)) };
     }
 
-    private static bool IsOpaqueProviderRef(string value)
-        => value.Length is >= 8 and <= 128
-            && !value.Contains('@', StringComparison.Ordinal)
-            && !value.Contains("://", StringComparison.Ordinal)
-            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or ':' or '.');
+    public static IReadOnlyList<string> Validate(BuildGhostCascadePrivateVoiceBinding? binding)
+    {
+        List<string> failures = [];
+        if (binding is null) return ["cascade-private-voice-binding-missing"];
+        if (binding.Schema != ToughTongueBuildGhostContractVersions.CascadePrivateVoiceBindingV1) failures.Add("voice-binding-schema-invalid");
+        if (binding.ModelProvider != "Landmass") failures.Add("voice-binding-model-provider-invalid");
+        if (binding.ModelId != "cascade") failures.Add("voice-binding-model-invalid");
+        if (binding.TtsProvider != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider) failures.Add("voice-binding-tts-provider-invalid");
+        if (binding.ProviderNamespace != ToughTongueBuildGhostVoiceProviders.CartesiaNamespace) failures.Add("voice-binding-provider-namespace-invalid");
+        if (binding.VoiceAlias != ToughTongueBuildGhostPersonaIds.RookVoice) failures.Add("voice-binding-alias-invalid");
+        if (!IsCartesiaVoiceId(binding.ProviderVoiceRef)) failures.Add("voice-binding-cartesia-voice-id-invalid");
+        if (!IsSha256(binding.VoiceReleaseDigest)) failures.Add("voice-binding-release-digest-invalid");
+        if (!IsSha256(binding.VoiceReadReceiptDigest)) failures.Add("voice-binding-read-receipt-digest-invalid");
+        if (binding.SupportedLocales is null
+            || !binding.SupportedLocales.SequenceEqual(ToughTongueBuildGhostScenarioContract.CanonicalLocales, StringComparer.Ordinal))
+        {
+            failures.Add("voice-binding-locales-invalid");
+        }
+        if (failures.Count == 0 && binding.ContractDigest != Digest(BindingAuthority(binding)))
+        {
+            failures.Add("voice-binding-contract-digest-invalid");
+        }
+        return failures;
+    }
 
-    private static bool IsSha256(string value)
+    private static IReadOnlyList<string> ValidateReceipt(BuildGhostCartesiaPrivateVoiceReadReceipt receipt)
+    {
+        List<string> failures = [];
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CartesiaPrivateVoiceReadReceiptV1) failures.Add("cartesia-read-receipt-schema-invalid");
+        if (receipt.ProviderNamespace != ToughTongueBuildGhostVoiceProviders.CartesiaNamespace) failures.Add("cartesia-provider-namespace-invalid");
+        if (!IsCartesiaVoiceId(receipt.RequestedVoiceId) || !IsCartesiaVoiceId(receipt.ReturnedVoiceId)) failures.Add("cartesia-voice-id-invalid");
+        if (!string.Equals(receipt.RequestedVoiceId, receipt.ReturnedVoiceId, StringComparison.Ordinal)) failures.Add("cartesia-voice-id-read-mismatch");
+        if (receipt.ReadHttpStatus != 200) failures.Add("cartesia-voice-read-http-status-invalid");
+        if (!receipt.IsOwner) failures.Add("cartesia-voice-owner-invalid");
+        if (receipt.Access != "private") failures.Add("cartesia-voice-access-not-private");
+        if (receipt.Visibility != "owner") failures.Add("cartesia-voice-visibility-not-owner");
+        if (receipt.SyntheticProvenance != ToughTongueBuildGhostVoiceProviders.FullySyntheticProvenance) failures.Add("cartesia-voice-synthetic-provenance-invalid");
+        if (!IsSha256(receipt.SourceVoiceReleaseDigest)) failures.Add("cartesia-voice-source-release-digest-invalid");
+        if (!IsSha256(receipt.ProviderResponseDigest)) failures.Add("cartesia-voice-provider-response-digest-invalid");
+        if (receipt.ObservedAtUtc == default) failures.Add("cartesia-voice-observed-at-invalid");
+        return failures;
+    }
+
+    private static JsonObject ReceiptAuthority(BuildGhostCartesiaPrivateVoiceReadReceipt receipt)
+        => new()
+        {
+            ["schema"] = receipt.Schema,
+            ["providerNamespace"] = receipt.ProviderNamespace,
+            ["requestedVoiceId"] = receipt.RequestedVoiceId,
+            ["returnedVoiceId"] = receipt.ReturnedVoiceId,
+            ["readHttpStatus"] = receipt.ReadHttpStatus,
+            ["isOwner"] = receipt.IsOwner,
+            ["access"] = receipt.Access,
+            ["visibility"] = receipt.Visibility,
+            ["syntheticProvenance"] = receipt.SyntheticProvenance,
+            ["sourceVoiceReleaseDigest"] = receipt.SourceVoiceReleaseDigest,
+            ["providerResponseDigest"] = receipt.ProviderResponseDigest,
+            ["observedAtUtc"] = receipt.ObservedAtUtc.ToUniversalTime().ToString("O")
+        };
+
+    private static JsonObject BindingAuthority(BuildGhostCascadePrivateVoiceBinding binding)
+        => new()
+        {
+            ["schema"] = binding.Schema,
+            ["modelProvider"] = binding.ModelProvider,
+            ["modelId"] = binding.ModelId,
+            ["ttsProvider"] = binding.TtsProvider,
+            ["providerNamespace"] = binding.ProviderNamespace,
+            ["voiceAlias"] = binding.VoiceAlias,
+            ["providerVoiceRef"] = binding.ProviderVoiceRef,
+            ["voiceReleaseDigest"] = binding.VoiceReleaseDigest,
+            ["voiceReadReceiptDigest"] = binding.VoiceReadReceiptDigest,
+            ["supportedLocales"] = new JsonArray(binding.SupportedLocales.Select(static locale => JsonValue.Create(locale)).ToArray())
+        };
+
+    private static bool IsCartesiaVoiceId(string? value)
+        => Guid.TryParseExact(value, "D", out Guid parsed)
+            && string.Equals(parsed.ToString("D"), value, StringComparison.Ordinal);
+
+    private static bool IsSha256(string? value)
         => value is { Length: 71 }
             && value.StartsWith("sha256:", StringComparison.Ordinal)
             && value.AsSpan(7).ToString().All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static string Digest(JsonNode node)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
+}
+
+public static class BuildGhostToughTongueCartesiaScenarioFieldContract
+{
+    public const string MissingOrUnverifiedBlocker = "cartesia-tts-provider-scenario-field-contract-not-configured-or-read-verified";
+
+    public static IReadOnlyList<string> Validate(BuildGhostToughTongueCartesiaScenarioFieldReceipt? receipt)
+    {
+        if (receipt is null) return [MissingOrUnverifiedBlocker];
+        List<string> failures = [];
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CartesiaScenarioFieldReceiptV1) failures.Add("cartesia-scenario-field-receipt-schema-invalid");
+        if (receipt.ProviderNamespace != ToughTongueBuildGhostVoiceProviders.CartesiaNamespace) failures.Add("cartesia-scenario-field-provider-namespace-invalid");
+        if (receipt.TtsProvider != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider) failures.Add("cartesia-scenario-field-provider-value-invalid");
+        if (!IsSafeFieldPath(receipt.ConfiguredFieldPath) || !IsSafeFieldPath(receipt.ReturnedFieldPath)) failures.Add("cartesia-scenario-field-path-invalid");
+        if (!string.Equals(receipt.ConfiguredFieldPath, receipt.ReturnedFieldPath, StringComparison.Ordinal)) failures.Add("cartesia-scenario-field-read-mismatch");
+        if (receipt.ReturnedValue != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider) failures.Add("cartesia-scenario-field-read-value-invalid");
+        if (receipt.ReadHttpStatus != 200) failures.Add("cartesia-scenario-field-read-http-status-invalid");
+        if (!IsSha256(receipt.ProviderSchemaDigest)) failures.Add("cartesia-scenario-field-provider-schema-digest-invalid");
+        if (!IsSha256(receipt.ProviderResponseDigest)) failures.Add("cartesia-scenario-field-provider-response-digest-invalid");
+        if (receipt.ObservedAtUtc == default) failures.Add("cartesia-scenario-field-observed-at-invalid");
+        return failures;
+    }
+
+    public static string DigestReceipt(BuildGhostToughTongueCartesiaScenarioFieldReceipt receipt)
+        => Digest(new JsonObject
+        {
+            ["schema"] = receipt.Schema,
+            ["providerNamespace"] = receipt.ProviderNamespace,
+            ["ttsProvider"] = receipt.TtsProvider,
+            ["configuredFieldPath"] = receipt.ConfiguredFieldPath,
+            ["returnedFieldPath"] = receipt.ReturnedFieldPath,
+            ["returnedValue"] = receipt.ReturnedValue,
+            ["readHttpStatus"] = receipt.ReadHttpStatus,
+            ["providerSchemaDigest"] = receipt.ProviderSchemaDigest,
+            ["providerResponseDigest"] = receipt.ProviderResponseDigest,
+            ["observedAtUtc"] = receipt.ObservedAtUtc.ToUniversalTime().ToString("O")
+        });
+
+    public static void Apply(JsonObject payload, string fieldPath, string value)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        if (!IsSafeFieldPath(fieldPath))
+        {
+            throw new ArgumentException("cartesia-scenario-field-path-invalid", nameof(fieldPath));
+        }
+        string[] segments = Segments(fieldPath);
+        JsonObject current = payload;
+        for (int index = 0; index < segments.Length - 1; index++)
+        {
+            JsonNode? existing = current[segments[index]];
+            if (existing is null)
+            {
+                JsonObject child = new();
+                current[segments[index]] = child;
+                current = child;
+            }
+            else if (existing is JsonObject child)
+            {
+                current = child;
+            }
+            else
+            {
+                throw new ArgumentException("cartesia-scenario-field-path-collides-with-contract", nameof(fieldPath));
+            }
+        }
+        string leaf = segments[^1];
+        if (current.ContainsKey(leaf))
+        {
+            throw new ArgumentException("cartesia-scenario-field-path-collides-with-contract", nameof(fieldPath));
+        }
+        current[leaf] = value;
+    }
+
+    public static string Read(JsonObject payload, string fieldPath)
+    {
+        if (!IsSafeFieldPath(fieldPath)) return string.Empty;
+        JsonNode? current = payload;
+        foreach (string segment in Segments(fieldPath))
+        {
+            current = current is JsonObject currentObject ? currentObject[segment] : null;
+        }
+        return current is JsonValue leaf && leaf.TryGetValue(out string? text) ? text?.Trim() ?? string.Empty : string.Empty;
+    }
+
+    private static string[] Segments(string value) => value.Split('.', StringSplitOptions.None);
+
+    private static bool IsSafeFieldPath(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return false;
+        string[] segments = Segments(value);
+        return segments.Length is >= 1 and <= 4
+            && segments.All(static segment => segment.Length is >= 1 and <= 64
+                && segment.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-'));
+    }
+
+    private static bool IsSha256(string? value)
+        => value is { Length: 71 }
+            && value.StartsWith("sha256:", StringComparison.Ordinal)
+            && value.AsSpan(7).ToString().All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static string Digest(JsonNode node)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
 }
 
 public interface IToughTongueBuildGhostScenarioClient
@@ -230,7 +398,8 @@ public static class ToughTongueBuildGhostScenarioContract
     public static ToughTongueBuildGhostScenarioCandidate CreatePrivateRookCandidate(
         BuildGhostPrivateToolDeploymentPackage deployment,
         Uri avatarUrl,
-        BuildGhostCascadePrivateVoiceBinding runtimeBinding)
+        BuildGhostCascadePrivateVoiceBinding runtimeBinding,
+        BuildGhostToughTongueCartesiaScenarioFieldReceipt? ttsProviderFieldReceipt = null)
     {
         ArgumentNullException.ThrowIfNull(deployment);
         ArgumentNullException.ThrowIfNull(runtimeBinding);
@@ -241,18 +410,22 @@ public static class ToughTongueBuildGhostScenarioContract
         {
             throw new ArgumentException("Private tool deployment package is not fail-closed and provider-neutral.", nameof(deployment));
         }
-        if (runtimeBinding.Schema != ToughTongueBuildGhostContractVersions.CascadePrivateVoiceBindingV1
-            || runtimeBinding.ModelProvider != "Landmass"
-            || runtimeBinding.ModelId != "cascade"
-            || !runtimeBinding.Private
-            || !runtimeBinding.SyntheticOrigin
-            || !runtimeBinding.ReadVerified
-            || !runtimeBinding.SupportedLocales.SequenceEqual(CanonicalLocales, StringComparer.Ordinal))
+        IReadOnlyList<string> bindingFailures = BuildGhostCascadePrivateVoiceBindingContract.Validate(runtimeBinding);
+        if (bindingFailures.Count != 0)
         {
-            throw new ArgumentException("Cascade private voice binding is not accepted.", nameof(runtimeBinding));
+            throw new ArgumentException(string.Join(',', bindingFailures), nameof(runtimeBinding));
         }
         RequirePublicHttps(avatarUrl, nameof(avatarUrl));
         BuildGhostPrivateToolDefinition tool = deployment.Tool;
+        IReadOnlyList<string> scenarioFieldFailures =
+            BuildGhostToughTongueCartesiaScenarioFieldContract.Validate(ttsProviderFieldReceipt);
+        bool providerSchemaReadVerified = scenarioFieldFailures.Count == 0;
+        string? ttsProviderFieldPath = providerSchemaReadVerified
+            ? ttsProviderFieldReceipt!.ConfiguredFieldPath
+            : null;
+        string scenarioFieldReceiptDigest = providerSchemaReadVerified
+            ? BuildGhostToughTongueCartesiaScenarioFieldContract.DigestReceipt(ttsProviderFieldReceipt!)
+            : string.Empty;
 
         JsonObject payload = new()
         {
@@ -313,10 +486,21 @@ public static class ToughTongueBuildGhostScenarioContract
                 ["tool_deployment_digest"] = deployment.ContractDigest,
                 ["runtime_binding_digest"] = runtimeBinding.ContractDigest,
                 ["voice_release_digest"] = runtimeBinding.VoiceReleaseDigest,
+                ["voice_read_receipt_digest"] = runtimeBinding.VoiceReadReceiptDigest,
+                ["tts_provider"] = runtimeBinding.TtsProvider,
+                ["provider_namespace"] = runtimeBinding.ProviderNamespace,
+                ["tts_provider_field_receipt_digest"] = scenarioFieldReceiptDigest,
                 ["supported_locales"] = string.Join(',', CanonicalLocales),
                 ["release_channel"] = "private-nonproduction-candidate"
             }
         };
+        if (providerSchemaReadVerified)
+        {
+            BuildGhostToughTongueCartesiaScenarioFieldContract.Apply(
+                payload,
+                ttsProviderFieldPath!,
+                ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider);
+        }
         string contractDigest = Digest(payload);
         payload["user_metadata"]!["scenario_contract_digest"] = contractDigest;
         return new ToughTongueBuildGhostScenarioCandidate(
@@ -324,6 +508,9 @@ public static class ToughTongueBuildGhostScenarioContract
             payload,
             tool,
             CanonicalLocales,
+            ttsProviderFieldPath,
+            providerSchemaReadVerified,
+            scenarioFieldFailures,
             contractDigest);
     }
 
@@ -332,6 +519,16 @@ public static class ToughTongueBuildGhostScenarioContract
         ToughTongueBuildGhostScenarioCandidate expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
+        if (!expected.ProviderSchemaReadVerified || expected.BlockingReasons.Count != 0)
+        {
+            IReadOnlyList<string> blockers = expected.BlockingReasons.Count == 0
+                ? [BuildGhostToughTongueCartesiaScenarioFieldContract.MissingOrUnverifiedBlocker]
+                : expected.BlockingReasons;
+            return new ToughTongueBuildGhostScenarioValidation(
+                false,
+                null,
+                blockers.Distinct(StringComparer.Ordinal).OrderBy(static reason => reason, StringComparer.Ordinal).ToArray());
+        }
         List<string> reasons = [];
         if (scenario is null)
         {
@@ -348,6 +545,12 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(Object(scenario, "appearance"), "language_code", "en-US", "scenario-base-locale-invalid", reasons);
         RequireText(Object(scenario, "ai_model_config"), "provider", "Landmass", "scenario-model-provider-invalid", reasons);
         RequireText(Object(scenario, "ai_model_config"), "model", "cascade", "scenario-model-invalid", reasons);
+        if (expected.TtsProviderFieldPath is null
+            || BuildGhostToughTongueCartesiaScenarioFieldContract.Read(scenario, expected.TtsProviderFieldPath)
+                != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider)
+        {
+            reasons.Add("scenario-tts-provider-mismatch");
+        }
         RequireBoolean(Object(scenario, "memory"), "is_memory", expected: false, "scenario-memory-must-be-disabled", reasons);
         JsonObject customFunction = Object(Object(Object(scenario, "tools_config"), "tools"), "custom_function");
         RequireBoolean(customFunction, "should_register", expected: true, "custom-function-not-registered", reasons);
@@ -362,6 +565,10 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(metadata, "tool_deployment_digest", Text(expectedMetadata, "tool_deployment_digest"), "tool-deployment-digest-mismatch", reasons);
         RequireText(metadata, "runtime_binding_digest", Text(expectedMetadata, "runtime_binding_digest"), "runtime-binding-digest-mismatch", reasons);
         RequireText(metadata, "voice_release_digest", Text(expectedMetadata, "voice_release_digest"), "voice-release-digest-mismatch", reasons);
+        RequireText(metadata, "voice_read_receipt_digest", Text(expectedMetadata, "voice_read_receipt_digest"), "voice-read-receipt-digest-mismatch", reasons);
+        RequireText(metadata, "tts_provider", ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider, "scenario-tts-provider-metadata-mismatch", reasons);
+        RequireText(metadata, "provider_namespace", ToughTongueBuildGhostVoiceProviders.CartesiaNamespace, "scenario-provider-namespace-mismatch", reasons);
+        RequireText(metadata, "tts_provider_field_receipt_digest", Text(expectedMetadata, "tts_provider_field_receipt_digest"), "scenario-tts-provider-field-receipt-digest-mismatch", reasons);
         RequireText(metadata, "scenario_contract_digest", expected.ContractDigest, "scenario-contract-digest-mismatch", reasons);
         RequireText(metadata, "supported_locales", string.Join(',', CanonicalLocales), "scenario-locales-mismatch", reasons);
         RequireText(metadata, "release_channel", "private-nonproduction-candidate", "scenario-release-channel-invalid", reasons);
@@ -457,6 +664,9 @@ public sealed class ToughTongueBuildGhostScenarioClient(
         string credential,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(expected);
+        ToughTongueBuildGhostScenarioValidation? blocked = BlockedCandidate(expected);
+        if (blocked is not null) return blocked;
         ValidateBoundary(scenarioId, credential);
         using HttpRequestMessage request = CreateRequest(HttpMethod.Get, $"scenarios/{scenarioId}", credential);
         using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -478,6 +688,8 @@ public sealed class ToughTongueBuildGhostScenarioClient(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(candidate);
+        ToughTongueBuildGhostScenarioValidation? blocked = BlockedCandidate(candidate);
+        if (blocked is not null) return (blocked, null);
         EnsurePrivateCanaryMutationsEnabled();
         ValidateCredential(credential);
         EnsureProviderBoundary();
@@ -551,16 +763,38 @@ public sealed class ToughTongueBuildGhostScenarioClient(
         }
     }
 
+    public static bool IsOfficialApiBaseAddress(Uri? baseAddress)
+    {
+        return baseAddress is not null
+            && baseAddress.IsAbsoluteUri
+            && string.Equals(baseAddress.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(baseAddress.Host, "api.toughtongueai.com", StringComparison.OrdinalIgnoreCase)
+            && baseAddress.IsDefaultPort
+            && string.Equals(baseAddress.AbsolutePath.TrimEnd('/'), "/api/public", StringComparison.Ordinal)
+            && string.IsNullOrEmpty(baseAddress.UserInfo)
+            && string.IsNullOrEmpty(baseAddress.Query)
+            && string.IsNullOrEmpty(baseAddress.Fragment);
+    }
+
     private void EnsureProviderBoundary()
     {
-        Uri? baseAddress = _httpClient.BaseAddress;
-        if (baseAddress is null
-            || !string.Equals(baseAddress.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(baseAddress.Host, "app.toughtongueai.com", StringComparison.OrdinalIgnoreCase)
-            || !baseAddress.AbsolutePath.TrimEnd('/').EndsWith("/api/public", StringComparison.Ordinal))
+        if (!IsOfficialApiBaseAddress(_httpClient.BaseAddress))
         {
             throw new InvalidOperationException("Tough Tongue scenario calls require the official HTTPS public API boundary.");
         }
+    }
+
+    private static ToughTongueBuildGhostScenarioValidation? BlockedCandidate(
+        ToughTongueBuildGhostScenarioCandidate candidate)
+    {
+        if (candidate.ProviderSchemaReadVerified && candidate.BlockingReasons.Count == 0) return null;
+        IReadOnlyList<string> blockers = candidate.BlockingReasons.Count == 0
+            ? [BuildGhostToughTongueCartesiaScenarioFieldContract.MissingOrUnverifiedBlocker]
+            : candidate.BlockingReasons;
+        return new ToughTongueBuildGhostScenarioValidation(
+            false,
+            null,
+            blockers.Distinct(StringComparer.Ordinal).OrderBy(static reason => reason, StringComparer.Ordinal).ToArray());
     }
 
     private static HttpRequestMessage CreateRequest(HttpMethod method, string relativePath, string credential)
@@ -600,6 +834,12 @@ public sealed class ToughTongueBuildGhostCanaryHarness(
         bool grantCreated = false;
         DateTimeOffset? grantExpiresAt = null;
 
+        if (!expected.ProviderSchemaReadVerified || expected.BlockingReasons.Count != 0)
+        {
+            blockers.AddRange(expected.BlockingReasons.Count == 0
+                ? [BuildGhostToughTongueCartesiaScenarioFieldContract.MissingOrUnverifiedBlocker]
+                : expected.BlockingReasons);
+        }
         if (!readEnabled) blockers.Add("scenario-read-canary-disabled");
         if (!IsScenarioId(scenarioId)) blockers.Add("scenario-id-missing-or-invalid");
         if (string.IsNullOrWhiteSpace(credential)) blockers.Add("fresh-governed-credential-required");

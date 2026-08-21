@@ -100,11 +100,12 @@ builder.Services.AddSingleton<IBuildGhostClock, SystemBuildGhostClock>();
 builder.Services.AddHttpClient<IToughTongueBuildGhostTransport, ToughTongueBuildGhostHttpTransport>(client =>
 {
     string configured = builder.Configuration["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_BASE_URL"]
-        ?? "https://app.toughtongueai.com/api/public/";
+        ?? "https://api.toughtongueai.com/api/public/";
     if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? baseAddress)
-        || !string.Equals(baseAddress.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        || !ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(baseAddress))
     {
-        throw new InvalidOperationException("Tough Tongue base URL must be an absolute HTTPS URL.");
+        throw new InvalidOperationException(
+            "Tough Tongue base URL must be the exact official HTTPS public API boundary.");
     }
 
     client.BaseAddress = baseAddress;
@@ -112,7 +113,7 @@ builder.Services.AddHttpClient<IToughTongueBuildGhostTransport, ToughTongueBuild
 });
 builder.Services.AddHttpClient<IToughTongueBuildGhostScenarioClient, ToughTongueBuildGhostScenarioClient>(client =>
 {
-    client.BaseAddress = new Uri("https://app.toughtongueai.com/api/public/", UriKind.Absolute);
+    client.BaseAddress = new Uri("https://api.toughtongueai.com/api/public/", UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddSingleton<ToughTongueBuildGhostCanaryHarness>();

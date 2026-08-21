@@ -15,6 +15,11 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private const string AccountTwo = "sha256:2222222222222222222222222222222222222222222222222222222222222222";
     private const string AccountThree = "sha256:3333333333333333333333333333333333333333333333333333333333333333";
     private const string VoiceReleaseDigest = "sha256:05ed9fff46ddb5a447e1d21cfd0f71cfb2a9286460fd112bb7514eb3eaa57e26";
+    private const string CartesiaVoiceId = "f161df88-b5a0-4ea8-aa21-6be12859f761";
+    private const string OtherCartesiaVoiceId = "86c6b891-3195-4e85-8be9-74f889d80620";
+    private const string ProviderResponseDigest = "sha256:4e6db0b62942d0ca42575d86ac47599458190e29210e86cb503635e1f86204df";
+    private const string ProviderSchemaDigest = "sha256:fe5490a49292fc33d0a8c5c52a08127c5c95f5920d8023f8d8472319e725c2dc";
+    private const string VerifiedScenarioFieldPath = "provider_verified.cartesia_tts_provider";
 
     [TestMethod]
     public async Task Remote_execution_is_disabled_by_default_and_returns_audited_deterministic_fallback()
@@ -266,7 +271,8 @@ public sealed class ToughTongueBuildGhostAdapterTests
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            RuntimeBinding());
+            RuntimeBinding(),
+            ScenarioFieldReceipt());
 
         Assert.AreEqual(ToughTongueBuildGhostContractVersions.ScenarioContractV1, candidate.Schema);
         Assert.IsFalse(candidate.Payload["is_public"]!.GetValue<bool>());
@@ -275,7 +281,11 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.IsFalse(candidate.Payload["memory"]!["is_memory"]!.GetValue<bool>());
         Assert.AreEqual("Landmass", candidate.Payload["ai_model_config"]!["provider"]!.GetValue<string>());
         Assert.AreEqual("cascade", candidate.Payload["ai_model_config"]!["model"]!.GetValue<string>());
-        Assert.AreEqual("private-provider-rook-voice-ref", candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
+        Assert.AreEqual(CartesiaVoiceId, candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
+        Assert.AreEqual("Cartesia", candidate.Payload["provider_verified"]!["cartesia_tts_provider"]!.GetValue<string>());
+        Assert.AreEqual(VerifiedScenarioFieldPath, candidate.TtsProviderFieldPath);
+        Assert.IsTrue(candidate.ProviderSchemaReadVerified);
+        Assert.IsEmpty(candidate.BlockingReasons);
         CollectionAssert.AreEqual(
             new[] { "de-DE", "en-US", "fr-FR", "ja-JP", "pt-BR", "zh-CN" },
             candidate.SupportedLocales.ToArray());
@@ -289,6 +299,8 @@ public sealed class ToughTongueBuildGhostAdapterTests
         StringAssert.Contains(candidate.Payload["ai_instructions"]!.GetValue<string>(), "never speak");
         Assert.AreEqual(ToolDeployment().ContractDigest, candidate.Payload["user_metadata"]!["tool_deployment_digest"]!.GetValue<string>());
         Assert.AreEqual(RuntimeBinding().ContractDigest, candidate.Payload["user_metadata"]!["runtime_binding_digest"]!.GetValue<string>());
+        Assert.AreEqual("Cartesia", candidate.Payload["user_metadata"]!["tts_provider"]!.GetValue<string>());
+        Assert.AreEqual("cartesia", candidate.Payload["user_metadata"]!["provider_namespace"]!.GetValue<string>());
     }
 
     [TestMethod]
@@ -320,24 +332,57 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
-    public void Cascade_private_voice_binding_rejects_unverified_or_nonopaque_authority()
+    public void Cascade_private_voice_binding_requires_an_exact_private_owned_Cartesia_read_receipt()
     {
         BuildGhostCascadePrivateVoiceBinding binding = RuntimeBinding();
         Assert.AreEqual("Landmass", binding.ModelProvider);
         Assert.AreEqual("cascade", binding.ModelId);
-        Assert.IsTrue(binding.Private);
-        Assert.IsTrue(binding.SyntheticOrigin);
-        Assert.IsTrue(binding.ReadVerified);
+        Assert.AreEqual("Cartesia", binding.TtsProvider);
+        Assert.AreEqual("cartesia", binding.ProviderNamespace);
+        Assert.AreEqual(CartesiaVoiceId, binding.ProviderVoiceRef);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.RookVoice, binding.VoiceAlias);
+        Assert.AreEqual(VoiceReleaseDigest, binding.VoiceReleaseDigest);
+        StringAssert.StartsWith(binding.VoiceReadReceiptDigest, "sha256:");
         StringAssert.StartsWith(binding.ContractDigest, "sha256:");
+        string serialized = JsonSerializer.Serialize(binding);
+        Assert.IsFalse(serialized.Contains("\"Private\":", StringComparison.Ordinal));
+        Assert.IsFalse(serialized.Contains("ReadVerified", StringComparison.Ordinal));
 
-        Assert.ThrowsExactly<ArgumentException>(() => BuildGhostCascadePrivateVoiceBindingContract.Create(
-            "https://provider.invalid/voice",
-            VoiceReleaseDigest,
-            ToughTongueBuildGhostScenarioContract.CanonicalLocales));
-        Assert.ThrowsExactly<ArgumentException>(() => BuildGhostCascadePrivateVoiceBindingContract.Create(
-            "private-provider-rook-voice-ref",
-            "sha256:not-a-release-digest",
-            ToughTongueBuildGhostScenarioContract.CanonicalLocales));
+    }
+
+    [TestMethod]
+    public void Cartesia_voice_binding_rejects_Unmixr_cross_wires_and_sha256_voice_refs()
+    {
+        BuildGhostCartesiaPrivateVoiceReadReceipt receipt = VoiceReadReceipt();
+        AssertVoiceReceiptRejected(receipt with { ProviderNamespace = "unmixr" }, "cartesia-provider-namespace-invalid");
+        AssertVoiceReceiptRejected(
+            receipt with
+            {
+                RequestedVoiceId = $"sha256:{new string('a', 64)}",
+                ReturnedVoiceId = $"sha256:{new string('a', 64)}"
+            },
+            "cartesia-voice-id-invalid");
+
+        BuildGhostCascadePrivateVoiceBinding binding = RuntimeBinding();
+        CollectionAssert.Contains(
+            BuildGhostCascadePrivateVoiceBindingContract.Validate(binding with { TtsProvider = "Unmixr" }).ToArray(),
+            "voice-binding-tts-provider-invalid");
+        CollectionAssert.Contains(
+            BuildGhostCascadePrivateVoiceBindingContract.Validate(binding with { ProviderNamespace = "unmixr" }).ToArray(),
+            "voice-binding-provider-namespace-invalid");
+    }
+
+    [TestMethod]
+    public void Cartesia_voice_binding_rejects_mismatch_nonowner_nonprivate_and_unverified_provenance()
+    {
+        BuildGhostCartesiaPrivateVoiceReadReceipt receipt = VoiceReadReceipt();
+        AssertVoiceReceiptRejected(receipt with { ReturnedVoiceId = OtherCartesiaVoiceId }, "cartesia-voice-id-read-mismatch");
+        AssertVoiceReceiptRejected(receipt with { IsOwner = false }, "cartesia-voice-owner-invalid");
+        AssertVoiceReceiptRejected(receipt with { Access = "public" }, "cartesia-voice-access-not-private");
+        AssertVoiceReceiptRejected(receipt with { Visibility = "shared" }, "cartesia-voice-visibility-not-owner");
+        AssertVoiceReceiptRejected(receipt with { SyntheticProvenance = "caller-asserted-synthetic" }, "cartesia-voice-synthetic-provenance-invalid");
+        AssertVoiceReceiptRejected(receipt with { SourceVoiceReleaseDigest = "sha256:not-a-release-digest" }, "cartesia-voice-source-release-digest-invalid");
+        AssertVoiceReceiptRejected(receipt with { ReadHttpStatus = 201 }, "cartesia-voice-read-http-status-invalid");
     }
 
     [TestMethod]
@@ -347,6 +392,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         JsonObject drifted = (JsonObject)candidate.Payload.DeepClone();
         drifted["id"] = "0123456789abcdef01234567";
         drifted["ai_model_config"]!["model"] = "other-model";
+        drifted["provider_verified"]!["cartesia_tts_provider"] = "Unmixr";
         drifted["user_metadata"]!["runtime_binding_digest"] = $"sha256:{new string('0', 64)}";
         drifted["user_metadata"]!["voice_release_digest"] = $"sha256:{new string('1', 64)}";
 
@@ -354,6 +400,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
 
         Assert.IsFalse(validation.Accepted);
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-model-invalid");
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-tts-provider-mismatch");
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "runtime-binding-digest-mismatch");
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "voice-release-digest-mismatch");
     }
@@ -364,7 +411,8 @@ public sealed class ToughTongueBuildGhostAdapterTests
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            RuntimeBinding());
+            RuntimeBinding(),
+            ScenarioFieldReceipt());
         JsonObject providerScenario = (JsonObject)candidate.Payload.DeepClone();
         providerScenario["id"] = "0123456789abcdef01234567";
         RecordingHttpHandler handler = new(
@@ -372,7 +420,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             JsonResponse(providerScenario));
         HttpClient client = new(handler)
         {
-            BaseAddress = new Uri("https://app.toughtongueai.com/api/public/")
+            BaseAddress = new Uri("https://api.toughtongueai.com/api/public/")
         };
         ToughTongueBuildGhostScenarioClient scenarios = new(
             client,
@@ -392,9 +440,9 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.AreEqual("0123456789abcdef01234567", scenarioId);
         Assert.HasCount(2, handler.Requests);
         Assert.AreEqual(HttpMethod.Post, handler.Requests[0].Method);
-        Assert.AreEqual("https://app.toughtongueai.com/api/public/scenarios", handler.Requests[0].Uri.AbsoluteUri);
+        Assert.AreEqual("https://api.toughtongueai.com/api/public/scenarios", handler.Requests[0].Uri.AbsoluteUri);
         Assert.AreEqual(HttpMethod.Get, handler.Requests[1].Method);
-        Assert.AreEqual("https://app.toughtongueai.com/api/public/scenarios/0123456789abcdef01234567", handler.Requests[1].Uri.AbsoluteUri);
+        Assert.AreEqual("https://api.toughtongueai.com/api/public/scenarios/0123456789abcdef01234567", handler.Requests[1].Uri.AbsoluteUri);
         Assert.IsTrue(handler.Requests.All(static request => request.HasBearerCredential));
         JsonObject posted = JsonNode.Parse(handler.Requests[0].Body!)!.AsObject();
         Assert.IsFalse(posted["is_public"]!.GetValue<bool>());
@@ -411,7 +459,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ["expires_at"] = clock.UtcNow.AddHours(1).ToString("O")
         }));
         ToughTongueBuildGhostScenarioClient scenarios = new(
-            new HttpClient(handler) { BaseAddress = new Uri("https://app.toughtongueai.com/api/public/") },
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
             clock,
             ScenarioConfiguration(mutationsEnabled: true));
 
@@ -421,7 +469,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             CancellationToken.None);
 
         Assert.AreEqual(clock.UtcNow.AddHours(1), grant.ExpiresAtUtc);
-        Assert.AreEqual("https://app.toughtongueai.com/api/public/scenario-access-token", handler.Requests.Single().Uri.AbsoluteUri);
+        Assert.AreEqual("https://api.toughtongueai.com/api/public/scenario-access-token", handler.Requests.Single().Uri.AbsoluteUri);
         Assert.AreEqual("0123456789abcdef01234567", JsonNode.Parse(handler.Requests.Single().Body!)!["scenario_id"]!.GetValue<string>());
         Assert.IsFalse(JsonSerializer.Serialize(new ToughTongueBuildGhostReceipt(
             ToughTongueBuildGhostContractVersions.ReceiptV1,
@@ -445,9 +493,69 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
                 ToolDeployment(),
                 new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-                RuntimeBinding()),
+                RuntimeBinding(),
+                ScenarioFieldReceipt()),
             "must-not-leave-process",
             CancellationToken.None));
+        Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public void Scenario_client_accepts_only_the_current_exact_official_API_boundary()
+    {
+        Assert.IsTrue(ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(
+            new Uri("https://api.toughtongueai.com/api/public/")));
+        Assert.IsFalse(ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(
+            new Uri("https://app.toughtongueai.com/api/public/")));
+        Assert.IsFalse(ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(
+            new Uri("https://api.toughtongueai.com/other/api/public/")));
+        Assert.IsFalse(ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(
+            new Uri("https://api.toughtongueai.com:8443/api/public/")));
+    }
+
+    [TestMethod]
+    public async Task Scenario_client_rejects_the_stale_app_host_before_sending_a_provider_credential()
+    {
+        RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+        ToughTongueBuildGhostScenarioClient scenarios = new(
+            new HttpClient(handler) { BaseAddress = new Uri("https://app.toughtongueai.com/api/public/") },
+            new FixedClock(),
+            ScenarioConfiguration(mutationsEnabled: true));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.VerifyPrivateScenarioAsync(
+            "0123456789abcdef01234567",
+            ScenarioCandidate(),
+            "must-not-leave-process",
+            CancellationToken.None));
+
+        Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Scenario_creation_is_blocked_without_a_provider_schema_backed_Cartesia_field_receipt()
+    {
+        RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+        ToughTongueBuildGhostScenarioClient scenarios = new(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
+            new FixedClock(),
+            ScenarioConfiguration(mutationsEnabled: true));
+        ToughTongueBuildGhostScenarioCandidate blockedCandidate =
+            ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                ToolDeployment(),
+                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                RuntimeBinding());
+
+        (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
+            await scenarios.CreatePrivateCandidateAsync(
+                blockedCandidate,
+                "must-not-leave-process",
+                CancellationToken.None);
+
+        Assert.IsFalse(validation.Accepted);
+        Assert.IsNull(scenarioId);
+        CollectionAssert.Contains(
+            validation.RejectionReasons.ToArray(),
+            BuildGhostToughTongueCartesiaScenarioFieldContract.MissingOrUnverifiedBlocker);
         Assert.IsEmpty(handler.Requests);
     }
 
@@ -456,13 +564,14 @@ public sealed class ToughTongueBuildGhostAdapterTests
     {
         RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
         ToughTongueBuildGhostScenarioClient scenarios = new(
-            new HttpClient(handler) { BaseAddress = new Uri("https://app.toughtongueai.com/api/public/") },
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
             new FixedClock(),
             ScenarioConfiguration(mutationsEnabled: false));
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            RuntimeBinding());
+            RuntimeBinding(),
+            ScenarioFieldReceipt());
 
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.CreatePrivateCandidateAsync(
             candidate,
@@ -567,15 +676,54 @@ public sealed class ToughTongueBuildGhostAdapterTests
 
     private static BuildGhostCascadePrivateVoiceBinding RuntimeBinding()
         => BuildGhostCascadePrivateVoiceBindingContract.Create(
-            "private-provider-rook-voice-ref",
-            VoiceReleaseDigest,
+            VoiceReadReceipt(),
             ToughTongueBuildGhostScenarioContract.CanonicalLocales);
+
+    private static BuildGhostCartesiaPrivateVoiceReadReceipt VoiceReadReceipt()
+        => new(
+            ToughTongueBuildGhostContractVersions.CartesiaPrivateVoiceReadReceiptV1,
+            ToughTongueBuildGhostVoiceProviders.CartesiaNamespace,
+            CartesiaVoiceId,
+            CartesiaVoiceId,
+            200,
+            true,
+            "private",
+            "owner",
+            ToughTongueBuildGhostVoiceProviders.FullySyntheticProvenance,
+            VoiceReleaseDigest,
+            ProviderResponseDigest,
+            DateTimeOffset.Parse("2026-08-21T08:00:00Z"));
+
+    private static BuildGhostToughTongueCartesiaScenarioFieldReceipt ScenarioFieldReceipt()
+        => new(
+            ToughTongueBuildGhostContractVersions.CartesiaScenarioFieldReceiptV1,
+            ToughTongueBuildGhostVoiceProviders.CartesiaNamespace,
+            ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider,
+            VerifiedScenarioFieldPath,
+            VerifiedScenarioFieldPath,
+            ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider,
+            200,
+            ProviderSchemaDigest,
+            ProviderResponseDigest,
+            DateTimeOffset.Parse("2026-08-21T08:05:00Z"));
 
     private static ToughTongueBuildGhostScenarioCandidate ScenarioCandidate()
         => ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            RuntimeBinding());
+            RuntimeBinding(),
+            ScenarioFieldReceipt());
+
+    private static void AssertVoiceReceiptRejected(
+        BuildGhostCartesiaPrivateVoiceReadReceipt receipt,
+        string expectedReason)
+    {
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() =>
+            BuildGhostCascadePrivateVoiceBindingContract.Create(
+                receipt,
+                ToughTongueBuildGhostScenarioContract.CanonicalLocales));
+        StringAssert.Contains(exception.Message, expectedReason);
+    }
 
     private static IConfiguration ScenarioConfiguration(bool mutationsEnabled)
         => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

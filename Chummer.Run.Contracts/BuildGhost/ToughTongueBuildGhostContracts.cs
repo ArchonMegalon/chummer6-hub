@@ -15,6 +15,8 @@ public static class ToughTongueBuildGhostContractVersions
     public const string PrivateToolContractV1 = "chummer.build_ghost.private_tool.v1";
     public const string PrivateToolDeploymentV1 = "chummer.build_ghost.private_tool_deployment.v1";
     public const string CascadePrivateVoiceBindingV1 = "chummer.build_ghost.cascade_private_voice_binding.v1";
+    public const string CartesiaPrivateVoiceReadReceiptV1 = "chummer.build_ghost.cartesia_private_voice_read_receipt.v1";
+    public const string CartesiaScenarioFieldReceiptV1 = "chummer.tough_tongue.cartesia_scenario_field_receipt.v1";
     public const string ScenarioCanaryReceiptV1 = "chummer.tough_tongue.build_ghost_canary_receipt.v1";
 }
 
@@ -23,6 +25,13 @@ public static class ToughTongueBuildGhostPersonaIds
     public const string Rook = "build-ghost-rook-v1";
     public const string RookAvatar = "build-ghost-rook-avatar-v1";
     public const string RookVoice = "build-ghost-rook-voice-v1";
+}
+
+public static class ToughTongueBuildGhostVoiceProviders
+{
+    public const string CartesiaNamespace = "cartesia";
+    public const string CartesiaTtsProvider = "Cartesia";
+    public const string FullySyntheticProvenance = "fully-synthetic-no-human-recording";
 }
 
 public sealed record ToughTongueBuildGhostRequest(
@@ -159,16 +168,42 @@ public sealed record BuildGhostPrivateToolAuthorityRequest(
     [property: JsonPropertyName("locale")] string Locale,
     [property: JsonPropertyName("request_kind")] string RequestKind);
 
+public sealed record BuildGhostCartesiaPrivateVoiceReadReceipt(
+    string Schema,
+    string ProviderNamespace,
+    string RequestedVoiceId,
+    string ReturnedVoiceId,
+    int ReadHttpStatus,
+    bool IsOwner,
+    string Access,
+    string Visibility,
+    string SyntheticProvenance,
+    string SourceVoiceReleaseDigest,
+    string ProviderResponseDigest,
+    DateTimeOffset ObservedAtUtc);
+
+public sealed record BuildGhostToughTongueCartesiaScenarioFieldReceipt(
+    string Schema,
+    string ProviderNamespace,
+    string TtsProvider,
+    string ConfiguredFieldPath,
+    string ReturnedFieldPath,
+    string ReturnedValue,
+    int ReadHttpStatus,
+    string ProviderSchemaDigest,
+    string ProviderResponseDigest,
+    DateTimeOffset ObservedAtUtc);
+
 public sealed record BuildGhostCascadePrivateVoiceBinding(
     string Schema,
     string ModelProvider,
     string ModelId,
+    string TtsProvider,
+    string ProviderNamespace,
     string VoiceAlias,
     string ProviderVoiceRef,
     string VoiceReleaseDigest,
-    bool Private,
-    bool SyntheticOrigin,
-    bool ReadVerified,
+    string VoiceReadReceiptDigest,
     IReadOnlyList<string> SupportedLocales,
     string ContractDigest);
 
@@ -177,6 +212,9 @@ public sealed record ToughTongueBuildGhostScenarioCandidate(
     JsonObject Payload,
     BuildGhostPrivateToolDefinition Tool,
     IReadOnlyList<string> SupportedLocales,
+    string? TtsProviderFieldPath,
+    bool ProviderSchemaReadVerified,
+    IReadOnlyList<string> BlockingReasons,
     string ContractDigest);
 
 public sealed record ToughTongueBuildGhostScenarioValidation(
