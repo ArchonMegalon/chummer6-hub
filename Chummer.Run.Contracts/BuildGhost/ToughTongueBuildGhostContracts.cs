@@ -17,7 +17,12 @@ public static class ToughTongueBuildGhostContractVersions
     public const string CascadePrivateVoiceBindingV1 = "chummer.build_ghost.cascade_private_voice_binding.v1";
     public const string CartesiaPrivateVoiceReadReceiptV1 = "chummer.build_ghost.cartesia_private_voice_read_receipt.v1";
     public const string CartesiaScenarioSchemaReceiptV1 = "chummer.tough_tongue.cartesia_scenario_schema_receipt.v1";
-    public const string CustomFunctionSchemaReceiptV1 = "chummer.tough_tongue.custom_function_schema_receipt.v1";
+    public const string CustomFunctionLibrarySchemaReceiptV1 = "chummer.tough_tongue.custom_function_library_schema_receipt.v1";
+    public const string CustomFunctionLibraryReadReceiptV1 = "chummer.tough_tongue.custom_function_library_read_receipt.v1";
+    public const string CustomFunctionDynamicAuthorizationReceiptV1 = "chummer.tough_tongue.custom_function_dynamic_authorization_receipt.v1";
+    public const string CustomFunctionDefinitionV1 = "chummer.tough_tongue.custom_function_definition.v1";
+    public const string CustomFunctionBindingV1 = "chummer.tough_tongue.custom_function_binding.v1";
+    public const string CustomFunctionAttachmentReceiptV1 = "chummer.tough_tongue.custom_function_attachment_receipt.v1";
     public const string ScenarioCanaryReceiptV1 = "chummer.tough_tongue.build_ghost_canary_receipt.v1";
     public const string CartesiaVoiceDeletionReceiptV1 = "chummer.build_ghost.cartesia_voice_deletion_receipt.v1";
     public const string ScenarioDeletionBlockerReceiptV1 = "chummer.tough_tongue.scenario_deletion_blocker_receipt.v1";
@@ -203,27 +208,114 @@ public sealed record BuildGhostToughTongueCartesiaScenarioSchemaReceipt(
     string TtsProvider,
     DateTimeOffset ObservedAtUtc);
 
-public sealed record BuildGhostToughTongueCustomFunctionSchemaReceipt(
+public sealed record BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt(
     string Schema,
     string ProviderNamespace,
-    Uri EvidenceUrl,
-    string EvidenceDigest,
-    string ToolSettingsFieldPath,
-    string NameProperty,
-    string DescriptionProperty,
-    string EndpointProperty,
-    string HttpMethodProperty,
-    string HeadersProperty,
-    string BodySchemaProperty,
-    string MaximumResponseCharactersProperty,
-    string TimeoutSecondsProperty,
-    string AuthenticationSchemeProperty,
-    string AuthenticationAudienceProperty,
-    string ContractDigestProperty,
-    string AuthorizationHeaderName,
-    string ContractHeaderName,
-    string PacketAccessKeyAuthorizationTemplate,
+    string DeploymentId,
+    string ServiceChunkName,
+    string ServiceChunkDigest,
+    long ServiceChunkBytes,
+    string StudioChunkName,
+    string StudioChunkDigest,
+    long StudioChunkBytes,
+    string ScenarioServiceChunkName,
+    string ScenarioServiceChunkDigest,
+    long ScenarioServiceChunkBytes,
+    string RuntimeChunkName,
+    string RuntimeChunkDigest,
+    long RuntimeChunkBytes,
+    Uri ApiBaseUri,
+    string ListPath,
+    string ByScenarioPathTemplate,
+    string CreatePath,
+    string UpdatePathTemplate,
+    string ExecutePathTemplate,
+    string DeletePathTemplate,
+    string ScenarioUpsertPath,
+    IReadOnlyList<string> CreateFields,
+    IReadOnlyList<string> ReturnedFields,
+    string ScenarioAttachmentField,
+    string RuntimeRegistrationPrefix,
     DateTimeOffset ObservedAtUtc);
+
+public sealed record BuildGhostToughTongueCustomFunctionLibraryReadReceipt(
+    string Schema,
+    Uri Endpoint,
+    string Method,
+    string SelectedSlotLabel,
+    string AccountRefDigest,
+    int HttpStatus,
+    bool JsonSchemaObserved,
+    IReadOnlyList<string> ReturnedFields,
+    string ProviderResponseDigest,
+    bool RawResponseExposed,
+    bool RawIdsExposed,
+    bool CredentialExposed,
+    DateTimeOffset ObservedAtUtc);
+
+public sealed record BuildGhostToughTongueDynamicAuthorizationReceipt(
+    string Schema,
+    string ProviderNamespace,
+    string DeploymentId,
+    string EvidenceSource,
+    string EvidenceDigest,
+    string HeaderName,
+    string HeaderValueTemplate,
+    string ArgumentName,
+    string InterpolationSemantics,
+    bool StoredHeaderValuesInterpolateToolArguments,
+    DateTimeOffset ObservedAtUtc);
+
+public sealed record BuildGhostToughTongueCustomFunctionDefinition(
+    string Schema,
+    JsonObject Payload,
+    string ToolContractDigest,
+    string ToolDeploymentDigest,
+    string LibrarySchemaReceiptDigest,
+    string LibraryReadReceiptDigest,
+    string DynamicAuthorizationReceiptDigest,
+    bool LibrarySchemaVerified,
+    bool AuthenticatedLibraryReadVerified,
+    bool DynamicAuthorizationVerified,
+    IReadOnlyList<string> BlockingReasons,
+    string ContractDigest);
+
+public sealed record BuildGhostToughTongueCustomFunctionBinding(
+    string Schema,
+    [property: JsonIgnore] string ProviderCustomFunctionId,
+    string ProviderCustomFunctionIdDigest,
+    string DefinitionContractDigest,
+    string ToolContractDigest,
+    string ToolDeploymentDigest,
+    string LibrarySchemaReceiptDigest,
+    string LibraryReadReceiptDigest,
+    string DynamicAuthorizationReceiptDigest,
+    int StoredReadHttpStatus,
+    bool StoredFieldsExactMatch,
+    string StoredResponseDigest,
+    bool RawResponseExposed,
+    bool RawIdsExposed,
+    bool CredentialExposed,
+    DateTimeOffset ObservedAtUtc,
+    string ContractDigest);
+
+public sealed record BuildGhostToughTongueCustomFunctionAttachmentReceipt(
+    string Schema,
+    string ScenarioIdDigest,
+    string ProviderCustomFunctionIdDigest,
+    string DefinitionContractDigest,
+    string BindingContractDigest,
+    string ScenarioAttachmentField,
+    int ScenarioReadHttpStatus,
+    bool ScenarioAttachmentExactMatch,
+    int ByScenarioReadHttpStatus,
+    bool ByScenarioAttachmentExactMatch,
+    bool RawResponseExposed,
+    bool RawIdsExposed,
+    bool CredentialExposed,
+    IReadOnlyList<string> BlockingReasons,
+    DateTimeOffset ObservedAtUtc,
+    string ContractDigest);
 
 public sealed record BuildGhostCascadePrivateVoiceBinding(
     string Schema,
@@ -246,9 +338,9 @@ public sealed record ToughTongueBuildGhostScenarioCandidate(
     string? TtsProviderFieldPath,
     string? TtsVoiceIdFieldPath,
     bool ProviderSchemaReadVerified,
-    BuildGhostToughTongueCustomFunctionSchemaReceipt? CustomFunctionSchemaReceipt,
-    string CustomFunctionSchemaReceiptDigest,
-    bool CustomFunctionSchemaReadVerified,
+    BuildGhostToughTongueCustomFunctionBinding? CustomFunctionBinding,
+    string CustomFunctionBindingDigest,
+    bool CustomFunctionBindingReadVerified,
     IReadOnlyList<string> BlockingReasons,
     string ContractDigest);
 

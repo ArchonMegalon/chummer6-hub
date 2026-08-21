@@ -352,127 +352,629 @@ public static class BuildGhostToughTongueCartesiaScenarioSchemaContract
         => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
 }
 
-public static class BuildGhostToughTongueCustomFunctionSchemaContract
+public static class BuildGhostToughTongueCustomFunctionContract
 {
-    public const string MissingOrUnverifiedBlocker =
-        "tough-tongue-custom-function-schema-receipt-missing-or-untrusted";
     public const string ProviderNamespace = "tough-tongue";
-    public const string ToolSettingsFieldPath = "tools_config.tools.custom_function.tool_settings";
+    public const string VerifiedDeploymentId = "dpl_DKFDJRMr7tN6xHLYuhLbBaEVDZi8";
+    public const string ServiceChunkName = "11.vljf9wpdc_.js";
+    public const string ServiceChunkDigest = "sha256:6762f11c1970fa1c313d893176fb77eee6fddc4060d49413842ccc46ce88f145";
+    public const long ServiceChunkBytes = 43_371;
+    public const string StudioChunkName = "022lmhmvlj3gq.js";
+    public const string StudioChunkDigest = "sha256:c1d1c9633f2645346b73165f9603b3491e266e568b2df3cc775014fc7b2c60a0";
+    public const long StudioChunkBytes = 475_108;
+    public const string ScenarioServiceChunkName = "0s5z52s8kf9d4.js";
+    public const string ScenarioServiceChunkDigest = "sha256:4cd1339b7470d41c60ece066b7c8555f6392395412bff102949bd8e0ab824a51";
+    public const long ScenarioServiceChunkBytes = 112_602;
+    public const string RuntimeChunkName = "10w5gkzd~f23z.js";
+    public const string RuntimeChunkDigest = "sha256:8a3427924a4eae6f5c7d97c10124178272db17d7c6b6b6189c0bdec78e0dfd14";
+    public const long RuntimeChunkBytes = 219_531;
+    public const string ApiBaseUrl = "https://api.toughtongueai.com/api/";
+    public const string ListPath = "custom-functions/";
+    public const string ByScenarioPathTemplate = "custom-functions/by-scenario/{scenario}";
+    public const string CreatePath = "custom-functions/";
+    public const string UpdatePathTemplate = "custom-functions/{id}";
+    public const string ExecutePathTemplate = "custom-functions/{id}/execute";
+    public const string DeletePathTemplate = "custom-functions/{id}";
+    public const string ScenarioUpsertPath = "scenarios/upsert";
+    public const string ScenarioAttachmentField = "custom_function_ids";
+    public const string RuntimeRegistrationPrefix = "api_";
+    public const string DynamicAuthorizationBlocker =
+        "tough-tongue-stored-header-dynamic-argument-interpolation-unproven";
+    public const string AuthenticatedLibraryReadBlocker =
+        "tough-tongue-custom-function-library-bearer-read-unverified";
+    public const string MissingBindingBlocker =
+        "tough-tongue-custom-function-binding-missing-or-unverified";
+    public const string ScenarioMutationPublicApiBlocker =
+        "tough-tongue-scenario-upsert-public-api-contract-undocumented";
 
-    public static IReadOnlyList<string> Validate(
-        BuildGhostToughTongueCustomFunctionSchemaReceipt? receipt,
+    public static readonly IReadOnlyList<string> CreateFields =
+    [
+        "name", "description", "function_type", "method", "url", "timeout_ms",
+        "headers", "query_params", "parameters"
+    ];
+
+    public static readonly IReadOnlyList<string> ReturnedFields =
+    [
+        "id", "name", "description", "function_type", "method", "url",
+        "timeout_ms", "headers", "query_params", "parameters"
+    ];
+
+    public static IReadOnlyList<string> ValidateLibrarySchema(
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt? receipt)
+    {
+        if (receipt is null) return ["tough-tongue-custom-function-library-schema-receipt-missing"];
+        List<string> failures = [];
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CustomFunctionLibrarySchemaReceiptV1) failures.Add("custom-function-library-schema-version-invalid");
+        if (receipt.ProviderNamespace != ProviderNamespace) failures.Add("custom-function-library-provider-namespace-invalid");
+        if (receipt.DeploymentId != VerifiedDeploymentId) failures.Add("custom-function-library-deployment-drift");
+        RequireEvidence(receipt.ServiceChunkName, receipt.ServiceChunkDigest, receipt.ServiceChunkBytes, ServiceChunkName, ServiceChunkDigest, ServiceChunkBytes, "service", failures);
+        RequireEvidence(receipt.StudioChunkName, receipt.StudioChunkDigest, receipt.StudioChunkBytes, StudioChunkName, StudioChunkDigest, StudioChunkBytes, "studio", failures);
+        RequireEvidence(receipt.ScenarioServiceChunkName, receipt.ScenarioServiceChunkDigest, receipt.ScenarioServiceChunkBytes, ScenarioServiceChunkName, ScenarioServiceChunkDigest, ScenarioServiceChunkBytes, "scenario-service", failures);
+        RequireEvidence(receipt.RuntimeChunkName, receipt.RuntimeChunkDigest, receipt.RuntimeChunkBytes, RuntimeChunkName, RuntimeChunkDigest, RuntimeChunkBytes, "runtime", failures);
+        if (receipt.ApiBaseUri?.AbsoluteUri != ApiBaseUrl) failures.Add("custom-function-api-base-drift");
+        if (receipt.ListPath != ListPath) failures.Add("custom-function-list-path-drift");
+        if (receipt.ByScenarioPathTemplate != ByScenarioPathTemplate) failures.Add("custom-function-by-scenario-path-drift");
+        if (receipt.CreatePath != CreatePath) failures.Add("custom-function-create-path-drift");
+        if (receipt.UpdatePathTemplate != UpdatePathTemplate) failures.Add("custom-function-update-path-drift");
+        if (receipt.ExecutePathTemplate != ExecutePathTemplate) failures.Add("custom-function-execute-path-drift");
+        if (receipt.DeletePathTemplate != DeletePathTemplate) failures.Add("custom-function-delete-path-drift");
+        if (receipt.ScenarioUpsertPath != ScenarioUpsertPath) failures.Add("custom-function-scenario-upsert-path-drift");
+        if (!receipt.CreateFields.SequenceEqual(CreateFields, StringComparer.Ordinal)) failures.Add("custom-function-create-fields-drift");
+        if (!receipt.ReturnedFields.SequenceEqual(ReturnedFields, StringComparer.Ordinal)) failures.Add("custom-function-returned-fields-drift");
+        if (receipt.ScenarioAttachmentField != ScenarioAttachmentField) failures.Add("custom-function-scenario-attachment-field-drift");
+        if (receipt.RuntimeRegistrationPrefix != RuntimeRegistrationPrefix) failures.Add("custom-function-runtime-registration-prefix-drift");
+        if (receipt.ObservedAtUtc == default) failures.Add("custom-function-library-observed-at-invalid");
+        return Ordered(failures);
+    }
+
+    public static IReadOnlyList<string> ValidateAuthenticatedRead(
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt? receipt,
+        string expectedAccountRefDigest)
+    {
+        if (receipt is null) return [AuthenticatedLibraryReadBlocker];
+        List<string> failures = [];
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CustomFunctionLibraryReadReceiptV1) failures.Add("custom-function-library-read-version-invalid");
+        if (receipt.Endpoint?.AbsoluteUri != $"{ApiBaseUrl}{ListPath}") failures.Add("custom-function-library-read-endpoint-invalid");
+        if (receipt.Method != "GET") failures.Add("custom-function-library-read-method-invalid");
+        if (!IsSafeSlotLabel(receipt.SelectedSlotLabel)) failures.Add("custom-function-library-read-slot-invalid");
+        if (!IsSha256(expectedAccountRefDigest) || receipt.AccountRefDigest != expectedAccountRefDigest) failures.Add("custom-function-library-read-account-ref-mismatch");
+        if (receipt.HttpStatus != 200) failures.Add(AuthenticatedLibraryReadBlocker);
+        if (!receipt.JsonSchemaObserved
+            || !receipt.ReturnedFields.SequenceEqual(ReturnedFields, StringComparer.Ordinal))
+        {
+            failures.Add("custom-function-library-read-schema-unverified");
+        }
+        if (!IsSha256(receipt.ProviderResponseDigest)) failures.Add("custom-function-library-read-response-digest-invalid");
+        if (receipt.RawResponseExposed || receipt.RawIdsExposed || receipt.CredentialExposed) failures.Add("custom-function-library-read-redaction-invalid");
+        if (receipt.ObservedAtUtc == default) failures.Add("custom-function-library-read-observed-at-invalid");
+        return Ordered(failures);
+    }
+
+    public static IReadOnlyList<string> ValidateDynamicAuthorization(
+        BuildGhostToughTongueDynamicAuthorizationReceipt? receipt,
         string? trustedReceiptDigest)
     {
-        if (receipt is null || !IsSha256(trustedReceiptDigest)) return [MissingOrUnverifiedBlocker];
+        if (receipt is null || !IsSha256(trustedReceiptDigest)) return [DynamicAuthorizationBlocker];
         List<string> failures = [];
-        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CustomFunctionSchemaReceiptV1) failures.Add("custom-function-schema-receipt-version-invalid");
-        if (receipt.ProviderNamespace != ProviderNamespace) failures.Add("custom-function-schema-provider-namespace-invalid");
-        if (!IsSafeEvidenceUrl(receipt.EvidenceUrl)) failures.Add("custom-function-schema-evidence-url-invalid");
-        if (!IsSha256(receipt.EvidenceDigest)) failures.Add("custom-function-schema-evidence-digest-invalid");
-        if (receipt.ToolSettingsFieldPath != ToolSettingsFieldPath) failures.Add("custom-function-tool-settings-field-path-invalid");
-        string[] properties =
-        [
-            receipt.NameProperty,
-            receipt.DescriptionProperty,
-            receipt.EndpointProperty,
-            receipt.HttpMethodProperty,
-            receipt.HeadersProperty,
-            receipt.BodySchemaProperty,
-            receipt.MaximumResponseCharactersProperty,
-            receipt.TimeoutSecondsProperty,
-            receipt.AuthenticationSchemeProperty,
-            receipt.AuthenticationAudienceProperty,
-            receipt.ContractDigestProperty
-        ];
-        if (properties.Any(static property => !IsSafeProperty(property))
-            || properties.Distinct(StringComparer.Ordinal).Count() != properties.Length)
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CustomFunctionDynamicAuthorizationReceiptV1) failures.Add("custom-function-dynamic-auth-version-invalid");
+        if (receipt.ProviderNamespace != ProviderNamespace) failures.Add("custom-function-dynamic-auth-provider-invalid");
+        if (receipt.DeploymentId != VerifiedDeploymentId) failures.Add("custom-function-dynamic-auth-deployment-drift");
+        if (!IsSafeChunkName(receipt.EvidenceSource) || !IsSha256(receipt.EvidenceDigest)) failures.Add("custom-function-dynamic-auth-evidence-invalid");
+        if (receipt.HeaderName != "Authorization") failures.Add("custom-function-dynamic-auth-header-invalid");
+        if (receipt.HeaderValueTemplate != "Bearer {{packet_access_key}}") failures.Add("custom-function-dynamic-auth-template-invalid");
+        if (receipt.ArgumentName != "packet_access_key") failures.Add("custom-function-dynamic-auth-argument-invalid");
+        if (receipt.InterpolationSemantics != "stored-header-values-interpolate-execute-args"
+            || !receipt.StoredHeaderValuesInterpolateToolArguments)
         {
-            failures.Add("custom-function-tool-settings-properties-invalid");
+            failures.Add(DynamicAuthorizationBlocker);
         }
-        if (receipt.AuthorizationHeaderName != "Authorization") failures.Add("custom-function-authorization-header-invalid");
-        if (receipt.ContractHeaderName != "X-Chummer-Build-Ghost-Tool-Contract") failures.Add("custom-function-contract-header-invalid");
-        if (receipt.PacketAccessKeyAuthorizationTemplate != "Bearer {{packet_access_key}}")
+        if (receipt.ObservedAtUtc == default) failures.Add("custom-function-dynamic-auth-observed-at-invalid");
+        if (failures.Count == 0 && DigestDynamicAuthorizationReceipt(receipt) != trustedReceiptDigest)
         {
-            failures.Add("custom-function-packet-key-authorization-template-invalid");
+            failures.Add("custom-function-dynamic-auth-receipt-untrusted");
         }
-        if (receipt.ObservedAtUtc == default) failures.Add("custom-function-schema-observed-at-invalid");
-        if (failures.Count == 0 && DigestReceipt(receipt) != trustedReceiptDigest)
-        {
-            failures.Add("custom-function-schema-receipt-digest-untrusted");
-        }
-        return failures;
+        return Ordered(failures);
     }
 
-    public static string DigestReceipt(BuildGhostToughTongueCustomFunctionSchemaReceipt receipt)
-        => Digest(new JsonObject
-        {
-            ["schema"] = receipt.Schema,
-            ["providerNamespace"] = receipt.ProviderNamespace,
-            ["evidenceUrl"] = receipt.EvidenceUrl.AbsoluteUri,
-            ["evidenceDigest"] = receipt.EvidenceDigest,
-            ["toolSettingsFieldPath"] = receipt.ToolSettingsFieldPath,
-            ["nameProperty"] = receipt.NameProperty,
-            ["descriptionProperty"] = receipt.DescriptionProperty,
-            ["endpointProperty"] = receipt.EndpointProperty,
-            ["httpMethodProperty"] = receipt.HttpMethodProperty,
-            ["headersProperty"] = receipt.HeadersProperty,
-            ["bodySchemaProperty"] = receipt.BodySchemaProperty,
-            ["maximumResponseCharactersProperty"] = receipt.MaximumResponseCharactersProperty,
-            ["timeoutSecondsProperty"] = receipt.TimeoutSecondsProperty,
-            ["authenticationSchemeProperty"] = receipt.AuthenticationSchemeProperty,
-            ["authenticationAudienceProperty"] = receipt.AuthenticationAudienceProperty,
-            ["contractDigestProperty"] = receipt.ContractDigestProperty,
-            ["authorizationHeaderName"] = receipt.AuthorizationHeaderName,
-            ["contractHeaderName"] = receipt.ContractHeaderName,
-            ["packetAccessKeyAuthorizationTemplate"] = receipt.PacketAccessKeyAuthorizationTemplate,
-            ["observedAtUtc"] = receipt.ObservedAtUtc.ToUniversalTime().ToString("O")
-        });
-
-    public static JsonObject CreateToolSettings(
+    public static BuildGhostToughTongueCustomFunctionDefinition CreateDefinition(
         BuildGhostPrivateToolDeploymentPackage deployment,
-        BuildGhostToughTongueCustomFunctionSchemaReceipt receipt)
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt? librarySchemaReceipt,
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt? libraryReadReceipt,
+        string expectedAccountRefDigest,
+        BuildGhostToughTongueDynamicAuthorizationReceipt? dynamicAuthorizationReceipt = null,
+        string? trustedDynamicAuthorizationReceiptDigest = null)
     {
         ArgumentNullException.ThrowIfNull(deployment);
-        ArgumentNullException.ThrowIfNull(receipt);
-        BuildGhostPrivateToolDefinition tool = deployment.Tool;
-        return new JsonObject
+        IReadOnlyList<string> schemaFailures = ValidateLibrarySchema(librarySchemaReceipt);
+        IReadOnlyList<string> readFailures = ValidateAuthenticatedRead(libraryReadReceipt, expectedAccountRefDigest);
+        IReadOnlyList<string> dynamicFailures = ValidateDynamicAuthorization(
+            dynamicAuthorizationReceipt,
+            trustedDynamicAuthorizationReceiptDigest);
+        bool schemaVerified = schemaFailures.Count == 0;
+        bool readVerified = readFailures.Count == 0;
+        bool dynamicVerified = dynamicFailures.Count == 0;
+        JsonObject payload = DefinitionPayload(deployment.Tool);
+        string librarySchemaDigest = schemaVerified ? DigestLibrarySchemaReceipt(librarySchemaReceipt!) : string.Empty;
+        string libraryReadDigest = readVerified ? DigestLibraryReadReceipt(libraryReadReceipt!) : string.Empty;
+        string dynamicDigest = dynamicVerified ? DigestDynamicAuthorizationReceipt(dynamicAuthorizationReceipt!) : string.Empty;
+        IReadOnlyList<string> blockers = Ordered(schemaFailures.Concat(readFailures).Concat(dynamicFailures));
+        JsonObject authority = new()
         {
-            [receipt.NameProperty] = tool.Name,
-            [receipt.DescriptionProperty] = tool.Description,
-            [receipt.EndpointProperty] = tool.Endpoint.AbsoluteUri,
-            [receipt.HttpMethodProperty] = tool.HttpMethod,
-            [receipt.HeadersProperty] = new JsonObject
-            {
-                [receipt.AuthorizationHeaderName] = receipt.PacketAccessKeyAuthorizationTemplate,
-                [receipt.ContractHeaderName] = tool.ContractDigest
-            },
-            [receipt.BodySchemaProperty] = JsonNode.Parse(tool.BodySchemaJson),
-            [receipt.MaximumResponseCharactersProperty] = tool.MaximumResponseCharacters,
-            [receipt.TimeoutSecondsProperty] = tool.TimeoutSeconds,
-            [receipt.AuthenticationSchemeProperty] = deployment.AuthenticationScheme,
-            [receipt.AuthenticationAudienceProperty] = deployment.AuthenticationAudience,
-            [receipt.ContractDigestProperty] = tool.ContractDigest
+            ["schema"] = ToughTongueBuildGhostContractVersions.CustomFunctionDefinitionV1,
+            ["payload"] = payload.DeepClone(),
+            ["toolContractDigest"] = deployment.Tool.ContractDigest,
+            ["toolDeploymentDigest"] = deployment.ContractDigest,
+            ["librarySchemaReceiptDigest"] = librarySchemaDigest,
+            ["libraryReadReceiptDigest"] = libraryReadDigest,
+            ["dynamicAuthorizationReceiptDigest"] = dynamicDigest
         };
+        return new BuildGhostToughTongueCustomFunctionDefinition(
+            ToughTongueBuildGhostContractVersions.CustomFunctionDefinitionV1,
+            payload,
+            deployment.Tool.ContractDigest,
+            deployment.ContractDigest,
+            librarySchemaDigest,
+            libraryReadDigest,
+            dynamicDigest,
+            schemaVerified,
+            readVerified,
+            dynamicVerified,
+            blockers,
+            Digest(authority));
     }
 
-    private static bool IsSafeEvidenceUrl(Uri? value)
-        => value is not null
-            && value.IsAbsoluteUri
-            && string.Equals(value.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            && (string.Equals(value.Host, "toughtongueai.com", StringComparison.OrdinalIgnoreCase)
-                || value.Host.EndsWith(".toughtongueai.com", StringComparison.OrdinalIgnoreCase))
-            && value.IsDefaultPort
-            && string.IsNullOrEmpty(value.UserInfo)
-            && string.IsNullOrEmpty(value.Fragment);
+    public static JsonObject SerializeCreatePayload(BuildGhostToughTongueCustomFunctionDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (!definition.LibrarySchemaVerified
+            || !definition.AuthenticatedLibraryReadVerified
+            || !definition.DynamicAuthorizationVerified
+            || definition.BlockingReasons.Count != 0
+            || definition.ContractDigest != DefinitionDigest(definition)
+            || !DefinitionPayloadShapeMatches(definition.Payload))
+        {
+            throw new InvalidDataException("custom-function-create-blocked-unverified-contract");
+        }
+        return (JsonObject)definition.Payload.DeepClone();
+    }
 
-    private static bool IsSafeProperty(string? value)
-        => value is { Length: >= 1 and <= 64 }
-            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
+    public static BuildGhostToughTongueCustomFunctionBinding CreateBinding(
+        BuildGhostToughTongueCustomFunctionDefinition definition,
+        string providerCustomFunctionId,
+        int storedReadHttpStatus,
+        JsonObject? storedFunction,
+        string storedResponseDigest,
+        DateTimeOffset observedAtUtc)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (!IsSafeOpaqueId(providerCustomFunctionId)
+            || storedReadHttpStatus != 200
+            || !IsSha256(storedResponseDigest)
+            || observedAtUtc == default
+            || !definition.LibrarySchemaVerified
+            || !definition.AuthenticatedLibraryReadVerified
+            || !definition.DynamicAuthorizationVerified
+            || definition.BlockingReasons.Count != 0
+            || definition.ContractDigest != DefinitionDigest(definition))
+        {
+            throw new ArgumentException("custom-function-binding-read-receipt-invalid");
+        }
+        bool storedFieldsMatch = StoredFunctionMatches(storedFunction, definition.Payload, providerCustomFunctionId);
+        if (!storedFieldsMatch) throw new ArgumentException("custom-function-stored-fields-mismatch", nameof(storedFunction));
+        string idDigest = DigestText(providerCustomFunctionId);
+        JsonObject authority = BindingAuthority(
+            idDigest,
+            definition,
+            storedReadHttpStatus,
+            storedFieldsMatch,
+            storedResponseDigest,
+            observedAtUtc);
+        return new BuildGhostToughTongueCustomFunctionBinding(
+            ToughTongueBuildGhostContractVersions.CustomFunctionBindingV1,
+            providerCustomFunctionId,
+            idDigest,
+            definition.ContractDigest,
+            definition.ToolContractDigest,
+            definition.ToolDeploymentDigest,
+            definition.LibrarySchemaReceiptDigest,
+            definition.LibraryReadReceiptDigest,
+            definition.DynamicAuthorizationReceiptDigest,
+            storedReadHttpStatus,
+            storedFieldsMatch,
+            storedResponseDigest,
+            RawResponseExposed: false,
+            RawIdsExposed: false,
+            CredentialExposed: false,
+            observedAtUtc,
+            Digest(authority));
+    }
+
+    public static IReadOnlyList<string> ValidateBinding(
+        BuildGhostToughTongueCustomFunctionBinding? binding,
+        BuildGhostPrivateToolDeploymentPackage deployment)
+    {
+        if (binding is null) return [MissingBindingBlocker];
+        List<string> failures = [];
+        if (binding.Schema != ToughTongueBuildGhostContractVersions.CustomFunctionBindingV1) failures.Add("custom-function-binding-version-invalid");
+        if (!IsSafeOpaqueId(binding.ProviderCustomFunctionId)
+            || binding.ProviderCustomFunctionIdDigest != DigestText(binding.ProviderCustomFunctionId)) failures.Add("custom-function-binding-id-invalid");
+        if (!IsSha256(binding.DefinitionContractDigest)) failures.Add("custom-function-definition-digest-invalid");
+        if (binding.ToolContractDigest != deployment.Tool.ContractDigest) failures.Add("custom-function-binding-tool-digest-mismatch");
+        if (binding.ToolDeploymentDigest != deployment.ContractDigest) failures.Add("custom-function-binding-deployment-digest-mismatch");
+        if (!IsSha256(binding.LibrarySchemaReceiptDigest)) failures.Add("custom-function-binding-library-schema-digest-invalid");
+        if (!IsSha256(binding.LibraryReadReceiptDigest)) failures.Add("custom-function-binding-library-read-digest-invalid");
+        if (!IsSha256(binding.DynamicAuthorizationReceiptDigest)) failures.Add("custom-function-binding-dynamic-auth-digest-invalid");
+        if (binding.StoredReadHttpStatus != 200 || !binding.StoredFieldsExactMatch || !IsSha256(binding.StoredResponseDigest)) failures.Add("custom-function-binding-stored-read-unverified");
+        if (binding.RawResponseExposed || binding.RawIdsExposed || binding.CredentialExposed) failures.Add("custom-function-binding-redaction-invalid");
+        if (binding.ObservedAtUtc == default) failures.Add("custom-function-binding-observed-at-invalid");
+        if (failures.Count == 0
+            && binding.ContractDigest != Digest(BindingAuthority(
+                binding.ProviderCustomFunctionIdDigest,
+                binding.DefinitionContractDigest,
+                binding.ToolContractDigest,
+                binding.ToolDeploymentDigest,
+                binding.LibrarySchemaReceiptDigest,
+                binding.LibraryReadReceiptDigest,
+                binding.DynamicAuthorizationReceiptDigest,
+                binding.StoredReadHttpStatus,
+                binding.StoredFieldsExactMatch,
+                binding.StoredResponseDigest,
+                binding.ObservedAtUtc)))
+        {
+            failures.Add("custom-function-binding-contract-digest-invalid");
+        }
+        return Ordered(failures);
+    }
+
+    public static BuildGhostToughTongueCustomFunctionAttachmentReceipt CreateAttachmentReceipt(
+        string scenarioId,
+        JsonObject? scenario,
+        int scenarioReadHttpStatus,
+        JsonArray? byScenarioFunctions,
+        int byScenarioReadHttpStatus,
+        BuildGhostToughTongueCustomFunctionBinding binding,
+        BuildGhostToughTongueCustomFunctionDefinition definition,
+        DateTimeOffset observedAtUtc)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        ArgumentNullException.ThrowIfNull(definition);
+        List<string> blockers = [];
+        if (!IsObjectId(scenarioId)) blockers.Add("custom-function-attachment-scenario-id-invalid");
+        bool definitionMatch = BindingMatchesDefinition(binding, definition)
+            && binding.DefinitionContractDigest == definition.ContractDigest
+            && definition.ContractDigest == DefinitionDigest(definition)
+            && definition.BlockingReasons.Count == 0
+            && definition.LibrarySchemaVerified
+            && definition.AuthenticatedLibraryReadVerified
+            && definition.DynamicAuthorizationVerified;
+        if (!definitionMatch) blockers.Add("custom-function-attachment-definition-unverified");
+        bool scenarioMatch = scenarioReadHttpStatus == 200
+            && ExactIdArray(scenario?[ScenarioAttachmentField] as JsonArray, binding.ProviderCustomFunctionId);
+        bool byScenarioMatch = byScenarioReadHttpStatus == 200
+            && definitionMatch
+            && ExactReturnedFunctionArray(
+                byScenarioFunctions,
+                binding.ProviderCustomFunctionId,
+                definition.Payload);
+        if (!scenarioMatch) blockers.Add("custom-function-scenario-attachment-readback-mismatch");
+        if (!byScenarioMatch) blockers.Add("custom-function-by-scenario-readback-mismatch");
+        if (observedAtUtc == default) blockers.Add("custom-function-attachment-observed-at-invalid");
+        string scenarioDigest = IsObjectId(scenarioId) ? DigestText(scenarioId) : string.Empty;
+        JsonObject authority = AttachmentAuthority(
+            scenarioDigest,
+            binding,
+            scenarioReadHttpStatus,
+            scenarioMatch,
+            byScenarioReadHttpStatus,
+            byScenarioMatch,
+            Ordered(blockers),
+            observedAtUtc);
+        return new BuildGhostToughTongueCustomFunctionAttachmentReceipt(
+            ToughTongueBuildGhostContractVersions.CustomFunctionAttachmentReceiptV1,
+            scenarioDigest,
+            binding.ProviderCustomFunctionIdDigest,
+            binding.DefinitionContractDigest,
+            binding.ContractDigest,
+            ScenarioAttachmentField,
+            scenarioReadHttpStatus,
+            scenarioMatch,
+            byScenarioReadHttpStatus,
+            byScenarioMatch,
+            RawResponseExposed: false,
+            RawIdsExposed: false,
+            CredentialExposed: false,
+            Ordered(blockers),
+            observedAtUtc,
+            Digest(authority));
+    }
+
+    public static IReadOnlyList<string> ValidateAttachmentReceipt(
+        BuildGhostToughTongueCustomFunctionAttachmentReceipt? receipt,
+        BuildGhostToughTongueCustomFunctionBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        if (receipt is null) return ["custom-function-attachment-receipt-missing"];
+        List<string> failures = [];
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CustomFunctionAttachmentReceiptV1) failures.Add("custom-function-attachment-version-invalid");
+        if (!IsSha256(receipt.ScenarioIdDigest)) failures.Add("custom-function-attachment-scenario-digest-invalid");
+        if (receipt.ProviderCustomFunctionIdDigest != binding.ProviderCustomFunctionIdDigest) failures.Add("custom-function-attachment-id-digest-mismatch");
+        if (receipt.DefinitionContractDigest != binding.DefinitionContractDigest) failures.Add("custom-function-attachment-definition-digest-mismatch");
+        if (receipt.BindingContractDigest != binding.ContractDigest) failures.Add("custom-function-attachment-binding-digest-mismatch");
+        if (receipt.ScenarioAttachmentField != ScenarioAttachmentField) failures.Add("custom-function-attachment-field-drift");
+        if (receipt.ScenarioReadHttpStatus != 200 || !receipt.ScenarioAttachmentExactMatch) failures.Add("custom-function-scenario-attachment-readback-mismatch");
+        if (receipt.ByScenarioReadHttpStatus != 200 || !receipt.ByScenarioAttachmentExactMatch) failures.Add("custom-function-by-scenario-readback-mismatch");
+        if (receipt.RawResponseExposed || receipt.RawIdsExposed || receipt.CredentialExposed) failures.Add("custom-function-attachment-redaction-invalid");
+        if (receipt.BlockingReasons.Count != 0) failures.AddRange(receipt.BlockingReasons);
+        if (receipt.ObservedAtUtc == default) failures.Add("custom-function-attachment-observed-at-invalid");
+        if (failures.Count == 0
+            && receipt.ContractDigest != Digest(AttachmentAuthority(
+                receipt.ScenarioIdDigest,
+                receipt.ProviderCustomFunctionIdDigest,
+                receipt.DefinitionContractDigest,
+                receipt.BindingContractDigest,
+                receipt.ScenarioAttachmentField,
+                receipt.ScenarioReadHttpStatus,
+                receipt.ScenarioAttachmentExactMatch,
+                receipt.ByScenarioReadHttpStatus,
+                receipt.ByScenarioAttachmentExactMatch,
+                receipt.BlockingReasons,
+                receipt.ObservedAtUtc)))
+        {
+            failures.Add("custom-function-attachment-contract-digest-invalid");
+        }
+        return Ordered(failures);
+    }
+
+    public static string DigestLibrarySchemaReceipt(BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt receipt)
+        => Digest(JsonSerializer.SerializeToNode(receipt) ?? new JsonObject());
+
+    public static string DigestLibraryReadReceipt(BuildGhostToughTongueCustomFunctionLibraryReadReceipt receipt)
+        => Digest(JsonSerializer.SerializeToNode(receipt) ?? new JsonObject());
+
+    public static string DigestDynamicAuthorizationReceipt(BuildGhostToughTongueDynamicAuthorizationReceipt receipt)
+        => Digest(JsonSerializer.SerializeToNode(receipt) ?? new JsonObject());
+
+    private static JsonObject DefinitionPayload(BuildGhostPrivateToolDefinition tool)
+        => new()
+        {
+            ["name"] = tool.Name,
+            ["description"] = tool.Description,
+            ["function_type"] = "default",
+            ["method"] = tool.HttpMethod,
+            ["url"] = tool.Endpoint.AbsoluteUri,
+            ["timeout_ms"] = checked(tool.TimeoutSeconds * 1_000),
+            ["headers"] = new JsonObject
+            {
+                ["Authorization"] = "Bearer {{packet_access_key}}",
+                ["X-Chummer-Build-Ghost-Tool-Contract"] = tool.ContractDigest
+            },
+            ["query_params"] = new JsonObject(),
+            ["parameters"] = JsonNode.Parse(tool.BodySchemaJson)
+        };
+
+    private static bool DefinitionPayloadShapeMatches(JsonObject payload)
+        => payload.Select(static pair => pair.Key).SequenceEqual(CreateFields, StringComparer.Ordinal)
+            && Text(payload, "function_type") == "default"
+            && Text(payload, "method") == "POST"
+            && payload["headers"] is JsonObject headers
+            && Text(headers, "Authorization") == "Bearer {{packet_access_key}}"
+            && IsSha256(Text(headers, "X-Chummer-Build-Ghost-Tool-Contract"))
+            && payload["query_params"] is JsonObject query && query.Count == 0
+            && payload["parameters"] is JsonObject;
+
+    private static bool StoredFunctionMatches(JsonObject? stored, JsonObject expected, string providerId)
+    {
+        if (stored is null || Text(stored, "id") != providerId) return false;
+        foreach (string field in CreateFields)
+        {
+            if (!JsonNode.DeepEquals(stored[field], expected[field])) return false;
+        }
+        return true;
+    }
+
+    private static bool BindingMatchesDefinition(
+        BuildGhostToughTongueCustomFunctionBinding binding,
+        BuildGhostToughTongueCustomFunctionDefinition definition)
+        => binding.Schema == ToughTongueBuildGhostContractVersions.CustomFunctionBindingV1
+            && IsSafeOpaqueId(binding.ProviderCustomFunctionId)
+            && binding.ProviderCustomFunctionIdDigest == DigestText(binding.ProviderCustomFunctionId)
+            && binding.DefinitionContractDigest == definition.ContractDigest
+            && binding.ToolContractDigest == definition.ToolContractDigest
+            && binding.ToolDeploymentDigest == definition.ToolDeploymentDigest
+            && binding.LibrarySchemaReceiptDigest == definition.LibrarySchemaReceiptDigest
+            && binding.LibraryReadReceiptDigest == definition.LibraryReadReceiptDigest
+            && binding.DynamicAuthorizationReceiptDigest == definition.DynamicAuthorizationReceiptDigest
+            && binding.StoredReadHttpStatus == 200
+            && binding.StoredFieldsExactMatch
+            && IsSha256(binding.StoredResponseDigest)
+            && !binding.RawResponseExposed
+            && !binding.RawIdsExposed
+            && !binding.CredentialExposed
+            && binding.ObservedAtUtc != default
+            && binding.ContractDigest == Digest(BindingAuthority(
+                binding.ProviderCustomFunctionIdDigest,
+                binding.DefinitionContractDigest,
+                binding.ToolContractDigest,
+                binding.ToolDeploymentDigest,
+                binding.LibrarySchemaReceiptDigest,
+                binding.LibraryReadReceiptDigest,
+                binding.DynamicAuthorizationReceiptDigest,
+                binding.StoredReadHttpStatus,
+                binding.StoredFieldsExactMatch,
+                binding.StoredResponseDigest,
+                binding.ObservedAtUtc));
+
+    private static string DefinitionDigest(BuildGhostToughTongueCustomFunctionDefinition definition)
+        => Digest(new JsonObject
+        {
+            ["schema"] = definition.Schema,
+            ["payload"] = definition.Payload.DeepClone(),
+            ["toolContractDigest"] = definition.ToolContractDigest,
+            ["toolDeploymentDigest"] = definition.ToolDeploymentDigest,
+            ["librarySchemaReceiptDigest"] = definition.LibrarySchemaReceiptDigest,
+            ["libraryReadReceiptDigest"] = definition.LibraryReadReceiptDigest,
+            ["dynamicAuthorizationReceiptDigest"] = definition.DynamicAuthorizationReceiptDigest
+        });
+
+    private static JsonObject BindingAuthority(
+        string idDigest,
+        BuildGhostToughTongueCustomFunctionDefinition definition,
+        int status,
+        bool exactMatch,
+        string responseDigest,
+        DateTimeOffset observedAtUtc)
+        => BindingAuthority(
+            idDigest,
+            definition.ContractDigest,
+            definition.ToolContractDigest,
+            definition.ToolDeploymentDigest,
+            definition.LibrarySchemaReceiptDigest,
+            definition.LibraryReadReceiptDigest,
+            definition.DynamicAuthorizationReceiptDigest,
+            status,
+            exactMatch,
+            responseDigest,
+            observedAtUtc);
+
+    private static JsonObject BindingAuthority(
+        string idDigest,
+        string definitionDigest,
+        string toolDigest,
+        string deploymentDigest,
+        string schemaReceiptDigest,
+        string readReceiptDigest,
+        string dynamicReceiptDigest,
+        int status,
+        bool exactMatch,
+        string responseDigest,
+        DateTimeOffset observedAtUtc)
+        => new()
+        {
+            ["schema"] = ToughTongueBuildGhostContractVersions.CustomFunctionBindingV1,
+            ["providerCustomFunctionIdDigest"] = idDigest,
+            ["definitionContractDigest"] = definitionDigest,
+            ["toolContractDigest"] = toolDigest,
+            ["toolDeploymentDigest"] = deploymentDigest,
+            ["librarySchemaReceiptDigest"] = schemaReceiptDigest,
+            ["libraryReadReceiptDigest"] = readReceiptDigest,
+            ["dynamicAuthorizationReceiptDigest"] = dynamicReceiptDigest,
+            ["storedReadHttpStatus"] = status,
+            ["storedFieldsExactMatch"] = exactMatch,
+            ["storedResponseDigest"] = responseDigest,
+            ["observedAtUtc"] = observedAtUtc.ToUniversalTime().ToString("O")
+        };
+
+    private static JsonObject AttachmentAuthority(
+        string scenarioDigest,
+        BuildGhostToughTongueCustomFunctionBinding binding,
+        int scenarioStatus,
+        bool scenarioMatch,
+        int byScenarioStatus,
+        bool byScenarioMatch,
+        IReadOnlyList<string> blockers,
+        DateTimeOffset observedAtUtc)
+        => AttachmentAuthority(
+            scenarioDigest,
+            binding.ProviderCustomFunctionIdDigest,
+            binding.DefinitionContractDigest,
+            binding.ContractDigest,
+            ScenarioAttachmentField,
+            scenarioStatus,
+            scenarioMatch,
+            byScenarioStatus,
+            byScenarioMatch,
+            blockers,
+            observedAtUtc);
+
+    private static JsonObject AttachmentAuthority(
+        string scenarioDigest,
+        string providerIdDigest,
+        string definitionDigest,
+        string bindingDigest,
+        string attachmentField,
+        int scenarioStatus,
+        bool scenarioMatch,
+        int byScenarioStatus,
+        bool byScenarioMatch,
+        IReadOnlyList<string> blockers,
+        DateTimeOffset observedAtUtc)
+        => new()
+        {
+            ["schema"] = ToughTongueBuildGhostContractVersions.CustomFunctionAttachmentReceiptV1,
+            ["scenarioIdDigest"] = scenarioDigest,
+            ["providerCustomFunctionIdDigest"] = providerIdDigest,
+            ["definitionContractDigest"] = definitionDigest,
+            ["bindingContractDigest"] = bindingDigest,
+            ["scenarioAttachmentField"] = attachmentField,
+            ["scenarioReadHttpStatus"] = scenarioStatus,
+            ["scenarioAttachmentExactMatch"] = scenarioMatch,
+            ["byScenarioReadHttpStatus"] = byScenarioStatus,
+            ["byScenarioAttachmentExactMatch"] = byScenarioMatch,
+            ["blockingReasons"] = new JsonArray(blockers.Select(static reason => JsonValue.Create(reason)).ToArray()),
+            ["observedAtUtc"] = observedAtUtc.ToUniversalTime().ToString("O")
+        };
+
+    private static void RequireEvidence(
+        string actualName,
+        string actualDigest,
+        long actualBytes,
+        string expectedName,
+        string expectedDigest,
+        long expectedBytes,
+        string label,
+        ICollection<string> failures)
+    {
+        if (actualName != expectedName) failures.Add($"custom-function-{label}-chunk-name-drift");
+        if (actualDigest != expectedDigest) failures.Add($"custom-function-{label}-chunk-digest-drift");
+        if (actualBytes != expectedBytes) failures.Add($"custom-function-{label}-chunk-size-drift");
+    }
+
+    private static bool ExactIdArray(JsonArray? values, string expected)
+        => values is { Count: 1 }
+            && values[0] is JsonValue value
+            && value.TryGetValue(out string? actual)
+            && actual == expected;
+
+    private static bool ExactReturnedFunctionArray(
+        JsonArray? values,
+        string expectedId,
+        JsonObject expectedDefinition)
+        => values is { Count: 1 }
+            && values[0] is JsonObject row
+            && StoredFunctionMatches(row, expectedDefinition, expectedId);
+
+    private static bool IsObjectId(string? value)
+        => value is { Length: 24 }
+            && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static bool IsSafeOpaqueId(string? value)
+        => value is { Length: >= 1 and <= 128 }
+            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
+
+    private static bool IsSafeChunkName(string? value)
+        => value is { Length: >= 4 and <= 128 }
+            && value.EndsWith(".js", StringComparison.Ordinal)
+            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-' or '_' or '~');
+
+    private static bool IsSafeSlotLabel(string? value)
+        => value is { Length: >= 3 and <= 64 }
+            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-');
 
     private static bool IsSha256(string? value)
         => value is { Length: 71 }
             && value.StartsWith("sha256:", StringComparison.Ordinal)
             && value.AsSpan(7).ToString().All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static string Text(JsonObject parent, string property)
+        => parent[property] is JsonValue value && value.TryGetValue(out string? text)
+            ? text?.Trim() ?? string.Empty
+            : string.Empty;
+
+    private static IReadOnlyList<string> Ordered(IEnumerable<string> failures)
+        => failures.Distinct(StringComparer.Ordinal).OrderBy(static reason => reason, StringComparer.Ordinal).ToArray();
+
+    private static string DigestText(string value)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
 
     private static string Digest(JsonNode node)
         => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
@@ -507,8 +1009,7 @@ public static class ToughTongueBuildGhostScenarioContract
         Uri avatarUrl,
         BuildGhostCascadePrivateVoiceBinding runtimeBinding,
         BuildGhostToughTongueCartesiaScenarioSchemaReceipt? scenarioSchemaReceipt = null,
-        BuildGhostToughTongueCustomFunctionSchemaReceipt? customFunctionSchemaReceipt = null,
-        string? trustedCustomFunctionSchemaReceiptDigest = null)
+        BuildGhostToughTongueCustomFunctionBinding? customFunctionBinding = null)
     {
         ArgumentNullException.ThrowIfNull(deployment);
         ArgumentNullException.ThrowIfNull(runtimeBinding);
@@ -538,13 +1039,11 @@ public static class ToughTongueBuildGhostScenarioContract
         string scenarioSchemaReceiptDigest = providerSchemaReadVerified
             ? BuildGhostToughTongueCartesiaScenarioSchemaContract.DigestReceipt(scenarioSchemaReceipt!)
             : string.Empty;
-        IReadOnlyList<string> customFunctionSchemaFailures =
-            BuildGhostToughTongueCustomFunctionSchemaContract.Validate(
-                customFunctionSchemaReceipt,
-                trustedCustomFunctionSchemaReceiptDigest);
-        bool customFunctionSchemaReadVerified = customFunctionSchemaFailures.Count == 0;
-        string customFunctionSchemaReceiptDigest = customFunctionSchemaReadVerified
-            ? BuildGhostToughTongueCustomFunctionSchemaContract.DigestReceipt(customFunctionSchemaReceipt!)
+        IReadOnlyList<string> customFunctionBindingFailures =
+            BuildGhostToughTongueCustomFunctionContract.ValidateBinding(customFunctionBinding, deployment);
+        bool customFunctionBindingReadVerified = customFunctionBindingFailures.Count == 0;
+        string customFunctionBindingDigest = customFunctionBindingReadVerified
+            ? customFunctionBinding!.ContractDigest
             : string.Empty;
 
         JsonObject payload = new()
@@ -578,20 +1077,14 @@ public static class ToughTongueBuildGhostScenarioContract
                 ["provider"] = runtimeBinding.ModelProvider,
                 ["model"] = runtimeBinding.ModelId
             },
+            [BuildGhostToughTongueCustomFunctionContract.ScenarioAttachmentField] =
+                customFunctionBindingReadVerified
+                    ? new JsonArray(customFunctionBinding!.ProviderCustomFunctionId)
+                    : new JsonArray(),
             ["tools_config"] = new JsonObject
             {
                 ["tools"] = new JsonObject
                 {
-                    ["custom_function"] = new JsonObject
-                    {
-                        ["should_register"] = true,
-                        ["add_to_system_prompt"] = true,
-                        ["tool_settings"] = customFunctionSchemaReadVerified
-                            ? BuildGhostToughTongueCustomFunctionSchemaContract.CreateToolSettings(
-                                deployment,
-                                customFunctionSchemaReceipt!)
-                            : null
-                    },
                     ["end_session"] = new JsonObject
                     {
                         ["should_register"] = true,
@@ -611,7 +1104,12 @@ public static class ToughTongueBuildGhostScenarioContract
                 ["tool_endpoint"] = tool.Endpoint.AbsoluteUri,
                 ["tool_http_method"] = tool.HttpMethod,
                 ["tool_authentication_audience"] = deployment.AuthenticationAudience,
-                ["custom_function_schema_receipt_digest"] = customFunctionSchemaReceiptDigest,
+                ["custom_function_binding_digest"] = customFunctionBindingDigest,
+                ["custom_function_id_digest"] = customFunctionBindingReadVerified ? customFunctionBinding!.ProviderCustomFunctionIdDigest : string.Empty,
+                ["custom_function_definition_digest"] = customFunctionBindingReadVerified ? customFunctionBinding!.DefinitionContractDigest : string.Empty,
+                ["custom_function_library_schema_receipt_digest"] = customFunctionBindingReadVerified ? customFunctionBinding!.LibrarySchemaReceiptDigest : string.Empty,
+                ["custom_function_library_read_receipt_digest"] = customFunctionBindingReadVerified ? customFunctionBinding!.LibraryReadReceiptDigest : string.Empty,
+                ["custom_function_dynamic_authorization_receipt_digest"] = customFunctionBindingReadVerified ? customFunctionBinding!.DynamicAuthorizationReceiptDigest : string.Empty,
                 ["runtime_binding_digest"] = runtimeBinding.ContractDigest,
                 ["voice_release_digest"] = runtimeBinding.VoiceReleaseDigest,
                 ["voice_read_receipt_digest"] = runtimeBinding.VoiceReadReceiptDigest,
@@ -639,10 +1137,10 @@ public static class ToughTongueBuildGhostScenarioContract
             ttsProviderFieldPath,
             ttsVoiceIdFieldPath,
             providerSchemaReadVerified,
-            customFunctionSchemaReceipt,
-            customFunctionSchemaReceiptDigest,
-            customFunctionSchemaReadVerified,
-            scenarioSchemaFailures.Concat(customFunctionSchemaFailures)
+            customFunctionBinding,
+            customFunctionBindingDigest,
+            customFunctionBindingReadVerified,
+            scenarioSchemaFailures.Concat(customFunctionBindingFailures)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(static reason => reason, StringComparer.Ordinal)
                 .ToArray(),
@@ -655,7 +1153,7 @@ public static class ToughTongueBuildGhostScenarioContract
     {
         ArgumentNullException.ThrowIfNull(expected);
         if (!expected.ProviderSchemaReadVerified
-            || !expected.CustomFunctionSchemaReadVerified
+            || !expected.CustomFunctionBindingReadVerified
             || expected.BlockingReasons.Count != 0)
         {
             IReadOnlyList<string> blockers = expected.BlockingReasons.Count == 0
@@ -702,23 +1200,12 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireBoolean(sessionAnalysis, "email_transcript", expected: false, "scenario-email-transcript-must-be-disabled", reasons);
         RequireBoolean(sessionAnalysis, "multimodal_analysis", expected: false, "scenario-multimodal-analysis-must-be-disabled", reasons);
         RequireBoolean(sessionAnalysis, "enable_extraction", expected: false, "scenario-extraction-must-be-disabled", reasons);
-        JsonObject customFunction = Object(Object(Object(scenario, "tools_config"), "tools"), "custom_function");
-        RequireBoolean(customFunction, "should_register", expected: true, "custom-function-not-registered", reasons);
-        RequireBoolean(customFunction, "add_to_system_prompt", expected: true, "custom-function-not-authoritative", reasons);
-        if (expected.CustomFunctionSchemaReceipt is null)
+        if (expected.CustomFunctionBinding is null
+            || !ExactStringArray(
+                scenario[BuildGhostToughTongueCustomFunctionContract.ScenarioAttachmentField] as JsonArray,
+                expected.CustomFunctionBinding.ProviderCustomFunctionId))
         {
-            reasons.Add("custom-function-schema-receipt-missing");
-        }
-        else
-        {
-            JsonObject actualSettings = Object(customFunction, "tool_settings");
-            JsonObject expectedSettings = Object(
-                Object(Object(Object(expected.Payload, "tools_config"), "tools"), "custom_function"),
-                "tool_settings");
-            if (!JsonNode.DeepEquals(actualSettings, expectedSettings))
-            {
-                reasons.Add("custom-function-tool-settings-mismatch");
-            }
+            reasons.Add("custom-function-scenario-attachment-mismatch");
         }
         JsonObject metadata = Object(scenario, "user_metadata");
         RequireText(metadata, "chummer_contract", expected.Schema, "scenario-contract-mismatch", reasons);
@@ -731,7 +1218,12 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(metadata, "tool_endpoint", expected.Tool.Endpoint.AbsoluteUri, "tool-endpoint-mismatch", reasons);
         RequireText(metadata, "tool_http_method", expected.Tool.HttpMethod, "tool-http-method-mismatch", reasons);
         RequireText(metadata, "tool_authentication_audience", Text(expectedMetadata, "tool_authentication_audience"), "tool-authentication-audience-mismatch", reasons);
-        RequireText(metadata, "custom_function_schema_receipt_digest", expected.CustomFunctionSchemaReceiptDigest, "custom-function-schema-receipt-digest-mismatch", reasons);
+        RequireText(metadata, "custom_function_binding_digest", expected.CustomFunctionBindingDigest, "custom-function-binding-digest-mismatch", reasons);
+        RequireText(metadata, "custom_function_id_digest", Text(expectedMetadata, "custom_function_id_digest"), "custom-function-id-digest-mismatch", reasons);
+        RequireText(metadata, "custom_function_definition_digest", Text(expectedMetadata, "custom_function_definition_digest"), "custom-function-definition-digest-mismatch", reasons);
+        RequireText(metadata, "custom_function_library_schema_receipt_digest", Text(expectedMetadata, "custom_function_library_schema_receipt_digest"), "custom-function-library-schema-receipt-digest-mismatch", reasons);
+        RequireText(metadata, "custom_function_library_read_receipt_digest", Text(expectedMetadata, "custom_function_library_read_receipt_digest"), "custom-function-library-read-receipt-digest-mismatch", reasons);
+        RequireText(metadata, "custom_function_dynamic_authorization_receipt_digest", Text(expectedMetadata, "custom_function_dynamic_authorization_receipt_digest"), "custom-function-dynamic-authorization-receipt-digest-mismatch", reasons);
         RequireText(metadata, "runtime_binding_digest", Text(expectedMetadata, "runtime_binding_digest"), "runtime-binding-digest-mismatch", reasons);
         RequireText(metadata, "voice_release_digest", Text(expectedMetadata, "voice_release_digest"), "voice-release-digest-mismatch", reasons);
         RequireText(metadata, "voice_read_receipt_digest", Text(expectedMetadata, "voice_read_receipt_digest"), "voice-read-receipt-digest-mismatch", reasons);
@@ -752,14 +1244,15 @@ public static class ToughTongueBuildGhostScenarioContract
     {
         ArgumentNullException.ThrowIfNull(candidate);
         if (!candidate.ProviderSchemaReadVerified
-            || !candidate.CustomFunctionSchemaReadVerified
+            || !candidate.CustomFunctionBindingReadVerified
             || candidate.BlockingReasons.Count != 0)
         {
             throw new InvalidDataException("scenario-create-payload-provider-schema-unverified");
         }
-        JsonObject customFunction = Object(Object(Object(candidate.Payload, "tools_config"), "tools"), "custom_function");
-        JsonObject toolSettings = Object(customFunction, "tool_settings");
-        if (toolSettings.Count == 0
+        if (candidate.CustomFunctionBinding is null
+            || !ExactStringArray(
+                candidate.Payload[BuildGhostToughTongueCustomFunctionContract.ScenarioAttachmentField] as JsonArray,
+                candidate.CustomFunctionBinding.ProviderCustomFunctionId)
             || candidate.ContractDigest != CreatePayloadDigest(candidate.Payload)
             || Text(Object(candidate.Payload, "user_metadata"), "tool_contract_digest") != candidate.Tool.ContractDigest
             || Text(Object(candidate.Payload, "user_metadata"), "tool_endpoint") != candidate.Tool.Endpoint.AbsoluteUri)
@@ -803,6 +1296,12 @@ public static class ToughTongueBuildGhostScenarioContract
     private static bool IsObjectId(string? value)
         => value is { Length: 24 }
             && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static bool ExactStringArray(JsonArray? values, string expected)
+        => values is { Count: 1 }
+            && values[0] is JsonValue value
+            && value.TryGetValue(out string? actual)
+            && actual == expected;
 
     private static JsonObject Object(JsonObject parent, string property)
         => parent[property] as JsonObject ?? new JsonObject();
@@ -879,31 +1378,20 @@ public sealed class ToughTongueBuildGhostScenarioClient(
         return ToughTongueBuildGhostScenarioContract.Validate(scenario, expected);
     }
 
-    public async Task<(ToughTongueBuildGhostScenarioValidation Validation, string? ScenarioId)> CreatePrivateCandidateAsync(
+    public Task<(ToughTongueBuildGhostScenarioValidation Validation, string? ScenarioId)> CreatePrivateCandidateAsync(
         ToughTongueBuildGhostScenarioCandidate candidate,
         string credential,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ToughTongueBuildGhostScenarioValidation? blocked = BlockedCandidate(candidate);
-        if (blocked is not null) return (blocked, null);
-        EnsurePrivateCanaryMutationsEnabled();
-        ValidateCredential(credential);
-        EnsureProviderBoundary();
-        using HttpRequestMessage request = CreateRequest(HttpMethod.Post, "scenarios", credential);
-        request.Content = JsonContent.Create(ToughTongueBuildGhostScenarioContract.SerializeCreatePayload(candidate));
-        using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-        {
-            return (new ToughTongueBuildGhostScenarioValidation(
+        if (blocked is not null) return Task.FromResult<(ToughTongueBuildGhostScenarioValidation, string?)>((blocked, null));
+        return Task.FromResult<(ToughTongueBuildGhostScenarioValidation, string?)>((
+            new ToughTongueBuildGhostScenarioValidation(
                 false,
                 null,
-                [$"scenario-create-http-{(int)response.StatusCode}"]), null);
-        }
-
-        JsonObject? scenario = await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken).ConfigureAwait(false);
-        ToughTongueBuildGhostScenarioValidation validation = ToughTongueBuildGhostScenarioContract.Validate(scenario, candidate);
-        return (validation, validation.ScenarioId);
+                [BuildGhostToughTongueCustomFunctionContract.ScenarioMutationPublicApiBlocker]),
+            null));
     }
 
     public async Task<ToughTongueBuildGhostScenarioAccessGrant> CreateAccessGrantAsync(
@@ -985,7 +1473,7 @@ public sealed class ToughTongueBuildGhostScenarioClient(
         ToughTongueBuildGhostScenarioCandidate candidate)
     {
         if (candidate.ProviderSchemaReadVerified
-            && candidate.CustomFunctionSchemaReadVerified
+            && candidate.CustomFunctionBindingReadVerified
             && candidate.BlockingReasons.Count == 0) return null;
         IReadOnlyList<string> blockers = candidate.BlockingReasons.Count == 0
             ? [BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker]
@@ -1034,7 +1522,7 @@ public sealed class ToughTongueBuildGhostCanaryHarness(
         DateTimeOffset? grantExpiresAt = null;
 
         if (!expected.ProviderSchemaReadVerified
-            || !expected.CustomFunctionSchemaReadVerified
+            || !expected.CustomFunctionBindingReadVerified
             || expected.BlockingReasons.Count != 0)
         {
             blockers.AddRange(expected.BlockingReasons.Count == 0
