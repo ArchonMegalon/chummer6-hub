@@ -17,7 +17,10 @@ public static class ToughTongueBuildGhostContractVersions
     public const string CascadePrivateVoiceBindingV1 = "chummer.build_ghost.cascade_private_voice_binding.v1";
     public const string CartesiaPrivateVoiceReadReceiptV1 = "chummer.build_ghost.cartesia_private_voice_read_receipt.v1";
     public const string CartesiaScenarioSchemaReceiptV1 = "chummer.tough_tongue.cartesia_scenario_schema_receipt.v1";
+    public const string CustomFunctionSchemaReceiptV1 = "chummer.tough_tongue.custom_function_schema_receipt.v1";
     public const string ScenarioCanaryReceiptV1 = "chummer.tough_tongue.build_ghost_canary_receipt.v1";
+    public const string CartesiaVoiceDeletionReceiptV1 = "chummer.build_ghost.cartesia_voice_deletion_receipt.v1";
+    public const string ScenarioDeletionBlockerReceiptV1 = "chummer.tough_tongue.scenario_deletion_blocker_receipt.v1";
 }
 
 public static class ToughTongueBuildGhostPersonaIds
@@ -200,6 +203,28 @@ public sealed record BuildGhostToughTongueCartesiaScenarioSchemaReceipt(
     string TtsProvider,
     DateTimeOffset ObservedAtUtc);
 
+public sealed record BuildGhostToughTongueCustomFunctionSchemaReceipt(
+    string Schema,
+    string ProviderNamespace,
+    Uri EvidenceUrl,
+    string EvidenceDigest,
+    string ToolSettingsFieldPath,
+    string NameProperty,
+    string DescriptionProperty,
+    string EndpointProperty,
+    string HttpMethodProperty,
+    string HeadersProperty,
+    string BodySchemaProperty,
+    string MaximumResponseCharactersProperty,
+    string TimeoutSecondsProperty,
+    string AuthenticationSchemeProperty,
+    string AuthenticationAudienceProperty,
+    string ContractDigestProperty,
+    string AuthorizationHeaderName,
+    string ContractHeaderName,
+    string PacketAccessKeyAuthorizationTemplate,
+    DateTimeOffset ObservedAtUtc);
+
 public sealed record BuildGhostCascadePrivateVoiceBinding(
     string Schema,
     string ModelProvider,
@@ -221,6 +246,9 @@ public sealed record ToughTongueBuildGhostScenarioCandidate(
     string? TtsProviderFieldPath,
     string? TtsVoiceIdFieldPath,
     bool ProviderSchemaReadVerified,
+    BuildGhostToughTongueCustomFunctionSchemaReceipt? CustomFunctionSchemaReceipt,
+    string CustomFunctionSchemaReceiptDigest,
+    bool CustomFunctionSchemaReadVerified,
     IReadOnlyList<string> BlockingReasons,
     string ContractDigest);
 
@@ -249,6 +277,31 @@ public sealed record ToughTongueBuildGhostCanaryReceipt(
     bool AccessGrantAttempted,
     bool AccessGrantCreated,
     DateTimeOffset? AccessGrantExpiresAtUtc,
+    IReadOnlyList<string> BlockingReasons,
+    DateTimeOffset ObservedAtUtc);
+
+public sealed record BuildGhostCartesiaVoiceDeletionReceipt(
+    string Schema,
+    string OutcomeStatus,
+    string VoiceIdDigest,
+    bool DeleteAttempted,
+    int? DeleteHttpStatus,
+    bool ReadbackAttempted,
+    int? ReadbackHttpStatus,
+    bool OwnerListAttempted,
+    int? OwnerListHttpStatus,
+    bool OwnerListAbsenceVerified,
+    bool RawResponseExposed,
+    bool RawVoiceIdExposed,
+    bool CredentialExposed,
+    IReadOnlyList<string> BlockingReasons,
+    DateTimeOffset ObservedAtUtc);
+
+public sealed record ToughTongueBuildGhostScenarioDeletionBlockerReceipt(
+    string Schema,
+    string OutcomeStatus,
+    string ScenarioIdDigest,
+    bool TransportAttempted,
     IReadOnlyList<string> BlockingReasons,
     DateTimeOffset ObservedAtUtc);
 

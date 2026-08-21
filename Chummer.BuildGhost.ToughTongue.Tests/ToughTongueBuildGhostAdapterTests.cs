@@ -389,13 +389,18 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
             RuntimeBinding(),
-            ScenarioSchemaReceipt());
+            ScenarioSchemaReceipt(),
+            CustomFunctionSchemaReceipt(),
+            CustomFunctionSchemaReceiptDigest());
 
         Assert.AreEqual(ToughTongueBuildGhostContractVersions.ScenarioContractV1, candidate.Schema);
         Assert.IsFalse(candidate.Payload["is_public"]!.GetValue<bool>());
         Assert.IsFalse(candidate.Payload["is_recording"]!.GetValue<bool>());
         Assert.AreEqual("never", candidate.Payload["analysis_access"]!.GetValue<string>());
         Assert.IsFalse(candidate.Payload["memory"]!["is_memory"]!.GetValue<bool>());
+        JsonObject sessionAnalysis = candidate.Payload["session_analysis"]!.AsObject();
+        Assert.IsTrue(new[] { "is_auto_analysis", "is_auto_submit", "email_analysis", "email_transcript", "multimodal_analysis", "enable_extraction" }
+            .All(field => sessionAnalysis[field]!.GetValue<bool>() == false));
         Assert.AreEqual("Landmass", candidate.Payload["ai_model_config"]!["provider"]!.GetValue<string>());
         Assert.AreEqual("cascade", candidate.Payload["ai_model_config"]!["model"]!.GetValue<string>());
         Assert.AreEqual(CartesiaVoiceId, candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
@@ -404,6 +409,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.AreEqual(BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsProviderFieldPath, candidate.TtsProviderFieldPath);
         Assert.AreEqual(BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsVoiceIdFieldPath, candidate.TtsVoiceIdFieldPath);
         Assert.IsTrue(candidate.ProviderSchemaReadVerified);
+        Assert.IsTrue(candidate.CustomFunctionSchemaReadVerified);
         Assert.IsEmpty(candidate.BlockingReasons);
         CollectionAssert.AreEqual(
             new[] { "de-DE", "en-US", "fr-FR", "ja-JP", "pt-BR", "zh-CN" },
@@ -415,6 +421,16 @@ public sealed class ToughTongueBuildGhostAdapterTests
         StringAssert.Contains(candidate.Tool.BodySchemaJson, "group-gaps");
         StringAssert.StartsWith(candidate.Tool.ContractDigest, "sha256:");
         StringAssert.StartsWith(candidate.ContractDigest, "sha256:");
+        JsonObject toolSettings = candidate.Payload["tools_config"]!["tools"]!["custom_function"]!["tool_settings"]!.AsObject();
+        Assert.AreEqual(candidate.Tool.Name, toolSettings["name"]!.GetValue<string>());
+        Assert.AreEqual(candidate.Tool.Description, toolSettings["description"]!.GetValue<string>());
+        Assert.AreEqual(candidate.Tool.Endpoint.AbsoluteUri, toolSettings["endpoint"]!.GetValue<string>());
+        Assert.AreEqual("POST", toolSettings["http_method"]!.GetValue<string>());
+        Assert.AreEqual("Bearer {{packet_access_key}}", toolSettings["headers"]!["Authorization"]!.GetValue<string>());
+        Assert.AreEqual(candidate.Tool.ContractDigest, toolSettings["headers"]!["X-Chummer-Build-Ghost-Tool-Contract"]!.GetValue<string>());
+        Assert.AreEqual("ephemeral-bearer", toolSettings["authentication_scheme"]!.GetValue<string>());
+        Assert.AreEqual("build-ghost-private-tool", toolSettings["authentication_audience"]!.GetValue<string>());
+        Assert.IsNotNull(toolSettings["body_schema"]!["properties"]!["packet_access_key"]);
         StringAssert.Contains(candidate.Payload["ai_instructions"]!.GetValue<string>(), "never speak");
         Assert.AreEqual(ToolDeployment().ContractDigest, candidate.Payload["user_metadata"]!["tool_deployment_digest"]!.GetValue<string>());
         Assert.AreEqual(RuntimeBinding().ContractDigest, candidate.Payload["user_metadata"]!["runtime_binding_digest"]!.GetValue<string>());
@@ -526,13 +542,64 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public void Scenario_readback_rejects_every_privacy_and_custom_tool_binding_drift()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        JsonObject drifted = ProviderScenario(candidate);
+        drifted["is_public"] = true;
+        drifted["is_recording"] = true;
+        drifted["analysis_access"] = "provider";
+        drifted["memory"]!["is_memory"] = true;
+        JsonObject sessionAnalysis = drifted["session_analysis"]!.AsObject();
+        foreach (string field in new[] { "is_auto_analysis", "is_auto_submit", "email_analysis", "email_transcript", "multimodal_analysis", "enable_extraction" })
+        {
+            sessionAnalysis[field] = true;
+        }
+        drifted["tools_config"]!["tools"]!["custom_function"]!["tool_settings"]!["endpoint"] =
+            "https://attacker.invalid/tool";
+        drifted["user_metadata"]!["tool_deployment_digest"] = $"sha256:{new string('0', 64)}";
+        drifted["user_metadata"]!["tool_contract_digest"] = $"sha256:{new string('1', 64)}";
+        drifted["user_metadata"]!["tool_endpoint"] = "https://attacker.invalid/tool";
+        drifted["user_metadata"]!["tool_authentication_audience"] = "other-audience";
+
+        ToughTongueBuildGhostScenarioValidation validation =
+            ToughTongueBuildGhostScenarioContract.Validate(drifted, candidate);
+
+        Assert.IsFalse(validation.Accepted);
+        string[] reasons = validation.RejectionReasons.ToArray();
+        foreach (string expected in new[]
+        {
+            "scenario-must-be-private",
+            "scenario-recording-must-be-disabled",
+            "scenario-analysis-access-invalid",
+            "scenario-memory-must-be-disabled",
+            "scenario-auto-analysis-must-be-disabled",
+            "scenario-auto-submit-must-be-disabled",
+            "scenario-email-analysis-must-be-disabled",
+            "scenario-email-transcript-must-be-disabled",
+            "scenario-multimodal-analysis-must-be-disabled",
+            "scenario-extraction-must-be-disabled",
+            "custom-function-tool-settings-mismatch",
+            "tool-deployment-digest-mismatch",
+            "tool-contract-digest-mismatch",
+            "tool-endpoint-mismatch",
+            "tool-authentication-audience-mismatch"
+        })
+        {
+            CollectionAssert.Contains(reasons, expected);
+        }
+    }
+
+    [TestMethod]
     public async Task Documented_scenario_create_and_read_contract_use_only_the_official_private_API_boundary()
     {
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
             RuntimeBinding(),
-            ScenarioSchemaReceipt());
+            ScenarioSchemaReceipt(),
+            CustomFunctionSchemaReceipt(),
+            CustomFunctionSchemaReceiptDigest());
         JsonObject providerScenario = ProviderScenario(candidate);
         RecordingHttpHandler handler = new(
             JsonResponse(providerScenario),
@@ -570,6 +637,11 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.IsNull(posted["ai_model_config"]!["tts_provider"]);
         Assert.IsNull(posted["ai_model_config"]!["tts_voice_id"]);
         Assert.AreEqual(candidate.ContractDigest, posted["user_metadata"]!["scenario_contract_digest"]!.GetValue<string>());
+        JsonObject postedTool = posted["tools_config"]!["tools"]!["custom_function"]!["tool_settings"]!.AsObject();
+        Assert.AreEqual("get_chummer_build_analysis", postedTool["name"]!.GetValue<string>());
+        Assert.AreEqual("https://canary.chummer.run/api/v1/ai/build-ghost/tool", postedTool["endpoint"]!.GetValue<string>());
+        Assert.AreEqual(candidate.Tool.ContractDigest, postedTool["contract_digest"]!.GetValue<string>());
+        Assert.AreEqual("build-ghost-private-tool", postedTool["authentication_audience"]!.GetValue<string>());
     }
 
     [TestMethod]
@@ -617,7 +689,9 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 ToolDeployment(),
                 new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
                 RuntimeBinding(),
-                ScenarioSchemaReceipt()),
+                ScenarioSchemaReceipt(),
+                CustomFunctionSchemaReceipt(),
+                CustomFunctionSchemaReceiptDigest()),
             "must-not-leave-process",
             CancellationToken.None));
         Assert.IsEmpty(handler.Requests);
@@ -683,6 +757,68 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public async Task Scenario_creation_is_blocked_without_a_separately_trusted_custom_function_schema_receipt()
+    {
+        RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+        ToughTongueBuildGhostScenarioClient scenarios = new(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
+            new FixedClock(),
+            ScenarioConfiguration(mutationsEnabled: true));
+        ToughTongueBuildGhostScenarioCandidate missing =
+            ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                ToolDeployment(),
+                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                RuntimeBinding(),
+                ScenarioSchemaReceipt());
+        ToughTongueBuildGhostScenarioCandidate untrusted =
+            ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                ToolDeployment(),
+                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                RuntimeBinding(),
+                ScenarioSchemaReceipt(),
+                CustomFunctionSchemaReceipt(),
+                $"sha256:{new string('0', 64)}");
+
+        foreach (ToughTongueBuildGhostScenarioCandidate candidate in new[] { missing, untrusted })
+        {
+            (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
+                await scenarios.CreatePrivateCandidateAsync(candidate, "must-not-leave-process", CancellationToken.None);
+            Assert.IsFalse(validation.Accepted);
+            Assert.IsNull(scenarioId);
+            Assert.IsNotEmpty(validation.RejectionReasons);
+        }
+        CollectionAssert.Contains(
+            missing.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionSchemaContract.MissingOrUnverifiedBlocker);
+        CollectionAssert.Contains(
+            untrusted.BlockingReasons.ToArray(),
+            "custom-function-schema-receipt-digest-untrusted");
+        Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Scenario_create_rejects_post_construction_tool_auth_drift_before_transport()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        JsonObject tamperedPayload = (JsonObject)candidate.Payload.DeepClone();
+        tamperedPayload["tools_config"]!["tools"]!["custom_function"]!["tool_settings"]!["headers"]!["Authorization"] =
+            "Bearer attacker-value";
+        ToughTongueBuildGhostScenarioCandidate tampered = candidate with { Payload = tamperedPayload };
+        RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+        ToughTongueBuildGhostScenarioClient scenarios = new(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
+            new FixedClock(),
+            ScenarioConfiguration(mutationsEnabled: true));
+
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() => scenarios.CreatePrivateCandidateAsync(
+            tampered,
+            "must-not-leave-process",
+            CancellationToken.None));
+
+        Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
     public async Task Scenario_creation_rejects_bundle_deployment_digest_url_size_and_field_drift_before_transport()
     {
         BuildGhostToughTongueCartesiaScenarioSchemaReceipt receipt = ScenarioSchemaReceipt();
@@ -707,7 +843,9 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 ToolDeployment(),
                 new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
                 RuntimeBinding(),
-                driftedReceipt);
+                driftedReceipt,
+                CustomFunctionSchemaReceipt(),
+                CustomFunctionSchemaReceiptDigest());
 
             (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
                 await scenarios.CreatePrivateCandidateAsync(blocked, "must-not-leave-process", CancellationToken.None);
@@ -731,7 +869,9 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
             RuntimeBinding(),
-            ScenarioSchemaReceipt());
+            ScenarioSchemaReceipt(),
+            CustomFunctionSchemaReceipt(),
+            CustomFunctionSchemaReceiptDigest());
 
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.CreatePrivateCandidateAsync(
             candidate,
@@ -742,6 +882,120 @@ public sealed class ToughTongueBuildGhostAdapterTests
             "must-not-leave-process",
             CancellationToken.None));
         Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Cartesia_voice_deletion_requires_204_404_and_complete_owner_list_absence()
+    {
+        const string credential = "cartesia-test-credential-must-stay-redacted";
+        RecordingHttpHandler handler = new(
+            new HttpResponseMessage(System.Net.HttpStatusCode.NoContent),
+            new HttpResponseMessage(System.Net.HttpStatusCode.NotFound),
+            JsonResponse(new JsonObject
+            {
+                ["data"] = new JsonArray(),
+                ["has_more"] = false,
+                ["next_page"] = null
+            }));
+        BuildGhostCartesiaVoiceDeletionClient client = CartesiaDeletionClient(handler, enabled: true);
+
+        BuildGhostCartesiaVoiceDeletionReceipt receipt = await client.DeleteAndVerifyAsync(
+            CartesiaVoiceId,
+            credential,
+            CancellationToken.None);
+
+        Assert.AreEqual("deleted-and-absence-verified", receipt.OutcomeStatus);
+        Assert.AreEqual(204, receipt.DeleteHttpStatus);
+        Assert.AreEqual(404, receipt.ReadbackHttpStatus);
+        Assert.AreEqual(200, receipt.OwnerListHttpStatus);
+        Assert.IsTrue(receipt.OwnerListAbsenceVerified);
+        Assert.HasCount(3, handler.Requests);
+        Assert.AreEqual(HttpMethod.Delete, handler.Requests[0].Method);
+        Assert.AreEqual($"https://api.cartesia.ai/voices/{CartesiaVoiceId}", handler.Requests[0].Uri.AbsoluteUri);
+        Assert.AreEqual(HttpMethod.Get, handler.Requests[1].Method);
+        Assert.AreEqual($"https://api.cartesia.ai/voices/{CartesiaVoiceId}", handler.Requests[1].Uri.AbsoluteUri);
+        Assert.AreEqual("https://api.cartesia.ai/voices?is_owner=true&limit=100", handler.Requests[2].Uri.AbsoluteUri);
+        Assert.IsTrue(handler.Requests.All(static request => request.HasBearerCredential));
+        Assert.IsTrue(handler.Requests.All(static request => request.ApiVersion == BuildGhostCartesiaVoiceDeletionClient.ApiVersion));
+        string rendered = JsonSerializer.Serialize(receipt);
+        Assert.IsFalse(rendered.Contains(CartesiaVoiceId, StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Contains(credential, StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task Cartesia_voice_deletion_disabled_mismatched_and_replayed_authorizations_make_zero_calls()
+    {
+        RecordingHttpHandler disabledHandler = new();
+        BuildGhostCartesiaVoiceDeletionReceipt disabled = await CartesiaDeletionClient(disabledHandler, enabled: false)
+            .DeleteAndVerifyAsync(CartesiaVoiceId, "credential", CancellationToken.None);
+        Assert.AreEqual("blocked", disabled.OutcomeStatus);
+        Assert.IsEmpty(disabledHandler.Requests);
+
+        RecordingHttpHandler mismatchHandler = new();
+        IConfiguration mismatchConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostCartesiaVoiceDeletionClient.ExecuteEnabledConfigurationKey] = "true",
+            [BuildGhostCartesiaVoiceDeletionClient.AuthorizedVoiceDigestConfigurationKey] = $"sha256:{new string('0', 64)}"
+        }).Build();
+        BuildGhostCartesiaVoiceDeletionClient mismatchClient = new(
+            new HttpClient(mismatchHandler) { BaseAddress = new Uri("https://api.cartesia.ai/") },
+            mismatchConfiguration,
+            new FixedClock());
+        BuildGhostCartesiaVoiceDeletionReceipt mismatch = await mismatchClient.DeleteAndVerifyAsync(
+            CartesiaVoiceId,
+            "credential",
+            CancellationToken.None);
+        Assert.AreEqual("blocked", mismatch.OutcomeStatus);
+        Assert.IsEmpty(mismatchHandler.Requests);
+
+        RecordingHttpHandler replayHandler = new(
+            new HttpResponseMessage(System.Net.HttpStatusCode.NoContent),
+            new HttpResponseMessage(System.Net.HttpStatusCode.NotFound),
+            JsonResponse(new JsonObject { ["data"] = new JsonArray(), ["has_more"] = false, ["next_page"] = null }));
+        BuildGhostCartesiaVoiceDeletionClient replayClient = CartesiaDeletionClient(replayHandler, enabled: true);
+        BuildGhostCartesiaVoiceDeletionReceipt first = await replayClient.DeleteAndVerifyAsync(
+            CartesiaVoiceId,
+            "credential",
+            CancellationToken.None);
+        BuildGhostCartesiaVoiceDeletionReceipt replay = await replayClient.DeleteAndVerifyAsync(
+            CartesiaVoiceId,
+            "credential",
+            CancellationToken.None);
+        Assert.AreEqual("deleted-and-absence-verified", first.OutcomeStatus);
+        Assert.AreEqual("blocked", replay.OutcomeStatus);
+        CollectionAssert.Contains(replay.BlockingReasons.ToArray(), "cartesia-voice-deletion-authorization-replay-rejected");
+        Assert.HasCount(3, replayHandler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Cartesia_voice_deletion_errors_and_Tough_Tongue_cleanup_blocker_are_redacted()
+    {
+        const string credential = "cartesia-error-secret";
+        HttpResponseMessage failure = new(System.Net.HttpStatusCode.InternalServerError)
+        {
+            Content = new StringContent($"provider leaked {credential} {CartesiaVoiceId}")
+        };
+        RecordingHttpHandler handler = new(failure);
+        BuildGhostCartesiaVoiceDeletionReceipt receipt = await CartesiaDeletionClient(handler, enabled: true)
+            .DeleteAndVerifyAsync(CartesiaVoiceId, credential, CancellationToken.None);
+        string rendered = JsonSerializer.Serialize(receipt);
+
+        Assert.AreEqual("failed", receipt.OutcomeStatus);
+        Assert.HasCount(1, handler.Requests);
+        Assert.IsFalse(rendered.Contains(credential, StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Contains(CartesiaVoiceId, StringComparison.Ordinal));
+        Assert.IsFalse(receipt.RawResponseExposed);
+        Assert.IsFalse(receipt.RawVoiceIdExposed);
+        Assert.IsFalse(receipt.CredentialExposed);
+
+        const string scenarioId = "0123456789abcdef01234567";
+        ToughTongueBuildGhostScenarioDeletionBlockerReceipt blocker =
+            ToughTongueBuildGhostScenarioCleanupContract.CreateBlockedReceipt(scenarioId, new FixedClock());
+        Assert.AreEqual("blocked", blocker.OutcomeStatus);
+        Assert.IsFalse(blocker.TransportAttempted);
+        CollectionAssert.Contains(blocker.BlockingReasons.ToArray(),
+            ToughTongueBuildGhostScenarioCleanupContract.UndocumentedDeletionBlocker);
+        Assert.IsFalse(JsonSerializer.Serialize(blocker).Contains(scenarioId, StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -872,12 +1126,40 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider,
             DateTimeOffset.Parse("2026-08-21T17:21:00Z"));
 
+    private static BuildGhostToughTongueCustomFunctionSchemaReceipt CustomFunctionSchemaReceipt()
+        => new(
+            ToughTongueBuildGhostContractVersions.CustomFunctionSchemaReceiptV1,
+            BuildGhostToughTongueCustomFunctionSchemaContract.ProviderNamespace,
+            new Uri("https://app.toughtongueai.com/"),
+            $"sha256:{new string('7', 64)}",
+            BuildGhostToughTongueCustomFunctionSchemaContract.ToolSettingsFieldPath,
+            "name",
+            "description",
+            "endpoint",
+            "http_method",
+            "headers",
+            "body_schema",
+            "maximum_response_characters",
+            "timeout_seconds",
+            "authentication_scheme",
+            "authentication_audience",
+            "contract_digest",
+            "Authorization",
+            "X-Chummer-Build-Ghost-Tool-Contract",
+            "Bearer {{packet_access_key}}",
+            DateTimeOffset.Parse("2026-08-21T18:00:00Z"));
+
+    private static string CustomFunctionSchemaReceiptDigest()
+        => BuildGhostToughTongueCustomFunctionSchemaContract.DigestReceipt(CustomFunctionSchemaReceipt());
+
     private static ToughTongueBuildGhostScenarioCandidate ScenarioCandidate()
         => ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
             new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
             RuntimeBinding(),
-            ScenarioSchemaReceipt());
+            ScenarioSchemaReceipt(),
+            CustomFunctionSchemaReceipt(),
+            CustomFunctionSchemaReceiptDigest());
 
     private static JsonObject ProviderScenario(ToughTongueBuildGhostScenarioCandidate candidate)
     {
@@ -908,6 +1190,22 @@ public sealed class ToughTongueBuildGhostAdapterTests
         {
             ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED"] = mutationsEnabled.ToString()
         }).Build();
+
+    private static BuildGhostCartesiaVoiceDeletionClient CartesiaDeletionClient(
+        HttpMessageHandler handler,
+        bool enabled)
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostCartesiaVoiceDeletionClient.ExecuteEnabledConfigurationKey] = enabled.ToString(),
+            [BuildGhostCartesiaVoiceDeletionClient.AuthorizedVoiceDigestConfigurationKey] =
+                BuildGhostCartesiaVoiceDeletionClient.VoiceIdDigest(CartesiaVoiceId)
+        }).Build();
+        return new BuildGhostCartesiaVoiceDeletionClient(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.cartesia.ai/") },
+            configuration,
+            new FixedClock());
+    }
 
     private static Dictionary<string, string?> RemoteConfiguration()
         => new(StringComparer.Ordinal)
@@ -1136,7 +1434,10 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 request.RequestUri!,
                 string.Equals(request.Headers.Authorization?.Scheme, "Bearer", StringComparison.Ordinal)
                     && !string.IsNullOrWhiteSpace(request.Headers.Authorization?.Parameter),
-                body));
+                body,
+                request.Headers.TryGetValues("Cartesia-Version", out IEnumerable<string>? versions)
+                    ? versions.Single()
+                    : string.Empty));
             if (_responses.Count == 0)
             {
                 throw new AssertFailedException("Unexpected provider HTTP request.");
@@ -1150,5 +1451,6 @@ public sealed class ToughTongueBuildGhostAdapterTests
         HttpMethod Method,
         Uri Uri,
         bool HasBearerCredential,
-        string? Body);
+        string? Body,
+        string ApiVersion);
 }

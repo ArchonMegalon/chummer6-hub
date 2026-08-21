@@ -116,6 +116,11 @@ builder.Services.AddHttpClient<IToughTongueBuildGhostScenarioClient, ToughTongue
     client.BaseAddress = new Uri("https://api.toughtongueai.com/api/public/", UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddHttpClient<BuildGhostCartesiaVoiceDeletionClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.cartesia.ai/", UriKind.Absolute);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddSingleton<ToughTongueBuildGhostCanaryHarness>();
 builder.Services.AddSingleton<IToughTongueBuildGhostAdapter, ToughTongueBuildGhostAdapter>();
 builder.Services.AddHttpClient<IBuildGhostPrivateToolAuthorityClient, BuildGhostPrivateToolAuthorityClient>(client =>
