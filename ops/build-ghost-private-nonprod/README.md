@@ -17,6 +17,13 @@ docker compose -f docker-compose.build-ghost-private-nonprod.yml config --quiet
 docker compose -f docker-compose.build-ghost-private-nonprod.yml up --build -d
 ```
 
+Governed Tough Tongue credentials and opaque SHA-256 account references may be
+injected only through the four `CHUMMER_BUILD_GHOST_TOUGH_TONGUE_*` runtime
+variables declared by the Compose service. Never put their values in this file
+or Compose source. Supplying credentials does not activate provider use: remote
+execution and all three canary gates remain literal `false`, while agent and
+voice identifiers remain empty until their separate read-verification gates pass.
+
 Health proof:
 
 ```sh
