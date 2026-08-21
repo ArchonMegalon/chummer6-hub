@@ -47,12 +47,21 @@ def test_ai_image_uses_explicit_core_and_registry_source_contexts():
 
 def test_internal_tls_routes_only_the_bounded_surfaces():
     assert "https://canary.chummer.run" in CADDY
-    assert "handle /api/v1/ai/*" in CADDY
+    assert "method POST\n\t\tpath /api/v1/ai/build-ghost/tool" in CADDY
     assert "reverse_proxy chummer-build-ghost-ai:8080" in CADDY
-    assert "handle /api/workspaces/*" in CADDY
+    assert "method POST\n\t\tpath /api/workspaces/import" in CADDY
+    assert "^/api/workspaces/[^/]+/build-ghost/tool-access$" in CADDY
+    assert "method GET DELETE" in CADDY
+    assert "^/api/workspaces/[^/]+$" in CADDY
     assert "https://presentation.canary.chummer.run" in CADDY
+    assert "method POST\n\t\tpath /api/internal/build-ghost/tool/resolve" in CADDY
     assert "reverse_proxy chummer-build-ghost-presentation:8080" in CADDY
-    assert "handle {\n\t\trespond 404\n\t}" in CADDY
+    assert CADDY.count('header Cache-Control "no-store"') == 3
+    assert CADDY.count("handle {\n\t\trespond 404\n\t}") == 2
+    assert "/api/v1/ai/*" not in CADDY
+    assert "handle /api/workspaces/*" not in CADDY
+    presentation_host = CADDY.split("https://presentation.canary.chummer.run", 1)[1]
+    assert "\n\treverse_proxy" not in presentation_host
 
 
 def test_ai_trusts_only_the_runtime_local_caddy_root():
@@ -78,6 +87,12 @@ def test_local_canary_is_single_use_private_and_self_cleaning():
     assert 'wrong_contract_status' in CANARY
     assert 'unknown_field_status' in CANARY
     assert 'neighbor_status' in CANARY
+    assert 'presentation_neighbor_status' in CANARY
+    assert '"$neighbor_status" != "404"' in CANARY
+    assert '"$presentation_neighbor_status" != "404"' in CANARY
+    assert '"$cross_owner_status" != "503"' in CANARY
+    assert 'grant_cache_control' in CANARY
+    assert '"$grant_cache_control" != "no-store"' in CANARY
     assert 'rg --fixed-strings --file "$canary_tmp/packet-key.txt"' in CANARY
     assert "TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED" in CANARY
     assert "rm -rf" not in CANARY

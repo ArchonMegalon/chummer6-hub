@@ -158,12 +158,20 @@ neighbor_status="$(curl --silent --show-error \
     --header "Authorization: Bearer $fabricated_key" \
     --data '{}' \
     "https://canary.chummer.run:${loopback_port}/api/v1/ai/build-ghost/explain")"
+presentation_neighbor_status="$(curl --silent --show-error \
+    --output "$canary_tmp/presentation-neighbor-response.json" \
+    --write-out '%{http_code}' \
+    --cacert "$canary_tmp/root.crt" \
+    --resolve "presentation.canary.chummer.run:${loopback_port}:127.0.0.1" \
+    "https://presentation.canary.chummer.run:${loopback_port}/health/ready")"
 if [ "$unknown_key_status" != "410" ] \
     || [ "$wrong_contract_status" != "401" ] \
     || [ "$unknown_field_status" != "400" ] \
-    || [ "$neighbor_status" != "401" ]; then
-    printf 'positive_canary=failed stage=negative-boundaries unknown_key=%s wrong_contract=%s unknown_field=%s neighbor=%s\n' \
-        "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" "$neighbor_status"
+    || [ "$neighbor_status" != "404" ] \
+    || [ "$presentation_neighbor_status" != "404" ]; then
+    printf 'positive_canary=failed stage=negative-boundaries unknown_key=%s wrong_contract=%s unknown_field=%s neighbor=%s presentation_neighbor=%s\n' \
+        "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" "$neighbor_status" \
+        "$presentation_neighbor_status"
     exit 1
 fi
 
@@ -206,13 +214,14 @@ cross_owner_status="$(curl --silent --show-error \
     --header "X-Chummer-Owner: $cross_owner_name" \
     --data '{"locale":"en-US","requestKind":"current-build"}' \
     "https://canary.chummer.run:${loopback_port}/api/workspaces/$workspace_id/build-ghost/tool-access")"
-if [ "$cross_owner_status" = "200" ]; then
-    printf 'positive_canary=failed stage=cross-owner status=200\n'
+if [ "$cross_owner_status" != "503" ]; then
+    printf 'positive_canary=failed stage=cross-owner status=%s expected=503\n' "$cross_owner_status"
     exit 1
 fi
 
 grant_status="$(curl --silent --show-error \
     --output "$canary_tmp/grant-response.json" \
+    --dump-header "$canary_tmp/grant-response-headers.txt" \
     --write-out '%{http_code}' \
     --cacert "$canary_tmp/root.crt" \
     --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
@@ -220,8 +229,10 @@ grant_status="$(curl --silent --show-error \
     --header "X-Chummer-Owner: $owner_name" \
     --data '{"locale":"en-US","requestKind":"current-build"}' \
     "https://canary.chummer.run:${loopback_port}/api/workspaces/$workspace_id/build-ghost/tool-access")"
-if [ "$grant_status" != "200" ]; then
-    printf 'positive_canary=failed stage=grant status=%s cross_owner=%s\n' "$grant_status" "$cross_owner_status"
+grant_cache_control="$(sed -n 's/^[Cc]ache-[Cc]ontrol:[[:space:]]*\(.*\)\r$/\1/p' "$canary_tmp/grant-response-headers.txt" | sed -n '1p')"
+if [ "$grant_status" != "200" ] || [ "$grant_cache_control" != "no-store" ]; then
+    printf 'positive_canary=failed stage=grant status=%s cache=%s cross_owner=%s\n' \
+        "$grant_status" "$grant_cache_control" "$cross_owner_status"
     exit 1
 fi
 
@@ -344,8 +355,10 @@ if [ "$closed_status" != "404" ]; then
     exit 1
 fi
 
-printf 'positive_canary=passed unknown_key=%s wrong_contract=%s unknown_field=%s neighbor=%s import=%s cross_owner=%s grant=%s tool=%s replay=%s schema=%s locale=%s characters=%s cache=%s ttl_seconds=%s pending_grants=%s gates=false cleanup=%s\n' \
+printf 'positive_canary=passed unknown_key=%s wrong_contract=%s unknown_field=%s neighbor=%s presentation_neighbor=%s import=%s cross_owner=%s grant=%s grant_cache=%s tool=%s replay=%s schema=%s locale=%s characters=%s cache=%s ttl_seconds=%s pending_grants=%s gates=false cleanup=%s\n' \
     "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" "$neighbor_status" \
-    "$import_status" "$cross_owner_status" "$grant_status" "$tool_status" "$replay_status" \
+    "$presentation_neighbor_status" \
+    "$import_status" "$cross_owner_status" "$grant_status" "$grant_cache_control" \
+    "$tool_status" "$replay_status" \
     "$response_schema" "$response_locale" "$response_characters" "$cache_control" "$ttl_seconds" \
     "$pending_grants" "$closed_status"
