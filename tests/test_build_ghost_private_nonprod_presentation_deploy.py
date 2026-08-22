@@ -12,6 +12,7 @@ COMPOSE = (ROOT / "docker-compose.build-ghost-private-nonprod.yml").read_text(en
 DOCKERIGNORE = (ROOT / ".dockerignore").read_text(encoding="utf-8")
 SCRIPT = DEPLOY.read_text(encoding="utf-8")
 DOCKERFILE_TEXT = DOCKERFILE.read_text(encoding="utf-8")
+CANARY = (OPS / "run-local-canary.sh").read_text(encoding="utf-8")
 
 
 def main_body() -> str:
@@ -194,6 +195,29 @@ def test_source_and_store_admission_precede_candidate_build_and_activation():
     assert '[ "$(image_id "$rollback_ref")" = "$old_presentation_image" ]' in preactivation
     assert '[ "$(running_container_id "$ai_service")" = "$ai_id_before" ]' in preactivation
     assert '[ "$(running_container_id "$edge_service")" = "$edge_id_before" ]' in preactivation
+    assert preactivation.count("validate_sources_and_labels") == 1
+
+
+def test_release_pin_and_oci_revision_share_the_exact_presentation_main_commit():
+    release_revision = "8090e53f6dd64794145d81d7698394e4881d0c02"
+    assert f'presentation_release_revision="{release_revision}"' in SCRIPT
+    assert (
+        '[ "$CHUMMER_PRESENTATION_REVISION" = "$presentation_release_revision" ]'
+        in SCRIPT
+    )
+    assert 'org.opencontainers.image.revision="${CHUMMER_PRESENTATION_REVISION}"' in DOCKERFILE_TEXT
+
+
+def test_keyed_packet_preflight_parses_every_json_object_and_exact_schema():
+    assert 'validate_packet_state_json "$container_id"' in SCRIPT
+    assert "'type == \"object\" and (.schema | type == \"string\") and .schema == $expected'" in SCRIPT
+    for schema in (
+        "chummer.build_ghost.packet_access_store_authority.v2",
+        "chummer.build_ghost.packet_access_pending.v2",
+        "chummer.build_ghost.packet_access_audit.v2",
+        "chummer.build_ghost.workspace_revocation.v2",
+    ):
+        assert schema in SCRIPT
 
 
 def test_rendered_compose_uses_normalized_hub_context_and_exact_source_args():
@@ -254,6 +278,19 @@ def test_postchecks_cover_auth_lifecycle_neighbors_gates_and_ingress_absence():
     assert "assert_provider_gates_false" in SCRIPT
     assert 'https://canary.chummer.run:$host_port/api/v1/ai/build-ghost/explain' in SCRIPT
     assert 'public-explain-not-404' in SCRIPT
+    assert 'timeout --signal=TERM --kill-after=60s 900s' in SCRIPT
+
+
+def test_canary_network_and_secret_cleanup_are_bounded_even_on_failure():
+    assert '"$curl_binary" --connect-timeout 5 --max-time 30 "$@"' in CANARY
+    cleanup = CANARY.split("cleanup() {", 1)[1].split("}\ntrap cleanup EXIT", 1)[0]
+    assert "set +e" in cleanup
+    assert "drain_grant || true" in cleanup
+    assert "close_workspace || true" in cleanup
+    assert "securely_remove_temp || true" in cleanup
+    assert cleanup.index("securely_remove_temp") > cleanup.index("close_workspace")
+    close = CANARY.split("close_workspace() {", 1)[1].split("\n}\n\ndrain_grant", 1)[0]
+    assert "return 0" in close
 
 
 def test_host_cutoffs_are_hard_and_build_polling_is_interruptible():

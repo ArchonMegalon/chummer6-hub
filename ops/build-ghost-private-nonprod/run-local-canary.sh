@@ -19,12 +19,23 @@ grant_pending_path=""
 revocation_grant_outstanding="false"
 revocation_grant_pending_path=""
 presentation_id=""
+curl_binary=""
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || {
         printf 'positive_canary=failed stage=preflight missing=%s\n' "$1"
         exit 1
     }
+}
+
+bounded_curl() {
+    "$curl_binary" --connect-timeout 5 --max-time 30 "$@"
+}
+
+# Keep every request, including best-effort EXIT cleanup, on the same bounded
+# transport contract without relying on each call site to remember the limits.
+curl() {
+    bounded_curl "$@"
 }
 
 container_id() {
@@ -57,7 +68,7 @@ securely_remove_temp() {
 close_workspace() {
     local close_status
     if [ "$workspace_closed" = "false" ] && [ -n "$workspace_id" ] && [ -n "$workspace_etag" ]; then
-        close_status="$(curl --silent \
+        close_status="$(bounded_curl --silent \
             --output "$canary_tmp/cleanup-response.json" \
             --write-out '%{http_code}' \
             --cacert "$canary_tmp/root.crt" \
@@ -66,8 +77,11 @@ close_workspace() {
             --header "X-Chummer-Owner: $owner_name" \
             --header "If-Match: $workspace_etag" \
             "https://canary.chummer.run:${loopback_port}/api/workspaces/$workspace_id" || true)"
-        [ "$close_status" = "200" ] && workspace_closed="true"
+        if [ "$close_status" = "200" ]; then
+            workspace_closed="true"
+        fi
     fi
+    return 0
 }
 
 drain_grant() {
@@ -76,7 +90,7 @@ drain_grant() {
         && [ -f "$canary_tmp/root.crt" ] \
         && [ -f "$canary_tmp/tool-request.json" ] \
         && [ -f "$canary_tmp/tool-request-headers.txt" ]; then
-        curl --silent \
+        bounded_curl --silent \
             --output "$canary_tmp/drain-response.json" \
             --cacert "$canary_tmp/root.crt" \
             --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
@@ -94,7 +108,7 @@ drain_grant() {
         && [ -f "$canary_tmp/root.crt" ] \
         && [ -f "$canary_tmp/revocation-tool-request.json" ] \
         && [ -f "$canary_tmp/tool-request-headers.txt" ]; then
-        curl --silent \
+        bounded_curl --silent \
             --output "$canary_tmp/revocation-drain-response.json" \
             --cacert "$canary_tmp/root.crt" \
             --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
@@ -110,15 +124,23 @@ drain_grant() {
 }
 
 cleanup() {
-    drain_grant
-    close_workspace
-    securely_remove_temp
+    local status="$?"
+    set +e
+    drain_grant || true
+    close_workspace || true
+    securely_remove_temp || true
+    return "$status"
 }
 trap cleanup EXIT
 
-for required in base64 cmp curl cut date docker find jq rg rmdir sed sha256sum shred tr truncate unlink wc; do
+for required in base64 cmp cut date docker find jq rg rmdir sed sha256sum shred tr truncate unlink wc; do
     require_command "$required"
 done
+curl_binary="$(type -P curl || true)"
+[ -n "$curl_binary" ] && [ -x "$curl_binary" ] || {
+    printf 'positive_canary=failed stage=preflight missing=curl\n'
+    exit 1
+}
 
 edge_id="$(container_id build-ghost-private-edge)"
 presentation_id="$(container_id chummer-build-ghost-presentation)"

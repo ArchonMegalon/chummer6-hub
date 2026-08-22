@@ -16,6 +16,7 @@ ai_service="chummer-build-ghost-ai"
 edge_service="build-ghost-private-edge"
 deployment_image="chummer-build-ghost-presentation:private-nonprod"
 rollback_repository="chummer-build-ghost-presentation"
+presentation_release_revision="8090e53f6dd64794145d81d7698394e4881d0c02"
 # Deliberately shared with the AI helper so the two private-lane activations
 # cannot overlap even though the historical filename names the AI lane.
 deploy_lock_file="/docker/chummercomplete/.state/locks/chummer-build-ghost-private-nonprod-ai-deploy.lock"
@@ -128,6 +129,8 @@ validate_sources_and_labels() {
     validate_source CHUMMER_RUN_SERVICES_SOURCE CHUMMER_RUN_SERVICES_REVISION
     [ "$CHUMMER_RUN_SERVICES_SOURCE" = "$repo_root" ] || fail "hub-source-does-not-own-helper"
     validate_source CHUMMER_PRESENTATION_SOURCE CHUMMER_PRESENTATION_REVISION
+    [ "$CHUMMER_PRESENTATION_REVISION" = "$presentation_release_revision" ] \
+        || fail "presentation-revision-not-release-pin"
     validate_source CHUMMER_CORE_ENGINE_SOURCE CHUMMER_CORE_ENGINE_REVISION
     validate_source CHUMMER_HUB_REGISTRY_SOURCE CHUMMER_HUB_REGISTRY_REVISION
     validate_source CHUMMER_UI_KIT_SOURCE CHUMMER_UI_KIT_REVISION
@@ -273,7 +276,8 @@ preserve_rollback_image() {
 
 preflight_packet_store() {
     local container_id="$1"
-    local result
+    local result directory expected_schema state_path
+    local path_manifest="$deploy_tmp/packet-store-paths"
     result="$(docker exec -i "$container_id" sh -s -- \
         /app/state/build-ghost-packet-access < "$packet_preflight")" \
         || fail "packet-store-preflight"
@@ -281,6 +285,41 @@ preflight_packet_store() {
         'packet_store_preflight=passed state=empty'|'packet_store_preflight=passed state=keyed-v2') ;;
         *) fail "packet-store-preflight-ambiguous" ;;
     esac
+
+    if [ "$result" = 'packet_store_preflight=passed state=empty' ]; then
+        return 0
+    fi
+
+    validate_packet_state_json "$container_id" \
+        /app/state/build-ghost-packet-access/state-authority.v2.json \
+        chummer.build_ghost.packet_access_store_authority.v2
+    while read -r directory expected_schema; do
+        : > "$path_manifest"
+        docker exec "$container_id" find \
+            "/app/state/build-ghost-packet-access/$directory" \
+            -mindepth 1 -maxdepth 1 -type f -name '*.json' -print0 \
+            > "$path_manifest" || fail "packet-store-json-list-unreadable"
+        while IFS= read -r -d '' state_path; do
+            validate_packet_state_json "$container_id" "$state_path" "$expected_schema"
+        done < "$path_manifest"
+    done <<'EOF'
+pending chummer.build_ghost.packet_access_pending.v2
+claims chummer.build_ghost.packet_access_pending.v2
+audit chummer.build_ghost.packet_access_audit.v2
+revocations chummer.build_ghost.workspace_revocation.v2
+EOF
+}
+
+validate_packet_state_json() {
+    local container_id="$1"
+    local state_path="$2"
+    local expected_schema="$3"
+    if ! docker exec "$container_id" cat -- "$state_path" \
+        | jq -e --arg expected "$expected_schema" \
+            'type == "object" and (.schema | type == "string") and .schema == $expected' \
+            >/dev/null; then
+        fail "packet-store-json-or-schema-invalid"
+    fi
 }
 
 verify_rendered_compose() {
@@ -428,7 +467,8 @@ verify_public_explain_absent() {
 }
 
 verify_lifecycle_canary() {
-    if ! "$canary_script" > "$deploy_tmp/lifecycle-canary.log" 2>&1; then
+    if ! timeout --signal=TERM --kill-after=60s 900s \
+        "$canary_script" > "$deploy_tmp/lifecycle-canary.log" 2>&1; then
         fail "lifecycle-canary-failed"
     fi
     rg --line-regexp \
@@ -453,6 +493,7 @@ verify_activation_authority_unchanged() {
         || fail "preactivation-edge-container-drift"
     assert_provider_gates_false "$ai_id_before"
     preflight_packet_store "$old_presentation_id"
+    validate_sources_and_labels
 }
 
 run_postchecks() {
@@ -563,7 +604,7 @@ main() {
         require_command "$lock_required"
     done
     acquire_deploy_lock "$deploy_lock_file"
-    for required in awk bash curl cut date df docker find git jq mktemp mv openssl realpath rg rmdir sed seq setsid shred sleep truncate unlink wc; do
+    for required in awk bash cat curl cut date df docker find git jq mktemp mv openssl realpath rg rmdir sed seq setsid shred sleep timeout truncate unlink wc; do
         require_command "$required"
     done
     [ -x "$packet_preflight" ] || fail "packet-store-preflight-not-executable"

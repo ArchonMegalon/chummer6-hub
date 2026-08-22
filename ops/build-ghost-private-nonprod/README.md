@@ -79,7 +79,10 @@ removal or prune operations.
 
 Use `deploy-presentation-with-rollback.sh` only after the six source paths and
 six exact 40-character revision variables above identify clean isolated
-checkouts. The helper and the AI deployer deliberately acquire the same
+checkouts. This release helper additionally requires Presentation revision
+`8090e53f6dd64794145d81d7698394e4881d0c02`, the exact remote-main squash being
+deployed, and revalidates all six clean source trees after the build immediately
+before activation. The helper and the AI deployer deliberately acquire the same
 nonblocking host-local lock, so their activations cannot overlap. It applies
 the same hard host limits: IO `full avg10` may not exceed 10, `/docker` must
 retain at least 20 GiB, and the interruptible build is polled at least once
@@ -92,8 +95,10 @@ runs the read-only packet-store preflight before the build and again
 immediately before activation. An empty store without an authority marker is
 admitted because the v2 application can initialize it. A nonempty store
 without `state-authority.v2.json`, a v1/unknown schema, a symlink, or ambiguous
-filesystem state fails before activation. The preflight never deletes, moves,
-or quarantines state and never emits its values. The application remains the
+filesystem state fails before activation. For keyed state, every authority and
+lifecycle file must also parse as a JSON object with its exact v2 schema; files
+are streamed to `jq` without emitting or persisting their values. The preflight
+never deletes, moves, or quarantines state and never emits its values. The application remains the
 keyed-MAC authority and fails health closed on a wrong token, contract, or MAC.
 
 Immediately before activation, the helper revalidates the rollback image, the
@@ -102,7 +107,9 @@ literal-false provider gates, and the packet store. It builds and recreates
 only `chummer-build-ghost-presentation`. Postchecks require the six exact
 source labels, Presentation health, missing and invalid private-route auth
 `401`, loopback-only edge binding, public `/explain` `404`, unchanged AI/edge
-IDs, and a v2 lifecycle receipt. The synthetic proof resolves one grant and
+IDs, and a v2 lifecycle receipt. The synthetic proof has bounded network calls
+and an outer 15-minute deadline; its EXIT cleanup cannot short-circuit before
+temporary packet-key material is shredded. It resolves one grant and
 requires replay `410`, then issues another grant, closes the workspace, and
 requires the revoked request to return the exact same no-store terminal `410`.
 
