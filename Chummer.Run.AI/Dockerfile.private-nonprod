@@ -30,6 +30,15 @@ RUN mkdir -p fleet/repos/chummer-media-factory/.tmp/package-feed \
       -p:ChummerFleetRoot=/src/fleet
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+ARG CHUMMER_RUN_SERVICES_REVISION
+ARG CHUMMER_CORE_ENGINE_REVISION
+ARG CHUMMER_HUB_REGISTRY_REVISION
+ARG CHUMMER_MEDIA_FACTORY_REVISION
+LABEL org.opencontainers.image.revision="${CHUMMER_RUN_SERVICES_REVISION}" \
+      run.chummer.build-ghost.profile="private-nonprod" \
+      run.chummer.build-ghost.core-revision="${CHUMMER_CORE_ENGINE_REVISION}" \
+      run.chummer.build-ghost.hub-registry-revision="${CHUMMER_HUB_REGISTRY_REVISION}" \
+      run.chummer.build-ghost.media-factory-revision="${CHUMMER_MEDIA_FACTORY_REVISION}"
 WORKDIR /app
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \

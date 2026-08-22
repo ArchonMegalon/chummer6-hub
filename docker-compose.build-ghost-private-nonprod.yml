@@ -39,6 +39,11 @@ services:
     build:
       context: .
       dockerfile: Chummer.Run.AI/Dockerfile.private-nonprod
+      args:
+        CHUMMER_RUN_SERVICES_REVISION: ${CHUMMER_RUN_SERVICES_REVISION:?set the exact clean Hub revision}
+        CHUMMER_CORE_ENGINE_REVISION: ${CHUMMER_CORE_ENGINE_REVISION:?set the exact clean Core revision}
+        CHUMMER_HUB_REGISTRY_REVISION: ${CHUMMER_HUB_REGISTRY_REVISION:?set the exact clean Hub Registry revision}
+        CHUMMER_MEDIA_FACTORY_REVISION: ${CHUMMER_MEDIA_FACTORY_REVISION:?set the exact clean Media Factory revision}
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:?set CHUMMER_RUN_SERVICES_SOURCE to this isolated Hub worktree}
         core-engine-source: ${CHUMMER_CORE_ENGINE_SOURCE:?set CHUMMER_CORE_ENGINE_SOURCE}

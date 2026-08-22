@@ -11,11 +11,20 @@ export CHUMMER_CORE_ENGINE_SOURCE=/absolute/path/to/chummer-core-engine
 export CHUMMER_HUB_REGISTRY_SOURCE=/absolute/path/to/chummer-hub-registry
 export CHUMMER_MEDIA_FACTORY_SOURCE=/absolute/path/to/chummer-media-factory
 export CHUMMER_UI_KIT_SOURCE=/absolute/path/to/chummer-ui-kit
+export CHUMMER_RUN_SERVICES_REVISION="$(git -C "$CHUMMER_RUN_SERVICES_SOURCE" rev-parse HEAD)"
+export CHUMMER_CORE_ENGINE_REVISION="$(git -C "$CHUMMER_CORE_ENGINE_SOURCE" rev-parse HEAD)"
+export CHUMMER_HUB_REGISTRY_REVISION="$(git -C "$CHUMMER_HUB_REGISTRY_SOURCE" rev-parse HEAD)"
+export CHUMMER_MEDIA_FACTORY_REVISION="$(git -C "$CHUMMER_MEDIA_FACTORY_SOURCE" rev-parse HEAD)"
 export CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN="$(openssl rand -hex 32)"
 export CHUMMER_AI_INTERNAL_API_TOKEN="$(openssl rand -hex 32)"
 docker compose -f docker-compose.build-ghost-private-nonprod.yml config --quiet
 docker compose -f docker-compose.build-ghost-private-nonprod.yml up --build -d
 ```
+
+The AI image records those four exact clean revisions as OCI labels. A running
+container is source-identified only when its image labels equal the four
+operator-resolved revisions; an image build or canary result without that
+readback is not deployment proof.
 
 Governed Tough Tongue credentials and opaque SHA-256 account references may be
 injected only through the five `CHUMMER_BUILD_GHOST_TOUGH_TONGUE_*` runtime
