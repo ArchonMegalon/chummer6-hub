@@ -296,16 +296,16 @@ def test_deployer_uses_the_shared_nonblocking_lane_lock_for_the_whole_operation(
 def test_source_and_store_admission_precede_candidate_build_and_activation():
     body = main_body()
     assert body.index("validate_sources_and_labels") < body.index("preserve_rollback_image")
-    assert body.index("snapshot_running_presentation") < body.index(
-        'preflight_packet_store "$old_presentation_id"'
+    assert body.index("snapshot_presentation_authority") < body.index(
+        "preflight_initial_packet_store"
     )
-    assert body.index('preflight_packet_store "$old_presentation_id"') < body.index(
+    assert body.index("preflight_initial_packet_store") < body.index(
         "validate_initial_packet_store_compatibility"
     )
     assert body.index("validate_initial_packet_store_compatibility") < body.index(
         "preserve_rollback_image"
     )
-    assert body.index('preflight_packet_store "$old_presentation_id"') < body.index(
+    assert body.index("preflight_initial_packet_store") < body.index(
         "build_candidate_under_limits"
     )
     assert body.index("build_candidate_under_limits") < body.index(
@@ -323,15 +323,49 @@ def test_source_and_store_admission_precede_candidate_build_and_activation():
     preactivation = SCRIPT.split("verify_activation_authority_unchanged()", 1)[1].split(
         "run_postchecks()", 1
     )[0]
-    assert 'preflight_packet_store "$old_presentation_id"' in preactivation
+    assert "preflight_initial_packet_store" in preactivation
     assert '[ "$(image_id "$rollback_ref")" = "$old_presentation_image" ]' in preactivation
     assert '[ "$(running_container_id "$ai_service")" = "$ai_id_before" ]' in preactivation
     assert '[ "$(running_container_id "$edge_service")" = "$edge_id_before" ]' in preactivation
     assert preactivation.count("validate_sources_and_labels") == 1
 
 
+def test_internal_authority_probe_uses_the_shared_snake_case_wire_contract():
+    probe = SCRIPT.split("verify_private_route_auth() {", 1)[1].split(
+        "verify_public_explain_absent() {", 1
+    )[0]
+    assert "packet_access_key:$key" in probe
+    assert "packet_digest:$digest" in probe
+    assert "request_kind:\"current-build\"" in probe
+    assert "packetAccessKey" not in probe
+    assert "packetDigest" not in probe
+    assert "requestKind" not in probe
+
+
+def test_lifecycle_canary_failure_emits_only_its_bounded_receipt(tmp_path):
+    canary = tmp_path / "failing-canary.sh"
+    canary.write_text(
+        "#!/bin/sh\n"
+        "printf 'transport detail that must stay private\\n'\n"
+        "printf 'positive_canary=failed stage=negative-boundaries provider_unknown_key=502\\n'\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    canary.chmod(0o700)
+    result = run_deploy_harness(
+        'deploy_tmp="$1"; canary_script="$2"; verify_lifecycle_canary',
+        str(tmp_path),
+        str(canary),
+    )
+
+    assert result.returncode != 0
+    assert "positive_canary=failed stage=negative-boundaries provider_unknown_key=502" in result.stderr
+    assert "stage=lifecycle-canary-failed" in result.stderr
+    assert "transport detail" not in result.stderr
+
+
 def test_release_pin_and_oci_revision_share_the_exact_presentation_main_commit():
-    release_revision = "8090e53f6dd64794145d81d7698394e4881d0c02"
+    release_revision = "1c492202ac708f302b59f47c2bb1e4c67e352328"
     assert f'presentation_release_revision="{release_revision}"' in SCRIPT
     assert (
         '[ "$CHUMMER_PRESENTATION_REVISION" = "$presentation_release_revision" ]'
@@ -373,6 +407,178 @@ def test_keyed_v2_store_rejects_a_pre_v2_running_image_before_build():
         "validate_initial_packet_store_compatibility"
     )
     assert empty_legacy.returncode == 0, empty_legacy.stderr
+
+
+def test_contained_recovery_mode_is_explicit_and_requires_exact_v2_authority():
+    invalid_mode = run_deploy_harness(
+        'recovery_mode="automatic"; validate_control_values'
+    )
+    assert invalid_mode.returncode != 0
+    assert "stage=presentation-recovery-mode-invalid" in invalid_mode.stderr
+
+    accepted = run_deploy_harness(
+        r'''
+recovery_mode="true"
+presentation_service="presentation"
+packet_store_schema_label="packet-schema"
+packet_store_schema_version="v2"
+presentation_is_contained() { :; }
+service_container_id_any_state() { printf 'stopped-presentation'; }
+docker() {
+    case "$*" in
+        *State.Status*) printf 'exited' ;;
+        *'{{.Image}}'*) printf 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' ;;
+        *) return 1 ;;
+    esac
+}
+image_id() { printf 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'; }
+image_label() { printf 'v2'; }
+packet_store_volume_name_from_presentation() { printf 'safe-volume'; }
+snapshot_presentation_authority
+printf 'id=%s image=%s volume=%s\n' "$old_presentation_id" "$old_presentation_image" "$old_packet_store_volume_name"
+'''
+    )
+    assert accepted.returncode == 0, accepted.stderr
+    assert accepted.stdout == (
+        "id=stopped-presentation "
+        "image=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+        "volume=safe-volume\n"
+    )
+
+    pre_v2 = run_deploy_harness(
+        r'''
+recovery_mode="true"
+presentation_service="presentation"
+packet_store_schema_label="packet-schema"
+packet_store_schema_version="v2"
+presentation_is_contained() { :; }
+service_container_id_any_state() { printf 'stopped-presentation'; }
+docker() {
+    case "$*" in
+        *State.Status*) printf 'exited' ;;
+        *'{{.Image}}'*) printf 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' ;;
+        *) return 1 ;;
+    esac
+}
+image_id() { printf 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'; }
+image_label() { printf 'v1'; }
+packet_store_volume_name_from_presentation() { printf 'safe-volume'; }
+snapshot_presentation_authority
+'''
+    )
+    assert pre_v2.returncode != 0
+    assert "stage=recovery-presentation-image-not-v2" in pre_v2.stderr
+
+
+def test_contained_recovery_preflight_binds_the_old_volume_and_image():
+    result = run_deploy_harness(
+        r'''
+recovery_mode="true"
+old_packet_store_volume_name="safe-volume"
+old_presentation_image="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+classify_packet_store_volume_for_rollback() {
+    printf 'args=%s,%s\n' "$1" "$2" >&2
+    printf 'keyed-v2'
+}
+preflight_initial_packet_store
+printf 'state=%s\n' "$last_packet_store_state"
+'''
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "state=keyed-v2\n"
+    assert "args=safe-volume,sha256:" in result.stderr
+
+
+def test_recovery_preactivation_rechecks_containment_volume_store_and_neighbors():
+    result = run_deploy_harness(
+        r'''
+recovery_mode="true"
+presentation_service="presentation"
+ai_service="ai"
+edge_service="edge"
+rollback_ref="presentation:rollback"
+old_presentation_id="stopped-presentation"
+old_presentation_image="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+old_packet_store_volume_name="safe-volume"
+candidate_recovery_ref="presentation:v2-recovery"
+ai_id_before="ai-id"
+edge_id_before="edge-id"
+initial_packet_store_state="keyed-v2"
+last_packet_store_state="keyed-v2"
+image_id() { printf '%s' "$old_presentation_image"; }
+candidate_recovery_is_preserved() { :; }
+verify_source_labels() { [ "$1" = "$candidate_recovery_ref" ]; }
+presentation_is_contained() { :; }
+service_container_id_any_state() { printf 'stopped-presentation'; }
+docker() {
+    [ "$1" = "inspect" ] || return 1
+    printf '%s' "$old_presentation_image"
+}
+packet_store_volume_name_from_presentation() { printf 'safe-volume'; }
+running_container_id() {
+    case "$1" in
+        ai) printf 'ai-id' ;;
+        edge) printf 'edge-id' ;;
+        *) return 1 ;;
+    esac
+}
+assert_provider_gates_false() { :; }
+preflight_initial_packet_store() {
+    printf 'store-rechecked\n'
+    last_packet_store_state="keyed-v2"
+}
+validate_sources_and_labels() { printf 'sources-rechecked\n'; }
+verify_activation_authority_unchanged
+'''
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "store-rechecked\nsources-rechecked\n"
+
+
+def test_running_preflight_treats_only_a_proven_absent_store_under_real_state_root_as_empty():
+    admitted = run_deploy_harness(
+        r'''
+container_id="presentation"
+deploy_tmp="/unused-for-empty-store"
+docker() {
+    [ "$1" = "exec" ] || return 1
+    shift 2
+    case "$*" in
+        "test ! -e /app/state/build-ghost-packet-access") return 0 ;;
+        "test ! -L /app/state/build-ghost-packet-access") return 0 ;;
+        "test -d /app/state") return 0 ;;
+        "test ! -L /app/state") return 0 ;;
+        *) return 1 ;;
+    esac
+}
+preflight_packet_store "$container_id"
+printf 'state=%s\n' "$last_packet_store_state"
+'''
+    )
+    assert admitted.returncode == 0, admitted.stderr
+    assert admitted.stdout == "state=empty\n"
+
+    rejected = run_deploy_harness(
+        r'''
+container_id="presentation"
+deploy_tmp="/unused-for-empty-store"
+docker() {
+    [ "$1" = "exec" ] || return 1
+    shift 2
+    case "$*" in
+        "test ! -e /app/state/build-ghost-packet-access") return 0 ;;
+        "test ! -L /app/state/build-ghost-packet-access") return 0 ;;
+        "test -d /app/state") return 0 ;;
+        "test ! -L /app/state") return 1 ;;
+        *) return 1 ;;
+    esac
+}
+preflight_packet_store "$container_id"
+'''
+    )
+    assert rejected.returncode != 0
+    assert "stage=packet-store-preflight" in rejected.stderr
 
 
 def run_rollback_branch(schema: str, state: str) -> subprocess.CompletedProcess[str]:
@@ -442,6 +648,29 @@ def test_exact_v2_rollback_image_with_unknown_state_is_contained():
     assert result.returncode != 0
     assert result.stdout == "contain:packet-store-state-unprovable\n"
     assert "restore" not in result.stdout
+
+
+def test_contained_recovery_failure_never_reactivates_the_known_bad_predecessor():
+    result = run_deploy_harness(
+        r'''
+activation_started="true"
+deploy_succeeded="false"
+rollback_started="false"
+recovery_mode="true"
+rollback_ref="presentation:rollback-test"
+old_presentation_image="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+image_id() { printf '%s' "$old_presentation_image"; }
+image_label() { printf 'v2'; }
+quiesce_and_classify_packet_store_for_rollback() { printf 'keyed-v2'; }
+restore_preserved_presentation_image() { printf 'restore-must-not-run\n'; }
+contain_presentation_for_recovery() { printf 'contain:%s\n' "$1"; }
+rollback_if_needed
+'''
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == "contain:recovery-candidate-failed\n"
+    assert "restore-must-not-run" not in result.stdout
 
 
 def test_failed_restore_is_immediately_followed_by_verified_containment():
@@ -552,6 +781,7 @@ edge_service="edge"
 old_presentation_id="old-presentation"
 candidate_image="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 candidate_recovery_ref="presentation:v2-recovery-test"
+old_packet_store_volume_name="safe-volume"
 ai_id_before="ai-id"
 edge_id_before="edge-id"
 running_container_id() {
@@ -574,6 +804,7 @@ image_id() { printf 'mutable-tag-must-not-be-authority\n' >&2; return 1; }
 candidate_recovery_is_preserved() { :; }
 verify_source_labels() { [ "$1" = "$candidate_recovery_ref" ]; }
 wait_for_presentation_health() { :; }
+packet_store_volume_name_from_presentation() { printf 'safe-volume'; }
 assert_provider_gates_false() { :; }
 copy_edge_root_certificate() { :; }
 verify_private_route_auth() { :; }
@@ -592,11 +823,27 @@ def run_quiesced_store_probe(store: Path) -> subprocess.CompletedProcess[str]:
     return run_deploy_harness(
         r'''
 store_under_test="$1"
+old_packet_store_volume_name="safe-volume"
 stop_running_presentations() { :; }
 presentation_is_contained() { :; }
 neighbors_and_gates_are_unchanged() { :; }
 service_container_id_any_state() { printf 'stopped-presentation-id'; }
-packet_store_host_root_from_presentation() { printf '%s' "$store_under_test"; }
+packet_store_volume_name_from_presentation() { printf 'safe-volume'; }
+classify_packet_store_volume_for_rollback() {
+    if [ ! -e "$store_under_test" ] && [ ! -L "$store_under_test" ]; then
+        printf 'empty'
+        return 0
+    fi
+    result="$("$packet_preflight" "$store_under_test" 2>/dev/null)" || {
+        printf 'unknown'
+        return 0
+    }
+    case "$result" in
+        'packet_store_preflight=passed state=empty') printf 'empty' ;;
+        'packet_store_preflight=passed state=keyed-v2') printf 'keyed-v2' ;;
+        *) printf 'unknown' ;;
+    esac
+}
 quiesce_and_classify_packet_store_for_rollback
 ''',
         str(store),
@@ -604,6 +851,11 @@ quiesce_and_classify_packet_store_for_rollback
 
 
 def test_quiesced_legacy_rollback_probe_requires_empty_and_authority_absent(tmp_path):
+    absent = tmp_path / "absent"
+    absent_result = run_quiesced_store_probe(absent)
+    assert absent_result.returncode == 0, absent_result.stderr
+    assert absent_result.stdout == "empty"
+
     empty = tmp_path / "empty"
     (empty / "pending").mkdir(parents=True)
     (empty / "consumed").mkdir()
@@ -628,6 +880,34 @@ def test_quiesced_legacy_rollback_probe_requires_empty_and_authority_absent(tmp_
     unknown_result = run_quiesced_store_probe(unknown)
     assert unknown_result.returncode == 0, unknown_result.stderr
     assert unknown_result.stdout == "unknown"
+
+
+def test_postchecks_reject_state_volume_drift_before_health_or_canary():
+    result = run_deploy_harness(
+        r'''
+presentation_service="presentation"
+old_presentation_id="old-presentation"
+old_packet_store_volume_name="old-volume"
+candidate_image="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+running_container_id() { printf 'candidate-presentation'; }
+docker() {
+    if [ "$1" = "inspect" ]; then
+        printf '%s' "$candidate_image"
+        return 0
+    fi
+    return 1
+}
+packet_store_volume_name_from_presentation() {
+    printf 'different-volume'
+}
+wait_for_presentation_health() { printf 'health-must-not-run\n'; }
+run_postchecks
+'''
+    )
+
+    assert result.returncode != 0
+    assert "stage=postcheck-state-volume-drift" in result.stderr
+    assert "health-must-not-run" not in result.stdout
 
 
 def test_legacy_restore_repeats_terminal_empty_state_and_containment_proof():
@@ -662,7 +942,27 @@ restore_preserved_presentation_image_or_contain legacy-empty
     assert terminal.count("neighbors_and_gates_are_unchanged") >= 2
     assert '[ "$terminal_state" = "empty" ]' in terminal
     assert '[ "$final_container_id" = "$container_id" ]' in terminal
-    assert '[ "$final_store_root" = "$store_root" ]' in terminal
+    assert '[ "$final_volume_name" = "$volume_name" ]' in terminal
+
+
+def test_contained_store_probe_uses_the_exact_labeled_volume_read_only():
+    resolver = SCRIPT.split("packet_store_volume_name_from_presentation() {", 1)[1].split(
+        "classify_packet_store_volume_for_rollback() {", 1
+    )[0]
+    assert 'com.docker.compose.project' in resolver
+    assert 'com.docker.compose.volume' in resolver
+    assert '[ "$volume_project" = "$project_name" ]' in resolver
+    assert '[ "$volume_role" = "build-ghost-packet-access" ]' in resolver
+
+    classifier = SCRIPT.split("classify_packet_store_volume_for_rollback() {", 1)[1].split(
+        "classify_contained_packet_store_for_rollback() {", 1
+    )[0]
+    assert "docker run --rm --pull never --read-only --network none --cap-drop ALL" in classifier
+    assert "docker run --rm --pull never --interactive --read-only --network none --cap-drop ALL" in classifier
+    assert "--security-opt no-new-privileges" in classifier
+    assert 'type=volume,src=$volume_name,dst=/app/state,readonly' in classifier
+    assert 'printf "absent"' in classifier
+    assert '/app/state/build-ghost-packet-access < "$packet_preflight"' in classifier
 
 
 def test_fail_closed_containment_stops_only_presentation_and_verifies_neighbors_and_gates():

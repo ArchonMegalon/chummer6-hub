@@ -16,7 +16,7 @@ ai_service="chummer-build-ghost-ai"
 edge_service="build-ghost-private-edge"
 deployment_image="chummer-build-ghost-presentation:private-nonprod"
 rollback_repository="chummer-build-ghost-presentation"
-presentation_release_revision="8090e53f6dd64794145d81d7698394e4881d0c02"
+presentation_release_revision="1c492202ac708f302b59f47c2bb1e4c67e352328"
 packet_store_schema_label="run.chummer.build-ghost.packet-store-schema"
 packet_store_schema_version="v2"
 # Deliberately shared with the AI helper so the two private-lane activations
@@ -25,6 +25,7 @@ deploy_lock_file="/docker/chummercomplete/.state/locks/chummer-build-ghost-priva
 max_io_full_avg10="${CHUMMER_BUILD_GHOST_DEPLOY_MAX_IO_FULL_AVG10:-10}"
 minimum_free_gib="${CHUMMER_BUILD_GHOST_DEPLOY_MINIMUM_FREE_GIB:-20}"
 build_poll_seconds="${CHUMMER_BUILD_GHOST_DEPLOY_POLL_SECONDS:-10}"
+recovery_mode="${CHUMMER_BUILD_GHOST_PRESENTATION_RECOVERY_MODE:-false}"
 
 deploy_tmp=""
 build_pid=""
@@ -35,6 +36,7 @@ rollback_started="false"
 old_presentation_id=""
 old_presentation_image=""
 old_presentation_store_schema=""
+old_packet_store_volume_name=""
 rollback_ref=""
 candidate_recovery_ref=""
 candidate_image=""
@@ -115,6 +117,10 @@ validate_control_values() {
     if [ "$build_poll_seconds" -lt 1 ] || [ "$build_poll_seconds" -gt 15 ]; then
         fail "build-poll-must-be-one-to-fifteen-seconds"
     fi
+    case "$recovery_mode" in
+        true|false) ;;
+        *) fail "presentation-recovery-mode-invalid" ;;
+    esac
 }
 
 validate_source() {
@@ -279,6 +285,35 @@ snapshot_running_presentation() {
     [ "$(image_id "$old_presentation_image")" = "$old_presentation_image" ] \
         || fail "old-presentation-image-unresolvable"
     old_presentation_store_schema="$(image_label "$old_presentation_image" "$packet_store_schema_label")"
+    old_packet_store_volume_name="$(packet_store_volume_name_from_presentation "$old_presentation_id")" \
+        || fail "old-presentation-state-volume-invalid"
+}
+
+snapshot_contained_presentation() {
+    local status
+    presentation_is_contained || fail "recovery-presentation-not-contained"
+    old_presentation_id="$(service_container_id_any_state "$presentation_service")" \
+        || fail "recovery-presentation-not-exactly-one"
+    status="$(docker inspect "$old_presentation_id" --format '{{.State.Status}}')"
+    [ "$status" = "exited" ] || fail "recovery-presentation-not-exited"
+    old_presentation_image="$(docker inspect "$old_presentation_id" --format '{{.Image}}')"
+    [[ "$old_presentation_image" =~ ^sha256:[0-9a-f]{64}$ ]] \
+        || fail "recovery-presentation-image-id-invalid"
+    [ "$(image_id "$old_presentation_image")" = "$old_presentation_image" ] \
+        || fail "recovery-presentation-image-unresolvable"
+    old_presentation_store_schema="$(image_label "$old_presentation_image" "$packet_store_schema_label")"
+    [ "$old_presentation_store_schema" = "$packet_store_schema_version" ] \
+        || fail "recovery-presentation-image-not-v2"
+    old_packet_store_volume_name="$(packet_store_volume_name_from_presentation "$old_presentation_id")" \
+        || fail "recovery-presentation-state-volume-invalid"
+}
+
+snapshot_presentation_authority() {
+    if [ "$recovery_mode" = "true" ]; then
+        snapshot_contained_presentation
+    else
+        snapshot_running_presentation
+    fi
 }
 
 preserve_rollback_image() {
@@ -333,9 +368,16 @@ preflight_packet_store() {
     local container_id="$1"
     local result directory expected_schema state_path
     local path_manifest="$deploy_tmp/packet-store-paths"
-    result="$(docker exec -i "$container_id" sh -s -- \
-        /app/state/build-ghost-packet-access < "$packet_preflight")" \
-        || fail "packet-store-preflight"
+    if docker exec "$container_id" test ! -e /app/state/build-ghost-packet-access \
+        && docker exec "$container_id" test ! -L /app/state/build-ghost-packet-access \
+        && docker exec "$container_id" test -d /app/state \
+        && docker exec "$container_id" test ! -L /app/state; then
+        result='packet_store_preflight=passed state=empty'
+    else
+        result="$(docker exec -i "$container_id" sh -s -- \
+            /app/state/build-ghost-packet-access < "$packet_preflight")" \
+            || fail "packet-store-preflight"
+    fi
     case "$result" in
         'packet_store_preflight=passed state=empty'|'packet_store_preflight=passed state=keyed-v2') ;;
         *) fail "packet-store-preflight-ambiguous" ;;
@@ -487,7 +529,7 @@ verify_private_route_auth() {
     jq -cS -n \
         --arg key 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' \
         --arg digest 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
-        '{packetAccessKey:$key,packetDigest:$digest,locale:"en-US",requestKind:"current-build"}' \
+        '{packet_access_key:$key,packet_digest:$digest,locale:"en-US",request_kind:"current-build"}' \
         > "$deploy_tmp/private-auth-request.json"
     chmod 0600 "$deploy_tmp/private-auth-request.json"
     missing_status="$(curl --silent --show-error --max-time 15 \
@@ -524,8 +566,16 @@ verify_public_explain_absent() {
 }
 
 verify_lifecycle_canary() {
+    local receipt
     if ! timeout --signal=TERM --kill-after=60s 900s \
         "$canary_script" > "$deploy_tmp/lifecycle-canary.log" 2>&1; then
+        receipt="$(rg --line-regexp 'positive_canary=(failed|passed) .*' \
+            "$deploy_tmp/lifecycle-canary.log" | sed -n '$p' || true)"
+        if [ -n "$receipt" ]; then
+            printf '%s\n' "$receipt" >&2
+        else
+            printf 'positive_canary=failed stage=receipt-missing\n' >&2
+        fi
         fail "lifecycle-canary-failed"
     fi
     rg --line-regexp \
@@ -541,18 +591,27 @@ verify_activation_authority_unchanged() {
     candidate_recovery_is_preserved \
         || fail "preactivation-candidate-recovery-reference-drift"
     verify_source_labels "$candidate_recovery_ref"
-    current_presentation_id="$(running_container_id "$presentation_service")"
+    if [ "$recovery_mode" = "true" ]; then
+        presentation_is_contained || fail "preactivation-recovery-containment-drift"
+        current_presentation_id="$(service_container_id_any_state "$presentation_service")" \
+            || fail "preactivation-recovery-presentation-not-exactly-one"
+    else
+        current_presentation_id="$(running_container_id "$presentation_service")"
+    fi
     [ "$current_presentation_id" = "$old_presentation_id" ] \
         || fail "preactivation-presentation-container-drift"
     current_presentation_image="$(docker inspect "$current_presentation_id" --format '{{.Image}}')"
     [ "$current_presentation_image" = "$old_presentation_image" ] \
         || fail "preactivation-presentation-image-drift"
+    [ "$(packet_store_volume_name_from_presentation "$current_presentation_id")" \
+        = "$old_packet_store_volume_name" ] \
+        || fail "preactivation-state-volume-drift"
     [ "$(running_container_id "$ai_service")" = "$ai_id_before" ] \
         || fail "preactivation-ai-container-drift"
     [ "$(running_container_id "$edge_service")" = "$edge_id_before" ] \
         || fail "preactivation-edge-container-drift"
     assert_provider_gates_false "$ai_id_before"
-    preflight_packet_store "$old_presentation_id"
+    preflight_initial_packet_store
     [ "$last_packet_store_state" = "$initial_packet_store_state" ] \
         || fail "preactivation-packet-store-state-drift"
     validate_sources_and_labels
@@ -620,57 +679,95 @@ neighbors_and_gates_are_unchanged() {
     provider_gates_are_false "$ai_id_before"
 }
 
-packet_store_host_root_from_presentation() {
+packet_store_volume_name_from_presentation() {
     local container_id="$1"
-    local mount_record mount_count mount_type mount_read_write mount_source resolved_source
+    local mount_record mount_count mount_type mount_read_write volume_name volume_project volume_role
     mount_record="$(docker inspect "$container_id" --format \
-        '{{range .Mounts}}{{if eq .Destination "/app/state"}}{{printf "%s|%t|%s\n" .Type .RW .Source}}{{end}}{{end}}')" \
+        '{{range .Mounts}}{{if eq .Destination "/app/state"}}{{printf "%s|%t|%s\n" .Type .RW .Name}}{{end}}{{end}}')" \
         || return 1
     mount_count="$(printf '%s\n' "$mount_record" | sed '/^$/d' | wc -l)"
     [ "$mount_count" -eq 1 ] || return 1
-    IFS='|' read -r mount_type mount_read_write mount_source <<EOF
+    IFS='|' read -r mount_type mount_read_write volume_name <<EOF
 $mount_record
 EOF
     [ "$mount_type" = "volume" ] || return 1
     [ "$mount_read_write" = "true" ] || return 1
-    [[ "$mount_source" == /* ]] || return 1
-    [ -d "$mount_source" ] || return 1
-    [ ! -L "$mount_source" ] || return 1
-    resolved_source="$(realpath -e -- "$mount_source")" || return 1
-    [ -d "$resolved_source/build-ghost-packet-access" ] || return 1
-    [ ! -L "$resolved_source/build-ghost-packet-access" ] || return 1
-    printf '%s' "$resolved_source/build-ghost-packet-access"
+    [[ "$volume_name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || return 1
+    volume_project="$(docker volume inspect "$volume_name" --format \
+        '{{index .Labels "com.docker.compose.project"}}')" || return 1
+    volume_role="$(docker volume inspect "$volume_name" --format \
+        '{{index .Labels "com.docker.compose.volume"}}')" || return 1
+    [ "$volume_project" = "$project_name" ] || return 1
+    [ "$volume_role" = "build-ghost-packet-access" ] || return 1
+    printf '%s' "$volume_name"
 }
 
-classify_packet_store_root_for_rollback() {
-    local store_root="$1"
-    local result authority_path
-    result="$("$packet_preflight" "$store_root" 2>/dev/null)" || {
+classify_packet_store_volume_for_rollback() {
+    local volume_name="$1"
+    local inspection_image="${2:-$candidate_recovery_ref}"
+    local path_state result
+    [[ "$volume_name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || {
         printf 'unknown'
         return 0
     }
-    authority_path="$store_root/state-authority.v2.json"
+    path_state="$(docker run --rm --pull never --read-only --network none --cap-drop ALL \
+        --security-opt no-new-privileges \
+        --mount "type=volume,src=$volume_name,dst=/app/state,readonly" \
+        --entrypoint sh "$inspection_image" -c '
+            if [ ! -e /app/state/build-ghost-packet-access ] \
+                && [ ! -L /app/state/build-ghost-packet-access ]; then
+                printf "absent"
+            elif [ -d /app/state/build-ghost-packet-access ] \
+                && [ ! -L /app/state/build-ghost-packet-access ]; then
+                printf "present"
+            else
+                printf "invalid"
+                exit 1
+            fi
+        ' 2>/dev/null)" || {
+        printf 'unknown'
+        return 0
+    }
+    if [ "$path_state" = "absent" ]; then
+        printf 'empty'
+        return 0
+    fi
+    [ "$path_state" = "present" ] || {
+        printf 'unknown'
+        return 0
+    }
+    result="$(docker run --rm --pull never --interactive --read-only --network none --cap-drop ALL \
+        --security-opt no-new-privileges \
+        --mount "type=volume,src=$volume_name,dst=/app/state,readonly" \
+        --entrypoint sh "$inspection_image" -s -- \
+        /app/state/build-ghost-packet-access < "$packet_preflight" 2>/dev/null)" || {
+        printf 'unknown'
+        return 0
+    }
     case "$result" in
-        'packet_store_preflight=passed state=empty')
-            if [ ! -e "$authority_path" ] && [ ! -L "$authority_path" ]; then
-                printf 'empty'
-            else
-                printf 'unknown'
-            fi
-            ;;
-        'packet_store_preflight=passed state=keyed-v2')
-            if [ -f "$authority_path" ] && [ ! -L "$authority_path" ]; then
-                printf 'keyed-v2'
-            else
-                printf 'unknown'
-            fi
-            ;;
+        'packet_store_preflight=passed state=empty') printf 'empty' ;;
+        'packet_store_preflight=passed state=keyed-v2') printf 'keyed-v2' ;;
         *) printf 'unknown' ;;
     esac
 }
 
+preflight_initial_packet_store() {
+    local state
+    if [ "$recovery_mode" = "false" ]; then
+        preflight_packet_store "$old_presentation_id"
+        return 0
+    fi
+    state="$(classify_packet_store_volume_for_rollback \
+        "$old_packet_store_volume_name" "$old_presentation_image")"
+    case "$state" in
+        empty|keyed-v2) ;;
+        *) fail "recovery-packet-store-state-unprovable" ;;
+    esac
+    last_packet_store_state="$state"
+}
+
 classify_contained_packet_store_for_rollback() {
-    local container_id store_root
+    local container_id volume_name
     presentation_is_contained || {
         printf 'unknown'
         return 0
@@ -683,11 +780,15 @@ classify_contained_packet_store_for_rollback() {
         printf 'unknown'
         return 0
     }
-    store_root="$(packet_store_host_root_from_presentation "$container_id")" || {
+    volume_name="$(packet_store_volume_name_from_presentation "$container_id")" || {
         printf 'unknown'
         return 0
     }
-    classify_packet_store_root_for_rollback "$store_root"
+    [ "$volume_name" = "$old_packet_store_volume_name" ] || {
+        printf 'unknown'
+        return 0
+    }
+    classify_packet_store_volume_for_rollback "$volume_name"
 }
 
 quiesce_and_classify_packet_store_for_rollback() {
@@ -699,19 +800,20 @@ quiesce_and_classify_packet_store_for_rollback() {
 }
 
 terminally_verify_legacy_empty_store_for_rollback() {
-    local container_id store_root terminal_state final_container_id final_store_root
+    local container_id volume_name terminal_state final_container_id final_volume_name
     presentation_is_contained || return 1
     neighbors_and_gates_are_unchanged || return 1
     container_id="$(service_container_id_any_state "$presentation_service")" || return 1
-    store_root="$(packet_store_host_root_from_presentation "$container_id")" || return 1
-    terminal_state="$(classify_packet_store_root_for_rollback "$store_root")" || return 1
+    volume_name="$(packet_store_volume_name_from_presentation "$container_id")" || return 1
+    [ "$volume_name" = "$old_packet_store_volume_name" ] || return 1
+    terminal_state="$(classify_packet_store_volume_for_rollback "$volume_name")" || return 1
     [ "$terminal_state" = "empty" ] || return 1
     presentation_is_contained || return 1
     neighbors_and_gates_are_unchanged || return 1
     final_container_id="$(service_container_id_any_state "$presentation_service")" || return 1
     [ "$final_container_id" = "$container_id" ] || return 1
-    final_store_root="$(packet_store_host_root_from_presentation "$final_container_id")" || return 1
-    [ "$final_store_root" = "$store_root" ] || return 1
+    final_volume_name="$(packet_store_volume_name_from_presentation "$final_container_id")" || return 1
+    [ "$final_volume_name" = "$volume_name" ] || return 1
     presentation_is_contained || return 1
     neighbors_and_gates_are_unchanged
 }
@@ -739,7 +841,7 @@ recovery_containment_is_verified() {
 contain_presentation_for_recovery() {
     local reason="$1"
     case "$reason" in
-        v2-authority-present|packet-store-state-unprovable|rollback-restore-failed) ;;
+        v2-authority-present|packet-store-state-unprovable|rollback-restore-failed|recovery-candidate-failed) ;;
         *) reason="packet-store-state-unprovable" ;;
     esac
     if ! stop_running_presentations \
@@ -754,13 +856,17 @@ contain_presentation_for_recovery() {
 }
 
 run_postchecks() {
-    local current_presentation_id current_presentation_image
+    local current_presentation_id current_presentation_image current_packet_store_volume_name
     current_presentation_id="$(running_container_id "$presentation_service")"
     [ "$current_presentation_id" != "$old_presentation_id" ] \
         || fail "postcheck-presentation-container-not-recreated"
     current_presentation_image="$(docker inspect "$current_presentation_id" --format '{{.Image}}')"
     [ "$current_presentation_image" = "$candidate_image" ] \
         || fail "postcheck-presentation-image-not-candidate"
+    current_packet_store_volume_name="$(packet_store_volume_name_from_presentation "$current_presentation_id")" \
+        || fail "postcheck-state-volume-invalid"
+    [ "$current_packet_store_volume_name" = "$old_packet_store_volume_name" ] \
+        || fail "postcheck-state-volume-drift"
     candidate_recovery_is_preserved \
         || fail "postcheck-candidate-recovery-reference-drift"
     verify_source_labels "$candidate_recovery_ref"
@@ -882,6 +988,10 @@ rollback_if_needed() {
         contain_presentation_for_recovery packet-store-state-unprovable || return 1
         return 1
     fi
+    if [ "$recovery_mode" = "true" ]; then
+        contain_presentation_for_recovery recovery-candidate-failed || return 1
+        return 1
+    fi
     if [ "$rollback_schema" = "$packet_store_schema_version" ]; then
         restore_preserved_presentation_image_or_contain v2-compatible
         return $?
@@ -957,8 +1067,8 @@ main() {
     ai_id_before="$(running_container_id "$ai_service")"
     edge_id_before="$(running_container_id "$edge_service")"
     assert_provider_gates_false "$ai_id_before"
-    snapshot_running_presentation
-    preflight_packet_store "$old_presentation_id"
+    snapshot_presentation_authority
+    preflight_initial_packet_store
     initial_packet_store_state="$last_packet_store_state"
     validate_initial_packet_store_compatibility
     preserve_rollback_image
@@ -974,8 +1084,8 @@ main() {
     compose up -d --no-deps --no-build --force-recreate "$presentation_service"
     run_postchecks
     deploy_succeeded="true"
-    printf 'presentation_deploy=passed rollback_ref=%s old_image=%s candidate_recovery_ref=%s candidate_image=%s sources=exact packet_store=keyed-v2 auth=401 lifecycle=one-use-replay-revocation gates=false neighbors=unchanged public_explain=404\n' \
-        "$rollback_ref" "$old_presentation_image" "$candidate_recovery_ref" "$candidate_image"
+    printf 'presentation_deploy=passed rollback_ref=%s old_image=%s candidate_recovery_ref=%s candidate_image=%s recovery_mode=%s sources=exact packet_store=keyed-v2 auth=401 lifecycle=one-use-replay-revocation gates=false neighbors=unchanged public_explain=404\n' \
+        "$rollback_ref" "$old_presentation_image" "$candidate_recovery_ref" "$candidate_image" "$recovery_mode"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
