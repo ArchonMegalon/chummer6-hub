@@ -29,6 +29,7 @@ ARG CHUMMER_UI_KIT_REVISION
 ARG CHUMMER_MEDIA_FACTORY_REVISION
 LABEL org.opencontainers.image.revision="${CHUMMER_PRESENTATION_REVISION}" \
       run.chummer.build-ghost.profile="private-nonprod" \
+      run.chummer.build-ghost.packet-store-schema="v2" \
       run.chummer.build-ghost.hub-revision="${CHUMMER_RUN_SERVICES_REVISION}" \
       run.chummer.build-ghost.core-revision="${CHUMMER_CORE_ENGINE_REVISION}" \
       run.chummer.build-ghost.hub-registry-revision="${CHUMMER_HUB_REGISTRY_REVISION}" \

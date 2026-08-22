@@ -38,6 +38,15 @@ def write_json(path: Path, schema: str) -> None:
     path.write_text(json.dumps({"schema": schema}), encoding="utf-8")
 
 
+def run_deploy_harness(body: str, *arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", "-c", 'source "$1"; shift; ' + body, "harness", str(DEPLOY), *arguments],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
 def test_shell_entrypoints_are_syntax_valid_without_running_docker():
     for shell, script in (("bash", DEPLOY), ("sh", PREFLIGHT)):
         result = subprocess.run(
@@ -139,6 +148,26 @@ def test_v1_or_ambiguous_authority_fails_without_rewriting_state(tmp_path):
     assert "mv " not in PREFLIGHT.read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("authority_kind", ("directory", "symlink", "fifo"))
+def test_authority_marker_must_be_a_real_regular_file(tmp_path, authority_kind):
+    store = tmp_path / "store"
+    store.mkdir()
+    authority = store / "state-authority.v2.json"
+    if authority_kind == "directory":
+        authority.mkdir()
+    elif authority_kind == "symlink":
+        target = tmp_path / "authority-target"
+        target.write_text("{}", encoding="utf-8")
+        authority.symlink_to(target)
+    else:
+        os.mkfifo(authority)
+
+    result = run_preflight(store)
+
+    assert result.returncode != 0
+    assert "packet_store_preflight=failed" in result.stderr
+
+
 def test_structurally_v2_state_is_admitted_but_v1_lifecycle_state_is_not(tmp_path):
     store = tmp_path / "store"
     write_json(
@@ -189,6 +218,7 @@ def test_host_owned_dockerfile_binds_every_build_source_revision():
         assert f"COPY --from={context}" in DOCKERFILE_TEXT
     assert 'org.opencontainers.image.revision="${CHUMMER_PRESENTATION_REVISION}"' in DOCKERFILE_TEXT
     assert 'run.chummer.build-ghost.profile="private-nonprod"' in DOCKERFILE_TEXT
+    assert 'run.chummer.build-ghost.packet-store-schema="v2"' in DOCKERFILE_TEXT
     assert "!ops/build-ghost-private-nonprod/Dockerfile.presentation-private-nonprod" in DOCKERIGNORE
 
 
@@ -240,6 +270,15 @@ def test_deployer_uses_the_shared_nonblocking_lane_lock_for_the_whole_operation(
 def test_source_and_store_admission_precede_candidate_build_and_activation():
     body = main_body()
     assert body.index("validate_sources_and_labels") < body.index("preserve_rollback_image")
+    assert body.index("snapshot_running_presentation") < body.index(
+        'preflight_packet_store "$old_presentation_id"'
+    )
+    assert body.index('preflight_packet_store "$old_presentation_id"') < body.index(
+        "validate_initial_packet_store_compatibility"
+    )
+    assert body.index("validate_initial_packet_store_compatibility") < body.index(
+        "preserve_rollback_image"
+    )
     assert body.index('preflight_packet_store "$old_presentation_id"') < body.index(
         "build_candidate_under_limits"
     )
@@ -267,6 +306,178 @@ def test_release_pin_and_oci_revision_share_the_exact_presentation_main_commit()
         in SCRIPT
     )
     assert 'org.opencontainers.image.revision="${CHUMMER_PRESENTATION_REVISION}"' in DOCKERFILE_TEXT
+
+
+def test_candidate_and_rollback_compatibility_use_the_exact_v2_image_label():
+    assert 'packet_store_schema_label="run.chummer.build-ghost.packet-store-schema"' in SCRIPT
+    assert 'packet_store_schema_version="v2"' in SCRIPT
+    assert 'image-packet-store-schema-label-drift' in SCRIPT
+    preserve = SCRIPT.split("preserve_rollback_image() {", 1)[1].split(
+        "preflight_packet_store() {", 1
+    )[0]
+    assert 'image_label "$rollback_ref" "$packet_store_schema_label"' in preserve
+    assert 'rollback-reference-schema-label-drift' in preserve
+
+
+def test_keyed_v2_store_rejects_a_pre_v2_running_image_before_build():
+    incompatible = run_deploy_harness(
+        'initial_packet_store_state="keyed-v2"; '
+        'old_presentation_store_schema=""; '
+        "validate_initial_packet_store_compatibility"
+    )
+    assert incompatible.returncode != 0
+    assert "stage=initial-keyed-v2-running-image-incompatible" in incompatible.stderr
+
+    compatible = run_deploy_harness(
+        'initial_packet_store_state="keyed-v2"; '
+        'old_presentation_store_schema="v2"; '
+        "validate_initial_packet_store_compatibility"
+    )
+    assert compatible.returncode == 0, compatible.stderr
+
+    empty_legacy = run_deploy_harness(
+        'initial_packet_store_state="empty"; '
+        'old_presentation_store_schema=""; '
+        "validate_initial_packet_store_compatibility"
+    )
+    assert empty_legacy.returncode == 0, empty_legacy.stderr
+
+
+def run_rollback_branch(schema: str, state: str) -> subprocess.CompletedProcess[str]:
+    return run_deploy_harness(
+        r'''
+activation_started="true"
+deploy_succeeded="false"
+rollback_started="false"
+rollback_ref="presentation:rollback-test"
+old_presentation_image="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+rollback_schema_under_test="$1"
+quiesced_state_under_test="$2"
+image_id() { printf '%s' "$old_presentation_image"; }
+image_label() { printf '%s' "$rollback_schema_under_test"; }
+quiesce_and_classify_packet_store_for_legacy_rollback() {
+    printf 'quiesce\n' >&2
+    printf '%s' "$quiesced_state_under_test"
+}
+restore_preserved_presentation_image() { printf 'restore\n'; }
+contain_presentation_for_recovery() { printf 'contain:%s\n' "$1"; }
+rollback_if_needed
+''',
+        schema,
+        state,
+    )
+
+
+def test_missing_auth_v2_initialization_then_failure_never_recreates_pre_v2_image():
+    result = run_rollback_branch("missing", "keyed-v2")
+
+    assert result.returncode != 0
+    assert result.stdout == "contain:v2-authority-present\n"
+    assert "quiesce" in result.stderr
+    assert "restore" not in result.stdout
+
+
+def test_unknown_post_activation_store_state_contains_without_legacy_rollback():
+    result = run_rollback_branch("missing", "unknown")
+
+    assert result.returncode != 0
+    assert result.stdout == "contain:packet-store-state-unprovable\n"
+    assert "restore" not in result.stdout
+
+
+def test_empty_pre_migration_store_allows_the_preserved_legacy_rollback():
+    result = run_rollback_branch("missing", "empty")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "restore\n"
+    assert "quiesce" in result.stderr
+
+
+def test_exact_v2_rollback_image_is_eligible_without_legacy_store_probe():
+    result = run_rollback_branch("v2", "unknown")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "restore\n"
+    assert "quiesce" not in result.stderr
+
+
+def run_quiesced_store_probe(store: Path) -> subprocess.CompletedProcess[str]:
+    return run_deploy_harness(
+        r'''
+store_under_test="$1"
+stop_running_presentations() { :; }
+presentation_is_contained() { :; }
+neighbors_and_gates_are_unchanged() { :; }
+service_container_id_any_state() { printf 'stopped-presentation-id'; }
+packet_store_host_root_from_presentation() { printf '%s' "$store_under_test"; }
+quiesce_and_classify_packet_store_for_legacy_rollback
+''',
+        str(store),
+    )
+
+
+def test_quiesced_legacy_rollback_probe_requires_empty_and_authority_absent(tmp_path):
+    empty = tmp_path / "empty"
+    (empty / "pending").mkdir(parents=True)
+    (empty / "consumed").mkdir()
+    empty_result = run_quiesced_store_probe(empty)
+    assert empty_result.returncode == 0, empty_result.stderr
+    assert empty_result.stdout == "empty"
+
+    keyed = tmp_path / "keyed"
+    write_json(
+        keyed / "state-authority.v2.json",
+        "chummer.build_ghost.packet_access_store_authority.v2",
+    )
+    keyed_result = run_quiesced_store_probe(keyed)
+    assert keyed_result.returncode == 0, keyed_result.stderr
+    assert keyed_result.stdout == "keyed-v2"
+
+    unknown = tmp_path / "unknown"
+    write_json(
+        unknown / "state-authority.v2.json",
+        "chummer.build_ghost.packet_access_store_authority.v1",
+    )
+    unknown_result = run_quiesced_store_probe(unknown)
+    assert unknown_result.returncode == 0, unknown_result.stderr
+    assert unknown_result.stdout == "unknown"
+
+
+def test_fail_closed_containment_stops_only_presentation_and_verifies_neighbors_and_gates():
+    result = run_deploy_harness(
+        r'''
+stop_running_presentations() { printf 'stop-presentation\n'; }
+presentation_is_contained() { printf 'contained\n'; }
+neighbors_and_gates_are_unchanged() { printf 'neighbors-and-gates\n'; }
+contain_presentation_for_recovery v2-authority-present
+'''
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "stop-presentation\ncontained\nneighbors-and-gates\n"
+    assert (
+        "reason=v2-authority-present containment=verified packet_store=preserved "
+        "candidate=preserved old_rollback=preserved neighbors=unchanged gates=false"
+        in result.stderr
+    )
+
+    stop_body = SCRIPT.split("stop_running_presentations() {", 1)[1].split(
+        "presentation_is_contained() {", 1
+    )[0]
+    assert 'com.docker.compose.service=$presentation_service' in stop_body
+    assert 'docker stop --time 30 "$container_id"' in stop_body
+    assert "$ai_service" not in stop_body
+    assert "$edge_service" not in stop_body
+    containment = SCRIPT.split("contain_presentation_for_recovery() {", 1)[1].split(
+        "run_postchecks() {", 1
+    )[0]
+    assert "presentation_is_contained" in containment
+    assert "neighbors_and_gates_are_unchanged" in containment
+    assert "packet_store=preserved" in containment
+    assert "candidate=preserved" in containment
+    assert "old_rollback=preserved" in containment
+    assert "compose up" not in containment
+    assert "docker image tag" not in containment
 
 
 def test_keyed_packet_preflight_parses_every_json_object_and_exact_schema():

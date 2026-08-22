@@ -17,6 +17,8 @@ edge_service="build-ghost-private-edge"
 deployment_image="chummer-build-ghost-presentation:private-nonprod"
 rollback_repository="chummer-build-ghost-presentation"
 presentation_release_revision="8090e53f6dd64794145d81d7698394e4881d0c02"
+packet_store_schema_label="run.chummer.build-ghost.packet-store-schema"
+packet_store_schema_version="v2"
 # Deliberately shared with the AI helper so the two private-lane activations
 # cannot overlap even though the historical filename names the AI lane.
 deploy_lock_file="/docker/chummercomplete/.state/locks/chummer-build-ghost-private-nonprod-ai-deploy.lock"
@@ -32,10 +34,13 @@ deploy_succeeded="false"
 rollback_started="false"
 old_presentation_id=""
 old_presentation_image=""
+old_presentation_store_schema=""
 rollback_ref=""
 ai_id_before=""
 edge_id_before=""
 deploy_lock_fd=""
+last_packet_store_state=""
+initial_packet_store_state=""
 
 fail() {
     printf 'presentation_deploy=failed stage=%s\n' "$1" >&2
@@ -65,17 +70,23 @@ compose() {
         "$@"
 }
 
-running_container_id() {
+resolve_running_container_id() {
     local service_name="$1"
     local resolved
     resolved="$(docker ps --no-trunc \
         --filter "label=com.docker.compose.project=$project_name" \
         --filter "label=com.docker.compose.service=$service_name" \
         --filter status=running \
-        --format '{{.ID}}')"
-    if [ "$(printf '%s\n' "$resolved" | sed '/^$/d' | wc -l)" -ne 1 ]; then
-        fail "runtime-$service_name-not-exactly-one"
-    fi
+        --format '{{.ID}}')" || return 1
+    [ "$(printf '%s\n' "$resolved" | sed '/^$/d' | wc -l)" -eq 1 ] || return 1
+    printf '%s' "$resolved"
+}
+
+running_container_id() {
+    local service_name="$1"
+    local resolved
+    resolved="$(resolve_running_container_id "$service_name")" \
+        || fail "runtime-$service_name-not-exactly-one"
     printf '%s' "$resolved"
 }
 
@@ -234,30 +245,42 @@ verify_source_labels() {
         || fail "image-media-label-drift"
     [ "$(image_label "$image" run.chummer.build-ghost.profile)" = "private-nonprod" ] \
         || fail "image-profile-label-drift"
+    [ "$(image_label "$image" "$packet_store_schema_label")" = "$packet_store_schema_version" ] \
+        || fail "image-packet-store-schema-label-drift"
 }
 
-assert_provider_gates_false() {
+provider_gates_are_false() {
     local container_id="$1"
     local environment required_false
-    environment="$(docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}')"
+    environment="$(docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}')" \
+        || return 1
     for required_false in \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED; do
         [ "$(printf '%s\n' "$environment" | awk -v expected="$required_false=false" '$0 == expected { count++ } END { print count + 0 }')" -eq 1 ] \
-            || fail "provider-gate-$required_false"
+            || return 1
     done
 }
 
-preserve_rollback_image() {
-    local timestamp nonce old_short preserved_id
+assert_provider_gates_false() {
+    local container_id="$1"
+    provider_gates_are_false "$container_id" || fail "provider-gates-not-exact-false"
+}
+
+snapshot_running_presentation() {
     old_presentation_id="$(running_container_id "$presentation_service")"
     old_presentation_image="$(docker inspect "$old_presentation_id" --format '{{.Image}}')"
     [[ "$old_presentation_image" =~ ^sha256:[0-9a-f]{64}$ ]] \
         || fail "old-presentation-image-id-invalid"
     [ "$(image_id "$old_presentation_image")" = "$old_presentation_image" ] \
         || fail "old-presentation-image-unresolvable"
+    old_presentation_store_schema="$(image_label "$old_presentation_image" "$packet_store_schema_label")"
+}
+
+preserve_rollback_image() {
+    local timestamp nonce old_short preserved_id preserved_schema
 
     timestamp="$(date -u +%Y%m%dt%H%M%Sz)"
     nonce="$(openssl rand -hex 12)"
@@ -270,6 +293,9 @@ preserve_rollback_image() {
     preserved_id="$(image_id "$rollback_ref")"
     [ "$preserved_id" = "$old_presentation_image" ] \
         || fail "rollback-reference-verification-failed"
+    preserved_schema="$(image_label "$rollback_ref" "$packet_store_schema_label")"
+    [ "$preserved_schema" = "$old_presentation_store_schema" ] \
+        || fail "rollback-reference-schema-label-drift"
     printf 'presentation_deploy=prepared rollback_ref=%s old_image=%s\n' \
         "$rollback_ref" "$old_presentation_image"
 }
@@ -285,6 +311,8 @@ preflight_packet_store() {
         'packet_store_preflight=passed state=empty'|'packet_store_preflight=passed state=keyed-v2') ;;
         *) fail "packet-store-preflight-ambiguous" ;;
     esac
+
+    last_packet_store_state="${result##*state=}"
 
     if [ "$result" = 'packet_store_preflight=passed state=empty' ]; then
         return 0
@@ -493,7 +521,144 @@ verify_activation_authority_unchanged() {
         || fail "preactivation-edge-container-drift"
     assert_provider_gates_false "$ai_id_before"
     preflight_packet_store "$old_presentation_id"
+    [ "$last_packet_store_state" = "$initial_packet_store_state" ] \
+        || fail "preactivation-packet-store-state-drift"
     validate_sources_and_labels
+}
+
+validate_initial_packet_store_compatibility() {
+    if [ "$initial_packet_store_state" = "keyed-v2" ] \
+        && [ "$old_presentation_store_schema" != "$packet_store_schema_version" ]; then
+        fail "initial-keyed-v2-running-image-incompatible"
+    fi
+}
+
+service_container_id_any_state() {
+    local service_name="$1"
+    local resolved
+    resolved="$(docker ps --all --no-trunc \
+        --filter "label=com.docker.compose.project=$project_name" \
+        --filter "label=com.docker.compose.service=$service_name" \
+        --format '{{.ID}}')" || return 1
+    [ "$(printf '%s\n' "$resolved" | sed '/^$/d' | wc -l)" -eq 1 ] || return 1
+    printf '%s' "$resolved"
+}
+
+stop_running_presentations() {
+    local running_ids container_id
+    running_ids="$(docker ps --no-trunc \
+        --filter "label=com.docker.compose.project=$project_name" \
+        --filter "label=com.docker.compose.service=$presentation_service" \
+        --format '{{.ID}}')" || return 1
+    while IFS= read -r container_id; do
+        [ -n "$container_id" ] || continue
+        docker stop --time 30 "$container_id" >/dev/null || return 1
+    done <<EOF
+$running_ids
+EOF
+}
+
+presentation_is_contained() {
+    local running_ids
+    running_ids="$(docker ps --no-trunc \
+        --filter "label=com.docker.compose.project=$project_name" \
+        --filter "label=com.docker.compose.service=$presentation_service" \
+        --format '{{.ID}}')" || return 1
+    [ "$(printf '%s\n' "$running_ids" | sed '/^$/d' | wc -l)" -eq 0 ]
+}
+
+neighbors_and_gates_are_unchanged() {
+    local current_ai_id current_edge_id
+    current_ai_id="$(resolve_running_container_id "$ai_service")" || return 1
+    current_edge_id="$(resolve_running_container_id "$edge_service")" || return 1
+    [ "$current_ai_id" = "$ai_id_before" ] || return 1
+    [ "$current_edge_id" = "$edge_id_before" ] || return 1
+    provider_gates_are_false "$ai_id_before"
+}
+
+packet_store_host_root_from_presentation() {
+    local container_id="$1"
+    local mount_record mount_count mount_type mount_read_write mount_source resolved_source
+    mount_record="$(docker inspect "$container_id" --format \
+        '{{range .Mounts}}{{if eq .Destination "/app/state"}}{{printf "%s|%t|%s\n" .Type .RW .Source}}{{end}}{{end}}')" \
+        || return 1
+    mount_count="$(printf '%s\n' "$mount_record" | sed '/^$/d' | wc -l)"
+    [ "$mount_count" -eq 1 ] || return 1
+    IFS='|' read -r mount_type mount_read_write mount_source <<EOF
+$mount_record
+EOF
+    [ "$mount_type" = "volume" ] || return 1
+    [ "$mount_read_write" = "true" ] || return 1
+    [[ "$mount_source" == /* ]] || return 1
+    [ -d "$mount_source" ] || return 1
+    [ ! -L "$mount_source" ] || return 1
+    resolved_source="$(realpath -e -- "$mount_source")" || return 1
+    [ -d "$resolved_source/build-ghost-packet-access" ] || return 1
+    [ ! -L "$resolved_source/build-ghost-packet-access" ] || return 1
+    printf '%s' "$resolved_source/build-ghost-packet-access"
+}
+
+quiesce_and_classify_packet_store_for_legacy_rollback() {
+    local container_id store_root result authority_path
+    stop_running_presentations || {
+        printf 'unknown'
+        return 0
+    }
+    presentation_is_contained || {
+        printf 'unknown'
+        return 0
+    }
+    neighbors_and_gates_are_unchanged || {
+        printf 'unknown'
+        return 0
+    }
+    container_id="$(service_container_id_any_state "$presentation_service")" || {
+        printf 'unknown'
+        return 0
+    }
+    store_root="$(packet_store_host_root_from_presentation "$container_id")" || {
+        printf 'unknown'
+        return 0
+    }
+    result="$("$packet_preflight" "$store_root" 2>/dev/null)" || {
+        printf 'unknown'
+        return 0
+    }
+    authority_path="$store_root/state-authority.v2.json"
+    case "$result" in
+        'packet_store_preflight=passed state=empty')
+            if [ ! -e "$authority_path" ] && [ ! -L "$authority_path" ]; then
+                printf 'empty'
+            else
+                printf 'unknown'
+            fi
+            ;;
+        'packet_store_preflight=passed state=keyed-v2')
+            if [ -f "$authority_path" ] && [ ! -L "$authority_path" ]; then
+                printf 'keyed-v2'
+            else
+                printf 'unknown'
+            fi
+            ;;
+        *) printf 'unknown' ;;
+    esac
+}
+
+contain_presentation_for_recovery() {
+    local reason="$1"
+    case "$reason" in
+        v2-authority-present|packet-store-state-unprovable) ;;
+        *) reason="packet-store-state-unprovable" ;;
+    esac
+    if ! stop_running_presentations \
+        || ! presentation_is_contained \
+        || ! neighbors_and_gates_are_unchanged; then
+        printf 'presentation_deploy=recovery-required reason=%s containment=failed packet_store=preserved candidate=preserved old_rollback=preserved\n' \
+            "$reason" >&2
+        return 1
+    fi
+    printf 'presentation_deploy=recovery-required reason=%s containment=verified packet_store=preserved candidate=preserved old_rollback=preserved neighbors=unchanged gates=false\n' \
+        "$reason" >&2
 }
 
 run_postchecks() {
@@ -526,20 +691,8 @@ run_postchecks() {
     assert_provider_gates_false "$ai_id_before"
 }
 
-rollback_if_needed() {
+restore_preserved_presentation_image() {
     local restored_presentation_id restored_image
-    if [ "$activation_started" != "true" ] || [ "$deploy_succeeded" = "true" ] \
-        || [ "$rollback_started" = "true" ]; then
-        return 0
-    fi
-    rollback_started="true"
-    printf 'presentation_deploy=rollback-started rollback_ref=%s\n' "$rollback_ref" >&2
-    set +e
-    if [ -z "$rollback_ref" ] \
-        || [ "$(image_id "$rollback_ref" 2>/dev/null)" != "$old_presentation_image" ]; then
-        printf 'presentation_deploy=rollback-failed stage=preserved-image-unavailable\n' >&2
-        return 1
-    fi
     docker image tag "$rollback_ref" "$deployment_image"
     if [ "$(image_id "$deployment_image" 2>/dev/null)" != "$old_presentation_image" ]; then
         printf 'presentation_deploy=rollback-failed stage=deployment-retag-verification\n' >&2
@@ -558,6 +711,41 @@ rollback_if_needed() {
     printf 'presentation_deploy=rollback-restored rollback_ref=%s image=%s\n' \
         "$rollback_ref" "$old_presentation_image" >&2
     return 0
+}
+
+rollback_if_needed() {
+    local rollback_schema quiesced_state containment_reason
+    if [ "$activation_started" != "true" ] || [ "$deploy_succeeded" = "true" ] \
+        || [ "$rollback_started" = "true" ]; then
+        return 0
+    fi
+    rollback_started="true"
+    printf 'presentation_deploy=rollback-started rollback_ref=%s\n' "$rollback_ref" >&2
+    set +e
+    if [ -z "$rollback_ref" ] \
+        || [ "$(image_id "$rollback_ref" 2>/dev/null)" != "$old_presentation_image" ]; then
+        printf 'presentation_deploy=rollback-failed stage=preserved-image-unavailable\n' >&2
+        return 1
+    fi
+
+    rollback_schema="$(image_label "$rollback_ref" "$packet_store_schema_label" 2>/dev/null)"
+    if [ "$rollback_schema" = "$packet_store_schema_version" ]; then
+        restore_preserved_presentation_image
+        return $?
+    fi
+
+    quiesced_state="$(quiesce_and_classify_packet_store_for_legacy_rollback)"
+    if [ "$quiesced_state" = "empty" ]; then
+        restore_preserved_presentation_image
+        return $?
+    fi
+    if [ "$quiesced_state" = "keyed-v2" ]; then
+        containment_reason="v2-authority-present"
+    else
+        containment_reason="packet-store-state-unprovable"
+    fi
+    contain_presentation_for_recovery "$containment_reason" || return 1
+    return 1
 }
 
 restore_pre_activation_tag_if_needed() {
@@ -618,8 +806,11 @@ main() {
     ai_id_before="$(running_container_id "$ai_service")"
     edge_id_before="$(running_container_id "$edge_service")"
     assert_provider_gates_false "$ai_id_before"
-    preserve_rollback_image
+    snapshot_running_presentation
     preflight_packet_store "$old_presentation_id"
+    initial_packet_store_state="$last_packet_store_state"
+    validate_initial_packet_store_compatibility
+    preserve_rollback_image
     load_runtime_environment_without_output
     verify_rendered_compose
     build_candidate_under_limits

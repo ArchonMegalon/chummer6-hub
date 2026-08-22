@@ -88,12 +88,17 @@ the same hard host limits: IO `full avg10` may not exceed 10, `/docker` must
 retain at least 20 GiB, and the interruptible build is polled at least once
 every 15 seconds.
 
-Before building, the helper resolves the exact running Presentation image,
-creates and verifies a collision-resistant
-`chummer-build-ghost-presentation:rollback-*` reference, and retains it. It
-runs the read-only packet-store preflight before the build and again
-immediately before activation. An empty store without an authority marker is
-admitted because the v2 application can initialize it. A nonempty store
+Before building, the helper resolves the exact running Presentation image and
+classifies it by the exact OCI label
+`run.chummer.build-ghost.packet-store-schema=v2`. A structurally keyed-v2
+store may proceed only when the running image already carries that exact
+label; a missing or different label is a pre-v2 image and fails before the
+build. After that admission check, it creates, verifies, and retains a
+collision-resistant `chummer-build-ghost-presentation:rollback-*` reference.
+Every candidate image is built with and checked for the exact v2 label. The
+read-only packet-store preflight runs before the build and again immediately
+before activation. An empty store without an authority marker is admitted
+because the v2 application can initialize it. A nonempty store
 without `state-authority.v2.json`, a v1/unknown schema, a symlink, or ambiguous
 filesystem state fails before activation. For keyed state, every authority and
 lifecycle file must also parse as a JSON object with its exact v2 schema; files
@@ -113,12 +118,31 @@ temporary packet-key material is shredded. It resolves one grant and
 requires replay `410`, then issues another grant, closes the workspace, and
 requires the revoked request to return the exact same no-store terminal `410`.
 
-If activation or any postcheck fails, the helper retags the preserved image to
-the mutable Presentation tag and recreates only Presentation, then verifies
-the old image and health plus unchanged neighbors. Rollback tags are never
-removed or pruned implicitly. A failure after a successful build but before
-activation also restores the mutable deployment tag without recreating the
-still-unchanged container. Packet state is never rolled back or discarded.
+If activation or any postcheck fails, an exact v2-labeled rollback image may be
+retagged to the mutable Presentation tag and recreated normally. A pre-v2
+rollback image is eligible only after the candidate Presentation has been
+stopped, no matching Presentation container remains running, the mounted
+packet volume is resolved without following a symlink, the structural
+preflight is exactly empty, and `state-authority.v2.json` is provably absent.
+This quiesced check closes the request-versus-rollback race at the first v2
+cutover boundary.
+
+If v2 authority exists or its absence cannot be proved, the helper never
+retags or recreates a pre-v2 image. It stops and contains only Presentation,
+verifies no Presentation container remains running, re-verifies unchanged AI
+and edge identities plus all provider gates false, preserves the packet
+volume, candidate image, old immutable rollback reference, and emits a fixed
+non-secret `recovery-required` receipt. A later retry must begin with the same
+structural preflight: keyed-v2 state requires an independently built and
+tested exact v2-labeled recovery image, while ambiguous or mixed state remains
+blocked. Containment deliberately leaves no Presentation process running; a
+separately authorized recovery action must recreate that exact v2-compatible
+image and prove its health before this normal deploy helper is rerun. A failure
+after a successful build but before activation may still
+restore the mutable deployment tag without recreating the unchanged old
+container because no candidate has touched the volume. Rollback tags are never
+removed or pruned implicitly, and packet state is never rolled back or
+discarded.
 
 ```sh
 ./ops/build-ghost-private-nonprod/deploy-presentation-with-rollback.sh

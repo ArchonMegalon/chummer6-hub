@@ -54,12 +54,13 @@ revocation_count="$(find "$store_root/revocations" -maxdepth 1 -type f -name '*.
 state_count="$((pending_count + claims_count + audit_count + revocation_count))"
 authority_path="$store_root/state-authority.v2.json"
 
-if [ ! -f "$authority_path" ]; then
+if [ ! -e "$authority_path" ] && [ ! -L "$authority_path" ]; then
     [ "$state_count" -eq 0 ] || fail "nonempty-unkeyed-state"
     printf 'packet_store_preflight=passed state=empty\n'
     exit 0
 fi
 
+[ -f "$authority_path" ] || fail "authority-not-regular-file"
 [ ! -L "$authority_path" ] || fail "authority-symlink"
 grep -Eq '"schema"[[:space:]]*:[[:space:]]*"chummer\.build_ghost\.packet_access_store_authority\.v2"' \
     "$authority_path" || fail "authority-not-v2"
