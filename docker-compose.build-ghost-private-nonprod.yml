@@ -4,8 +4,15 @@ services:
   chummer-build-ghost-presentation:
     image: chummer-build-ghost-presentation:private-nonprod
     build:
-      context: ${CHUMMER_PRESENTATION_SOURCE:?set CHUMMER_PRESENTATION_SOURCE to the isolated Presentation worktree}
-      dockerfile: Chummer.Api/Dockerfile.private-nonprod
+      context: .
+      dockerfile: ops/build-ghost-private-nonprod/Dockerfile.presentation-private-nonprod
+      args:
+        CHUMMER_RUN_SERVICES_REVISION: ${CHUMMER_RUN_SERVICES_REVISION:?set the exact clean Hub revision}
+        CHUMMER_PRESENTATION_REVISION: ${CHUMMER_PRESENTATION_REVISION:?set the exact clean Presentation revision}
+        CHUMMER_CORE_ENGINE_REVISION: ${CHUMMER_CORE_ENGINE_REVISION:?set the exact clean Core revision}
+        CHUMMER_HUB_REGISTRY_REVISION: ${CHUMMER_HUB_REGISTRY_REVISION:?set the exact clean Hub Registry revision}
+        CHUMMER_UI_KIT_REVISION: ${CHUMMER_UI_KIT_REVISION:?set the exact clean UI Kit revision}
+        CHUMMER_MEDIA_FACTORY_REVISION: ${CHUMMER_MEDIA_FACTORY_REVISION:?set the exact clean Media Factory revision}
       additional_contexts:
         presentation-source: ${CHUMMER_PRESENTATION_SOURCE:?set CHUMMER_PRESENTATION_SOURCE to the isolated Presentation worktree}
         core-engine-source: ${CHUMMER_CORE_ENGINE_SOURCE:?set CHUMMER_CORE_ENGINE_SOURCE}
