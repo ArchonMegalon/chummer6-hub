@@ -16,7 +16,7 @@ RUN mkdir -p fleet/repos/chummer-media-factory/.tmp/package-feed \
       -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
  && dotnet build fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj \
       -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
- && rm fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/packages.lock.json \
+ && rm -f fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/packages.lock.json \
        fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/packages.lock.json \
  && dotnet build fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/Chummer.Media.Factory.Runtime.csproj \
       -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
