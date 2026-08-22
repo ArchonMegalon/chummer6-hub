@@ -95,9 +95,13 @@ store may proceed only when the running image already carries that exact
 label; a missing or different label is a pre-v2 image and fails before the
 build. After that admission check, it creates, verifies, and retains a
 collision-resistant `chummer-build-ghost-presentation:rollback-*` reference.
-Every candidate image is built with and checked for the exact v2 label. The
-read-only packet-store preflight runs before the build and again immediately
-before activation. An empty store without an authority marker is admitted
+Every candidate image is built with and checked for the exact v2 label, then
+preserved before activation under a second collision-resistant immutable
+`chummer-build-ghost-presentation:v2-recovery-*` reference. The helper verifies
+that reference still resolves to the exact candidate image and retains it on
+success, rollback, containment, and pre-activation failure. The read-only
+packet-store preflight runs before the build and again immediately before
+activation. An empty store without an authority marker is admitted
 because the v2 application can initialize it. A nonempty store
 without `state-authority.v2.json`, a v1/unknown schema, a symlink, or ambiguous
 filesystem state fails before activation. For keyed state, every authority and
@@ -118,26 +122,32 @@ temporary packet-key material is shredded. It resolves one grant and
 requires replay `410`, then issues another grant, closes the workspace, and
 requires the revoked request to return the exact same no-store terminal `410`.
 
-If activation or any postcheck fails, an exact v2-labeled rollback image may be
-retagged to the mutable Presentation tag and recreated normally. A pre-v2
-rollback image is eligible only after the candidate Presentation has been
-stopped, no matching Presentation container remains running, the mounted
-packet volume is resolved without following a symlink, the structural
-preflight is exactly empty, and `state-authority.v2.json` is provably absent.
-This quiesced check closes the request-versus-rollback race at the first v2
-cutover boundary.
+If activation or any postcheck fails, every rollback path first stops the
+candidate Presentation, proves that no matching Presentation container remains
+running, resolves the mounted packet volume without following a symlink, and
+reruns the structural preflight. An exact v2-labeled rollback image is eligible
+only when this quiesced result is exactly empty or keyed-v2. A pre-v2 rollback
+image is eligible only when the result is exactly empty and
+`state-authority.v2.json` is provably absent. Unknown, unreadable, mixed, or
+ambiguous state never reaches a retag or recreate. This quiesced check closes
+the request-versus-rollback race for both first cutover and later v2 releases.
 
 If v2 authority exists or its absence cannot be proved, the helper never
 retags or recreates a pre-v2 image. It stops and contains only Presentation,
 verifies no Presentation container remains running, re-verifies unchanged AI
 and edge identities plus all provider gates false, preserves the packet
-volume, candidate image, old immutable rollback reference, and emits a fixed
-non-secret `recovery-required` receipt. A later retry must begin with the same
+volume, candidate image through its exact immutable v2 recovery reference, and
+the old immutable rollback reference, and emits that non-secret recovery ref
+in a fixed `recovery-required` receipt. Any failed retag, recreate, image
+readback, health check, neighbor check, provider-gate check, or preserved-image
+check immediately enters the same containment path; an unhealthy or uncertain
+Presentation is never left running. A later retry must begin with the same
 structural preflight: keyed-v2 state requires an independently built and
 tested exact v2-labeled recovery image, while ambiguous or mixed state remains
 blocked. Containment deliberately leaves no Presentation process running; a
-separately authorized recovery action must recreate that exact v2-compatible
-image and prove its health before this normal deploy helper is rerun. A failure
+separately authorized recovery action may use the named immutable candidate
+recovery ref, must prove its health, and only then may rerun this normal deploy
+helper. A failure
 after a successful build but before activation may still
 restore the mutable deployment tag without recreating the unchanged old
 container because no candidate has touched the volume. Rollback tags are never

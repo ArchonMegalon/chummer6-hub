@@ -283,6 +283,9 @@ def test_source_and_store_admission_precede_candidate_build_and_activation():
         "build_candidate_under_limits"
     )
     assert body.index("build_candidate_under_limits") < body.index(
+        "preserve_candidate_recovery_image"
+    )
+    assert body.index("preserve_candidate_recovery_image") < body.index(
         "verify_activation_authority_unchanged"
     )
     assert body.index("verify_activation_authority_unchanged") < body.index(
@@ -355,7 +358,7 @@ rollback_schema_under_test="$1"
 quiesced_state_under_test="$2"
 image_id() { printf '%s' "$old_presentation_image"; }
 image_label() { printf '%s' "$rollback_schema_under_test"; }
-quiesce_and_classify_packet_store_for_legacy_rollback() {
+quiesce_and_classify_packet_store_for_rollback() {
     printf 'quiesce\n' >&2
     printf '%s' "$quiesced_state_under_test"
 }
@@ -393,12 +396,84 @@ def test_empty_pre_migration_store_allows_the_preserved_legacy_rollback():
     assert "quiesce" in result.stderr
 
 
-def test_exact_v2_rollback_image_is_eligible_without_legacy_store_probe():
+def test_exact_v2_rollback_image_requires_a_proven_empty_or_keyed_v2_store():
+    empty = run_rollback_branch("v2", "empty")
+    keyed = run_rollback_branch("v2", "keyed-v2")
+
+    for result in (empty, keyed):
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == "restore\n"
+        assert "quiesce" in result.stderr
+
+
+def test_exact_v2_rollback_image_with_unknown_state_is_contained():
     result = run_rollback_branch("v2", "unknown")
 
+    assert result.returncode != 0
+    assert result.stdout == "contain:packet-store-state-unprovable\n"
+    assert "restore" not in result.stdout
+
+
+def test_failed_restore_is_immediately_followed_by_verified_containment():
+    result = run_deploy_harness(
+        r'''
+activation_started="true"
+deploy_succeeded="false"
+rollback_started="false"
+rollback_ref="presentation:rollback-test"
+old_presentation_image="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+image_id() { printf '%s' "$old_presentation_image"; }
+image_label() { printf 'v2'; }
+quiesce_and_classify_packet_store_for_rollback() { printf 'keyed-v2'; }
+restore_preserved_presentation_image() { printf 'restore-attempt\n'; return 1; }
+contain_presentation_for_recovery() { printf 'contain:%s\n' "$1"; }
+rollback_if_needed
+'''
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == "restore-attempt\ncontain:rollback-restore-failed\n"
+
+
+def test_candidate_image_gets_a_unique_verified_immutable_recovery_reference():
+    result = run_deploy_harness(
+        r'''
+deployment_image="presentation:candidate"
+rollback_repository="presentation"
+candidate_under_test="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+date() { printf '20260822t173000z'; }
+openssl() { printf '0123456789abcdef01234567'; }
+image_id() { printf '%s' "$candidate_under_test"; }
+image_label() { printf 'v2'; }
+verify_source_labels() { printf 'verify:%s\n' "$1"; }
+docker() {
+    if [ "$1" = "image" ] && [ "$2" = "inspect" ]; then
+        return 1
+    fi
+    if [ "$1" = "image" ] && [ "$2" = "tag" ]; then
+        printf 'tag:%s:%s\n' "$3" "$4"
+        return 0
+    fi
+    return 1
+}
+preserve_candidate_recovery_image
+printf 'ref:%s\nimage:%s\n' "$candidate_recovery_ref" "$candidate_image"
+'''
+    )
+
+    expected_ref = (
+        "presentation:v2-recovery-20260822t173000z-"
+        "bbbbbbbbbbbbbbbb-0123456789abcdef01234567"
+    )
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "restore\n"
-    assert "quiesce" not in result.stderr
+    assert f"tag:sha256:{'b' * 64}:{expected_ref}\n" in result.stdout
+    assert f"verify:{expected_ref}\n" in result.stdout
+    assert f"ref:{expected_ref}\n" in result.stdout
+    assert f"image:sha256:{'b' * 64}\n" in result.stdout
+    assert "v2-recovery-${timestamp}-${candidate_short:0:16}-${nonce}" in SCRIPT
+    assert "candidate-recovery-reference-collision" in SCRIPT
+    assert "candidate-recovery-reference-verification-failed" in SCRIPT
+    assert "candidate-recovery-schema-label-drift" in SCRIPT
 
 
 def run_quiesced_store_probe(store: Path) -> subprocess.CompletedProcess[str]:
@@ -410,7 +485,7 @@ presentation_is_contained() { :; }
 neighbors_and_gates_are_unchanged() { :; }
 service_container_id_any_state() { printf 'stopped-presentation-id'; }
 packet_store_host_root_from_presentation() { printf '%s' "$store_under_test"; }
-quiesce_and_classify_packet_store_for_legacy_rollback
+quiesce_and_classify_packet_store_for_rollback
 ''',
         str(store),
     )
@@ -449,15 +524,22 @@ def test_fail_closed_containment_stops_only_presentation_and_verifies_neighbors_
 stop_running_presentations() { printf 'stop-presentation\n'; }
 presentation_is_contained() { printf 'contained\n'; }
 neighbors_and_gates_are_unchanged() { printf 'neighbors-and-gates\n'; }
+rollback_image_is_preserved() { printf 'rollback-preserved\n'; }
+candidate_recovery_is_preserved() { printf 'candidate-preserved\n'; }
+candidate_recovery_ref="chummer-build-ghost-presentation:v2-recovery-test"
 contain_presentation_for_recovery v2-authority-present
 '''
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "stop-presentation\ncontained\nneighbors-and-gates\n"
+    assert result.stdout == (
+        "stop-presentation\ncontained\nneighbors-and-gates\n"
+        "rollback-preserved\ncandidate-preserved\n"
+    )
     assert (
         "reason=v2-authority-present containment=verified packet_store=preserved "
-        "candidate=preserved old_rollback=preserved neighbors=unchanged gates=false"
+        "candidate_recovery_ref=chummer-build-ghost-presentation:v2-recovery-test "
+        "old_rollback=preserved neighbors=unchanged gates=false"
         in result.stderr
     )
 
@@ -473,8 +555,10 @@ contain_presentation_for_recovery v2-authority-present
     )[0]
     assert "presentation_is_contained" in containment
     assert "neighbors_and_gates_are_unchanged" in containment
+    assert "rollback_image_is_preserved" in containment
+    assert "candidate_recovery_is_preserved" in containment
     assert "packet_store=preserved" in containment
-    assert "candidate=preserved" in containment
+    assert "candidate_recovery_ref=%s" in containment
     assert "old_rollback=preserved" in containment
     assert "compose up" not in containment
     assert "docker image tag" not in containment

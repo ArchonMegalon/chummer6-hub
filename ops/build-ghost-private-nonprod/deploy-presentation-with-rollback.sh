@@ -36,6 +36,8 @@ old_presentation_id=""
 old_presentation_image=""
 old_presentation_store_schema=""
 rollback_ref=""
+candidate_recovery_ref=""
+candidate_image=""
 ai_id_before=""
 edge_id_before=""
 deploy_lock_fd=""
@@ -300,6 +302,32 @@ preserve_rollback_image() {
         "$rollback_ref" "$old_presentation_image"
 }
 
+preserve_candidate_recovery_image() {
+    local timestamp nonce candidate_short preserved_id preserved_schema
+    candidate_image="$(image_id "$deployment_image")"
+    [[ "$candidate_image" =~ ^sha256:[0-9a-f]{64}$ ]] \
+        || fail "candidate-image-id-invalid"
+    verify_source_labels "$candidate_image"
+
+    timestamp="$(date -u +%Y%m%dt%H%M%Sz)"
+    nonce="$(openssl rand -hex 12)"
+    candidate_short="${candidate_image#sha256:}"
+    candidate_recovery_ref="$rollback_repository:v2-recovery-${timestamp}-${candidate_short:0:16}-${nonce}"
+    if docker image inspect "$candidate_recovery_ref" >/dev/null 2>&1; then
+        fail "candidate-recovery-reference-collision"
+    fi
+    docker image tag "$candidate_image" "$candidate_recovery_ref"
+    preserved_id="$(image_id "$candidate_recovery_ref")"
+    [ "$preserved_id" = "$candidate_image" ] \
+        || fail "candidate-recovery-reference-verification-failed"
+    preserved_schema="$(image_label "$candidate_recovery_ref" "$packet_store_schema_label")"
+    [ "$preserved_schema" = "$packet_store_schema_version" ] \
+        || fail "candidate-recovery-schema-label-drift"
+    verify_source_labels "$candidate_recovery_ref"
+    printf 'presentation_deploy=candidate-recovery-prepared candidate_recovery_ref=%s candidate_image=%s\n' \
+        "$candidate_recovery_ref" "$candidate_image"
+}
+
 preflight_packet_store() {
     local container_id="$1"
     local result directory expected_schema state_path
@@ -509,6 +537,11 @@ verify_activation_authority_unchanged() {
     local current_presentation_id current_presentation_image
     [ "$(image_id "$rollback_ref")" = "$old_presentation_image" ] \
         || fail "preactivation-rollback-reference-drift"
+    candidate_recovery_is_preserved \
+        || fail "preactivation-candidate-recovery-reference-drift"
+    [ "$(image_id "$deployment_image")" = "$candidate_image" ] \
+        || fail "preactivation-candidate-deployment-tag-drift"
+    verify_source_labels "$candidate_recovery_ref"
     current_presentation_id="$(running_container_id "$presentation_service")"
     [ "$current_presentation_id" = "$old_presentation_id" ] \
         || fail "preactivation-presentation-container-drift"
@@ -598,7 +631,7 @@ EOF
     printf '%s' "$resolved_source/build-ghost-packet-access"
 }
 
-quiesce_and_classify_packet_store_for_legacy_rollback() {
+quiesce_and_classify_packet_store_for_rollback() {
     local container_id store_root result authority_path
     stop_running_presentations || {
         printf 'unknown'
@@ -644,21 +677,36 @@ quiesce_and_classify_packet_store_for_legacy_rollback() {
     esac
 }
 
+rollback_image_is_preserved() {
+    [ -n "$rollback_ref" ] || return 1
+    [ "$(image_id "$rollback_ref" 2>/dev/null)" = "$old_presentation_image" ]
+}
+
+candidate_recovery_is_preserved() {
+    [ -n "$candidate_recovery_ref" ] || return 1
+    [ -n "$candidate_image" ] || return 1
+    [ "$(image_id "$candidate_recovery_ref" 2>/dev/null)" = "$candidate_image" ] || return 1
+    [ "$(image_label "$candidate_recovery_ref" "$packet_store_schema_label" 2>/dev/null)" \
+        = "$packet_store_schema_version" ]
+}
+
 contain_presentation_for_recovery() {
     local reason="$1"
     case "$reason" in
-        v2-authority-present|packet-store-state-unprovable) ;;
+        v2-authority-present|packet-store-state-unprovable|rollback-restore-failed) ;;
         *) reason="packet-store-state-unprovable" ;;
     esac
     if ! stop_running_presentations \
         || ! presentation_is_contained \
-        || ! neighbors_and_gates_are_unchanged; then
-        printf 'presentation_deploy=recovery-required reason=%s containment=failed packet_store=preserved candidate=preserved old_rollback=preserved\n' \
-            "$reason" >&2
+        || ! neighbors_and_gates_are_unchanged \
+        || ! rollback_image_is_preserved \
+        || ! candidate_recovery_is_preserved; then
+        printf 'presentation_deploy=recovery-required reason=%s containment=failed packet_store=preserved candidate_recovery_ref=%s old_rollback=preserved\n' \
+            "$reason" "$candidate_recovery_ref" >&2
         return 1
     fi
-    printf 'presentation_deploy=recovery-required reason=%s containment=verified packet_store=preserved candidate=preserved old_rollback=preserved neighbors=unchanged gates=false\n' \
-        "$reason" >&2
+    printf 'presentation_deploy=recovery-required reason=%s containment=verified packet_store=preserved candidate_recovery_ref=%s old_rollback=preserved neighbors=unchanged gates=false\n' \
+        "$reason" "$candidate_recovery_ref" >&2
 }
 
 run_postchecks() {
@@ -692,25 +740,50 @@ run_postchecks() {
 }
 
 restore_preserved_presentation_image() {
-    local restored_presentation_id restored_image
-    docker image tag "$rollback_ref" "$deployment_image"
+    local restored_presentation_id restored_image current_ai_id current_edge_id
+    if ! docker image tag "$rollback_ref" "$deployment_image"; then
+        printf 'presentation_deploy=rollback-failed stage=deployment-retag\n' >&2
+        return 1
+    fi
     if [ "$(image_id "$deployment_image" 2>/dev/null)" != "$old_presentation_image" ]; then
         printf 'presentation_deploy=rollback-failed stage=deployment-retag-verification\n' >&2
         return 1
     fi
-    compose up -d --no-deps --no-build --force-recreate "$presentation_service"
-    restored_presentation_id="$(running_container_id "$presentation_service")"
-    restored_image="$(docker inspect "$restored_presentation_id" --format '{{.Image}}')"
+    if ! compose up -d --no-deps --no-build --force-recreate "$presentation_service"; then
+        printf 'presentation_deploy=rollback-failed stage=presentation-recreate\n' >&2
+        return 1
+    fi
+    restored_presentation_id="$(resolve_running_container_id "$presentation_service")" || {
+        printf 'presentation_deploy=rollback-failed stage=restored-presentation-not-running\n' >&2
+        return 1
+    }
+    restored_image="$(docker inspect "$restored_presentation_id" --format '{{.Image}}')" || {
+        printf 'presentation_deploy=rollback-failed stage=restored-presentation-uninspectable\n' >&2
+        return 1
+    }
+    current_ai_id="$(resolve_running_container_id "$ai_service")" || return 1
+    current_edge_id="$(resolve_running_container_id "$edge_service")" || return 1
     if [ "$restored_image" != "$old_presentation_image" ] \
         || ! wait_for_presentation_health "$restored_presentation_id" rollback-verification \
-        || [ "$(running_container_id "$ai_service")" != "$ai_id_before" ] \
-        || [ "$(running_container_id "$edge_service")" != "$edge_id_before" ]; then
+        || [ "$current_ai_id" != "$ai_id_before" ] \
+        || [ "$current_edge_id" != "$edge_id_before" ] \
+        || ! provider_gates_are_false "$ai_id_before" \
+        || ! rollback_image_is_preserved \
+        || ! candidate_recovery_is_preserved; then
         printf 'presentation_deploy=rollback-failed stage=runtime-verification\n' >&2
         return 1
     fi
     printf 'presentation_deploy=rollback-restored rollback_ref=%s image=%s\n' \
         "$rollback_ref" "$old_presentation_image" >&2
     return 0
+}
+
+restore_preserved_presentation_image_or_contain() {
+    if restore_preserved_presentation_image; then
+        return 0
+    fi
+    contain_presentation_for_recovery rollback-restore-failed || true
+    return 1
 }
 
 rollback_if_needed() {
@@ -725,18 +798,22 @@ rollback_if_needed() {
     if [ -z "$rollback_ref" ] \
         || [ "$(image_id "$rollback_ref" 2>/dev/null)" != "$old_presentation_image" ]; then
         printf 'presentation_deploy=rollback-failed stage=preserved-image-unavailable\n' >&2
+        contain_presentation_for_recovery rollback-restore-failed || true
         return 1
     fi
 
     rollback_schema="$(image_label "$rollback_ref" "$packet_store_schema_label" 2>/dev/null)"
+    quiesced_state="$(quiesce_and_classify_packet_store_for_rollback)"
+    if [ "$quiesced_state" != "empty" ] && [ "$quiesced_state" != "keyed-v2" ]; then
+        contain_presentation_for_recovery packet-store-state-unprovable || return 1
+        return 1
+    fi
     if [ "$rollback_schema" = "$packet_store_schema_version" ]; then
-        restore_preserved_presentation_image
+        restore_preserved_presentation_image_or_contain
         return $?
     fi
-
-    quiesced_state="$(quiesce_and_classify_packet_store_for_legacy_rollback)"
     if [ "$quiesced_state" = "empty" ]; then
-        restore_preserved_presentation_image
+        restore_preserved_presentation_image_or_contain
         return $?
     fi
     if [ "$quiesced_state" = "keyed-v2" ]; then
@@ -814,6 +891,7 @@ main() {
     load_runtime_environment_without_output
     verify_rendered_compose
     build_candidate_under_limits
+    preserve_candidate_recovery_image
     ensure_hard_limits
     verify_activation_authority_unchanged
 
@@ -821,8 +899,8 @@ main() {
     compose up -d --no-deps --no-build --force-recreate "$presentation_service"
     run_postchecks
     deploy_succeeded="true"
-    printf 'presentation_deploy=passed rollback_ref=%s old_image=%s candidate_image=%s sources=exact packet_store=keyed-v2 auth=401 lifecycle=one-use-replay-revocation gates=false neighbors=unchanged public_explain=404\n' \
-        "$rollback_ref" "$old_presentation_image" "$(image_id "$deployment_image")"
+    printf 'presentation_deploy=passed rollback_ref=%s old_image=%s candidate_recovery_ref=%s candidate_image=%s sources=exact packet_store=keyed-v2 auth=401 lifecycle=one-use-replay-revocation gates=false neighbors=unchanged public_explain=404\n' \
+        "$rollback_ref" "$old_presentation_image" "$candidate_recovery_ref" "$(image_id "$deployment_image")"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
