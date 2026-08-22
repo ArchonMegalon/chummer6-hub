@@ -4,17 +4,17 @@
     "net10.0": {
       "Chummer.Engine.Contracts": {
         "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.sha8a736655c5d8, )",
-        "resolved": "0.0.0-packageplane.candidate.sha8a736655c5d8",
-        "contentHash": "ZQuZ0vik3If44xTFJYW39nVQLqrZiRFN42+jdxrKrX6ZdG2W6CvcaXEoIOo6+/Hbcz4463BLfWfJQIWcikkOVw=="
+        "requested": "[0.0.0-packageplane.candidate.sha7b0ee284b845, )",
+        "resolved": "0.0.0-packageplane.candidate.sha7b0ee284b845",
+        "contentHash": "dyDglInurZV3SnaB7xlcDlfkz0J9EHLuwX0A+AlORrSf3ILA5AmaPwR8m/r0yMxkWWl0dvKE4yDCIG2gBss72A=="
       },
       "Chummer.Engine.GmCharacterEdits": {
         "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.sha8a736655c5d8, )",
-        "resolved": "0.0.0-packageplane.candidate.sha8a736655c5d8",
-        "contentHash": "nHYKU9t6DVyrrq00JXOP72HqBygkogU5fJN8woEV4er/8KNaa9h8eOLc8MWdZs3E+G5b07KdbSJ2hIOEg7OnIg==",
+        "requested": "[0.0.0-packageplane.candidate.sha7b0ee284b845, )",
+        "resolved": "0.0.0-packageplane.candidate.sha7b0ee284b845",
+        "contentHash": "yVgBagBYYeM4cxuceVPK9/iWQ2burIlleX0+lCens+s1oQSLY7eVEOlYOr035TfyC0Bf06o2SwefF+S2NNSCDg==",
         "dependencies": {
-          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha8a736655c5d8",
+          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha7b0ee284b845",
           "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
           "Chummer.Run.Contracts": "0.1.0-preview"
         }
@@ -49,7 +49,7 @@
       "chummer.campaign.contracts": {
         "type": "Project",
         "dependencies": {
-          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sha8a736655c5d8, )"
+          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sha7b0ee284b845, )"
         }
       },
       "chummer.control.contracts": {
@@ -61,7 +61,7 @@
       "chummer.run.contracts": {
         "type": "Project",
         "dependencies": {
-          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sha8a736655c5d8, )",
+          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sha7b0ee284b845, )",
           "Chummer.Hub.Registry.Contracts": "[0.1.0-preview, )",
           "Chummer.Play.Contracts": "[0.1.0-preview, )"
         }
