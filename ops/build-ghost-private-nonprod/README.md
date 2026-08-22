@@ -98,8 +98,11 @@ collision-resistant `chummer-build-ghost-presentation:rollback-*` reference.
 Every candidate image is built with and checked for the exact v2 label, then
 preserved before activation under a second collision-resistant immutable
 `chummer-build-ghost-presentation:v2-recovery-*` reference. The helper verifies
-that reference still resolves to the exact candidate image and retains it on
-success, rollback, containment, and pre-activation failure. The read-only
+that reference still resolves to the exact captured candidate image, derives
+the Compose activation tag from that immutable reference immediately before
+activation, and binds runtime postchecks and the success receipt to the
+captured image digest rather than the mutable tag. It retains the recovery
+reference on success, rollback, containment, and pre-activation failure. The read-only
 packet-store preflight runs before the build and again immediately before
 activation. An empty store without an authority marker is admitted
 because the v2 application can initialize it. A nonempty store
@@ -130,7 +133,10 @@ only when this quiesced result is exactly empty or keyed-v2. A pre-v2 rollback
 image is eligible only when the result is exactly empty and
 `state-authority.v2.json` is provably absent. Unknown, unreadable, mixed, or
 ambiguous state never reaches a retag or recreate. This quiesced check closes
-the request-versus-rollback race for both first cutover and later v2 releases.
+the request-versus-rollback race for later v2 releases. Immediately before a
+first-cutover pre-v2 restore, the helper repeats the empty-store/absent-authority
+classification and proves that Presentation is still contained and attached to
+the same exact packet-store mount; any drift enters containment instead.
 
 If v2 authority exists or its absence cannot be proved, the helper never
 retags or recreates a pre-v2 image. It stops and contains only Presentation,
@@ -138,9 +144,13 @@ verifies no Presentation container remains running, re-verifies unchanged AI
 and edge identities plus all provider gates false, preserves the packet
 volume, candidate image through its exact immutable v2 recovery reference, and
 the old immutable rollback reference, and emits that non-secret recovery ref
-in a fixed `recovery-required` receipt. Any failed retag, recreate, image
+in a fixed `recovery-required` receipt. The verified receipt is emitted only
+after two terminal containment, neighbor, provider-gate, and recovery-reference
+passes. Any failed retag, recreate, image
 readback, health check, neighbor check, provider-gate check, or preserved-image
-check immediately enters the same containment path; an unhealthy or uncertain
+check immediately enters the same containment path. A restored container is
+re-resolved after its health wait and must still be the exact same container on
+the exact preserved image; an unhealthy, replaced, or uncertain
 Presentation is never left running. A later retry must begin with the same
 structural preflight: keyed-v2 state requires an independently built and
 tested exact v2-labeled recovery image, while ambiguous or mixed state remains

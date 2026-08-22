@@ -289,6 +289,9 @@ def test_source_and_store_admission_precede_candidate_build_and_activation():
         "verify_activation_authority_unchanged"
     )
     assert body.index("verify_activation_authority_unchanged") < body.index(
+        "prepare_candidate_activation_tag"
+    )
+    assert body.index("prepare_candidate_activation_tag") < body.index(
         'activation_started="true"'
     )
     preactivation = SCRIPT.split("verify_activation_authority_unchanged()", 1)[1].split(
@@ -362,6 +365,7 @@ quiesce_and_classify_packet_store_for_rollback() {
     printf 'quiesce\n' >&2
     printf '%s' "$quiesced_state_under_test"
 }
+terminally_verify_legacy_empty_store_for_rollback() { printf 'terminal-empty-proof\n'; }
 restore_preserved_presentation_image() { printf 'restore\n'; }
 contain_presentation_for_recovery() { printf 'contain:%s\n' "$1"; }
 rollback_if_needed
@@ -392,7 +396,7 @@ def test_empty_pre_migration_store_allows_the_preserved_legacy_rollback():
     result = run_rollback_branch("missing", "empty")
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "restore\n"
+    assert result.stdout == "terminal-empty-proof\nrestore\n"
     assert "quiesce" in result.stderr
 
 
@@ -474,6 +478,88 @@ printf 'ref:%s\nimage:%s\n' "$candidate_recovery_ref" "$candidate_image"
     assert "candidate-recovery-reference-collision" in SCRIPT
     assert "candidate-recovery-reference-verification-failed" in SCRIPT
     assert "candidate-recovery-schema-label-drift" in SCRIPT
+    assert "readonly candidate_image candidate_recovery_ref" in SCRIPT
+
+
+def test_activation_and_success_are_bound_to_captured_candidate_and_recovery_ref():
+    result = run_deploy_harness(
+        r'''
+candidate_image="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+candidate_recovery_ref="presentation:v2-recovery-test"
+deployment_image="presentation:mutable"
+candidate_recovery_is_preserved() { printf 'recovery-preserved\n'; }
+verify_source_labels() { printf 'labels:%s\n' "$1"; }
+docker() {
+    [ "$1" = "image" ] && [ "$2" = "tag" ] || return 1
+    printf 'tag:%s:%s\n' "$3" "$4"
+}
+image_id() { printf '%s' "$candidate_image"; }
+prepare_candidate_activation_tag
+'''
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == (
+        "recovery-preserved\n"
+        "labels:presentation:v2-recovery-test\n"
+        "tag:presentation:v2-recovery-test:presentation:mutable\n"
+        "recovery-preserved\n"
+    )
+
+    postchecks = SCRIPT.split("run_postchecks() {", 1)[1].split(
+        "restore_preserved_presentation_image() {", 1
+    )[0]
+    assert '[ "$current_presentation_image" = "$candidate_image" ]' in postchecks
+    assert 'image_id "$deployment_image"' not in postchecks
+    body = main_body()
+    success_receipt = body.split("presentation_deploy=passed", 1)[1]
+    assert '"$candidate_recovery_ref" "$candidate_image"' in success_receipt
+    assert 'image_id "$deployment_image"' not in success_receipt
+
+
+def test_postchecks_reject_mutable_tag_as_candidate_authority():
+    result = run_deploy_harness(
+        r'''
+presentation_service="presentation"
+ai_service="ai"
+edge_service="edge"
+old_presentation_id="old-presentation"
+candidate_image="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+candidate_recovery_ref="presentation:v2-recovery-test"
+ai_id_before="ai-id"
+edge_id_before="edge-id"
+running_container_id() {
+    case "$1" in
+        presentation) printf 'candidate-presentation' ;;
+        ai) printf 'ai-id' ;;
+        edge) printf 'edge-id' ;;
+        *) return 1 ;;
+    esac
+}
+docker() {
+    if [ "$1" = "inspect" ]; then
+        printf '%s' "$candidate_image"
+        return 0
+    fi
+    [ "$1" = "exec" ] && return 0
+    return 1
+}
+image_id() { printf 'mutable-tag-must-not-be-authority\n' >&2; return 1; }
+candidate_recovery_is_preserved() { :; }
+verify_source_labels() { [ "$1" = "$candidate_recovery_ref" ]; }
+wait_for_presentation_health() { :; }
+assert_provider_gates_false() { :; }
+copy_edge_root_certificate() { :; }
+verify_private_route_auth() { :; }
+verify_public_explain_absent() { :; }
+verify_lifecycle_canary() { :; }
+preflight_packet_store() { :; }
+run_postchecks
+'''
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "mutable-tag-must-not-be-authority" not in result.stderr
 
 
 def run_quiesced_store_probe(store: Path) -> subprocess.CompletedProcess[str]:
@@ -518,6 +604,41 @@ def test_quiesced_legacy_rollback_probe_requires_empty_and_authority_absent(tmp_
     assert unknown_result.stdout == "unknown"
 
 
+def test_legacy_restore_repeats_terminal_empty_state_and_containment_proof():
+    rejected = run_deploy_harness(
+        r'''
+terminally_verify_legacy_empty_store_for_rollback() {
+    printf 'terminal-proof-failed\n'
+    return 1
+}
+restore_preserved_presentation_image() { printf 'restore-must-not-run\n'; }
+contain_presentation_for_recovery() { printf 'contain:%s\n' "$1"; }
+restore_preserved_presentation_image_or_contain legacy-empty
+'''
+    )
+
+    assert rejected.returncode != 0
+    assert rejected.stdout == (
+        "terminal-proof-failed\ncontain:packet-store-state-unprovable\n"
+    )
+    assert "restore-must-not-run" not in rejected.stdout
+
+    wrapper = SCRIPT.split("restore_preserved_presentation_image_or_contain() {", 1)[1].split(
+        "rollback_if_needed() {", 1
+    )[0]
+    assert wrapper.index("terminally_verify_legacy_empty_store_for_rollback") < wrapper.index(
+        "restore_preserved_presentation_image"
+    )
+    terminal = SCRIPT.split("terminally_verify_legacy_empty_store_for_rollback() {", 1)[1].split(
+        "rollback_image_is_preserved() {", 1
+    )[0]
+    assert terminal.count("presentation_is_contained") >= 2
+    assert terminal.count("neighbors_and_gates_are_unchanged") >= 2
+    assert '[ "$terminal_state" = "empty" ]' in terminal
+    assert '[ "$final_container_id" = "$container_id" ]' in terminal
+    assert '[ "$final_store_root" = "$store_root" ]' in terminal
+
+
 def test_fail_closed_containment_stops_only_presentation_and_verifies_neighbors_and_gates():
     result = run_deploy_harness(
         r'''
@@ -533,8 +654,9 @@ contain_presentation_for_recovery v2-authority-present
 
     assert result.returncode == 0, result.stderr
     assert result.stdout == (
-        "stop-presentation\ncontained\nneighbors-and-gates\n"
-        "rollback-preserved\ncandidate-preserved\n"
+        "stop-presentation\n"
+        "rollback-preserved\ncandidate-preserved\ncontained\nneighbors-and-gates\n"
+        "rollback-preserved\ncandidate-preserved\ncontained\nneighbors-and-gates\n"
     )
     assert (
         "reason=v2-authority-present containment=verified packet_store=preserved "
@@ -553,15 +675,44 @@ contain_presentation_for_recovery v2-authority-present
     containment = SCRIPT.split("contain_presentation_for_recovery() {", 1)[1].split(
         "run_postchecks() {", 1
     )[0]
-    assert "presentation_is_contained" in containment
-    assert "neighbors_and_gates_are_unchanged" in containment
-    assert "rollback_image_is_preserved" in containment
-    assert "candidate_recovery_is_preserved" in containment
+    recovery_check = SCRIPT.split("recovery_containment_is_verified() {", 1)[1].split(
+        "contain_presentation_for_recovery() {", 1
+    )[0]
+    assert containment.count("recovery_containment_is_verified") == 2
+    assert "presentation_is_contained" in recovery_check
+    assert "neighbors_and_gates_are_unchanged" in recovery_check
+    assert "rollback_image_is_preserved" in recovery_check
+    assert "candidate_recovery_is_preserved" in recovery_check
     assert "packet_store=preserved" in containment
     assert "candidate_recovery_ref=%s" in containment
     assert "old_rollback=preserved" in containment
     assert "compose up" not in containment
     assert "docker image tag" not in containment
+
+
+def test_containment_receipt_requires_a_second_terminal_neighbor_verification():
+    result = run_deploy_harness(
+        r'''
+neighbor_checks=0
+stop_running_presentations() { printf 'stop-presentation\n'; }
+presentation_is_contained() { printf 'contained\n'; }
+neighbors_and_gates_are_unchanged() {
+    neighbor_checks=$((neighbor_checks + 1))
+    printf 'neighbors-check-%s\n' "$neighbor_checks"
+    [ "$neighbor_checks" -eq 1 ]
+}
+rollback_image_is_preserved() { printf 'rollback-preserved\n'; }
+candidate_recovery_is_preserved() { printf 'candidate-preserved\n'; }
+candidate_recovery_ref="presentation:v2-recovery-test"
+contain_presentation_for_recovery rollback-restore-failed
+'''
+    )
+
+    assert result.returncode != 0
+    assert "neighbors-check-1" in result.stdout
+    assert "neighbors-check-2" in result.stdout
+    assert "containment=failed" in result.stderr
+    assert "containment=verified" not in result.stderr
 
 
 def test_keyed_packet_preflight_parses_every_json_object_and_exact_schema():
@@ -622,6 +773,95 @@ def test_activation_and_automatic_rollback_are_presentation_only():
     assert 'candidate_built="true"' in SCRIPT
     assert "restore_pre_activation_tag_if_needed" in SCRIPT
     assert "preactivation-tag-restored" in SCRIPT
+
+
+def test_rollback_rechecks_neighbors_and_provider_gates_after_the_health_wait():
+    restore = SCRIPT.split("restore_preserved_presentation_image() {", 1)[1].split(
+        "restore_preserved_presentation_image_or_contain() {", 1
+    )[0]
+
+    assert restore.index("wait_for_presentation_health") < restore.index(
+        "neighbors_and_gates_are_unchanged"
+    )
+    assert "current_ai_id" not in restore
+    assert "current_edge_id" not in restore
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_returncode", "expected_stage"),
+    (
+        ("stable", 0, "rollback-restored"),
+        ("id-drift", 1, "runtime-verification"),
+        ("image-drift", 1, "runtime-verification"),
+    ),
+)
+def test_rollback_re_resolves_same_exact_image_and_container_after_health(
+    tmp_path, mode, expected_returncode, expected_stage
+):
+    resolve_count = tmp_path / "resolve-count"
+    inspect_count = tmp_path / "inspect-count"
+    resolve_count.write_text("0", encoding="utf-8")
+    inspect_count.write_text("0", encoding="utf-8")
+    result = run_deploy_harness(
+        r'''
+mode="$1"
+resolve_count_file="$2"
+inspect_count_file="$3"
+presentation_service="presentation"
+deployment_image="presentation:mutable"
+rollback_ref="presentation:rollback"
+old_presentation_image="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+docker() {
+    if [ "$1" = "image" ] && [ "$2" = "tag" ]; then
+        return 0
+    fi
+    if [ "$1" = "inspect" ]; then
+        count="$(cat "$inspect_count_file")"
+        count=$((count + 1))
+        printf '%s' "$count" > "$inspect_count_file"
+        if [ "$mode" = "image-drift" ] && [ "$count" -eq 2 ]; then
+            printf 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+        else
+            printf '%s' "$old_presentation_image"
+        fi
+        return 0
+    fi
+    return 1
+}
+image_id() { printf '%s' "$old_presentation_image"; }
+compose() { :; }
+resolve_running_container_id() {
+    count="$(cat "$resolve_count_file")"
+    count=$((count + 1))
+    printf '%s' "$count" > "$resolve_count_file"
+    if [ "$mode" = "id-drift" ] && [ "$count" -eq 2 ]; then
+        printf 'restored-presentation-2'
+    else
+        printf 'restored-presentation-1'
+    fi
+}
+wait_for_presentation_health() { :; }
+neighbors_and_gates_are_unchanged() { :; }
+rollback_image_is_preserved() { :; }
+candidate_recovery_is_preserved() { :; }
+restore_preserved_presentation_image
+''',
+        mode,
+        str(resolve_count),
+        str(inspect_count),
+    )
+
+    assert result.returncode == expected_returncode, result.stderr
+    assert expected_stage in result.stderr
+    assert resolve_count.read_text(encoding="utf-8") == "2"
+    assert inspect_count.read_text(encoding="utf-8") == "2"
+
+    restore = SCRIPT.split("restore_preserved_presentation_image() {", 1)[1].split(
+        "restore_preserved_presentation_image_or_contain() {", 1
+    )[0]
+    health_index = restore.index("wait_for_presentation_health")
+    assert restore.index('resolve_running_container_id "$presentation_service"', health_index) > health_index
+    assert restore.index('docker inspect "$post_health_presentation_id"', health_index) > health_index
 
 
 def test_postchecks_cover_auth_lifecycle_neighbors_gates_and_ingress_absence():
