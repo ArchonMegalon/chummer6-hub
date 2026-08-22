@@ -76,6 +76,7 @@ def test_internal_tls_routes_only_the_bounded_surfaces():
     assert "reverse_proxy chummer-build-ghost-presentation:8080" in CADDY
     assert CADDY.count('header Cache-Control "no-store"') == 4
     assert CADDY.count("handle {\n\t\trespond 404\n\t}") == 2
+    assert "/api/v1/ai/build-ghost/explain" not in CADDY
     assert "/api/v1/ai/*" not in CADDY
     assert "handle /api/workspaces/*" not in CADDY
     presentation_host = CADDY.split("https://presentation.canary.chummer.run", 1)[1]

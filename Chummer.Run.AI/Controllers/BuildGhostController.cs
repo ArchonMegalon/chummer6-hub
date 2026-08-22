@@ -1,4 +1,5 @@
 using Chummer.Run.AI.Services.BuildGhost;
+using Chummer.Run.AI.Security;
 using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -199,20 +200,10 @@ public sealed class BuildGhostController(
             detail: "The private tool deployment contract is not active.");
 
     private bool IsInternallyAuthorized()
-    {
-        string configured = configuration["FLEET_INTERNAL_API_TOKEN"]?.Trim() ?? string.Empty;
-        const string prefix = "Bearer ";
-        string header = Request.Headers.Authorization.ToString();
-        if (string.IsNullOrWhiteSpace(configured)
-            || !header.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        byte[] supplied = Encoding.UTF8.GetBytes(header[prefix.Length..].Trim());
-        byte[] expected = Encoding.UTF8.GetBytes(configured);
-        return supplied.Length == expected.Length && CryptographicOperations.FixedTimeEquals(supplied, expected);
-    }
+        => HttpContext.Items.TryGetValue(
+                AiMutationAuthorizationMiddleware.AuthorizationMarker,
+                out object? authorized)
+            && authorized is true;
 
     private bool EphemeralBearerMatches(string packetAccessKey)
     {
