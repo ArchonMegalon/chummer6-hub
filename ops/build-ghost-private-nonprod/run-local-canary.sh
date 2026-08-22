@@ -137,10 +137,10 @@ for required in base64 cmp cut date docker find jq rg rmdir sed sha256sum shred 
     require_command "$required"
 done
 curl_binary="$(type -P curl || true)"
-[ -n "$curl_binary" ] && [ -x "$curl_binary" ] || {
+if [ -z "$curl_binary" ] || [ ! -x "$curl_binary" ]; then
     printf 'positive_canary=failed stage=preflight missing=curl\n'
     exit 1
-}
+fi
 
 edge_id="$(container_id build-ghost-private-edge)"
 presentation_id="$(container_id chummer-build-ghost-presentation)"
