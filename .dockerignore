@@ -35,6 +35,9 @@ Chummer.Run.LoopbackProbe/obj/**
 !Chummer.Run.Api/**
 !Chummer.Run.AI/
 !Chummer.Run.AI/**
+!ops/
+!ops/build-ghost-private-nonprod/
+!ops/build-ghost-private-nonprod/Dockerfile.presentation-private-nonprod
 !Chummer.Run.Contracts/
 !Chummer.Run.Contracts/**
 !Chummer.World.Contracts/

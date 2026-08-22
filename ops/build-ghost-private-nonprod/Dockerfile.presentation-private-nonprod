@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1.7
+FROM mcr.microsoft.com/dotnet/sdk:10.0.103 AS build
+ARG CHUMMER_BUILD_CONCURRENCY=1
+WORKDIR /src
+
+COPY --from=presentation-source . chummer-presentation/
+COPY --from=core-engine-source . chummer-core-engine/
+COPY --from=run-services-source . chummer.run-services/
+COPY --from=hub-registry-source . chummer-hub-registry/
+COPY --from=ui-kit-source . chummer-ui-kit/
+COPY --from=media-factory-source . fleet/repos/chummer-media-factory/
+
+WORKDIR /src/chummer-presentation
+RUN --mount=type=cache,id=chummer-build-ghost-presentation-nuget,target=/root/.nuget/packages,sharing=locked \
+    dotnet restore Chummer.Api/Chummer.Api.csproj \
+      -p:RestorePackagesPath=/root/.nuget/packages \
+      -p:ChummerUseLocalCompatibilityTree=true \
+ && dotnet publish Chummer.Api/Chummer.Api.csproj -c Release -o /app/publish --no-restore \
+      --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
+      -p:RestorePackagesPath=/root/.nuget/packages \
+      -p:ChummerUseLocalCompatibilityTree=true
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+ARG CHUMMER_RUN_SERVICES_REVISION
+ARG CHUMMER_PRESENTATION_REVISION
+ARG CHUMMER_CORE_ENGINE_REVISION
+ARG CHUMMER_HUB_REGISTRY_REVISION
+ARG CHUMMER_UI_KIT_REVISION
+ARG CHUMMER_MEDIA_FACTORY_REVISION
+LABEL org.opencontainers.image.revision="${CHUMMER_PRESENTATION_REVISION}" \
+      run.chummer.build-ghost.profile="private-nonprod" \
+      run.chummer.build-ghost.hub-revision="${CHUMMER_RUN_SERVICES_REVISION}" \
+      run.chummer.build-ghost.core-revision="${CHUMMER_CORE_ENGINE_REVISION}" \
+      run.chummer.build-ghost.hub-registry-revision="${CHUMMER_HUB_REGISTRY_REVISION}" \
+      run.chummer.build-ghost.ui-kit-revision="${CHUMMER_UI_KIT_REVISION}" \
+      run.chummer.build-ghost.media-factory-revision="${CHUMMER_MEDIA_FACTORY_REVISION}"
+WORKDIR /app
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=build /app/publish .
+COPY --from=build /src/chummer-presentation/Chummer/data ./data
+COPY --from=build /src/chummer-presentation/Chummer/lang ./lang
+COPY --from=build --chmod=0555 /src/chummer-presentation/Docker/migrate-state-volume-ownership.sh /usr/local/bin/chummer-state-ownership-migration
+RUN find /app -xdev -type d -exec chmod 0755 {} + \
+ && find /app -xdev -type f -exec chmod 0644 {} + \
+ && install -d -o "$APP_UID" -g "$APP_UID" -m 0700 /app/state
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+USER $APP_UID:$APP_UID
+ENTRYPOINT ["dotnet", "Chummer.Api.dll"]

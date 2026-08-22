@@ -56,6 +56,21 @@ def test_packet_store_is_absolute_private_and_presentation_owned():
     assert "build-ghost-packet-access" not in ai
 
 
+def test_presentation_build_recipe_is_hub_owned_and_source_labeled():
+    presentation = service_block("chummer-build-ghost-presentation", "chummer-build-ghost-ai")
+    assert "context: ." in presentation
+    assert "dockerfile: ops/build-ghost-private-nonprod/Dockerfile.presentation-private-nonprod" in presentation
+    for revision in (
+        "CHUMMER_RUN_SERVICES_REVISION",
+        "CHUMMER_PRESENTATION_REVISION",
+        "CHUMMER_CORE_ENGINE_REVISION",
+        "CHUMMER_HUB_REGISTRY_REVISION",
+        "CHUMMER_UI_KIT_REVISION",
+        "CHUMMER_MEDIA_FACTORY_REVISION",
+    ):
+        assert revision in presentation
+
+
 def test_ai_image_uses_explicit_core_and_registry_source_contexts():
     ai = service_block("chummer-build-ghost-ai", "build-ghost-private-edge")
     assert "core-engine-source: ${CHUMMER_CORE_ENGINE_SOURCE:?" in ai
@@ -98,6 +113,13 @@ def test_ai_trusts_only_the_runtime_local_caddy_root():
 def test_local_canary_is_single_use_private_and_self_cleaning():
     assert "synthetic-build-ghost-canary" in CANARY
     assert 'replay_status' in CANARY
+    assert 'revoked_status' in CANARY
+    assert 'revoked_cache_control' in CANARY
+    assert 'terminal_equivalent="true"' in CANARY
+    assert 'cmp --silent "$canary_tmp/replay-response.json" "$canary_tmp/revoked-response.json"' in CANARY
+    assert 'state-authority.v2.json' in CANARY
+    assert 'audit_records' in CANARY
+    assert 'revocation_markers' in CANARY
     assert '"410"' in CANARY
     assert 'workspace_closed="true"' in CANARY
     assert 'closed_status' in CANARY
@@ -117,7 +139,7 @@ def test_local_canary_is_single_use_private_and_self_cleaning():
     assert '"$cross_owner_status" != "503"' in CANARY
     assert 'grant_cache_control' in CANARY
     assert '"$grant_cache_control" != "no-store"' in CANARY
-    assert 'rg --fixed-strings --file "$canary_tmp/packet-key.txt"' in CANARY
+    assert 'rg --fixed-strings --file "$canary_tmp/packet-key-patterns.txt"' in CANARY
     assert "TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED" in CANARY
     assert "rm -rf" not in CANARY
     assert "set -x" not in CANARY

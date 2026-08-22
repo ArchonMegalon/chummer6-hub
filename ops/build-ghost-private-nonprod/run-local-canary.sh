@@ -16,6 +16,8 @@ workspace_etag=""
 workspace_closed="false"
 grant_outstanding="false"
 grant_pending_path=""
+revocation_grant_outstanding="false"
+revocation_grant_pending_path=""
 presentation_id=""
 
 require_command() {
@@ -87,6 +89,24 @@ drain_grant() {
             grant_outstanding="false"
         fi
     fi
+    if [ "$revocation_grant_outstanding" = "true" ] \
+        && [ -n "$presentation_id" ] \
+        && [ -f "$canary_tmp/root.crt" ] \
+        && [ -f "$canary_tmp/revocation-tool-request.json" ] \
+        && [ -f "$canary_tmp/tool-request-headers.txt" ]; then
+        curl --silent \
+            --output "$canary_tmp/revocation-drain-response.json" \
+            --cacert "$canary_tmp/root.crt" \
+            --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
+            --header "@$canary_tmp/tool-request-headers.txt" \
+            --data-binary "@$canary_tmp/revocation-tool-request.json" \
+            "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool" \
+            >/dev/null 2>&1 || true
+        if [ -n "$revocation_grant_pending_path" ] \
+            && ! docker exec "$presentation_id" test -f "$revocation_grant_pending_path"; then
+            revocation_grant_outstanding="false"
+        fi
+    fi
 }
 
 cleanup() {
@@ -96,7 +116,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for required in base64 curl cut date docker find jq rg rmdir sed sha256sum shred tr truncate unlink wc; do
+for required in base64 cmp curl cut date docker find jq rg rmdir sed sha256sum shred tr truncate unlink wc; do
     require_command "$required"
 done
 
@@ -378,6 +398,7 @@ fi
 
 replay_status="$(curl --silent --show-error \
     --output "$canary_tmp/replay-response.json" \
+    --dump-header "$canary_tmp/replay-response-headers.txt" \
     --write-out '%{http_code}' \
     --cacert "$canary_tmp/root.crt" \
     --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
@@ -389,12 +410,97 @@ if [ "$replay_status" != "410" ]; then
     exit 1
 fi
 
-presentation_leaks="$(docker logs "$presentation_id" 2>&1 | rg --fixed-strings --file "$canary_tmp/packet-key.txt" --count || true)"
-ai_leaks="$(docker logs "$ai_id" 2>&1 | rg --fixed-strings --file "$canary_tmp/packet-key.txt" --count || true)"
-pending_grants="$(docker exec "$presentation_id" sh -lc 'find /app/state/build-ghost-packet-access -type f 2>/dev/null | wc -l' | tr -d ' ')"
-if [ "${presentation_leaks:-0}" != "0" ] || [ "${ai_leaks:-0}" != "0" ] || [ "$pending_grants" != "0" ]; then
-    printf 'positive_canary=failed stage=secret-or-grant-cleanliness presentation_leaks=%s ai_leaks=%s pending=%s\n' \
-        "${presentation_leaks:-0}" "${ai_leaks:-0}" "$pending_grants"
+replay_cache_control="$(sed -n 's/^[Cc]ache-[Cc]ontrol:[[:space:]]*\(.*\)\r$/\1/p' "$canary_tmp/replay-response-headers.txt" | sed -n '1p')"
+if [ "$replay_cache_control" != "no-store" ]; then
+    printf 'positive_canary=failed stage=replay-cache cache=%s\n' "$replay_cache_control"
+    exit 1
+fi
+
+revocation_grant_status="$(curl --silent --show-error \
+    --output "$canary_tmp/revocation-grant-response.json" \
+    --dump-header "$canary_tmp/revocation-grant-response-headers.txt" \
+    --write-out '%{http_code}' \
+    --cacert "$canary_tmp/root.crt" \
+    --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
+    --header 'Content-Type: application/json' \
+    --header "X-Chummer-Owner: $owner_name" \
+    --data '{"locale":"en-US","requestKind":"current-build"}' \
+    "https://canary.chummer.run:${loopback_port}/api/workspaces/$workspace_id/build-ghost/tool-access")"
+revocation_grant_cache="$(sed -n 's/^[Cc]ache-[Cc]ontrol:[[:space:]]*\(.*\)\r$/\1/p' "$canary_tmp/revocation-grant-response-headers.txt" | sed -n '1p')"
+if [ "$revocation_grant_status" != "200" ] || [ "$revocation_grant_cache" != "no-store" ]; then
+    printf 'positive_canary=failed stage=revocation-grant status=%s cache=%s\n' \
+        "$revocation_grant_status" "$revocation_grant_cache"
+    exit 1
+fi
+
+jq -er '.packetAccessKey | select(type == "string" and length >= 32)' \
+    "$canary_tmp/revocation-grant-response.json" > "$canary_tmp/revocation-packet-key.txt"
+jq -er '.packetDigest | select(test("^sha256:[0-9a-fA-F]{64}$"))' \
+    "$canary_tmp/revocation-grant-response.json" > "$canary_tmp/revocation-packet-digest.txt"
+jq -n \
+    --arg schema "chummer.build_ghost.private_tool_request.v2" \
+    --rawfile key "$canary_tmp/revocation-packet-key.txt" \
+    --rawfile digest "$canary_tmp/revocation-packet-digest.txt" \
+    '{schema:$schema,packet_access_key:($key|rtrimstr("\n")),packet_digest:($digest|rtrimstr("\n")),locale:"en-US",request_kind:"current-build",question:"This request must be revoked before it reaches Rook."}' \
+    > "$canary_tmp/revocation-tool-request.json"
+chmod 0600 "$canary_tmp/revocation-packet-key.txt" \
+    "$canary_tmp/revocation-packet-digest.txt" "$canary_tmp/revocation-tool-request.json"
+revocation_pending_hash="$(tr -d '\n' < "$canary_tmp/revocation-packet-key.txt" | sha256sum | cut -d ' ' -f 1)"
+revocation_grant_pending_path="/app/state/build-ghost-packet-access/pending/${revocation_pending_hash}.json"
+revocation_grant_outstanding="true"
+
+close_workspace
+if [ "$workspace_closed" != "true" ]; then
+    printf 'positive_canary=failed stage=workspace-cleanup\n'
+    exit 1
+fi
+if ! docker exec "$presentation_id" test -f "$revocation_grant_pending_path"; then
+    revocation_grant_outstanding="false"
+fi
+
+revoked_status="$(curl --silent --show-error \
+    --output "$canary_tmp/revoked-response.json" \
+    --dump-header "$canary_tmp/revoked-response-headers.txt" \
+    --write-out '%{http_code}' \
+    --cacert "$canary_tmp/root.crt" \
+    --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
+    --header "@$canary_tmp/tool-request-headers.txt" \
+    --data-binary "@$canary_tmp/revocation-tool-request.json" \
+    "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool")"
+revoked_cache_control="$(sed -n 's/^[Cc]ache-[Cc]ontrol:[[:space:]]*\(.*\)\r$/\1/p' "$canary_tmp/revoked-response-headers.txt" | sed -n '1p')"
+if [ "$revoked_status" != "410" ] || [ "$revoked_cache_control" != "no-store" ]; then
+    printf 'positive_canary=failed stage=revoked status=%s cache=%s\n' \
+        "$revoked_status" "$revoked_cache_control"
+    exit 1
+fi
+revocation_grant_outstanding="false"
+if ! cmp --silent "$canary_tmp/replay-response.json" "$canary_tmp/revoked-response.json"; then
+    printf 'positive_canary=failed stage=terminal-equivalence\n'
+    exit 1
+fi
+terminal_equivalent="true"
+
+{
+    tr -d '\n' < "$canary_tmp/packet-key.txt"
+    printf '\n'
+    tr -d '\n' < "$canary_tmp/revocation-packet-key.txt"
+    printf '\n'
+} > "$canary_tmp/packet-key-patterns.txt"
+chmod 0600 "$canary_tmp/packet-key-patterns.txt"
+
+presentation_leaks="$(docker logs "$presentation_id" 2>&1 | rg --fixed-strings --file "$canary_tmp/packet-key-patterns.txt" --count || true)"
+ai_leaks="$(docker logs "$ai_id" 2>&1 | rg --fixed-strings --file "$canary_tmp/packet-key-patterns.txt" --count || true)"
+pending_grants="$(docker exec "$presentation_id" sh -lc 'find /app/state/build-ghost-packet-access/pending -maxdepth 1 -type f -name "*.json" 2>/dev/null | wc -l' | tr -d ' ')"
+active_claims="$(docker exec "$presentation_id" sh -lc 'find /app/state/build-ghost-packet-access/claims -maxdepth 1 -type f -name "*.json" 2>/dev/null | wc -l' | tr -d ' ')"
+audit_records="$(docker exec "$presentation_id" sh -lc 'find /app/state/build-ghost-packet-access/audit -maxdepth 1 -type f -name "*.json" 2>/dev/null | wc -l' | tr -d ' ')"
+revocation_markers="$(docker exec "$presentation_id" sh -lc 'find /app/state/build-ghost-packet-access/revocations -maxdepth 1 -type f -name "*.json" 2>/dev/null | wc -l' | tr -d ' ')"
+if [ "${presentation_leaks:-0}" != "0" ] || [ "${ai_leaks:-0}" != "0" ] \
+    || [ "$pending_grants" != "0" ] || [ "$active_claims" != "0" ] \
+    || [ "$audit_records" -lt 4 ] || [ "$revocation_markers" -lt 1 ] \
+    || ! docker exec "$presentation_id" test -f /app/state/build-ghost-packet-access/state-authority.v2.json; then
+    printf 'positive_canary=failed stage=secret-or-lifecycle-cleanliness presentation_leaks=%s ai_leaks=%s pending=%s claims=%s audit=%s revocations=%s\n' \
+        "${presentation_leaks:-0}" "${ai_leaks:-0}" "$pending_grants" "$active_claims" \
+        "$audit_records" "$revocation_markers"
     exit 1
 fi
 
@@ -410,11 +516,6 @@ for required_false in \
     fi
 done
 
-close_workspace
-if [ "$workspace_closed" != "true" ]; then
-    printf 'positive_canary=failed stage=workspace-cleanup\n'
-    exit 1
-fi
 closed_status="$(curl --silent --show-error \
     --output "$canary_tmp/closed-response.json" \
     --write-out '%{http_code}' \
@@ -427,12 +528,12 @@ if [ "$closed_status" != "404" ]; then
     exit 1
 fi
 
-printf 'positive_canary=passed legacy_unknown_key=%s legacy_wrong_contract=%s legacy_unknown_field=%s provider_unknown_key=%s provider_wrong_contract=%s provider_ambiguous_auth=%s provider_unknown_field=%s provider_noncanonical_key=%s neighbor=%s presentation_neighbor=%s import=%s cross_owner=%s grant=%s grant_cache=%s tool=%s replay=%s auth=packet-access-key-body-v2 schema=%s locale=%s characters=%s cache=%s ttl_seconds=%s pending_grants=%s gates=false cleanup=%s\n' \
+printf 'positive_canary=passed legacy_unknown_key=%s legacy_wrong_contract=%s legacy_unknown_field=%s provider_unknown_key=%s provider_wrong_contract=%s provider_ambiguous_auth=%s provider_unknown_field=%s provider_noncanonical_key=%s neighbor=%s presentation_neighbor=%s import=%s cross_owner=%s grant=%s grant_cache=%s tool=%s replay=%s revoked=%s terminal_equivalent=%s auth=packet-access-key-body-v2 schema=%s locale=%s characters=%s cache=%s ttl_seconds=%s pending_grants=%s active_claims=%s audit_records=%s revocation_markers=%s gates=false cleanup=%s\n' \
     "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" \
     "$provider_unknown_key_status" "$provider_wrong_contract_status" "$provider_ambiguous_auth_status" \
     "$provider_unknown_field_status" "$provider_noncanonical_key_status" "$neighbor_status" \
     "$presentation_neighbor_status" \
     "$import_status" "$cross_owner_status" "$grant_status" "$grant_cache_control" \
-    "$tool_status" "$replay_status" \
+    "$tool_status" "$replay_status" "$revoked_status" "$terminal_equivalent" \
     "$response_schema" "$response_locale" "$response_characters" "$cache_control" "$ttl_seconds" \
-    "$pending_grants" "$closed_status"
+    "$pending_grants" "$active_claims" "$audit_records" "$revocation_markers" "$closed_status"
