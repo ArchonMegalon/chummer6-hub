@@ -9,6 +9,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 OPS = ROOT / "ops" / "build-ghost-private-nonprod"
 DEPLOY = OPS / "deploy-presentation-with-rollback.sh"
+AI_DEPLOY = OPS / "deploy-ai-with-rollback.sh"
 PREFLIGHT = OPS / "preflight-packet-access-state.sh"
 DOCKERFILE = OPS / "Dockerfile.presentation-private-nonprod"
 COMPOSE = (ROOT / "docker-compose.build-ghost-private-nonprod.yml").read_text(encoding="utf-8")
@@ -16,6 +17,12 @@ DOCKERIGNORE = (ROOT / ".dockerignore").read_text(encoding="utf-8")
 SCRIPT = DEPLOY.read_text(encoding="utf-8")
 DOCKERFILE_TEXT = DOCKERFILE.read_text(encoding="utf-8")
 CANARY = (OPS / "run-local-canary.sh").read_text(encoding="utf-8")
+
+
+def pressure_awk_program(script: Path) -> str:
+    text = script.read_text(encoding="utf-8")
+    marker = "io_full_avg10=\"$(awk '"
+    return text.split(marker, 1)[1].split("' /proc/pressure/io)", 1)[0]
 
 
 def main_body() -> str:
@@ -56,6 +63,25 @@ def test_shell_entrypoints_are_syntax_valid_without_running_docker():
             text=True,
         )
         assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("script", (DEPLOY, AI_DEPLOY))
+def test_host_pressure_probe_executes_on_the_host_awk(script):
+    program = pressure_awk_program(script)
+    result = subprocess.run(
+        ["awk", program],
+        input=(
+            "some avg10=4.00 avg60=3.00 avg300=2.00 total=1\n"
+            "full avg10=1.25 avg60=1.00 avg300=0.75 total=2\n"
+        ),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "1.25\n"
+    assert "for (index" not in program
 
 
 def test_empty_packet_store_is_the_only_unkeyed_state_admitted(tmp_path):

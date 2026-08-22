@@ -76,7 +76,7 @@ running_container_id() {
 
 ensure_hard_limits() {
     local io_full_avg10 free_kib minimum_free_kib
-    io_full_avg10="$(awk '/^full / { for (index = 1; index <= NF; index++) if ($index ~ /^avg10=/) { split($index, pair, "="); print pair[2]; exit } }' /proc/pressure/io)"
+    io_full_avg10="$(awk '/^full / { for (field = 1; field <= NF; field++) if ($field ~ /^avg10=/) { split($field, pair, "="); print pair[2]; exit } }' /proc/pressure/io)"
     [ -n "$io_full_avg10" ] || fail "host-io-pressure-unreadable"
     if ! awk -v observed="$io_full_avg10" -v maximum="$max_io_full_avg10" 'BEGIN { exit !(observed <= maximum) }'; then
         fail "host-io-pressure-cutoff"
