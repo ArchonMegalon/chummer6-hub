@@ -327,7 +327,7 @@ public sealed class BuildGhostPrivateToolEndpointTests
         BuildGhostController controller = Controller(new ThrowingAuthority(gone));
         Authorize(controller);
         IActionResult result = await controller.Tool(Request(), CancellationToken.None);
-        ObjectResult problem = Assert.IsInstanceOfType<ObjectResult>(result);
+        JsonResult problem = Assert.IsInstanceOfType<JsonResult>(result);
         Assert.AreEqual(StatusCodes.Status410Gone, problem.StatusCode);
 
         BuildGhostController providerController = Controller(new ThrowingAuthority(gone));
@@ -335,9 +335,38 @@ public sealed class BuildGhostPrivateToolEndpointTests
         IActionResult providerReplay = await providerController.ProviderToolV2(
             ProviderRequest(),
             CancellationToken.None);
-        ObjectResult providerProblem = Assert.IsInstanceOfType<ObjectResult>(providerReplay);
+        JsonResult providerProblem = Assert.IsInstanceOfType<JsonResult>(providerReplay);
         Assert.AreEqual(StatusCodes.Status410Gone, providerProblem.StatusCode);
         Assert.AreEqual("no-store", providerController.HttpContext.Response.Headers.CacheControl.ToString());
+    }
+
+    [TestMethod]
+    public async Task Provider_v2_terminal_gone_responses_are_byte_equivalent()
+    {
+        BuildGhostPrivateToolResolutionException gone = new(
+            "private-tool-authority-rejected",
+            StatusCodes.Status410Gone);
+
+        BuildGhostController replayController = Controller(new ThrowingAuthority(gone));
+        AuthorizeProviderV2(replayController);
+        JsonResult replay = Assert.IsInstanceOfType<JsonResult>(
+            await replayController.ProviderToolV2(ProviderRequest(), CancellationToken.None));
+
+        BuildGhostController revokedController = Controller(new ThrowingAuthority(gone));
+        AuthorizeProviderV2(revokedController);
+        JsonResult revoked = Assert.IsInstanceOfType<JsonResult>(
+            await revokedController.ProviderToolV2(ProviderRequest(), CancellationToken.None));
+
+        JsonSerializerOptions webJson = new(JsonSerializerDefaults.Web);
+        string replayBody = JsonSerializer.Serialize(replay.Value, webJson);
+        string revokedBody = JsonSerializer.Serialize(revoked.Value, webJson);
+
+        Assert.AreEqual(StatusCodes.Status410Gone, replay.StatusCode);
+        Assert.AreEqual(StatusCodes.Status410Gone, revoked.StatusCode);
+        Assert.AreEqual("no-store", replayController.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.AreEqual("no-store", revokedController.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.AreEqual("{\"error\":\"private-tool-authority-rejected\"}", replayBody);
+        Assert.AreEqual(replayBody, revokedBody);
     }
 
     [TestMethod]

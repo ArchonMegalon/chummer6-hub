@@ -186,11 +186,18 @@ public sealed class BuildGhostController(
                 "Build Ghost private tool resolution failed with {Reason}; trace {TraceId}.",
                 exception.Reason,
                 HttpContext.TraceIdentifier);
-            return Problem(
-                statusCode: exception.StatusCode,
-                title: "Build Ghost private tool request failed",
-                detail: exception.Reason);
+            return PrivateToolResolutionFailure(exception);
         }
+    }
+
+    private JsonResult PrivateToolResolutionFailure(
+        BuildGhostPrivateToolResolutionException exception)
+    {
+        Response.Headers.CacheControl = "no-store";
+        return new JsonResult(new { error = exception.Reason })
+        {
+            StatusCode = exception.StatusCode
+        };
     }
 
     private ObjectResult PrivateToolUnavailable()
