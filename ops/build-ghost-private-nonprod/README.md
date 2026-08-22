@@ -29,6 +29,26 @@ characters. It must match exactly one aligned account reference. Invalid,
 missing, duplicate, cooling-down, or quota-exhausted pins fail closed without
 falling back to a different account.
 
+The source contract pins the read-only Tough Tongue client evidence observed on
+2026-08-22 at deployment `dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i`. Premium live
+avatars remain private-candidate-only: Anam uses provider value `anam`, HeyGen
+uses `liveavatar`, both declare a `2x` minute multiplier, and both require the
+`Landmass` model provider. Scenario readback must preserve the exact
+`appearance.live_avatar_id` and `appearance.live_avatar_provider` values; the
+session runtime must derive `avatar_config.enabled`, `avatar_config.avatar_id`,
+and `avatar_config.provider` from them. Raw provider avatar identifiers are
+excluded from binding receipts. This is provider-managed speech animation, not
+local lip-sync proof: MuseTalk and the local lip-sync lane are explicitly
+deferred.
+
+Pinned client bundles and Premium account status do not authorize or perform a
+provider mutation. A Build Ghost live-avatar candidate still requires an exact
+Rook avatar binding, the digest-bound schema receipt, verified Cartesia voice
+binding, verified private custom-function binding, scenario readback, and all
+runtime canary gates. Missing or drifted evidence adds a blocker and leaves
+remote execution disabled. The 2026-08-22 read-only account review created no
+scenario, avatar, session, function, or access grant.
+
 Health proof:
 
 ```sh
