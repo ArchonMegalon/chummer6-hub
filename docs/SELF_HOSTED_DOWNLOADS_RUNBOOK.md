@@ -77,7 +77,11 @@ does not deploy a database. Configure distinct owner-only runtime and migrator c
 `CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE` to the reviewed provider CA bundle, and set
 `CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME` (without a trailing dot) plus
 `CHUMMER_INSTALL_LINKING_POSTGRES_IP` to one certificate-SAN identity and its reviewed address. The
-`Host` in both connection files must equal that DNS name. Pre-create the LOGIN role named by
+address must remain stable across portal and database restarts or recreation; an automatically
+assigned container address is not an acceptable production input. If the provider address changes,
+keep the public edge failed closed, review and update the address, then rerun the complete Compose
+attestation and guarded portal deployment. The `Host` in both connection files must equal that DNS
+name. Pre-create the LOGIN role named by
 `CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE`. The `prepare` phase migrates the schema and
 grants that existing role; it never creates a LOGIN.
 

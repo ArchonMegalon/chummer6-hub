@@ -631,6 +631,9 @@ public sealed class InstallLinkingStore : IDisposable
                 token => authority.CheckReadinessAsync(token));
             if (!schemaReadiness.Ready)
             {
+                _logger.LogError(
+                    "InstallLinking PostgreSQL authority readiness is blocked with code {AuthorityCode}.",
+                    SafeAuthorityCode(schemaReadiness.Code));
                 throw new InvalidOperationException(
                     $"Install-linking PostgreSQL authority is not ready ({SafeAuthorityCode(schemaReadiness.Code)}).");
             }

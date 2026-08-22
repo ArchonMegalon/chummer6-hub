@@ -10,6 +10,7 @@ using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.AI.Services.Spider;
 using Chummer.Run.AI.Services.Transcription;
 using Chummer.Run.AI.Services.Newspaper;
+using Chummer.Run.AI.Services.BuildGhost;
 using Chummer.Run.AI.Security;
 using CanonicalTranscriptionProvider = Chummer.Run.Contracts.Transcription.ITranscriptionProvider;
 
@@ -95,6 +96,39 @@ builder.Services.AddSingleton<INewspaperValidationService, NewspaperValidationSe
 builder.Services.AddSingleton<INewspaperCompositionService, NewspaperCompositionService>();
 builder.Services.AddSingleton<INewspaperHtmlRenderer, NewspaperHtmlRenderer>();
 builder.Services.AddSingleton<INewspaperRenderService, NewspaperRenderService>();
+builder.Services.AddSingleton<IBuildGhostClock, SystemBuildGhostClock>();
+builder.Services.AddHttpClient<IToughTongueBuildGhostTransport, ToughTongueBuildGhostHttpTransport>(client =>
+{
+    string configured = builder.Configuration["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_BASE_URL"]
+        ?? "https://api.toughtongueai.com/api/public/";
+    if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? baseAddress)
+        || !ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(baseAddress))
+    {
+        throw new InvalidOperationException(
+            "Tough Tongue base URL must be the exact official HTTPS public API boundary.");
+    }
+
+    client.BaseAddress = baseAddress;
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddHttpClient<IToughTongueBuildGhostScenarioClient, ToughTongueBuildGhostScenarioClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.toughtongueai.com/api/public/", UriKind.Absolute);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddHttpClient<BuildGhostCartesiaVoiceDeletionClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.cartesia.ai/", UriKind.Absolute);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddSingleton<ToughTongueBuildGhostCanaryHarness>();
+builder.Services.AddSingleton<IToughTongueBuildGhostAdapter, ToughTongueBuildGhostAdapter>();
+builder.Services.AddHttpClient<IBuildGhostPrivateToolAuthorityClient, BuildGhostPrivateToolAuthorityClient>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(BuildGhostPrivateToolAuthorityClient.TimeoutSeconds);
+});
+builder.Services.AddSingleton<IBuildGhostPersonaReleaseRegistry>(
+    static sp => new BuildGhostPersonaReleaseRegistry(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<CanonicalTranscriptionProvider, LocalTranscriptionProvider>();
 #pragma warning disable CS0618
 builder.Services.AddSingleton<Chummer.Run.AI.Compatibility.ITranscriptionProvider>(sp =>

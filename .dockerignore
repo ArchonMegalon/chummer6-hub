@@ -33,6 +33,8 @@ Chummer.Run.LoopbackProbe/obj/**
 !Chummer.Run.Identity/**
 !Chummer.Run.Api/
 !Chummer.Run.Api/**
+!Chummer.Run.AI/
+!Chummer.Run.AI/**
 !Chummer.Run.Contracts/
 !Chummer.Run.Contracts/**
 !Chummer.World.Contracts/

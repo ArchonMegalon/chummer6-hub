@@ -1,0 +1,138 @@
+name: chummer-build-ghost-private-nonprod
+
+services:
+  chummer-build-ghost-presentation:
+    image: chummer-build-ghost-presentation:private-nonprod
+    build:
+      context: ${CHUMMER_PRESENTATION_SOURCE:?set CHUMMER_PRESENTATION_SOURCE to the isolated Presentation worktree}
+      dockerfile: Chummer.Api/Dockerfile.private-nonprod
+      additional_contexts:
+        presentation-source: ${CHUMMER_PRESENTATION_SOURCE:?set CHUMMER_PRESENTATION_SOURCE to the isolated Presentation worktree}
+        core-engine-source: ${CHUMMER_CORE_ENGINE_SOURCE:?set CHUMMER_CORE_ENGINE_SOURCE}
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:?set CHUMMER_RUN_SERVICES_SOURCE to this isolated Hub worktree}
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:?set CHUMMER_HUB_REGISTRY_SOURCE}
+        ui-kit-source: ${CHUMMER_UI_KIT_SOURCE:?set CHUMMER_UI_KIT_SOURCE}
+        media-factory-source: ${CHUMMER_MEDIA_FACTORY_SOURCE:?set CHUMMER_MEDIA_FACTORY_SOURCE}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      CHUMMER_ALLOW_OWNER_HEADER: "true"
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_DEPLOYMENT_ENABLED: "true"
+      CHUMMER_BUILD_GHOST_PACKET_ACCESS_STORE_ROOT: /app/state/build-ghost-packet-access
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN: ${CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN:?set an operator-local token of at least 32 bytes}
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST: sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104
+      CHUMMER_STATE_PATH: /app/state
+    volumes:
+      - build-ghost-packet-access:/app/state
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      build-ghost-private: {}
+
+  chummer-build-ghost-ai:
+    image: chummer-build-ghost-ai:private-nonprod
+    build:
+      context: .
+      dockerfile: Chummer.Run.AI/Dockerfile.private-nonprod
+      args:
+        CHUMMER_RUN_SERVICES_REVISION: ${CHUMMER_RUN_SERVICES_REVISION:?set the exact clean Hub revision}
+        CHUMMER_CORE_ENGINE_REVISION: ${CHUMMER_CORE_ENGINE_REVISION:?set the exact clean Core revision}
+        CHUMMER_HUB_REGISTRY_REVISION: ${CHUMMER_HUB_REGISTRY_REVISION:?set the exact clean Hub Registry revision}
+        CHUMMER_MEDIA_FACTORY_REVISION: ${CHUMMER_MEDIA_FACTORY_REVISION:?set the exact clean Media Factory revision}
+      additional_contexts:
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:?set CHUMMER_RUN_SERVICES_SOURCE to this isolated Hub worktree}
+        core-engine-source: ${CHUMMER_CORE_ENGINE_SOURCE:?set CHUMMER_CORE_ENGINE_SOURCE}
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:?set CHUMMER_HUB_REGISTRY_SOURCE}
+        media-factory-source: ${CHUMMER_MEDIA_FACTORY_SOURCE:?set CHUMMER_MEDIA_FACTORY_SOURCE}
+    restart: unless-stopped
+    depends_on:
+      chummer-build-ghost-presentation:
+        condition: service_healthy
+      build-ghost-private-edge:
+        condition: service_started
+      build-ghost-private-trust-export:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_ENDPOINT: https://canary.chummer.run/api/v2/ai/build-ghost/tool
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTH_AUDIENCE: build-ghost-private-tool
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_TRANSPORT_MODE: provider-body-key-v2
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTHORITY_ENDPOINT: https://presentation.canary.chummer.run/api/internal/build-ghost/tool/resolve
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN: ${CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN:?set an operator-local token of at least 32 bytes}
+      CHUMMER_AI_INTERNAL_API_TOKEN: ${CHUMMER_AI_INTERNAL_API_TOKEN:?set a distinct operator-local token of at least 32 bytes}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID:-}
+      SSL_CERT_FILE: /caddy-trust/root.crt
+    volumes:
+      - caddy-trust:/caddy-trust:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      build-ghost-private: {}
+
+  build-ghost-private-edge:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CHUMMER_BUILD_GHOST_PRIVATE_HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./ops/build-ghost-private-nonprod/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      build-ghost-private:
+        aliases:
+          - canary.chummer.run
+          - presentation.canary.chummer.run
+      build-ghost-loopback: {}
+
+  build-ghost-private-trust-export:
+    image: caddy:2.10.2-alpine
+    restart: "no"
+    depends_on:
+      build-ghost-private-edge:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        for attempt in $$(seq 1 30); do
+          if [ -s /caddy-data/caddy/pki/authorities/local/root.crt ]; then
+            cp /caddy-data/caddy/pki/authorities/local/root.crt /caddy-trust/root.crt
+            chmod 0444 /caddy-trust/root.crt
+            exit 0
+          fi
+          sleep 1
+        done
+        exit 1
+    network_mode: none
+    volumes:
+      - caddy-data:/caddy-data:ro
+      - caddy-trust:/caddy-trust
+
+volumes:
+  build-ghost-packet-access:
+  caddy-data:
+  caddy-config:
+  caddy-trust:
+
+networks:
+  build-ghost-private:
+    internal: true
+  build-ghost-loopback: {}

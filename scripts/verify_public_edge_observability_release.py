@@ -75,9 +75,16 @@ GATE_CONTRACT = "chummer.public_edge_observability_release_gate.v1"
 MAX_JSON_BYTES = 1024 * 1024
 MAX_RUNTIME_SOURCE_BYTES = 8 * 1024 * 1024
 TRUSTED_OPERATOR_KEY_ROOT = ROOT / "ops" / "trusted-observability-attesters"
-# Deliberately empty until a reviewed change pins a real external operator key.
-# Runtime flags and environment variables cannot extend this authority set.
-TRUSTED_OPERATOR_ATTESTERS: dict[str, dict[str, str]] = {}
+# Runtime flags and environment variables cannot extend this code-owned authority set.
+TRUSTED_OPERATOR_ATTESTERS: dict[str, dict[str, str]] = {
+    "local-observability-operator-2026": {
+        "role": "observability_operator",
+        "public_key_path": "local-observability-operator-2026.public.pem",
+        "public_key_sha256": (
+            "79a5ce3eb145d8742ce76b7440f0096c5622681d6b4f0ae5525a3795516c566d"
+        ),
+    },
+}
 ATTESTATION_NONCE_RE = re.compile(r"^[0-9a-f]{64}$")
 
 OPERATOR_PROOF_FIELDS = {

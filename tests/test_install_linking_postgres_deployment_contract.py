@@ -59,6 +59,18 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             environment,
         )
 
+    def test_reviewed_postgres_address_is_documented_as_stable_and_reattested(self) -> None:
+        security = SECURITY_DOC_PATH.read_text(encoding="utf-8")
+        runbook = RUNBOOK_PATH.read_text(encoding="utf-8")
+
+        for document in (security, runbook):
+            with self.subTest(document=document[:40]):
+                normalized = " ".join(document.split())
+                self.assertIn("stable across portal and database restarts or recreation", normalized)
+                self.assertIn("automatically assigned container address", normalized)
+                self.assertIn("complete Compose attestation", normalized)
+                self.assertIn("guarded portal deployment", normalized)
+
     def test_install_linking_processes_disable_privilege_escalation_and_core_dumps(self) -> None:
         for service_name in (
             "chummer-portal",

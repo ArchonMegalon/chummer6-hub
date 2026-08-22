@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Chummer.Run.Contracts/BuildGhost/ToughTongueBuildGhostContracts.cs" Link="ToughTongueBuildGhostContracts.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/BuildGhost/ToughTongueBuildGhostAdapter.cs" Link="ToughTongueBuildGhostAdapter.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/BuildGhost/ToughTongueBuildGhostHttpTransport.cs" Link="ToughTongueBuildGhostHttpTransport.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/BuildGhost/ToughTongueBuildGhostScenarioContract.cs" Link="ToughTongueBuildGhostScenarioContract.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/BuildGhost/BuildGhostProviderCleanupContracts.cs" Link="BuildGhostProviderCleanupContracts.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/BuildGhost/BuildGhostPrivateToolAuthorityClient.cs" Link="BuildGhostPrivateToolAuthorityClient.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/BuildGhost/BuildGhostPersonaReleaseRegistry.cs" Link="BuildGhostPersonaReleaseRegistry.cs" />
+    <Compile Include="../Chummer.Run.AI/Controllers/BuildGhostController.cs" Link="BuildGhostController.cs" />
+    <Compile Include="../Chummer.Run.AI/Security/AiMutationAuthorizationMiddleware.cs" Link="AiMutationAuthorizationMiddleware.cs" />
+    <Compile Include="../Chummer.Run.AI/Security/AiPublicEndpoints.cs" Link="AiPublicEndpoints.cs" />
+    <Compile Include="../Chummer.Run.Api/Services/KarmaForge/BuildGhostConciergeService.cs" Link="BuildGhostConciergeService.cs" />
+    <Compile Include="../Chummer.Run.Api/Services/Support/AnswerlyRuntimePolicy.cs" Link="AnswerlyRuntimePolicy.cs" />
+    <Compile Include="../Chummer.Run.Api/Services/Support/AnswerlyHumanizerAdapter.cs" Link="AnswerlyHumanizerAdapter.cs" />
+    <Compile Include="../Chummer.Run.Api/Services/Support/RuleSafeOutputGate.cs" Link="RuleSafeOutputGate.cs" />
+    <PackageReference Include="MSTest" Version="4.0.2" />
+    <ProjectReference Include="../Chummer.Control.Contracts/Chummer.Control.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <AssemblyAttribute Include="Microsoft.VisualStudio.TestTools.UnitTesting.DoNotParallelizeAttribute" />
+  </ItemGroup>
+</Project>
