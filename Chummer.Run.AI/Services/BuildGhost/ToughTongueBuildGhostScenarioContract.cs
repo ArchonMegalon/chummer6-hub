@@ -352,6 +352,214 @@ public static class BuildGhostToughTongueCartesiaScenarioSchemaContract
         => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
 }
 
+public static class BuildGhostToughTonguePremiumLiveAvatarSchemaContract
+{
+    public const string MissingOrUnverifiedBlocker =
+        "tough-tongue-premium-live-avatar-schema-receipt-missing-or-invalid";
+    public const string ProviderNamespace = "tough-tongue";
+    public const string VerifiedDeploymentId = "dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
+    public const string VerifiedStudioBundleUrl =
+        "https://app.toughtongueai.com/_next/static/chunks/0dic_u.sbe1xm.js?dpl=dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
+    public const string VerifiedStudioBundleDigest =
+        "sha256:7e22f357c2ebe5e9f6988f6fa4cfec1c332ebf3c0f573e5dc31feaeefcf5c7e7";
+    public const long VerifiedStudioBundleBytes = 499_677;
+    public const string VerifiedScenarioRuntimeBundleUrl =
+        "https://app.toughtongueai.com/_next/static/chunks/0m4xondr3o4oe.js?dpl=dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
+    public const string VerifiedScenarioRuntimeBundleDigest =
+        "sha256:7ba4d63277d18d2ff8c2ffd3128576a1ad15e4670e4f4c9921b6846de6ba71d7";
+    public const long VerifiedScenarioRuntimeBundleBytes = 219_531;
+    public const string VerifiedSessionCreateBundleUrl =
+        "https://app.toughtongueai.com/_next/static/chunks/04i2xipv9rrh-.js?dpl=dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
+    public const string VerifiedSessionCreateBundleDigest =
+        "sha256:01c2f887b5970283734c086bdbf1c3ec1e6af8f6e07a62e229c0f8cd96f5c1eb";
+    public const long VerifiedSessionCreateBundleBytes = 166_081;
+    public const string ScenarioLiveAvatarIdFieldPath = "appearance.live_avatar_id";
+    public const string ScenarioLiveAvatarProviderFieldPath = "appearance.live_avatar_provider";
+    public const string RuntimeEnabledFieldPath = "avatar_config.enabled";
+    public const string RuntimeAvatarIdFieldPath = "avatar_config.avatar_id";
+    public const string RuntimeProviderFieldPath = "avatar_config.provider";
+
+    public static readonly IReadOnlyList<string> AllowedProviders =
+    [
+        ToughTongueBuildGhostLiveAvatarProviders.Anam,
+        ToughTongueBuildGhostLiveAvatarProviders.HeyGen
+    ];
+
+    public static IReadOnlyList<string> Validate(
+        BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt? receipt)
+    {
+        if (receipt is null) return [MissingOrUnverifiedBlocker];
+        List<string> failures = [];
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.PremiumLiveAvatarSchemaReceiptV1) failures.Add("premium-live-avatar-schema-version-invalid");
+        if (receipt.ProviderNamespace != ProviderNamespace) failures.Add("premium-live-avatar-provider-namespace-invalid");
+        if (receipt.DeploymentId != VerifiedDeploymentId) failures.Add("premium-live-avatar-deployment-drift");
+        RequireBundle(receipt.StudioBundleUrl, receipt.StudioBundleDigest, receipt.StudioBundleBytes,
+            VerifiedStudioBundleUrl, VerifiedStudioBundleDigest, VerifiedStudioBundleBytes, "studio", failures);
+        RequireBundle(receipt.ScenarioRuntimeBundleUrl, receipt.ScenarioRuntimeBundleDigest, receipt.ScenarioRuntimeBundleBytes,
+            VerifiedScenarioRuntimeBundleUrl, VerifiedScenarioRuntimeBundleDigest, VerifiedScenarioRuntimeBundleBytes, "scenario-runtime", failures);
+        RequireBundle(receipt.SessionCreateBundleUrl, receipt.SessionCreateBundleDigest, receipt.SessionCreateBundleBytes,
+            VerifiedSessionCreateBundleUrl, VerifiedSessionCreateBundleDigest, VerifiedSessionCreateBundleBytes, "session-create", failures);
+        if (receipt.ScenarioLiveAvatarIdFieldPath != ScenarioLiveAvatarIdFieldPath) failures.Add("premium-live-avatar-id-field-drift");
+        if (receipt.ScenarioLiveAvatarProviderFieldPath != ScenarioLiveAvatarProviderFieldPath) failures.Add("premium-live-avatar-provider-field-drift");
+        if (receipt.RuntimeEnabledFieldPath != RuntimeEnabledFieldPath) failures.Add("premium-live-avatar-runtime-enabled-field-drift");
+        if (receipt.RuntimeAvatarIdFieldPath != RuntimeAvatarIdFieldPath) failures.Add("premium-live-avatar-runtime-id-field-drift");
+        if (receipt.RuntimeProviderFieldPath != RuntimeProviderFieldPath) failures.Add("premium-live-avatar-runtime-provider-field-drift");
+        if (receipt.RequiredModelProvider != ToughTongueBuildGhostLiveAvatarProviders.RequiredModelProvider) failures.Add("premium-live-avatar-model-provider-drift");
+        if (receipt.AllowedProviders is null
+            || !receipt.AllowedProviders.SequenceEqual(AllowedProviders, StringComparer.Ordinal))
+        {
+            failures.Add("premium-live-avatar-provider-set-drift");
+        }
+        if (receipt.AnamMinutesMultiplier != ToughTongueBuildGhostLiveAvatarProviders.PremiumMinutesMultiplier) failures.Add("premium-live-avatar-anam-cost-drift");
+        if (receipt.HeyGenMinutesMultiplier != ToughTongueBuildGhostLiveAvatarProviders.PremiumMinutesMultiplier) failures.Add("premium-live-avatar-heygen-cost-drift");
+        if (!receipt.ProviderManagedLipSynchronizationAdvertised) failures.Add("premium-live-avatar-provider-animation-unverified");
+        if (receipt.ObservedAtUtc == default) failures.Add("premium-live-avatar-observed-at-invalid");
+        return Ordered(failures);
+    }
+
+    public static BuildGhostToughTonguePremiumLiveAvatarBinding CreateBinding(
+        BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt receipt,
+        string provider,
+        string providerAvatarId)
+    {
+        IReadOnlyList<string> receiptFailures = Validate(receipt);
+        if (receiptFailures.Count != 0)
+        {
+            throw new ArgumentException(string.Join(',', receiptFailures), nameof(receipt));
+        }
+        if (!AllowedProviders.Contains(provider, StringComparer.Ordinal))
+        {
+            throw new ArgumentException("premium-live-avatar-provider-not-approved", nameof(provider));
+        }
+        if (!IsSafeProviderAvatarId(providerAvatarId))
+        {
+            throw new ArgumentException("premium-live-avatar-id-invalid", nameof(providerAvatarId));
+        }
+
+        string schemaReceiptDigest = DigestReceipt(receipt);
+        string avatarIdDigest = DigestText(providerAvatarId);
+        BuildGhostToughTonguePremiumLiveAvatarBinding binding = new(
+            ToughTongueBuildGhostContractVersions.PremiumLiveAvatarBindingV1,
+            provider,
+            providerAvatarId,
+            avatarIdDigest,
+            ToughTongueBuildGhostLiveAvatarProviders.RequiredModelProvider,
+            ToughTongueBuildGhostLiveAvatarProviders.PremiumMinutesMultiplier,
+            ProviderManagedLipSynchronization: true,
+            schemaReceiptDigest,
+            string.Empty);
+        return binding with { ContractDigest = Digest(BindingAuthority(binding)) };
+    }
+
+    public static IReadOnlyList<string> ValidateBinding(
+        BuildGhostToughTonguePremiumLiveAvatarBinding? binding,
+        BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt? receipt)
+    {
+        List<string> failures = [.. Validate(receipt)];
+        if (binding is null)
+        {
+            failures.Add("premium-live-avatar-binding-missing");
+            return Ordered(failures);
+        }
+        if (binding.Schema != ToughTongueBuildGhostContractVersions.PremiumLiveAvatarBindingV1) failures.Add("premium-live-avatar-binding-version-invalid");
+        if (!AllowedProviders.Contains(binding.Provider, StringComparer.Ordinal)) failures.Add("premium-live-avatar-binding-provider-invalid");
+        if (!IsSafeProviderAvatarId(binding.ProviderAvatarId)
+            || binding.ProviderAvatarIdDigest != DigestText(binding.ProviderAvatarId)) failures.Add("premium-live-avatar-binding-id-invalid");
+        if (binding.RequiredModelProvider != ToughTongueBuildGhostLiveAvatarProviders.RequiredModelProvider) failures.Add("premium-live-avatar-binding-model-provider-invalid");
+        if (binding.MinutesMultiplier != ToughTongueBuildGhostLiveAvatarProviders.PremiumMinutesMultiplier) failures.Add("premium-live-avatar-binding-cost-invalid");
+        if (!binding.ProviderManagedLipSynchronization) failures.Add("premium-live-avatar-binding-animation-unverified");
+        if (receipt is not null && failures.Count == 0 && binding.SchemaReceiptDigest != DigestReceipt(receipt)) failures.Add("premium-live-avatar-binding-schema-receipt-mismatch");
+        if (failures.Count == 0 && binding.ContractDigest != Digest(BindingAuthority(binding))) failures.Add("premium-live-avatar-binding-contract-digest-invalid");
+        return Ordered(failures);
+    }
+
+    public static string DigestReceipt(BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt receipt)
+        => Digest(new JsonObject
+        {
+            ["schema"] = receipt.Schema,
+            ["providerNamespace"] = receipt.ProviderNamespace,
+            ["deploymentId"] = receipt.DeploymentId,
+            ["studioBundleUrl"] = receipt.StudioBundleUrl.AbsoluteUri,
+            ["studioBundleDigest"] = receipt.StudioBundleDigest,
+            ["studioBundleBytes"] = receipt.StudioBundleBytes,
+            ["scenarioRuntimeBundleUrl"] = receipt.ScenarioRuntimeBundleUrl.AbsoluteUri,
+            ["scenarioRuntimeBundleDigest"] = receipt.ScenarioRuntimeBundleDigest,
+            ["scenarioRuntimeBundleBytes"] = receipt.ScenarioRuntimeBundleBytes,
+            ["sessionCreateBundleUrl"] = receipt.SessionCreateBundleUrl.AbsoluteUri,
+            ["sessionCreateBundleDigest"] = receipt.SessionCreateBundleDigest,
+            ["sessionCreateBundleBytes"] = receipt.SessionCreateBundleBytes,
+            ["scenarioLiveAvatarIdFieldPath"] = receipt.ScenarioLiveAvatarIdFieldPath,
+            ["scenarioLiveAvatarProviderFieldPath"] = receipt.ScenarioLiveAvatarProviderFieldPath,
+            ["runtimeEnabledFieldPath"] = receipt.RuntimeEnabledFieldPath,
+            ["runtimeAvatarIdFieldPath"] = receipt.RuntimeAvatarIdFieldPath,
+            ["runtimeProviderFieldPath"] = receipt.RuntimeProviderFieldPath,
+            ["requiredModelProvider"] = receipt.RequiredModelProvider,
+            ["allowedProviders"] = new JsonArray(receipt.AllowedProviders.Select(static value => JsonValue.Create(value)).ToArray()),
+            ["anamMinutesMultiplier"] = receipt.AnamMinutesMultiplier,
+            ["heyGenMinutesMultiplier"] = receipt.HeyGenMinutesMultiplier,
+            ["providerManagedLipSynchronizationAdvertised"] = receipt.ProviderManagedLipSynchronizationAdvertised,
+            ["observedAtUtc"] = receipt.ObservedAtUtc.ToUniversalTime().ToString("O")
+        });
+
+    public static string Read(JsonObject payload, string fieldPath)
+    {
+        if (!IsSafeFieldPath(fieldPath)) return string.Empty;
+        JsonNode? current = payload;
+        foreach (string segment in fieldPath.Split('.', StringSplitOptions.None))
+        {
+            current = current is JsonObject currentObject ? currentObject[segment] : null;
+        }
+        return current is JsonValue leaf && leaf.TryGetValue(out string? value)
+            ? value?.Trim() ?? string.Empty
+            : string.Empty;
+    }
+
+    private static void RequireBundle(
+        Uri? actualUrl,
+        string actualDigest,
+        long actualBytes,
+        string expectedUrl,
+        string expectedDigest,
+        long expectedBytes,
+        string label,
+        ICollection<string> failures)
+    {
+        if (actualUrl?.AbsoluteUri != expectedUrl) failures.Add($"premium-live-avatar-{label}-bundle-url-drift");
+        if (actualDigest != expectedDigest) failures.Add($"premium-live-avatar-{label}-bundle-digest-drift");
+        if (actualBytes != expectedBytes) failures.Add($"premium-live-avatar-{label}-bundle-size-drift");
+    }
+
+    private static JsonObject BindingAuthority(BuildGhostToughTonguePremiumLiveAvatarBinding binding)
+        => new()
+        {
+            ["schema"] = binding.Schema,
+            ["provider"] = binding.Provider,
+            ["providerAvatarIdDigest"] = binding.ProviderAvatarIdDigest,
+            ["requiredModelProvider"] = binding.RequiredModelProvider,
+            ["minutesMultiplier"] = binding.MinutesMultiplier,
+            ["providerManagedLipSynchronization"] = binding.ProviderManagedLipSynchronization,
+            ["schemaReceiptDigest"] = binding.SchemaReceiptDigest
+        };
+
+    private static bool IsSafeProviderAvatarId(string? value)
+        => value is { Length: >= 1 and <= 256 }
+            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' or ':');
+
+    private static bool IsSafeFieldPath(string? value)
+        => value is { Length: >= 3 and <= 128 }
+            && value.Split('.', StringSplitOptions.None).All(static segment => segment.Length is >= 1 and <= 64
+                && segment.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-'));
+
+    private static IReadOnlyList<string> Ordered(IEnumerable<string> failures)
+        => failures.Distinct(StringComparer.Ordinal).OrderBy(static value => value, StringComparer.Ordinal).ToArray();
+
+    private static string DigestText(string value)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
+
+    private static string Digest(JsonNode node)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
+}
+
 public static class BuildGhostToughTongueCustomFunctionContract
 {
     public const string ProviderNamespace = "tough-tongue";
@@ -1147,6 +1355,70 @@ public static class ToughTongueBuildGhostScenarioContract
             contractDigest);
     }
 
+    public static ToughTongueBuildGhostScenarioCandidate CreatePrivateRookPremiumLiveAvatarCandidate(
+        BuildGhostPrivateToolDeploymentPackage deployment,
+        Uri avatarUrl,
+        BuildGhostCascadePrivateVoiceBinding runtimeBinding,
+        BuildGhostToughTonguePremiumLiveAvatarBinding liveAvatarBinding,
+        BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt? liveAvatarSchemaReceipt,
+        BuildGhostToughTongueCartesiaScenarioSchemaReceipt? scenarioSchemaReceipt = null,
+        BuildGhostToughTongueCustomFunctionBinding? customFunctionBinding = null)
+    {
+        ArgumentNullException.ThrowIfNull(liveAvatarBinding);
+        ToughTongueBuildGhostScenarioCandidate candidate = CreatePrivateRookCandidate(
+            deployment,
+            avatarUrl,
+            runtimeBinding,
+            scenarioSchemaReceipt,
+            customFunctionBinding);
+        IReadOnlyList<string> liveAvatarFailures =
+            BuildGhostToughTonguePremiumLiveAvatarSchemaContract.ValidateBinding(
+                liveAvatarBinding,
+                liveAvatarSchemaReceipt);
+        if (liveAvatarFailures.Count != 0)
+        {
+            return candidate with
+            {
+                LiveAvatarBinding = liveAvatarBinding,
+                LiveAvatarBindingDigest = string.Empty,
+                LiveAvatarSchemaVerified = false,
+                LiveAvatarIdFieldPath = null,
+                LiveAvatarProviderFieldPath = null,
+                BlockingReasons = candidate.BlockingReasons.Concat(liveAvatarFailures)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(static reason => reason, StringComparer.Ordinal)
+                    .ToArray()
+            };
+        }
+
+        JsonObject payload = (JsonObject)candidate.Payload.DeepClone();
+        JsonObject appearance = Object(payload, "appearance");
+        appearance["live_avatar_id"] = liveAvatarBinding.ProviderAvatarId;
+        appearance["live_avatar_provider"] = liveAvatarBinding.Provider;
+        JsonObject metadata = Object(payload, "user_metadata");
+        metadata["live_avatar_provider"] = liveAvatarBinding.Provider;
+        metadata["live_avatar_id_digest"] = liveAvatarBinding.ProviderAvatarIdDigest;
+        metadata["live_avatar_schema_receipt_digest"] = liveAvatarBinding.SchemaReceiptDigest;
+        metadata["live_avatar_binding_digest"] = liveAvatarBinding.ContractDigest;
+        metadata["live_avatar_minutes_multiplier"] = liveAvatarBinding.MinutesMultiplier.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        metadata["live_avatar_render_posture"] = "provider-managed";
+        metadata["local_lip_sync_posture"] = "deferred";
+        metadata.Remove("scenario_contract_digest");
+        string contractDigest = Digest(payload);
+        metadata["scenario_contract_digest"] = contractDigest;
+        return candidate with
+        {
+            Payload = payload,
+            ContractDigest = contractDigest,
+            LiveAvatarBinding = liveAvatarBinding,
+            LiveAvatarBindingDigest = liveAvatarBinding.ContractDigest,
+            LiveAvatarSchemaVerified = true,
+            LiveAvatarIdFieldPath = liveAvatarSchemaReceipt!.ScenarioLiveAvatarIdFieldPath,
+            LiveAvatarProviderFieldPath = liveAvatarSchemaReceipt.ScenarioLiveAvatarProviderFieldPath
+        };
+    }
+
     public static ToughTongueBuildGhostScenarioValidation Validate(
         JsonObject? scenario,
         ToughTongueBuildGhostScenarioCandidate expected)
@@ -1154,10 +1426,13 @@ public static class ToughTongueBuildGhostScenarioContract
         ArgumentNullException.ThrowIfNull(expected);
         if (!expected.ProviderSchemaReadVerified
             || !expected.CustomFunctionBindingReadVerified
+            || (expected.LiveAvatarBinding is not null && !expected.LiveAvatarSchemaVerified)
             || expected.BlockingReasons.Count != 0)
         {
             IReadOnlyList<string> blockers = expected.BlockingReasons.Count == 0
-                ? [BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker]
+                ? expected.LiveAvatarBinding is not null && !expected.LiveAvatarSchemaVerified
+                    ? [BuildGhostToughTonguePremiumLiveAvatarSchemaContract.MissingOrUnverifiedBlocker]
+                    : [BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker]
                 : expected.BlockingReasons;
             return new ToughTongueBuildGhostScenarioValidation(
                 false,
@@ -1178,6 +1453,23 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(Object(scenario, "appearance"), "voice", Text(Object(expected.Payload, "appearance"), "voice"), "scenario-voice-mismatch", reasons);
         RequireText(Object(scenario, "appearance"), "avatar_url", Text(Object(expected.Payload, "appearance"), "avatar_url"), "scenario-avatar-mismatch", reasons);
         RequireText(Object(scenario, "appearance"), "language_code", "en-US", "scenario-base-locale-invalid", reasons);
+        if (expected.LiveAvatarBinding is not null)
+        {
+            if (expected.LiveAvatarIdFieldPath is null
+                || BuildGhostToughTonguePremiumLiveAvatarSchemaContract.Read(
+                    scenario,
+                    expected.LiveAvatarIdFieldPath) != expected.LiveAvatarBinding.ProviderAvatarId)
+            {
+                reasons.Add("scenario-live-avatar-id-mismatch");
+            }
+            if (expected.LiveAvatarProviderFieldPath is null
+                || BuildGhostToughTonguePremiumLiveAvatarSchemaContract.Read(
+                    scenario,
+                    expected.LiveAvatarProviderFieldPath) != expected.LiveAvatarBinding.Provider)
+            {
+                reasons.Add("scenario-live-avatar-provider-mismatch");
+            }
+        }
         RequireText(Object(scenario, "ai_model_config"), "provider", "Landmass", "scenario-model-provider-invalid", reasons);
         RequireText(Object(scenario, "ai_model_config"), "model", "cascade", "scenario-model-invalid", reasons);
         if (expected.TtsProviderFieldPath is null
@@ -1233,6 +1525,16 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(metadata, "scenario_contract_digest", expected.ContractDigest, "scenario-contract-digest-mismatch", reasons);
         RequireText(metadata, "supported_locales", string.Join(',', CanonicalLocales), "scenario-locales-mismatch", reasons);
         RequireText(metadata, "release_channel", "private-nonproduction-candidate", "scenario-release-channel-invalid", reasons);
+        if (expected.LiveAvatarBinding is not null)
+        {
+            RequireText(metadata, "live_avatar_provider", expected.LiveAvatarBinding.Provider, "scenario-live-avatar-provider-metadata-mismatch", reasons);
+            RequireText(metadata, "live_avatar_id_digest", expected.LiveAvatarBinding.ProviderAvatarIdDigest, "scenario-live-avatar-id-digest-mismatch", reasons);
+            RequireText(metadata, "live_avatar_schema_receipt_digest", expected.LiveAvatarBinding.SchemaReceiptDigest, "scenario-live-avatar-schema-receipt-digest-mismatch", reasons);
+            RequireText(metadata, "live_avatar_binding_digest", expected.LiveAvatarBindingDigest, "scenario-live-avatar-binding-digest-mismatch", reasons);
+            RequireText(metadata, "live_avatar_minutes_multiplier", expected.LiveAvatarBinding.MinutesMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture), "scenario-live-avatar-cost-mismatch", reasons);
+            RequireText(metadata, "live_avatar_render_posture", "provider-managed", "scenario-live-avatar-render-posture-invalid", reasons);
+            RequireText(metadata, "local_lip_sync_posture", "deferred", "scenario-local-lip-sync-posture-invalid", reasons);
+        }
 
         return new ToughTongueBuildGhostScenarioValidation(
             reasons.Count == 0,

@@ -17,6 +17,8 @@ public static class ToughTongueBuildGhostContractVersions
     public const string CascadePrivateVoiceBindingV1 = "chummer.build_ghost.cascade_private_voice_binding.v1";
     public const string CartesiaPrivateVoiceReadReceiptV1 = "chummer.build_ghost.cartesia_private_voice_read_receipt.v1";
     public const string CartesiaScenarioSchemaReceiptV1 = "chummer.tough_tongue.cartesia_scenario_schema_receipt.v1";
+    public const string PremiumLiveAvatarSchemaReceiptV1 = "chummer.tough_tongue.premium_live_avatar_schema_receipt.v1";
+    public const string PremiumLiveAvatarBindingV1 = "chummer.tough_tongue.premium_live_avatar_binding.v1";
     public const string CustomFunctionLibrarySchemaReceiptV1 = "chummer.tough_tongue.custom_function_library_schema_receipt.v1";
     public const string CustomFunctionLibraryReadReceiptV1 = "chummer.tough_tongue.custom_function_library_read_receipt.v1";
     public const string CustomFunctionDynamicAuthorizationReceiptV1 = "chummer.tough_tongue.custom_function_dynamic_authorization_receipt.v1";
@@ -40,6 +42,14 @@ public static class ToughTongueBuildGhostVoiceProviders
     public const string CartesiaNamespace = "cartesia";
     public const string CartesiaTtsProvider = "Cartesia";
     public const string FullySyntheticProvenance = "fully-synthetic-no-human-recording";
+}
+
+public static class ToughTongueBuildGhostLiveAvatarProviders
+{
+    public const string Anam = "anam";
+    public const string HeyGen = "liveavatar";
+    public const string RequiredModelProvider = "Landmass";
+    public const decimal PremiumMinutesMultiplier = 2m;
 }
 
 public sealed record ToughTongueBuildGhostRequest(
@@ -208,6 +218,42 @@ public sealed record BuildGhostToughTongueCartesiaScenarioSchemaReceipt(
     string TtsProvider,
     DateTimeOffset ObservedAtUtc);
 
+public sealed record BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt(
+    string Schema,
+    string ProviderNamespace,
+    string DeploymentId,
+    Uri StudioBundleUrl,
+    string StudioBundleDigest,
+    long StudioBundleBytes,
+    Uri ScenarioRuntimeBundleUrl,
+    string ScenarioRuntimeBundleDigest,
+    long ScenarioRuntimeBundleBytes,
+    Uri SessionCreateBundleUrl,
+    string SessionCreateBundleDigest,
+    long SessionCreateBundleBytes,
+    string ScenarioLiveAvatarIdFieldPath,
+    string ScenarioLiveAvatarProviderFieldPath,
+    string RuntimeEnabledFieldPath,
+    string RuntimeAvatarIdFieldPath,
+    string RuntimeProviderFieldPath,
+    string RequiredModelProvider,
+    IReadOnlyList<string> AllowedProviders,
+    decimal AnamMinutesMultiplier,
+    decimal HeyGenMinutesMultiplier,
+    bool ProviderManagedLipSynchronizationAdvertised,
+    DateTimeOffset ObservedAtUtc);
+
+public sealed record BuildGhostToughTonguePremiumLiveAvatarBinding(
+    string Schema,
+    string Provider,
+    [property: JsonIgnore] string ProviderAvatarId,
+    string ProviderAvatarIdDigest,
+    string RequiredModelProvider,
+    decimal MinutesMultiplier,
+    bool ProviderManagedLipSynchronization,
+    string SchemaReceiptDigest,
+    string ContractDigest);
+
 public sealed record BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt(
     string Schema,
     string ProviderNamespace,
@@ -342,7 +388,12 @@ public sealed record ToughTongueBuildGhostScenarioCandidate(
     string CustomFunctionBindingDigest,
     bool CustomFunctionBindingReadVerified,
     IReadOnlyList<string> BlockingReasons,
-    string ContractDigest);
+    string ContractDigest,
+    BuildGhostToughTonguePremiumLiveAvatarBinding? LiveAvatarBinding = null,
+    string LiveAvatarBindingDigest = "",
+    bool LiveAvatarSchemaVerified = false,
+    string? LiveAvatarIdFieldPath = null,
+    string? LiveAvatarProviderFieldPath = null);
 
 public sealed record ToughTongueBuildGhostScenarioValidation(
     bool Accepted,
