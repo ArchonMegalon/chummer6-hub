@@ -38,6 +38,12 @@ revision-drifted source, a rendered provider gate other than literal `false`,
 IO `full avg10` above 10, less than 20 GiB free under `/docker`, or a build poll
 interval above 15 seconds.
 
+Only one helper may run on the host at a time. It acquires the fixed
+host-local lock
+`/docker/chummercomplete/.state/locks/chummer-build-ghost-private-nonprod-ai-deploy.lock`
+nonblockingly and fails before inspecting or changing runtime state when
+another deploy owns that lock.
+
 Before starting the build, the helper resolves the running AI's full image ID,
 creates a collision-resistant `chummer-build-ghost-ai:rollback-*` reference,
 and verifies that the new reference resolves to that exact ID. The unique
@@ -47,6 +53,10 @@ and edge container IDs must remain unchanged. Postchecks require exact source
 labels, AI health, all four provider gates false, a revision/digest-bound
 authenticated deterministic fallback with no remote attempt, missing-auth
 `401`, and loopback Caddy `/api/v1/ai/build-ghost/explain` `404`.
+
+Immediately before activation, the helper re-resolves the rollback reference,
+running AI container and image, and the Presentation and edge container IDs.
+Any drift from the pre-build snapshot fails before the AI activation boundary.
 
 If activation or any postcheck fails, the helper retags the preserved image to
 the mutable `private-nonprod` deployment tag and force-recreates only the AI

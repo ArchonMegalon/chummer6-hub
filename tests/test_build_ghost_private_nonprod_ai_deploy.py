@@ -11,6 +11,12 @@ def main_sequence() -> str:
     return SCRIPT.split("for required in awk bash", 1)[1]
 
 
+def main_body() -> str:
+    return SCRIPT.split("main() {", 1)[1].split(
+        'if [ "${BASH_SOURCE[0]}" = "$0" ]; then', 1
+    )[0]
+
+
 def test_deployer_is_valid_bash_without_executing_docker():
     result = subprocess.run(
         ["bash", "-n", str(DEPLOY)],
@@ -39,6 +45,77 @@ def test_old_image_is_resolved_and_immutably_preserved_before_build_or_recreate(
     )
 
 
+def test_host_lock_is_nonblocking_held_for_main_and_released_on_exit(tmp_path):
+    lock_file = tmp_path / "ai-deploy.lock"
+    owner_script = (
+        'source "$1"; acquire_deploy_lock "$2"; '
+        "printf 'locked\\n'; read -r _"
+    )
+    owner = subprocess.Popen(
+        ["bash", "-c", owner_script, "lock-owner", str(DEPLOY), str(lock_file)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert owner.stdout is not None
+        assert owner.stdout.readline() == "locked\n"
+        contender = subprocess.run(
+            [
+                "bash",
+                "-c",
+                'source "$1"; acquire_deploy_lock "$2"; printf "unexpected\\n"',
+                "lock-contender",
+                str(DEPLOY),
+                str(lock_file),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        assert contender.returncode != 0
+        assert "stage=concurrent-deploy-lock-held" in contender.stderr
+    finally:
+        assert owner.stdin is not None
+        owner.stdin.close()
+        owner.wait(timeout=5)
+
+    released = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; acquire_deploy_lock "$2"; printf "acquired\\n"',
+            "lock-after-owner",
+            str(DEPLOY),
+            str(lock_file),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert released.returncode == 0, released.stderr
+    assert released.stdout == "acquired\n"
+
+
+def test_fixed_host_lock_is_acquired_before_runtime_or_build_work():
+    assert (
+        'deploy_lock_file="/docker/chummercomplete/.state/locks/'
+        'chummer-build-ghost-private-nonprod-ai-deploy.lock"'
+    ) in SCRIPT
+    assert 'flock --nonblock "$deploy_lock_fd"' in SCRIPT
+    assert 'fail "concurrent-deploy-lock-held"' in SCRIPT
+    body = main_body()
+    assert body.index('acquire_deploy_lock "$deploy_lock_file"') < body.index(
+        'presentation_id_before="$(running_container_id "$presentation_service")"'
+    )
+    assert body.index('acquire_deploy_lock "$deploy_lock_file"') < body.index(
+        "build_candidate_under_limits"
+    )
+
+
 def test_activation_and_rollback_are_bounded_to_ai_and_preserve_the_rollback_tag():
     recreate = 'compose up -d --no-deps --no-build --force-recreate "$ai_service"'
     assert SCRIPT.count(recreate) == 2
@@ -55,6 +132,31 @@ def test_activation_and_rollback_are_bounded_to_ai_and_preserve_the_rollback_tag
     assert "docker system prune" not in SCRIPT
     assert "trap on_exit EXIT" in SCRIPT
     assert "if ! (rollback_if_needed); then" in SCRIPT
+
+
+def test_preactivation_recheck_closes_build_time_identity_drift():
+    verification = SCRIPT.split("verify_activation_authority_unchanged()", 1)[1].split(
+        "rollback_if_needed()", 1
+    )[0]
+    assert '[ "$(image_id "$rollback_ref")" = "$old_ai_image" ]' in verification
+    assert 'current_ai_id="$(running_container_id "$ai_service")"' in verification
+    assert '[ "$current_ai_id" = "$old_ai_id" ]' in verification
+    assert 'current_ai_image="$(docker inspect "$current_ai_id" --format \'{{.Image}}\')"' in verification
+    assert '[ "$current_ai_image" = "$old_ai_image" ]' in verification
+    assert '[ "$(running_container_id "$presentation_service")" = "$presentation_id_before" ]' in verification
+    assert '[ "$(running_container_id "$edge_service")" = "$edge_id_before" ]' in verification
+
+    body = main_body()
+    assert body.index("build_candidate_under_limits") < body.index(
+        "verify_activation_authority_unchanged"
+    )
+    assert body.index("verify_activation_authority_unchanged") < body.index(
+        'activation_started="true"'
+    )
+    assert (
+        "ensure_hard_limits\n    verify_activation_authority_unchanged\n\n"
+        '    activation_started="true"'
+    ) in body
 
 
 def test_host_cutoffs_are_hard_and_build_polling_is_interruptible():

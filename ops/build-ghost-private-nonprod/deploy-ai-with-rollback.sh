@@ -14,6 +14,7 @@ presentation_service="chummer-build-ghost-presentation"
 edge_service="build-ghost-private-edge"
 deployment_image="chummer-build-ghost-ai:private-nonprod"
 rollback_repository="chummer-build-ghost-ai"
+deploy_lock_file="/docker/chummercomplete/.state/locks/chummer-build-ghost-private-nonprod-ai-deploy.lock"
 max_io_full_avg10="${CHUMMER_BUILD_GHOST_DEPLOY_MAX_IO_FULL_AVG10:-10}"
 minimum_free_gib="${CHUMMER_BUILD_GHOST_DEPLOY_MINIMUM_FREE_GIB:-20}"
 build_poll_seconds="${CHUMMER_BUILD_GHOST_DEPLOY_POLL_SECONDS:-10}"
@@ -29,6 +30,7 @@ old_ai_image=""
 rollback_ref=""
 presentation_id_before=""
 edge_id_before=""
+deploy_lock_fd=""
 
 fail() {
     printf 'ai_deploy=failed stage=%s\n' "$1" >&2
@@ -37,6 +39,17 @@ fail() {
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "preflight-missing-$1"
+}
+
+acquire_deploy_lock() {
+    local requested_lock_file="${1:-$deploy_lock_file}"
+    local requested_lock_root
+    requested_lock_root="$(dirname -- "$requested_lock_file")"
+    mkdir -p -- "$requested_lock_root"
+    [ ! -L "$requested_lock_file" ] || fail "deploy-lock-must-not-be-symlink"
+    exec {deploy_lock_fd}>> "$requested_lock_file"
+    chmod 0600 "$requested_lock_file"
+    flock --nonblock "$deploy_lock_fd" || fail "concurrent-deploy-lock-held"
 }
 
 compose() {
@@ -448,6 +461,22 @@ run_postchecks() {
     verify_public_explain_absent "$edge_id_before"
 }
 
+verify_activation_authority_unchanged() {
+    local current_ai_id current_ai_image
+    [ "$(image_id "$rollback_ref")" = "$old_ai_image" ] \
+        || fail "preactivation-rollback-reference-drift"
+    current_ai_id="$(running_container_id "$ai_service")"
+    [ "$current_ai_id" = "$old_ai_id" ] \
+        || fail "preactivation-ai-container-drift"
+    current_ai_image="$(docker inspect "$current_ai_id" --format '{{.Image}}')"
+    [ "$current_ai_image" = "$old_ai_image" ] \
+        || fail "preactivation-ai-image-drift"
+    [ "$(running_container_id "$presentation_service")" = "$presentation_id_before" ] \
+        || fail "preactivation-presentation-container-drift"
+    [ "$(running_container_id "$edge_service")" = "$edge_id_before" ] \
+        || fail "preactivation-edge-container-drift"
+}
+
 rollback_if_needed() {
     local restored_ai_id restored_image
     if [ "$activation_started" != "true" ] || [ "$deploy_succeeded" = "true" ] \
@@ -492,32 +521,43 @@ on_exit() {
     exit "$status"
 }
 
-trap on_exit EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
+main() {
+    trap on_exit EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
 
-for required in awk bash cut date df docker find git jq mv openssl realpath rg rmdir sed seq setsid sha256sum shred sleep truncate unlink wc; do
-    require_command "$required"
-done
-validate_control_values
-deploy_tmp="$(mktemp -d)"
-chmod 0700 "$deploy_tmp"
-validate_sources_and_labels
-ensure_hard_limits
+    for lock_required in chmod dirname flock mkdir; do
+        require_command "$lock_required"
+    done
+    acquire_deploy_lock "$deploy_lock_file"
+    for required in awk bash cut date df docker find git jq mv openssl realpath rg rmdir sed seq setsid sha256sum shred sleep truncate unlink wc; do
+        require_command "$required"
+    done
+    validate_control_values
+    deploy_tmp="$(mktemp -d)"
+    chmod 0700 "$deploy_tmp"
+    validate_sources_and_labels
+    ensure_hard_limits
 
-presentation_id_before="$(running_container_id "$presentation_service")"
-edge_id_before="$(running_container_id "$edge_service")"
-preserve_rollback_image
-load_runtime_secrets_without_output
-ensure_hard_limits
-verify_rendered_compose
-build_candidate_under_limits
-ensure_hard_limits
+    presentation_id_before="$(running_container_id "$presentation_service")"
+    edge_id_before="$(running_container_id "$edge_service")"
+    preserve_rollback_image
+    load_runtime_secrets_without_output
+    ensure_hard_limits
+    verify_rendered_compose
+    build_candidate_under_limits
+    ensure_hard_limits
+    verify_activation_authority_unchanged
 
-activation_started="true"
-compose up -d --no-deps --no-build --force-recreate "$ai_service"
-run_postchecks
-deploy_succeeded="true"
-printf 'ai_deploy=passed rollback_ref=%s old_image=%s candidate_image=%s gates=false neighbors=unchanged public_explain=404 deterministic_fallback=true remote_attempted=false\n' \
-    "$rollback_ref" "$old_ai_image" "$(image_id "$deployment_image")"
+    activation_started="true"
+    compose up -d --no-deps --no-build --force-recreate "$ai_service"
+    run_postchecks
+    deploy_succeeded="true"
+    printf 'ai_deploy=passed rollback_ref=%s old_image=%s candidate_image=%s gates=false neighbors=unchanged public_explain=404 deterministic_fallback=true remote_attempted=false\n' \
+        "$rollback_ref" "$old_ai_image" "$(image_id "$deployment_image")"
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    main "$@"
+fi
