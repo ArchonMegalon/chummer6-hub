@@ -21,6 +21,7 @@ public static class ToughTongueBuildGhostContractVersions
     public const string PremiumLiveAvatarBindingV1 = "chummer.tough_tongue.premium_live_avatar_binding.v1";
     public const string CustomFunctionLibrarySchemaReceiptV1 = "chummer.tough_tongue.custom_function_library_schema_receipt.v1";
     public const string CustomFunctionLibraryReadReceiptV1 = "chummer.tough_tongue.custom_function_library_read_receipt.v1";
+    public const string CustomFunctionLibraryReadReceiptV2 = "chummer.tough_tongue.custom_function_library_read_receipt.v2";
     public const string CustomFunctionDynamicAuthorizationReceiptV1 = "chummer.tough_tongue.custom_function_dynamic_authorization_receipt.v1";
     public const string CustomFunctionDefinitionV1 = "chummer.tough_tongue.custom_function_definition.v1";
     public const string CustomFunctionBindingV1 = "chummer.tough_tongue.custom_function_binding.v1";
@@ -291,6 +292,8 @@ public sealed record BuildGhostToughTongueCustomFunctionLibraryReadReceipt(
     string SelectedSlotLabel,
     string AccountRefDigest,
     int HttpStatus,
+    string JsonResponseShape,
+    int RowCount,
     bool JsonSchemaObserved,
     IReadOnlyList<string> ReturnedFields,
     string ProviderResponseDigest,

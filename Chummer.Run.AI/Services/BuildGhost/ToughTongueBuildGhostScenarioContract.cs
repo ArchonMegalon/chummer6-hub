@@ -590,10 +590,13 @@ public static class BuildGhostToughTongueCustomFunctionContract
         "tough-tongue-stored-header-dynamic-argument-interpolation-unproven";
     public const string AuthenticatedLibraryReadBlocker =
         "tough-tongue-custom-function-library-bearer-read-unverified";
+    public const string AuthenticatedLibraryReadSchemaBlocker =
+        "tough-tongue-custom-function-library-read-pinned-schema-unverified";
     public const string MissingBindingBlocker =
         "tough-tongue-custom-function-binding-missing-or-unverified";
     public const string ScenarioMutationPublicApiBlocker =
         "tough-tongue-scenario-upsert-public-api-contract-undocumented";
+    public const string JsonArrayResponseShape = "array";
 
     public static readonly IReadOnlyList<string> CreateFields =
     [
@@ -637,18 +640,33 @@ public static class BuildGhostToughTongueCustomFunctionContract
 
     public static IReadOnlyList<string> ValidateAuthenticatedRead(
         BuildGhostToughTongueCustomFunctionLibraryReadReceipt? receipt,
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt? librarySchemaReceipt,
         string expectedAccountRefDigest)
     {
         if (receipt is null) return [AuthenticatedLibraryReadBlocker];
         List<string> failures = [];
-        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CustomFunctionLibraryReadReceiptV1) failures.Add("custom-function-library-read-version-invalid");
+        bool pinnedSchemaVerified = ValidateLibrarySchema(librarySchemaReceipt).Count == 0;
+        if (receipt.Schema != ToughTongueBuildGhostContractVersions.CustomFunctionLibraryReadReceiptV2) failures.Add("custom-function-library-read-version-invalid");
         if (receipt.Endpoint?.AbsoluteUri != $"{ApiBaseUrl}{ListPath}") failures.Add("custom-function-library-read-endpoint-invalid");
         if (receipt.Method != "GET") failures.Add("custom-function-library-read-method-invalid");
         if (!IsSafeSlotLabel(receipt.SelectedSlotLabel)) failures.Add("custom-function-library-read-slot-invalid");
         if (!IsSha256(expectedAccountRefDigest) || receipt.AccountRefDigest != expectedAccountRefDigest) failures.Add("custom-function-library-read-account-ref-mismatch");
         if (receipt.HttpStatus != 200) failures.Add(AuthenticatedLibraryReadBlocker);
-        if (!receipt.JsonSchemaObserved
-            || !receipt.ReturnedFields.SequenceEqual(ReturnedFields, StringComparer.Ordinal))
+        if (receipt.JsonResponseShape != JsonArrayResponseShape) failures.Add("custom-function-library-read-response-shape-invalid");
+        if (receipt.RowCount < 0) failures.Add("custom-function-library-read-row-count-invalid");
+        if (!pinnedSchemaVerified) failures.Add(AuthenticatedLibraryReadSchemaBlocker);
+        if (receipt.RowCount == 0)
+        {
+            if (receipt.JsonSchemaObserved) failures.Add("custom-function-library-read-empty-schema-claim-invalid");
+            if (receipt.ReturnedFields is null || receipt.ReturnedFields.Count != 0)
+            {
+                failures.Add("custom-function-library-read-empty-fields-claim-invalid");
+            }
+        }
+        else if (receipt.RowCount > 0
+                 && (!receipt.JsonSchemaObserved
+                     || receipt.ReturnedFields is null
+                     || !receipt.ReturnedFields.SequenceEqual(ReturnedFields, StringComparer.Ordinal)))
         {
             failures.Add("custom-function-library-read-schema-unverified");
         }
@@ -694,7 +712,10 @@ public static class BuildGhostToughTongueCustomFunctionContract
     {
         ArgumentNullException.ThrowIfNull(deployment);
         IReadOnlyList<string> schemaFailures = ValidateLibrarySchema(librarySchemaReceipt);
-        IReadOnlyList<string> readFailures = ValidateAuthenticatedRead(libraryReadReceipt, expectedAccountRefDigest);
+        IReadOnlyList<string> readFailures = ValidateAuthenticatedRead(
+            libraryReadReceipt,
+            librarySchemaReceipt,
+            expectedAccountRefDigest);
         IReadOnlyList<string> dynamicFailures = ValidateDynamicAuthorization(
             dynamicAuthorizationReceipt,
             trustedDynamicAuthorizationReceiptDigest);

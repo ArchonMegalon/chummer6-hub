@@ -857,6 +857,166 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public void Empty_authenticated_library_array_uses_pinned_schema_without_claiming_observed_row_fields()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt schemaReceipt =
+            CustomFunctionLibrarySchemaReceipt();
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt readReceipt =
+            CustomFunctionLibraryReadReceipt(schemaObserved: false);
+
+        Assert.AreEqual(BuildGhostToughTongueCustomFunctionContract.JsonArrayResponseShape, readReceipt.JsonResponseShape);
+        Assert.AreEqual(0, readReceipt.RowCount);
+        Assert.IsFalse(readReceipt.JsonSchemaObserved);
+        Assert.IsEmpty(readReceipt.ReturnedFields);
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+            readReceipt,
+            schemaReceipt,
+            CustomFunctionAccountRef));
+
+        BuildGhostToughTongueCustomFunctionDefinition withoutDynamicAuthorization =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                ToolDeployment(),
+                schemaReceipt,
+                readReceipt,
+                CustomFunctionAccountRef);
+        Assert.IsTrue(withoutDynamicAuthorization.AuthenticatedLibraryReadVerified);
+        Assert.IsFalse(withoutDynamicAuthorization.DynamicAuthorizationVerified);
+        CollectionAssert.Contains(
+            withoutDynamicAuthorization.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.DynamicAuthorizationBlocker);
+        Assert.ThrowsExactly<InvalidDataException>(() =>
+            BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(withoutDynamicAuthorization));
+
+        BuildGhostToughTongueCustomFunctionDefinition definition =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                ToolDeployment(),
+                schemaReceipt,
+                readReceipt,
+                CustomFunctionAccountRef,
+                DynamicAuthorizationReceipt(),
+                DynamicAuthorizationReceiptDigest());
+        Assert.IsTrue(definition.LibrarySchemaVerified);
+        Assert.IsTrue(definition.AuthenticatedLibraryReadVerified);
+        Assert.IsTrue(definition.DynamicAuthorizationVerified);
+        Assert.IsEmpty(definition.BlockingReasons);
+        Assert.AreEqual(
+            BuildGhostToughTongueCustomFunctionContract.DigestLibraryReadReceipt(readReceipt),
+            definition.LibraryReadReceiptDigest);
+    }
+
+    [TestMethod]
+    public void Nonempty_authenticated_library_array_requires_exact_observed_row_fields()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt schemaReceipt =
+            CustomFunctionLibrarySchemaReceipt();
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt readReceipt =
+            CustomFunctionLibraryReadReceipt();
+
+        Assert.AreEqual(1, readReceipt.RowCount);
+        Assert.IsTrue(readReceipt.JsonSchemaObserved);
+        CollectionAssert.AreEqual(
+            BuildGhostToughTongueCustomFunctionContract.ReturnedFields.ToArray(),
+            readReceipt.ReturnedFields.ToArray());
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+            readReceipt,
+            schemaReceipt,
+            CustomFunctionAccountRef));
+
+        IReadOnlyList<string> missingFields =
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                readReceipt with { JsonSchemaObserved = false, ReturnedFields = [] },
+                schemaReceipt,
+                CustomFunctionAccountRef);
+        CollectionAssert.Contains(
+            missingFields.ToArray(),
+            "custom-function-library-read-schema-unverified");
+    }
+
+    [TestMethod]
+    public void Empty_library_receipt_rejects_field_claims_invalid_shape_count_and_legacy_version()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt schemaReceipt =
+            CustomFunctionLibrarySchemaReceipt();
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt empty =
+            CustomFunctionLibraryReadReceipt(schemaObserved: false);
+
+        IReadOnlyList<string> inventedFields =
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty with
+                {
+                    JsonSchemaObserved = true,
+                    ReturnedFields = BuildGhostToughTongueCustomFunctionContract.ReturnedFields
+                },
+                schemaReceipt,
+                CustomFunctionAccountRef);
+        CollectionAssert.Contains(
+            inventedFields.ToArray(),
+            "custom-function-library-read-empty-schema-claim-invalid");
+        CollectionAssert.Contains(
+            inventedFields.ToArray(),
+            "custom-function-library-read-empty-fields-claim-invalid");
+
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty with { JsonResponseShape = "object" },
+                schemaReceipt,
+                CustomFunctionAccountRef).ToArray(),
+            "custom-function-library-read-response-shape-invalid");
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty with { RowCount = -1 },
+                schemaReceipt,
+                CustomFunctionAccountRef).ToArray(),
+            "custom-function-library-read-row-count-invalid");
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty with { Schema = ToughTongueBuildGhostContractVersions.CustomFunctionLibraryReadReceiptV1 },
+                schemaReceipt,
+                CustomFunctionAccountRef).ToArray(),
+            "custom-function-library-read-version-invalid");
+    }
+
+    [TestMethod]
+    public void Empty_library_receipt_fails_closed_when_separately_pinned_schema_drifts()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt driftedSchema =
+            CustomFunctionLibrarySchemaReceipt() with
+            {
+                ReturnedFields = BuildGhostToughTongueCustomFunctionContract.ReturnedFields.Reverse().ToArray()
+            };
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt empty =
+            CustomFunctionLibraryReadReceipt(schemaObserved: false);
+
+        IReadOnlyList<string> failures =
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty,
+                driftedSchema,
+                CustomFunctionAccountRef);
+        CollectionAssert.Contains(
+            failures.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.AuthenticatedLibraryReadSchemaBlocker);
+
+        BuildGhostToughTongueCustomFunctionDefinition definition =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                ToolDeployment(),
+                driftedSchema,
+                empty,
+                CustomFunctionAccountRef,
+                DynamicAuthorizationReceipt(),
+                DynamicAuthorizationReceiptDigest());
+        Assert.IsFalse(definition.LibrarySchemaVerified);
+        Assert.IsFalse(definition.AuthenticatedLibraryReadVerified);
+        CollectionAssert.Contains(
+            definition.BlockingReasons.ToArray(),
+            "custom-function-returned-fields-drift");
+        CollectionAssert.Contains(
+            definition.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.AuthenticatedLibraryReadSchemaBlocker);
+        Assert.ThrowsExactly<InvalidDataException>(() =>
+            BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(definition));
+    }
+
+    [TestMethod]
     public void Sanitized_401_library_probe_and_missing_dynamic_header_semantics_block_serialization()
     {
         BuildGhostToughTongueCustomFunctionDefinition definition =
@@ -1262,12 +1422,14 @@ public sealed class ToughTongueBuildGhostAdapterTests
         int status = 200,
         bool schemaObserved = true)
         => new(
-            ToughTongueBuildGhostContractVersions.CustomFunctionLibraryReadReceiptV1,
+            ToughTongueBuildGhostContractVersions.CustomFunctionLibraryReadReceiptV2,
             new Uri("https://api.toughtongueai.com/api/custom-functions/"),
             "GET",
             "team-slot-4",
             CustomFunctionAccountRef,
             status,
+            BuildGhostToughTongueCustomFunctionContract.JsonArrayResponseShape,
+            schemaObserved ? 1 : 0,
             schemaObserved,
             schemaObserved ? BuildGhostToughTongueCustomFunctionContract.ReturnedFields : [],
             status == 200 ? $"sha256:{new string('8', 64)}" : string.Empty,
