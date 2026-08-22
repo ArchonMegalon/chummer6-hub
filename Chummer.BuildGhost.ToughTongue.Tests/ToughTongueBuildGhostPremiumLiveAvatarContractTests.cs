@@ -10,6 +10,61 @@ namespace Chummer.BuildGhost.ToughTongue.Tests;
 public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
 {
     [TestMethod]
+    public void Current_cartesia_and_custom_function_evidence_uses_the_same_verified_deployment()
+    {
+        const string deployment = "dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
+        DateTimeOffset observedAtUtc = DateTimeOffset.Parse("2026-08-22T05:35:00Z");
+        BuildGhostToughTongueCartesiaScenarioSchemaReceipt cartesia = new(
+            "chummer.tough_tongue.cartesia_scenario_schema_receipt.v1",
+            "cartesia",
+            deployment,
+            new Uri("https://app.toughtongueai.com/_next/static/chunks/0m4xondr3o4oe.js?dpl=dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i"),
+            "sha256:7ba4d63277d18d2ff8c2ffd3128576a1ad15e4670e4f4c9921b6846de6ba71d7",
+            219_531,
+            new Uri("https://app.toughtongueai.com/_next/static/chunks/04i2xipv9rrh-.js?dpl=dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i"),
+            "sha256:01c2f887b5970283734c086bdbf1c3ec1e6af8f6e07a62e229c0f8cd96f5c1eb",
+            166_081,
+            "tts_provider",
+            "tts_voice_id",
+            "ai_model_config.tts_provider",
+            "ai_model_config.tts_voice_id",
+            "Cartesia",
+            observedAtUtc);
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt customFunctions = new(
+            "chummer.tough_tongue.custom_function_library_schema_receipt.v1",
+            "tough-tongue",
+            deployment,
+            "08a43for7u2by.js",
+            "sha256:c82bf0103f53edbc5933f9b6b4aa8716ba05119412b8cff447c1338a22ffa1cc",
+            43_729,
+            "0dic_u.sbe1xm.js",
+            "sha256:7e22f357c2ebe5e9f6988f6fa4cfec1c332ebf3c0f573e5dc31feaeefcf5c7e7",
+            499_677,
+            "06i87mpuoc~sp.js",
+            "sha256:361eee45d31a83d6a5cbf1883184a92a4c873c4afaa5f0045fc5fe2dbb08bfe6",
+            53_767,
+            "0m4xondr3o4oe.js",
+            "sha256:7ba4d63277d18d2ff8c2ffd3128576a1ad15e4670e4f4c9921b6846de6ba71d7",
+            219_531,
+            new Uri("https://api.toughtongueai.com/api/"),
+            "custom-functions/",
+            "custom-functions/by-scenario/{scenario}",
+            "custom-functions/",
+            "custom-functions/{id}",
+            "custom-functions/{id}/execute",
+            "custom-functions/{id}",
+            "scenarios/upsert",
+            ["name", "description", "function_type", "method", "url", "timeout_ms", "headers", "query_params", "parameters"],
+            ["id", "name", "description", "function_type", "method", "url", "timeout_ms", "headers", "query_params", "parameters"],
+            "custom_function_ids",
+            "api_",
+            observedAtUtc);
+
+        Assert.IsEmpty(BuildGhostToughTongueCartesiaScenarioSchemaContract.Validate(cartesia));
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateLibrarySchema(customFunctions));
+    }
+
+    [TestMethod]
     public void Current_premium_live_avatar_schema_pins_anam_heygen_landmass_costs_and_runtime_fields()
     {
         BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt receipt = CurrentReceipt();

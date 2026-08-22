@@ -272,11 +272,11 @@ public static class BuildGhostCascadePrivateVoiceBindingContract
 public static class BuildGhostToughTongueCartesiaScenarioSchemaContract
 {
     public const string MissingOrUnverifiedBlocker = "cartesia-scenario-bundle-schema-receipt-missing-or-invalid";
-    public const string VerifiedDeploymentId = "dpl_DKFDJRMr7tN6xHLYuhLbBaEVDZi8";
-    public const string VerifiedScenarioReadBundleUrl = "https://app.toughtongueai.com/_next/static/chunks/10w5gkzd~f23z.js?dpl=dpl_DKFDJRMr7tN6xHLYuhLbBaEVDZi8";
-    public const string VerifiedScenarioReadBundleDigest = "sha256:8a3427924a4eae6f5c7d97c10124178272db17d7c6b6b6189c0bdec78e0dfd14";
+    public const string VerifiedDeploymentId = "dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
+    public const string VerifiedScenarioReadBundleUrl = "https://app.toughtongueai.com/_next/static/chunks/0m4xondr3o4oe.js?dpl=dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
+    public const string VerifiedScenarioReadBundleDigest = "sha256:7ba4d63277d18d2ff8c2ffd3128576a1ad15e4670e4f4c9921b6846de6ba71d7";
     public const long VerifiedScenarioReadBundleBytes = 219_531;
-    public const string VerifiedScenarioCreateBundleUrl = "https://app.toughtongueai.com/_next/static/chunks/04i2xipv9rrh-.js?dpl=dpl_DKFDJRMr7tN6xHLYuhLbBaEVDZi8";
+    public const string VerifiedScenarioCreateBundleUrl = "https://app.toughtongueai.com/_next/static/chunks/04i2xipv9rrh-.js?dpl=dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
     public const string VerifiedScenarioCreateBundleDigest = "sha256:01c2f887b5970283734c086bdbf1c3ec1e6af8f6e07a62e229c0f8cd96f5c1eb";
     public const long VerifiedScenarioCreateBundleBytes = 166_081;
     public const string CreateTtsProviderFieldPath = "tts_provider";
@@ -563,18 +563,18 @@ public static class BuildGhostToughTonguePremiumLiveAvatarSchemaContract
 public static class BuildGhostToughTongueCustomFunctionContract
 {
     public const string ProviderNamespace = "tough-tongue";
-    public const string VerifiedDeploymentId = "dpl_DKFDJRMr7tN6xHLYuhLbBaEVDZi8";
-    public const string ServiceChunkName = "11.vljf9wpdc_.js";
-    public const string ServiceChunkDigest = "sha256:6762f11c1970fa1c313d893176fb77eee6fddc4060d49413842ccc46ce88f145";
-    public const long ServiceChunkBytes = 43_371;
-    public const string StudioChunkName = "022lmhmvlj3gq.js";
-    public const string StudioChunkDigest = "sha256:c1d1c9633f2645346b73165f9603b3491e266e568b2df3cc775014fc7b2c60a0";
-    public const long StudioChunkBytes = 475_108;
-    public const string ScenarioServiceChunkName = "0s5z52s8kf9d4.js";
-    public const string ScenarioServiceChunkDigest = "sha256:4cd1339b7470d41c60ece066b7c8555f6392395412bff102949bd8e0ab824a51";
-    public const long ScenarioServiceChunkBytes = 112_602;
-    public const string RuntimeChunkName = "10w5gkzd~f23z.js";
-    public const string RuntimeChunkDigest = "sha256:8a3427924a4eae6f5c7d97c10124178272db17d7c6b6b6189c0bdec78e0dfd14";
+    public const string VerifiedDeploymentId = "dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i";
+    public const string ServiceChunkName = "08a43for7u2by.js";
+    public const string ServiceChunkDigest = "sha256:c82bf0103f53edbc5933f9b6b4aa8716ba05119412b8cff447c1338a22ffa1cc";
+    public const long ServiceChunkBytes = 43_729;
+    public const string StudioChunkName = "0dic_u.sbe1xm.js";
+    public const string StudioChunkDigest = "sha256:7e22f357c2ebe5e9f6988f6fa4cfec1c332ebf3c0f573e5dc31feaeefcf5c7e7";
+    public const long StudioChunkBytes = 499_677;
+    public const string ScenarioServiceChunkName = "06i87mpuoc~sp.js";
+    public const string ScenarioServiceChunkDigest = "sha256:361eee45d31a83d6a5cbf1883184a92a4c873c4afaa5f0045fc5fe2dbb08bfe6";
+    public const long ScenarioServiceChunkBytes = 53_767;
+    public const string RuntimeChunkName = "0m4xondr3o4oe.js";
+    public const string RuntimeChunkDigest = "sha256:7ba4d63277d18d2ff8c2ffd3128576a1ad15e4670e4f4c9921b6846de6ba71d7";
     public const long RuntimeChunkBytes = 219_531;
     public const string ApiBaseUrl = "https://api.toughtongueai.com/api/";
     public const string ListPath = "custom-functions/";
