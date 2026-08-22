@@ -8,6 +8,7 @@ namespace Chummer.Run.AI.Security;
 public sealed class AiMutationAuthorizationMiddleware
 {
     public const string BuildGhostPrivateToolPath = "/api/v1/ai/build-ghost/tool";
+    public const string BuildGhostPrivateProviderToolPath = "/api/v2/ai/build-ghost/tool";
     public const string PrimaryTokenConfigurationKey = "CHUMMER_AI_INTERNAL_API_TOKEN";
     public const string FallbackTokenConfigurationKey = "FLEET_INTERNAL_API_TOKEN";
     internal static readonly object AuthorizationMarker = new();
@@ -21,6 +22,10 @@ public sealed class AiMutationAuthorizationMiddleware
 
     public async Task InvokeAsync(HttpContext context, IConfiguration configuration)
     {
+        if (IsPrivateToolRequest(context.Request))
+        {
+            context.Response.Headers.CacheControl = "no-store";
+        }
         if (IsAnonymousRequest(context.Request))
         {
             await _next(context);
@@ -63,11 +68,11 @@ public sealed class AiMutationAuthorizationMiddleware
             return true;
         }
 
-        // This exact route owns a separate, short-lived bearer boundary that is
-        // digest-bound to the request body. All other mutations stay behind the
-        // service-wide internal bearer enforced by this middleware.
-        if (HttpMethods.IsPost(request.Method)
-            && string.Equals(request.Path.Value, BuildGhostPrivateToolPath, StringComparison.Ordinal))
+        // These exact routes own separate short-lived packet-key boundaries:
+        // v1 duplicates the key as bearer, while provider v2 accepts it only in
+        // the digest-bound body. All other mutations stay behind this service's
+        // internal bearer.
+        if (IsPrivateToolRequest(request))
         {
             return true;
         }
@@ -81,6 +86,11 @@ public sealed class AiMutationAuthorizationMiddleware
         return string.Equals(path, AiPublicEndpoints.HealthPath, StringComparison.OrdinalIgnoreCase)
                || string.Equals(path, AiPublicEndpoints.CapabilitiesPath, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsPrivateToolRequest(HttpRequest request)
+        => HttpMethods.IsPost(request.Method)
+            && (string.Equals(request.Path.Value, BuildGhostPrivateToolPath, StringComparison.Ordinal)
+                || string.Equals(request.Path.Value, BuildGhostPrivateProviderToolPath, StringComparison.Ordinal));
 
     private static string NormalizePath(string? path)
     {

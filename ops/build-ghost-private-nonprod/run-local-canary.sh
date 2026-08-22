@@ -4,7 +4,8 @@ set -euo pipefail
 # Local proof only: this runner never contacts public DNS or a voice provider.
 project_name="chummer-build-ghost-private-nonprod"
 loopback_port="${CHUMMER_BUILD_GHOST_PRIVATE_HTTPS_PORT:-8443}"
-contract_digest="sha256:473a30bae8bfdff67ca6bd925e51a499c953b2def8000917f2f2b017ba01f14b"
+legacy_contract_digest="sha256:473a30bae8bfdff67ca6bd925e51a499c953b2def8000917f2f2b017ba01f14b"
+provider_contract_digest="sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104"
 owner_name="synthetic-build-ghost-canary"
 cross_owner_name="synthetic-build-ghost-cross-owner"
 canary_tmp="$(mktemp -d)"
@@ -79,7 +80,7 @@ drain_grant() {
             --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
             --header "@$canary_tmp/tool-request-headers.txt" \
             --data-binary "@$canary_tmp/tool-request.json" \
-            "https://canary.chummer.run:${loopback_port}/api/v1/ai/build-ghost/tool" \
+            "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool" \
             >/dev/null 2>&1 || true
         if [ -n "$grant_pending_path" ] \
             && ! docker exec "$presentation_id" test -f "$grant_pending_path"; then
@@ -118,12 +119,35 @@ jq '. + {unexpected_private_field:"blocked"}' "$canary_tmp/fabricated-request.js
 {
     printf 'Content-Type: application/json\n'
     printf 'Authorization: Bearer %s\n' "$fabricated_key"
-    printf 'X-Chummer-Build-Ghost-Tool-Contract: %s\n' "$contract_digest"
+    printf 'X-Chummer-Build-Ghost-Tool-Contract: %s\n' "$legacy_contract_digest"
 } > "$canary_tmp/fabricated-request-headers.txt"
-sed "s/$contract_digest/sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/" \
+sed "s/$legacy_contract_digest/sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/" \
     "$canary_tmp/fabricated-request-headers.txt" > "$canary_tmp/wrong-contract-headers.txt"
 chmod 0600 "$canary_tmp/fabricated-request.json" "$canary_tmp/unknown-field-request.json" \
     "$canary_tmp/fabricated-request-headers.txt" "$canary_tmp/wrong-contract-headers.txt"
+
+provider_fabricated_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+provider_noncanonical_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB"
+jq -n \
+    --arg schema "chummer.build_ghost.private_tool_request.v2" \
+    --arg key "$provider_fabricated_key" \
+    --arg digest "$fabricated_digest" \
+    '{schema:$schema,packet_access_key:$key,packet_digest:$digest,locale:"en-US",request_kind:"current-build"}' \
+    > "$canary_tmp/provider-fabricated-request.json"
+jq --arg key "$provider_noncanonical_key" '.packet_access_key = $key' \
+    "$canary_tmp/provider-fabricated-request.json" > "$canary_tmp/provider-noncanonical-request.json"
+jq '. + {unexpected_private_field:"blocked"}' "$canary_tmp/provider-fabricated-request.json" \
+    > "$canary_tmp/provider-unknown-field-request.json"
+{
+    printf 'Content-Type: application/json\n'
+    printf 'Cache-Control: no-store\n'
+    printf 'X-Chummer-Build-Ghost-Tool-Contract: %s\n' "$provider_contract_digest"
+} > "$canary_tmp/provider-request-headers.txt"
+sed "s/$provider_contract_digest/sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/" \
+    "$canary_tmp/provider-request-headers.txt" > "$canary_tmp/provider-wrong-contract-headers.txt"
+chmod 0600 "$canary_tmp/provider-fabricated-request.json" "$canary_tmp/provider-noncanonical-request.json" \
+    "$canary_tmp/provider-unknown-field-request.json" "$canary_tmp/provider-request-headers.txt" \
+    "$canary_tmp/provider-wrong-contract-headers.txt"
 
 unknown_key_status="$(curl --silent --show-error \
     --output "$canary_tmp/unknown-key-response.json" \
@@ -149,6 +173,47 @@ unknown_field_status="$(curl --silent --show-error \
     --header "@$canary_tmp/fabricated-request-headers.txt" \
     --data-binary "@$canary_tmp/unknown-field-request.json" \
     "https://canary.chummer.run:${loopback_port}/api/v1/ai/build-ghost/tool")"
+provider_unknown_key_status="$(curl --silent --show-error \
+    --output "$canary_tmp/provider-unknown-key-response.json" \
+    --write-out '%{http_code}' \
+    --cacert "$canary_tmp/root.crt" \
+    --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
+    --header "@$canary_tmp/provider-request-headers.txt" \
+    --data-binary "@$canary_tmp/provider-fabricated-request.json" \
+    "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool")"
+provider_wrong_contract_status="$(curl --silent --show-error \
+    --output "$canary_tmp/provider-wrong-contract-response.json" \
+    --write-out '%{http_code}' \
+    --cacert "$canary_tmp/root.crt" \
+    --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
+    --header "@$canary_tmp/provider-wrong-contract-headers.txt" \
+    --data-binary "@$canary_tmp/provider-fabricated-request.json" \
+    "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool")"
+provider_ambiguous_auth_status="$(curl --silent --show-error \
+    --output "$canary_tmp/provider-ambiguous-auth-response.json" \
+    --write-out '%{http_code}' \
+    --cacert "$canary_tmp/root.crt" \
+    --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
+    --header "@$canary_tmp/provider-request-headers.txt" \
+    --header "Authorization: Bearer $provider_fabricated_key" \
+    --data-binary "@$canary_tmp/provider-fabricated-request.json" \
+    "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool")"
+provider_unknown_field_status="$(curl --silent --show-error \
+    --output "$canary_tmp/provider-unknown-field-response.json" \
+    --write-out '%{http_code}' \
+    --cacert "$canary_tmp/root.crt" \
+    --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
+    --header "@$canary_tmp/provider-request-headers.txt" \
+    --data-binary "@$canary_tmp/provider-unknown-field-request.json" \
+    "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool")"
+provider_noncanonical_key_status="$(curl --silent --show-error \
+    --output "$canary_tmp/provider-noncanonical-key-response.json" \
+    --write-out '%{http_code}' \
+    --cacert "$canary_tmp/root.crt" \
+    --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
+    --header "@$canary_tmp/provider-request-headers.txt" \
+    --data-binary "@$canary_tmp/provider-noncanonical-request.json" \
+    "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool")"
 neighbor_status="$(curl --silent --show-error \
     --output "$canary_tmp/neighbor-response.json" \
     --write-out '%{http_code}' \
@@ -167,10 +232,17 @@ presentation_neighbor_status="$(curl --silent --show-error \
 if [ "$unknown_key_status" != "410" ] \
     || [ "$wrong_contract_status" != "401" ] \
     || [ "$unknown_field_status" != "400" ] \
+    || [ "$provider_unknown_key_status" != "410" ] \
+    || [ "$provider_wrong_contract_status" != "401" ] \
+    || [ "$provider_ambiguous_auth_status" != "401" ] \
+    || [ "$provider_unknown_field_status" != "400" ] \
+    || [ "$provider_noncanonical_key_status" != "400" ] \
     || [ "$neighbor_status" != "404" ] \
     || [ "$presentation_neighbor_status" != "404" ]; then
-    printf 'positive_canary=failed stage=negative-boundaries unknown_key=%s wrong_contract=%s unknown_field=%s neighbor=%s presentation_neighbor=%s\n' \
-        "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" "$neighbor_status" \
+    printf 'positive_canary=failed stage=negative-boundaries legacy_unknown_key=%s legacy_wrong_contract=%s legacy_unknown_field=%s provider_unknown_key=%s provider_wrong_contract=%s provider_ambiguous_auth=%s provider_unknown_field=%s provider_noncanonical_key=%s neighbor=%s presentation_neighbor=%s\n' \
+        "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" \
+        "$provider_unknown_key_status" "$provider_wrong_contract_status" "$provider_ambiguous_auth_status" \
+        "$provider_unknown_field_status" "$provider_noncanonical_key_status" "$neighbor_status" \
         "$presentation_neighbor_status"
     exit 1
 fi
@@ -241,15 +313,15 @@ jq -er '.packetAccessKey | select(type == "string" and length >= 32)' "$canary_t
 jq -er '.packetDigest | select(test("^sha256:[0-9a-fA-F]{64}$"))' "$canary_tmp/grant-response.json" \
     > "$canary_tmp/packet-digest.txt"
 jq -n \
+    --arg schema "chummer.build_ghost.private_tool_request.v2" \
     --rawfile key "$canary_tmp/packet-key.txt" \
     --rawfile digest "$canary_tmp/packet-digest.txt" \
-    '{packet_access_key:($key|rtrimstr("\n")),packet_digest:($digest|rtrimstr("\n")),locale:"en-US",request_kind:"current-build",question:"Give one grounded, advisory build observation."}' \
+    '{schema:$schema,packet_access_key:($key|rtrimstr("\n")),packet_digest:($digest|rtrimstr("\n")),locale:"en-US",request_kind:"current-build",question:"Give one grounded, advisory build observation."}' \
     > "$canary_tmp/tool-request.json"
 {
     printf 'Content-Type: application/json\n'
-    printf 'Authorization: Bearer '
-    tr -d '\n' < "$canary_tmp/packet-key.txt"
-    printf '\nX-Chummer-Build-Ghost-Tool-Contract: %s\n' "$contract_digest"
+    printf 'Cache-Control: no-store\n'
+    printf 'X-Chummer-Build-Ghost-Tool-Contract: %s\n' "$provider_contract_digest"
 } > "$canary_tmp/tool-request-headers.txt"
 chmod 0600 "$canary_tmp/packet-key.txt" "$canary_tmp/packet-digest.txt" \
     "$canary_tmp/tool-request.json" "$canary_tmp/tool-request-headers.txt"
@@ -272,7 +344,7 @@ tool_status="$(curl --silent --show-error \
     --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
     --header "@$canary_tmp/tool-request-headers.txt" \
     --data-binary "@$canary_tmp/tool-request.json" \
-    "https://canary.chummer.run:${loopback_port}/api/v1/ai/build-ghost/tool")"
+    "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool")"
 if ! docker exec "$presentation_id" test -f "$grant_pending_path"; then
     grant_outstanding="false"
 fi
@@ -311,7 +383,7 @@ replay_status="$(curl --silent --show-error \
     --resolve "canary.chummer.run:${loopback_port}:127.0.0.1" \
     --header "@$canary_tmp/tool-request-headers.txt" \
     --data-binary "@$canary_tmp/tool-request.json" \
-    "https://canary.chummer.run:${loopback_port}/api/v1/ai/build-ghost/tool")"
+    "https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool")"
 if [ "$replay_status" != "410" ]; then
     printf 'positive_canary=failed stage=replay status=%s\n' "$replay_status"
     exit 1
@@ -355,8 +427,10 @@ if [ "$closed_status" != "404" ]; then
     exit 1
 fi
 
-printf 'positive_canary=passed unknown_key=%s wrong_contract=%s unknown_field=%s neighbor=%s presentation_neighbor=%s import=%s cross_owner=%s grant=%s grant_cache=%s tool=%s replay=%s schema=%s locale=%s characters=%s cache=%s ttl_seconds=%s pending_grants=%s gates=false cleanup=%s\n' \
-    "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" "$neighbor_status" \
+printf 'positive_canary=passed legacy_unknown_key=%s legacy_wrong_contract=%s legacy_unknown_field=%s provider_unknown_key=%s provider_wrong_contract=%s provider_ambiguous_auth=%s provider_unknown_field=%s provider_noncanonical_key=%s neighbor=%s presentation_neighbor=%s import=%s cross_owner=%s grant=%s grant_cache=%s tool=%s replay=%s auth=packet-access-key-body-v2 schema=%s locale=%s characters=%s cache=%s ttl_seconds=%s pending_grants=%s gates=false cleanup=%s\n' \
+    "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" \
+    "$provider_unknown_key_status" "$provider_wrong_contract_status" "$provider_ambiguous_auth_status" \
+    "$provider_unknown_field_status" "$provider_noncanonical_key_status" "$neighbor_status" \
     "$presentation_neighbor_status" \
     "$import_status" "$cross_owner_status" "$grant_status" "$grant_cache_control" \
     "$tool_status" "$replay_status" \

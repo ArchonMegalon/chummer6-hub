@@ -453,11 +453,52 @@ public sealed class ToughTongueBuildGhostAdapterTests
         {
             [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = package.Tool.Endpoint.AbsoluteUri,
             [BuildGhostPrivateToolDeploymentContract.AudienceConfigurationKey] = package.AuthenticationAudience,
+            [BuildGhostPrivateToolDeploymentContract.TransportModeConfigurationKey] = BuildGhostPrivateToolDeploymentContract.LegacyBearerV1TransportMode,
             [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "true"
         }).Build();
         BuildGhostPrivateToolDeploymentValidation blocked = BuildGhostPrivateToolDeploymentContract.FromConfiguration(enabled);
         Assert.IsFalse(blocked.Accepted);
         CollectionAssert.Contains(blocked.RejectionReasons.ToArray(), "remote-execution-must-remain-disabled");
+    }
+
+    [TestMethod]
+    public void Provider_body_key_v2_deployment_is_explicit_provider_scoped_and_fails_closed_on_mode_drift()
+    {
+        BuildGhostPrivateToolDeploymentPackage package = ProviderToolDeployment();
+
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.PrivateToolDeploymentV2, package.Schema);
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.PrivateToolContractV2, package.Tool.Schema);
+        Assert.AreEqual(BuildGhostPrivateToolDeploymentContract.ProviderBodyKeyAuthenticationScheme, package.AuthenticationScheme);
+        Assert.IsFalse(package.ProviderNeutral);
+        Assert.IsFalse(package.RemoteExecutionEnabled);
+        Assert.AreEqual("https://canary.chummer.run/api/v2/ai/build-ghost/tool", package.Tool.Endpoint.AbsoluteUri);
+        Assert.AreEqual("sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104", package.Tool.ContractDigest);
+        Assert.AreEqual("sha256:50707c6ba39796bad7bb1d924dfc1ab2d626b48232561c5ec98a0e72a22827a5", package.ContractDigest);
+        CollectionAssert.AreEqual(
+            new[] { "Cache-Control", "X-Chummer-Build-Ghost-Tool-Contract" },
+            package.Tool.RequiredHeaderNames.ToArray());
+        Assert.IsFalse(package.Tool.RequiredHeaderNames.Contains("Authorization", StringComparer.Ordinal));
+        Assert.IsEmpty(BuildGhostPrivateToolDeploymentContract.ValidateProviderBodyCredentialDeployment(package));
+        StringAssert.StartsWith(BuildGhostPrivateToolDeploymentContract.BodyCredentialEvidenceDigest(package), "sha256:");
+
+        IConfiguration missingMode = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = package.Tool.Endpoint.AbsoluteUri,
+            [BuildGhostPrivateToolDeploymentContract.AudienceConfigurationKey] = package.AuthenticationAudience,
+            [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "false"
+        }).Build();
+        CollectionAssert.Contains(
+            BuildGhostPrivateToolDeploymentContract.FromConfiguration(missingMode).RejectionReasons.ToArray(),
+            "private-tool-transport-mode-missing-or-invalid");
+
+        IConfiguration crossedMode = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = "https://canary.chummer.run/api/v1/ai/build-ghost/tool",
+            [BuildGhostPrivateToolDeploymentContract.AudienceConfigurationKey] = package.AuthenticationAudience,
+            [BuildGhostPrivateToolDeploymentContract.TransportModeConfigurationKey] = BuildGhostPrivateToolDeploymentContract.ProviderBodyKeyV2TransportMode,
+            [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "false"
+        }).Build();
+        Assert.IsFalse(BuildGhostPrivateToolDeploymentContract.FromConfiguration(crossedMode).Accepted);
     }
 
     [TestMethod]
@@ -1067,6 +1108,86 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public void Provider_v2_custom_function_uses_only_body_credential_and_rejects_dynamic_header_ambiguity()
+    {
+        BuildGhostPrivateToolDeploymentPackage deployment = ProviderToolDeployment();
+        BuildGhostToughTongueCustomFunctionDefinition definition =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                deployment,
+                CustomFunctionLibrarySchemaReceipt(),
+                CustomFunctionLibraryReadReceipt(schemaObserved: false),
+                CustomFunctionAccountRef);
+
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.CustomFunctionDefinitionV2, definition.Schema);
+        Assert.AreEqual(BuildGhostToughTongueCustomFunctionContract.BodyCredentialAuthenticationMode, definition.AuthenticationMode);
+        Assert.IsTrue(definition.AuthenticationVerified);
+        Assert.IsFalse(definition.DynamicAuthorizationVerified);
+        Assert.AreEqual(string.Empty, definition.DynamicAuthorizationReceiptDigest);
+        Assert.AreEqual(
+            BuildGhostPrivateToolDeploymentContract.BodyCredentialEvidenceDigest(deployment),
+            definition.AuthenticationEvidenceDigest);
+        Assert.IsEmpty(definition.BlockingReasons);
+
+        JsonObject payload = BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(definition);
+        JsonObject headers = payload["headers"]!.AsObject();
+        Assert.AreEqual(2, headers.Count);
+        Assert.IsFalse(headers.ContainsKey("Authorization"));
+        Assert.AreEqual("no-store", headers["Cache-Control"]!.GetValue<string>());
+        Assert.AreEqual(deployment.Tool.ContractDigest, headers["X-Chummer-Build-Ghost-Tool-Contract"]!.GetValue<string>());
+        Assert.AreEqual(deployment.Tool.Endpoint.AbsoluteUri, payload["url"]!.GetValue<string>());
+        Assert.AreEqual(
+            ToughTongueBuildGhostContractVersions.PrivateToolRequestV2,
+            payload["parameters"]!["properties"]!["schema"]!["enum"]![0]!.GetValue<string>());
+
+        BuildGhostToughTongueCustomFunctionDefinition ambiguous =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                deployment,
+                CustomFunctionLibrarySchemaReceipt(),
+                CustomFunctionLibraryReadReceipt(schemaObserved: false),
+                CustomFunctionAccountRef,
+                DynamicAuthorizationReceipt(),
+                DynamicAuthorizationReceiptDigest());
+        Assert.IsFalse(ambiguous.AuthenticationVerified);
+        CollectionAssert.Contains(
+            ambiguous.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.BodyCredentialDynamicHeaderBlocker);
+        Assert.ThrowsExactly<InvalidDataException>(() =>
+            BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(ambiguous));
+
+        JsonObject stored = (JsonObject)definition.Payload.DeepClone();
+        stored["id"] = CustomFunctionId;
+        BuildGhostToughTongueCustomFunctionBinding binding =
+            BuildGhostToughTongueCustomFunctionContract.CreateBinding(
+                definition,
+                CustomFunctionId,
+                200,
+                stored,
+                $"sha256:{new string('b', 64)}",
+                DateTimeOffset.Parse("2026-08-22T04:00:00Z"));
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateBinding(binding, deployment));
+        Assert.IsFalse(JsonSerializer.Serialize(binding).Contains(CustomFunctionId, StringComparison.Ordinal));
+
+        ToughTongueBuildGhostScenarioCandidate candidate =
+            ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                deployment,
+                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                RuntimeBinding(),
+                ScenarioSchemaReceipt(),
+                binding);
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.ScenarioContractV2, candidate.Schema);
+        Assert.IsEmpty(candidate.BlockingReasons);
+        Assert.AreEqual(
+            deployment.Tool.Endpoint.AbsoluteUri,
+            candidate.Payload["user_metadata"]!["tool_endpoint"]!.GetValue<string>());
+        Assert.AreEqual(
+            deployment.Tool.ContractDigest,
+            candidate.Payload["user_metadata"]!["tool_contract_digest"]!.GetValue<string>());
+        Assert.AreEqual(
+            deployment.ContractDigest,
+            candidate.Payload["user_metadata"]!["tool_deployment_digest"]!.GetValue<string>());
+    }
+
+    [TestMethod]
     public void Custom_function_binding_requires_exact_stored_readback_and_serializes_only_digests()
     {
         BuildGhostToughTongueCustomFunctionDefinition definition = CustomFunctionDefinition();
@@ -1347,6 +1468,11 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private static BuildGhostPrivateToolDeploymentPackage ToolDeployment()
         => BuildGhostPrivateToolDeploymentContract.Create(
             new Uri("https://canary.chummer.run/api/v1/ai/build-ghost/tool"),
+            "build-ghost-private-tool");
+
+    private static BuildGhostPrivateToolDeploymentPackage ProviderToolDeployment()
+        => BuildGhostPrivateToolDeploymentContract.CreateProviderBodyKeyV2(
+            new Uri("https://canary.chummer.run/api/v2/ai/build-ghost/tool"),
             "build-ghost-private-tool");
 
     private static BuildGhostCascadePrivateVoiceBinding RuntimeBinding()

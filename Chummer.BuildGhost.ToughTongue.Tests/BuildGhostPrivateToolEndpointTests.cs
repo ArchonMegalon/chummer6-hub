@@ -1,4 +1,5 @@
 using Chummer.Run.AI.Controllers;
+using Chummer.Run.AI.Security;
 using Chummer.Run.AI.Services.BuildGhost;
 using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.AspNetCore.Http;
@@ -17,6 +18,7 @@ namespace Chummer.BuildGhost.ToughTongue.Tests;
 public sealed class BuildGhostPrivateToolEndpointTests
 {
     private const string PacketKey = "opaque-packet-access-key-1234567890";
+    private const string ProviderPacketKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     private const string PacketDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string ServiceToken = "internal-service-token-1234567890abcdef";
 
@@ -28,7 +30,7 @@ public sealed class BuildGhostPrivateToolEndpointTests
         BuildGhostPrivateToolRequest request = Request();
 
         controller.HttpContext.Request.Headers.Authorization = "Bearer wrong-packet-key-123456789012345";
-        controller.HttpContext.Request.Headers["X-Chummer-Build-Ghost-Tool-Contract"] = ContractDigest();
+        controller.HttpContext.Request.Headers["X-Chummer-Build-Ghost-Tool-Contract"] = LegacyContractDigest();
         IActionResult wrongBearer = await controller.Tool(request, CancellationToken.None);
         Assert.IsInstanceOfType<UnauthorizedResult>(wrongBearer);
 
@@ -54,6 +56,122 @@ public sealed class BuildGhostPrivateToolEndpointTests
         Assert.AreEqual(PacketDigest, controller.HttpContext.Response.Headers["X-Chummer-Build-Ghost-Packet-Digest"].ToString());
         Assert.AreEqual("no-store", controller.HttpContext.Response.Headers.CacheControl.ToString());
         Assert.AreEqual(1, authority.Calls);
+        Assert.AreEqual(ContractDigest(), authority.LastContractDigest);
+    }
+
+    [TestMethod]
+    public async Task Provider_v2_uses_the_canonical_body_key_as_the_only_external_credential()
+    {
+        RecordingAuthority authority = new(PacketJson());
+        BuildGhostController controller = Controller(authority);
+        AuthorizeProviderV2(controller);
+
+        IActionResult result = await controller.ProviderToolV2(ProviderRequest(), CancellationToken.None);
+
+        ContentResult content = Assert.IsInstanceOfType<ContentResult>(result);
+        Assert.AreEqual(PacketJson(), content.Content);
+        Assert.IsFalse(controller.HttpContext.Request.Headers.ContainsKey("Authorization"));
+        Assert.IsFalse(controller.HttpContext.Request.Headers.ContainsKey("Cookie"));
+        Assert.AreEqual("no-store", controller.HttpContext.Response.Headers.CacheControl.ToString());
+        Assert.AreEqual(1, authority.Calls);
+        Assert.AreEqual(ContractDigest(), authority.LastContractDigest);
+    }
+
+    [TestMethod]
+    public async Task Provider_v2_rejects_header_body_ambiguity_query_cookie_and_v1_fallback()
+    {
+        static async Task AssertRejected(Action<HttpRequest> mutate)
+        {
+            RecordingAuthority authority = new(PacketJson());
+            BuildGhostController controller = Controller(authority);
+            AuthorizeProviderV2(controller);
+            mutate(controller.HttpContext.Request);
+
+            IActionResult result = await controller.ProviderToolV2(ProviderRequest(), CancellationToken.None);
+
+            Assert.IsInstanceOfType<UnauthorizedResult>(result);
+            Assert.AreEqual(0, authority.Calls);
+            Assert.AreEqual("no-store", controller.HttpContext.Response.Headers.CacheControl.ToString());
+        }
+
+        await AssertRejected(request => request.Headers.Authorization = $"Bearer {ProviderPacketKey}");
+        await AssertRejected(request => request.Headers.Authorization = new[] { "Bearer first", "Bearer second" });
+        await AssertRejected(request => request.Headers.Cookie = $"packet_access_key={ProviderPacketKey}");
+        await AssertRejected(request => request.QueryString = new QueryString($"?packet_access_key={ProviderPacketKey}"));
+        await AssertRejected(request => request.Headers.CacheControl = string.Empty);
+        await AssertRejected(request =>
+        {
+            request.Headers.Authorization = $"Bearer {ProviderPacketKey}";
+            request.Headers["X-Chummer-Build-Ghost-Tool-Contract"] = LegacyContractDigest();
+        });
+    }
+
+    [TestMethod]
+    public void Provider_v2_requires_exact_schema_and_canonical_32_byte_base64url_key()
+    {
+        Assert.IsEmpty(BuildGhostPrivateToolAuthorityClient.ValidateProviderRequest(ProviderRequest()));
+        BuildGhostPrivateToolProviderRequest[] invalid =
+        [
+            ProviderRequest() with { Schema = ToughTongueBuildGhostContractVersions.PrivateToolContractV2 },
+            ProviderRequest() with { PacketAccessKey = string.Empty },
+            ProviderRequest() with { PacketAccessKey = new string('A', 42) },
+            ProviderRequest() with { PacketAccessKey = new string('A', 44) },
+            ProviderRequest() with { PacketAccessKey = $"{new string('A', 42)}+" },
+            ProviderRequest() with { PacketAccessKey = $"{new string('A', 42)}B" }
+        ];
+        Assert.IsTrue(invalid.All(static request =>
+            BuildGhostPrivateToolAuthorityClient.ValidateProviderRequest(request).Count != 0));
+
+        string unknownField = $$"""
+            {"schema":"{{ToughTongueBuildGhostContractVersions.PrivateToolRequestV2}}","packet_access_key":"{{ProviderPacketKey}}","packet_digest":"{{PacketDigest}}","locale":"en-US","request_kind":"current-build","question":null,"authorization":"blocked"}
+            """;
+        Assert.ThrowsExactly<JsonException>(() =>
+            JsonSerializer.Deserialize<BuildGhostPrivateToolProviderRequest>(unknownField));
+    }
+
+    [TestMethod]
+    public async Task Provider_v2_invalid_input_returns_only_fixed_reasons_and_never_the_key()
+    {
+        RecordingAuthority authority = new(PacketJson());
+        BuildGhostController controller = Controller(authority);
+        AuthorizeProviderV2(controller);
+        const string malformedSecret = "malformed-secret-must-never-be-rendered";
+
+        IActionResult result = await controller.ProviderToolV2(
+            ProviderRequest() with { PacketAccessKey = malformedSecret },
+            CancellationToken.None);
+
+        BadRequestObjectResult badRequest = Assert.IsInstanceOfType<BadRequestObjectResult>(result);
+        string rendered = JsonSerializer.Serialize(badRequest.Value);
+        Assert.IsFalse(rendered.Contains(malformedSecret, StringComparison.Ordinal));
+        Assert.AreEqual(0, authority.Calls);
+    }
+
+    [TestMethod]
+    public async Task Mutation_middleware_marks_both_exact_tool_routes_no_store_without_opening_neighbors()
+    {
+        int calls = 0;
+        AiMutationAuthorizationMiddleware middleware = new(_ =>
+        {
+            calls++;
+            return Task.CompletedTask;
+        });
+        IConfiguration empty = new ConfigurationBuilder().Build();
+        DefaultHttpContext provider = new();
+        provider.Request.Method = HttpMethods.Post;
+        provider.Request.Path = AiMutationAuthorizationMiddleware.BuildGhostPrivateProviderToolPath;
+
+        await middleware.InvokeAsync(provider, empty);
+
+        Assert.AreEqual(1, calls);
+        Assert.AreEqual("no-store", provider.Response.Headers.CacheControl.ToString());
+
+        DefaultHttpContext neighbor = new();
+        neighbor.Request.Method = HttpMethods.Post;
+        neighbor.Request.Path = "/api/v2/ai/build-ghost/explain";
+        await middleware.InvokeAsync(neighbor, empty);
+        Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, neighbor.Response.StatusCode);
+        Assert.AreEqual(1, calls);
     }
 
     [TestMethod]
@@ -204,12 +322,52 @@ public sealed class BuildGhostPrivateToolEndpointTests
         BuildGhostPrivateToolResolutionException gone = await Assert.ThrowsExactlyAsync<BuildGhostPrivateToolResolutionException>(
             () => client.ResolveAsync(Request(), ContractDigest(), CancellationToken.None));
         Assert.AreEqual(StatusCodes.Status410Gone, gone.StatusCode);
+        Assert.AreEqual("private-tool-authority-rejected", gone.Reason);
 
         BuildGhostController controller = Controller(new ThrowingAuthority(gone));
         Authorize(controller);
         IActionResult result = await controller.Tool(Request(), CancellationToken.None);
         ObjectResult problem = Assert.IsInstanceOfType<ObjectResult>(result);
         Assert.AreEqual(StatusCodes.Status410Gone, problem.StatusCode);
+
+        BuildGhostController providerController = Controller(new ThrowingAuthority(gone));
+        AuthorizeProviderV2(providerController);
+        IActionResult providerReplay = await providerController.ProviderToolV2(
+            ProviderRequest(),
+            CancellationToken.None);
+        ObjectResult providerProblem = Assert.IsInstanceOfType<ObjectResult>(providerReplay);
+        Assert.AreEqual(StatusCodes.Status410Gone, providerProblem.StatusCode);
+        Assert.AreEqual("no-store", providerController.HttpContext.Response.Headers.CacheControl.ToString());
+    }
+
+    [TestMethod]
+    public async Task Authority_binding_conflict_stays_conflict_and_never_falls_back_to_legacy_resolution()
+    {
+        BuildGhostPrivateToolAuthorityClient client = Client(new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Conflict)));
+        BuildGhostPrivateToolResolutionException conflict =
+            await Assert.ThrowsExactlyAsync<BuildGhostPrivateToolResolutionException>(
+                () => client.ResolveAsync(
+                    new BuildGhostPrivateToolRequest(
+                        ProviderPacketKey,
+                        PacketDigest,
+                        "en-US",
+                        "current-build",
+                        null),
+                    ContractDigest(),
+                    CancellationToken.None));
+        Assert.AreEqual(StatusCodes.Status409Conflict, conflict.StatusCode);
+
+        RecordingAuthority authority = new(PacketJson());
+        BuildGhostController wrongContractController = Controller(authority);
+        AuthorizeProviderV2(wrongContractController);
+        wrongContractController.HttpContext.Request.Headers["X-Chummer-Build-Ghost-Tool-Contract"] =
+            LegacyContractDigest();
+        IActionResult noFallback = await wrongContractController.ProviderToolV2(
+            ProviderRequest(),
+            CancellationToken.None);
+        Assert.IsInstanceOfType<UnauthorizedResult>(noFallback);
+        Assert.AreEqual(0, authority.Calls);
     }
 
     private static BuildGhostController Controller(IBuildGhostPrivateToolAuthorityClient authority)
@@ -227,6 +385,12 @@ public sealed class BuildGhostPrivateToolEndpointTests
     private static void Authorize(BuildGhostController controller)
     {
         controller.HttpContext.Request.Headers.Authorization = $"Bearer {PacketKey}";
+        controller.HttpContext.Request.Headers["X-Chummer-Build-Ghost-Tool-Contract"] = LegacyContractDigest();
+    }
+
+    private static void AuthorizeProviderV2(BuildGhostController controller)
+    {
+        controller.HttpContext.Request.Headers.CacheControl = "no-store";
         controller.HttpContext.Request.Headers["X-Chummer-Build-Ghost-Tool-Contract"] = ContractDigest();
     }
 
@@ -236,8 +400,9 @@ public sealed class BuildGhostPrivateToolEndpointTests
     private static IConfiguration Configuration()
         => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = "https://canary.chummer.run/api/v1/ai/build-ghost/tool",
+            [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = "https://canary.chummer.run/api/v2/ai/build-ghost/tool",
             [BuildGhostPrivateToolDeploymentContract.AudienceConfigurationKey] = "build-ghost-private-tool",
+            [BuildGhostPrivateToolDeploymentContract.TransportModeConfigurationKey] = BuildGhostPrivateToolDeploymentContract.ProviderBodyKeyV2TransportMode,
             [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "false",
             [BuildGhostPrivateToolAuthorityClient.AuthorityEndpointConfigurationKey] = "https://canary.chummer.run/api/internal/build-ghost/tool/resolve",
             [BuildGhostPrivateToolAuthorityClient.ServiceTokenConfigurationKey] = ServiceToken
@@ -246,8 +411,22 @@ public sealed class BuildGhostPrivateToolEndpointTests
     private static string ContractDigest()
         => BuildGhostPrivateToolDeploymentContract.FromConfiguration(Configuration()).Package!.Tool.ContractDigest;
 
+    private static string LegacyContractDigest()
+        => BuildGhostPrivateToolDeploymentContract.Create(
+            new Uri("https://canary.chummer.run/api/v1/ai/build-ghost/tool"),
+            "build-ghost-private-tool").Tool.ContractDigest;
+
     private static BuildGhostPrivateToolRequest Request()
         => new(PacketKey, PacketDigest, "en-US", "current-build", "What should I improve?");
+
+    private static BuildGhostPrivateToolProviderRequest ProviderRequest()
+        => new(
+            ToughTongueBuildGhostContractVersions.PrivateToolRequestV2,
+            ProviderPacketKey,
+            PacketDigest,
+            "en-US",
+            "current-build",
+            "What should I improve?");
 
     private static string PacketJson(
         string schema = ToughTongueBuildGhostContractVersions.AnalysisV1,
@@ -269,11 +448,13 @@ public sealed class BuildGhostPrivateToolEndpointTests
     private sealed class RecordingAuthority(string response) : IBuildGhostPrivateToolAuthorityClient
     {
         public int Calls { get; private set; }
+        public string LastContractDigest { get; private set; } = string.Empty;
 
         public Task<string> ResolveAsync(BuildGhostPrivateToolRequest request, string toolContractDigest, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Calls++;
+            LastContractDigest = toolContractDigest;
             return Task.FromResult(response);
         }
     }

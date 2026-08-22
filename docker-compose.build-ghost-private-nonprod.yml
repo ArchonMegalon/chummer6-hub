@@ -21,7 +21,7 @@ services:
       CHUMMER_BUILD_GHOST_PRIVATE_TOOL_DEPLOYMENT_ENABLED: "true"
       CHUMMER_BUILD_GHOST_PACKET_ACCESS_STORE_ROOT: /app/state/build-ghost-packet-access
       CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN: ${CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN:?set an operator-local token of at least 32 bytes}
-      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST: sha256:473a30bae8bfdff67ca6bd925e51a499c953b2def8000917f2f2b017ba01f14b
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST: sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104
       CHUMMER_STATE_PATH: /app/state
     volumes:
       - build-ghost-packet-access:/app/state
@@ -60,8 +60,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_ENDPOINT: https://canary.chummer.run/api/v1/ai/build-ghost/tool
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_ENDPOINT: https://canary.chummer.run/api/v2/ai/build-ghost/tool
       CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTH_AUDIENCE: build-ghost-private-tool
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_TRANSPORT_MODE: provider-body-key-v2
       CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTHORITY_ENDPOINT: https://presentation.canary.chummer.run/api/internal/build-ghost/tool/resolve
       CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN: ${CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN:?set an operator-local token of at least 32 bytes}
       CHUMMER_AI_INTERNAL_API_TOKEN: ${CHUMMER_AI_INTERNAL_API_TOKEN:?set a distinct operator-local token of at least 32 bytes}

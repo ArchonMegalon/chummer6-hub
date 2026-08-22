@@ -15,6 +15,9 @@ def test_private_lane_is_loopback_only_and_remote_execution_is_fail_closed():
     assert '127.0.0.1:${CHUMMER_BUILD_GHOST_PRIVATE_HTTPS_PORT:-8443}:443' in COMPOSE
     assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"' in COMPOSE
     assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED: "false"' in COMPOSE
+    assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED: "false"' in COMPOSE
+    assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED: "false"' in COMPOSE
+    assert 'CHUMMER_BUILD_GHOST_PRIVATE_TOOL_TRANSPORT_MODE: provider-body-key-v2' in COMPOSE
     assert "network_mode: host" not in COMPOSE
     presentation = service_block("chummer-build-ghost-presentation", "chummer-build-ghost-ai")
     ai = service_block("chummer-build-ghost-ai", "build-ghost-private-edge")
@@ -41,6 +44,8 @@ def test_runtime_secret_is_required_but_never_defaulted_or_committed():
     assert COMPOSE.count(required) == 2
     assert "internal-service-token" not in COMPOSE
     assert "packet_access_key:" not in COMPOSE
+    assert "sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104" in COMPOSE
+    assert "sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104" in CANARY
 
 
 def test_packet_store_is_absolute_private_and_presentation_owned():
@@ -60,6 +65,7 @@ def test_ai_image_uses_explicit_core_and_registry_source_contexts():
 def test_internal_tls_routes_only_the_bounded_surfaces():
     assert "https://canary.chummer.run" in CADDY
     assert "method POST\n\t\tpath /api/v1/ai/build-ghost/tool" in CADDY
+    assert "method POST\n\t\tpath /api/v2/ai/build-ghost/tool" in CADDY
     assert "reverse_proxy chummer-build-ghost-ai:8080" in CADDY
     assert "method POST\n\t\tpath /api/workspaces/import" in CADDY
     assert "^/api/workspaces/[^/]+/build-ghost/tool-access$" in CADDY
@@ -68,7 +74,7 @@ def test_internal_tls_routes_only_the_bounded_surfaces():
     assert "https://presentation.canary.chummer.run" in CADDY
     assert "method POST\n\t\tpath /api/internal/build-ghost/tool/resolve" in CADDY
     assert "reverse_proxy chummer-build-ghost-presentation:8080" in CADDY
-    assert CADDY.count('header Cache-Control "no-store"') == 3
+    assert CADDY.count('header Cache-Control "no-store"') == 4
     assert CADDY.count("handle {\n\t\trespond 404\n\t}") == 2
     assert "/api/v1/ai/*" not in CADDY
     assert "handle /api/workspaces/*" not in CADDY
@@ -98,6 +104,11 @@ def test_local_canary_is_single_use_private_and_self_cleaning():
     assert 'unknown_key_status' in CANARY
     assert 'wrong_contract_status' in CANARY
     assert 'unknown_field_status' in CANARY
+    assert 'provider_unknown_key_status' in CANARY
+    assert 'provider_ambiguous_auth_status' in CANARY
+    assert 'provider_noncanonical_key_status' in CANARY
+    assert '"https://canary.chummer.run:${loopback_port}/api/v2/ai/build-ghost/tool"' in CANARY
+    assert 'auth=packet-access-key-body-v2' in CANARY
     assert 'neighbor_status' in CANARY
     assert 'presentation_neighbor_status' in CANARY
     assert '"$neighbor_status" != "404"' in CANARY

@@ -5,6 +5,14 @@
 
 https://canary.chummer.run {
 	tls internal
+	@private_provider_tool_v2 {
+		method POST
+		path /api/v2/ai/build-ghost/tool
+	}
+	handle @private_provider_tool_v2 {
+		header Cache-Control "no-store"
+		reverse_proxy chummer-build-ghost-ai:8080
+	}
 	@private_tool {
 		method POST
 		path /api/v1/ai/build-ghost/tool

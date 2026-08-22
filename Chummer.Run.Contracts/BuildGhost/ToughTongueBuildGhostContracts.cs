@@ -11,9 +11,14 @@ public static class ToughTongueBuildGhostContractVersions
     public const string ReceiptV1 = "chummer.tough_tongue.build_ghost_receipt.v1";
     public const string PersonaReleaseV1 = "chummer.build_ghost_persona_release.v1";
     public const string ScenarioContractV1 = "chummer.tough_tongue.build_ghost_scenario.v1";
+    public const string ScenarioContractV2 = "chummer.tough_tongue.build_ghost_scenario.v2";
     public const string ToolContractV1 = "chummer.tough_tongue.build_ghost_tool.v1";
     public const string PrivateToolContractV1 = "chummer.build_ghost.private_tool.v1";
+    public const string PrivateToolContractV2 = "chummer.build_ghost.private_tool.v2";
+    public const string PrivateToolRequestV2 = "chummer.build_ghost.private_tool_request.v2";
     public const string PrivateToolDeploymentV1 = "chummer.build_ghost.private_tool_deployment.v1";
+    public const string PrivateToolDeploymentV2 = "chummer.build_ghost.private_tool_deployment.v2";
+    public const string PrivateToolBodyCredentialEvidenceV1 = "chummer.build_ghost.private_tool_body_credential_evidence.v1";
     public const string CascadePrivateVoiceBindingV1 = "chummer.build_ghost.cascade_private_voice_binding.v1";
     public const string CartesiaPrivateVoiceReadReceiptV1 = "chummer.build_ghost.cartesia_private_voice_read_receipt.v1";
     public const string CartesiaScenarioSchemaReceiptV1 = "chummer.tough_tongue.cartesia_scenario_schema_receipt.v1";
@@ -24,7 +29,9 @@ public static class ToughTongueBuildGhostContractVersions
     public const string CustomFunctionLibraryReadReceiptV2 = "chummer.tough_tongue.custom_function_library_read_receipt.v2";
     public const string CustomFunctionDynamicAuthorizationReceiptV1 = "chummer.tough_tongue.custom_function_dynamic_authorization_receipt.v1";
     public const string CustomFunctionDefinitionV1 = "chummer.tough_tongue.custom_function_definition.v1";
+    public const string CustomFunctionDefinitionV2 = "chummer.tough_tongue.custom_function_definition.v2";
     public const string CustomFunctionBindingV1 = "chummer.tough_tongue.custom_function_binding.v1";
+    public const string CustomFunctionBindingV2 = "chummer.tough_tongue.custom_function_binding.v2";
     public const string CustomFunctionAttachmentReceiptV1 = "chummer.tough_tongue.custom_function_attachment_receipt.v1";
     public const string ScenarioCanaryReceiptV1 = "chummer.tough_tongue.build_ghost_canary_receipt.v1";
     public const string CartesiaVoiceDeletionReceiptV1 = "chummer.build_ghost.cartesia_voice_deletion_receipt.v1";
@@ -182,6 +189,15 @@ public sealed record BuildGhostPrivateToolRequest(
     [property: JsonPropertyName("question")] string? Question);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record BuildGhostPrivateToolProviderRequest(
+    [property: JsonPropertyName("schema")] string Schema,
+    [property: JsonPropertyName("packet_access_key")] string PacketAccessKey,
+    [property: JsonPropertyName("packet_digest")] string PacketDigest,
+    [property: JsonPropertyName("locale")] string Locale,
+    [property: JsonPropertyName("request_kind")] string RequestKind,
+    [property: JsonPropertyName("question")] string? Question);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record BuildGhostPrivateToolAuthorityRequest(
     [property: JsonPropertyName("packet_access_key")] string PacketAccessKey,
     [property: JsonPropertyName("packet_digest")] string PacketDigest,
@@ -326,6 +342,9 @@ public sealed record BuildGhostToughTongueCustomFunctionDefinition(
     bool LibrarySchemaVerified,
     bool AuthenticatedLibraryReadVerified,
     bool DynamicAuthorizationVerified,
+    string AuthenticationMode,
+    string AuthenticationEvidenceDigest,
+    bool AuthenticationVerified,
     IReadOnlyList<string> BlockingReasons,
     string ContractDigest);
 
@@ -339,6 +358,9 @@ public sealed record BuildGhostToughTongueCustomFunctionBinding(
     string LibrarySchemaReceiptDigest,
     string LibraryReadReceiptDigest,
     string DynamicAuthorizationReceiptDigest,
+    string AuthenticationMode,
+    string AuthenticationEvidenceDigest,
+    bool AuthenticationVerified,
     int StoredReadHttpStatus,
     bool StoredFieldsExactMatch,
     string StoredResponseDigest,

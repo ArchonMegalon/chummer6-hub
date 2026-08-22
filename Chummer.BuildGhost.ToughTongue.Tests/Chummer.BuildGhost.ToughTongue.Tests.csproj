@@ -15,6 +15,8 @@
     <Compile Include="../Chummer.Run.AI/Services/BuildGhost/BuildGhostPrivateToolAuthorityClient.cs" Link="BuildGhostPrivateToolAuthorityClient.cs" />
     <Compile Include="../Chummer.Run.AI/Services/BuildGhost/BuildGhostPersonaReleaseRegistry.cs" Link="BuildGhostPersonaReleaseRegistry.cs" />
     <Compile Include="../Chummer.Run.AI/Controllers/BuildGhostController.cs" Link="BuildGhostController.cs" />
+    <Compile Include="../Chummer.Run.AI/Security/AiMutationAuthorizationMiddleware.cs" Link="AiMutationAuthorizationMiddleware.cs" />
+    <Compile Include="../Chummer.Run.AI/Security/AiPublicEndpoints.cs" Link="AiPublicEndpoints.cs" />
     <Compile Include="../Chummer.Run.Api/Services/KarmaForge/BuildGhostConciergeService.cs" Link="BuildGhostConciergeService.cs" />
     <Compile Include="../Chummer.Run.Api/Services/Support/AnswerlyRuntimePolicy.cs" Link="AnswerlyRuntimePolicy.cs" />
     <Compile Include="../Chummer.Run.Api/Services/Support/AnswerlyHumanizerAdapter.cs" Link="AnswerlyHumanizerAdapter.cs" />
