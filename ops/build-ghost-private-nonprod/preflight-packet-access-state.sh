@@ -25,9 +25,19 @@ for directory in pending claims audit revocations; do
     fi
 done
 
+legacy_consumed_path="$store_root/consumed"
+if [ -e "$legacy_consumed_path" ] || [ -L "$legacy_consumed_path" ]; then
+    [ -d "$legacy_consumed_path" ] || fail "legacy-consumed-directory-invalid"
+    [ ! -L "$legacy_consumed_path" ] || fail "legacy-consumed-directory-invalid"
+    legacy_consumed_entries="$(find "$legacy_consumed_path" -mindepth 1 -maxdepth 1 \
+        | wc -l | tr -d ' ')"
+    [ "$legacy_consumed_entries" -eq 0 ] || fail "legacy-consumed-state-not-empty"
+fi
+
 unknown_root_entries="$(find "$store_root" -mindepth 1 -maxdepth 1 \
     ! -name pending ! -name claims ! -name audit ! -name revocations \
-    ! -name .operation.lock ! -name state-authority.v2.json | wc -l | tr -d ' ')"
+    ! -name consumed ! -name .operation.lock ! -name state-authority.v2.json \
+    | wc -l | tr -d ' ')"
 [ "$unknown_root_entries" -eq 0 ] || fail "unknown-root-state"
 
 for directory in pending claims audit revocations; do

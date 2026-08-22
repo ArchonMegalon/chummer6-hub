@@ -1,6 +1,9 @@
 import json
+import os
 from pathlib import Path
 import subprocess
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +63,64 @@ def test_empty_packet_store_is_the_only_unkeyed_state_admitted(tmp_path):
     assert unkeyed.returncode != 0
     assert "stage=nonempty-unkeyed-state" in unkeyed.stderr
     assert "opaque" not in unkeyed.stderr
+
+
+def test_empty_legacy_consumed_directory_is_admitted_and_preserved(tmp_path):
+    store = tmp_path / "store"
+    (store / "pending").mkdir(parents=True)
+    consumed = store / "consumed"
+    consumed.mkdir()
+
+    result = run_preflight(store)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "packet_store_preflight=passed state=empty\n"
+    assert consumed.is_dir()
+    assert not consumed.is_symlink()
+    assert list(consumed.iterdir()) == []
+
+
+@pytest.mark.parametrize("entry_kind", ("file", "directory", "symlink", "fifo"))
+def test_nonempty_legacy_consumed_directory_is_rejected(tmp_path, entry_kind):
+    store = tmp_path / "store"
+    consumed = store / "consumed"
+    consumed.mkdir(parents=True)
+    entry = consumed / "legacy-entry"
+    if entry_kind == "file":
+        entry.write_text("legacy", encoding="utf-8")
+    elif entry_kind == "directory":
+        entry.mkdir()
+    elif entry_kind == "symlink":
+        target = tmp_path / "legacy-target"
+        target.write_text("legacy", encoding="utf-8")
+        entry.symlink_to(target)
+    else:
+        os.mkfifo(entry)
+
+    result = run_preflight(store)
+
+    assert result.returncode != 0
+    assert "packet_store_preflight=failed" in result.stderr
+
+
+@pytest.mark.parametrize("consumed_kind", ("file", "symlink", "fifo"))
+def test_legacy_consumed_path_must_be_a_real_directory(tmp_path, consumed_kind):
+    store = tmp_path / "store"
+    store.mkdir()
+    consumed = store / "consumed"
+    if consumed_kind == "file":
+        consumed.write_text("legacy", encoding="utf-8")
+    elif consumed_kind == "symlink":
+        target = tmp_path / "legacy-target"
+        target.mkdir()
+        consumed.symlink_to(target, target_is_directory=True)
+    else:
+        os.mkfifo(consumed)
+
+    result = run_preflight(store)
+
+    assert result.returncode != 0
+    assert "packet_store_preflight=failed" in result.stderr
 
 
 def test_v1_or_ambiguous_authority_fails_without_rewriting_state(tmp_path):
