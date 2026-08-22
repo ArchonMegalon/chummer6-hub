@@ -26,6 +26,39 @@ container is source-identified only when its image labels equal the four
 operator-resolved revisions; an image build or canary result without that
 readback is not deployment proof.
 
+## Bounded AI-only deploy and rollback
+
+After the full lane exists, use `deploy-ai-with-rollback.sh` for an AI-only
+revision change. Run the helper from the exact clean Hub worktree named by
+`CHUMMER_RUN_SERVICES_SOURCE`; provide the same six absolute source paths and
+four exact 40-character revision variables shown above. The helper obtains the
+two internal tokens and the five optional governed-provider bindings from the
+single running AI container without printing them. It refuses a dirty or
+revision-drifted source, a rendered provider gate other than literal `false`,
+IO `full avg10` above 10, less than 20 GiB free under `/docker`, or a build poll
+interval above 15 seconds.
+
+Before starting the build, the helper resolves the running AI's full image ID,
+creates a collision-resistant `chummer-build-ghost-ai:rollback-*` reference,
+and verifies that the new reference resolves to that exact ID. The unique
+rollback reference is operationally immutable: the helper never retags or
+deletes it. It builds and recreates only `chummer-build-ghost-ai`; Presentation
+and edge container IDs must remain unchanged. Postchecks require exact source
+labels, AI health, all four provider gates false, a revision/digest-bound
+authenticated deterministic fallback with no remote attempt, missing-auth
+`401`, and loopback Caddy `/api/v1/ai/build-ghost/explain` `404`.
+
+If activation or any postcheck fails, the helper retags the preserved image to
+the mutable `private-nonprod` deployment tag and force-recreates only the AI
+service. It verifies the restored image and health but retains the unique
+rollback reference. Cleanup of old rollback references is always a separate,
+explicit operator decision; this helper never invokes Docker image/container
+removal or prune operations.
+
+```sh
+./ops/build-ghost-private-nonprod/deploy-ai-with-rollback.sh
+```
+
 Governed Tough Tongue credentials and opaque SHA-256 account references may be
 injected only through the five `CHUMMER_BUILD_GHOST_TOUGH_TONGUE_*` runtime
 variables declared by the Compose service. Never put their values in this file
