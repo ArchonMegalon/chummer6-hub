@@ -8,6 +8,7 @@ enables a provider gate, creates a provider resource, or claims live readback.
 from __future__ import annotations
 
 import argparse
+import calendar
 import datetime as dt
 import hashlib
 import json
@@ -32,8 +33,13 @@ VERIFIED_AT = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2
 MAX_CONFIG_BYTES = 256 * 1024
 MAX_ENVIRONMENT_BYTES = 256 * 1024
 MAX_CONTRACT_BYTES = 512 * 1024
+MAX_ACCOUNT_SELECTION_POLICY_BYTES = 512 * 1024
 CANDIDATE_KINDS = ("agent", "voice", "function", "scenario", "live_avatar")
 EXPECTED_SLOT_COUNT = 6
+ACCOUNT_SELECTION_POLICY_SCHEMA = "ea.tough_tongue.operator_premium_grants.v1"
+PREMIUM_BASIS = "operator_policy_available_minutes_gt_threshold"
+PREMIUM_THRESHOLD_MINUTES = 1100.0
+PREMIUM_VALIDITY_CALENDAR_MONTHS = 11
 DOCUMENTED_GET_ROUTES = {
     "balance": "balance",
     "subscriptions": "subscriptions",
@@ -208,6 +214,161 @@ def _candidate_digest(value: str) -> str:
     return _digest(value.encode("utf-8"))
 
 
+def _utc_now() -> dt.datetime:
+    return dt.datetime.now(dt.timezone.utc)
+
+
+def _utc_timestamp(value: Any, label: str) -> dt.datetime:
+    if not isinstance(value, str) or VERIFIED_AT.fullmatch(value) is None:
+        raise ConfigError(f"{label}-invalid")
+    try:
+        return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=dt.timezone.utc
+        )
+    except ValueError as error:
+        raise ConfigError(f"{label}-invalid") from error
+
+
+def _add_calendar_months(value: dt.datetime, months: int) -> dt.datetime:
+    if value.tzinfo is None or value.utcoffset() != dt.timedelta(0) or months < 0:
+        raise ConfigError("account-selection-policy-calendar-invalid")
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+
+def _validated_account_selection_policy(
+    payload: dict[str, Any],
+    expected_digest: str,
+    account_refs: list[str],
+    preferred_account_ref: str,
+) -> dict[str, Any]:
+    required = {
+        "schema", "generatedAt", "status", "sourceType", "decisionSequence",
+        "decisionEvidenceDigest", "supersededDecisionEvidenceDigest",
+        "premiumBasis", "thresholdComparison", "thresholdMinutes",
+        "validityCalendarMonths", "identityBasis", "providerPlanLabelBasis",
+        "inputAuditEvidenceDigest", "qualificationObservedAt", "premiumValidUntil",
+        "grants", "unqualifiedAccountRefs", "preferredAccountRef",
+        "preferredOrganizationMembershipVerified", "readyForAccountSelection",
+        "readyForResourceBinding", "resourceOwnershipVerified",
+        "laterBalanceDropRevokesBeforeExpiry", "identityMismatchRequiresRequalification",
+        "expiryRequiresRequalification", "runtimeGatesChanged",
+        "providerActivationPerformed", "rawCredentialsPersisted",
+        "rawIdentifiersPersisted", "evidenceDigest",
+    }
+    if set(payload) != required:
+        raise ConfigError("account-selection-policy-schema-invalid")
+    if not isinstance(expected_digest, str) or SHA256.fullmatch(expected_digest) is None:
+        raise ConfigError("account-selection-policy-digest-invalid")
+    if _digest(_canonical(payload)) != expected_digest:
+        raise ConfigError("account-selection-policy-digest-mismatch")
+    internal_digest = payload.get("evidenceDigest")
+    if not isinstance(internal_digest, str) or SHA256.fullmatch(internal_digest) is None:
+        raise ConfigError("account-selection-policy-evidence-invalid")
+    without_evidence = {key: value for key, value in payload.items() if key != "evidenceDigest"}
+    if _digest(_canonical(without_evidence)) != internal_digest:
+        raise ConfigError("account-selection-policy-evidence-mismatch")
+    if (
+        payload.get("schema") != ACCOUNT_SELECTION_POLICY_SCHEMA
+        or payload.get("status") != "active"
+        or payload.get("sourceType") != "user_authority"
+        or payload.get("decisionSequence") != 2
+        or payload.get("premiumBasis") != PREMIUM_BASIS
+        or payload.get("thresholdComparison") != "strictly_greater_than"
+        or payload.get("thresholdMinutes") != PREMIUM_THRESHOLD_MINUTES
+        or payload.get("validityCalendarMonths") != PREMIUM_VALIDITY_CALENDAR_MONTHS
+        or payload.get("identityBasis") != "stable_account_ref_sha256"
+        or payload.get("providerPlanLabelBasis") != "unproven_by_documented_api"
+    ):
+        raise ConfigError("account-selection-policy-authority-invalid")
+    for field in (
+        "decisionEvidenceDigest", "supersededDecisionEvidenceDigest",
+        "inputAuditEvidenceDigest",
+    ):
+        if not isinstance(payload.get(field), str) or SHA256.fullmatch(payload[field]) is None:
+            raise ConfigError("account-selection-policy-authority-invalid")
+    if payload["decisionEvidenceDigest"] == payload["supersededDecisionEvidenceDigest"]:
+        raise ConfigError("account-selection-policy-supersession-invalid")
+    generated_at = _utc_timestamp(payload.get("generatedAt"), "account-selection-policy-generated-at")
+    observed_at = _utc_timestamp(
+        payload.get("qualificationObservedAt"),
+        "account-selection-policy-observed-at",
+    )
+    valid_until = _utc_timestamp(
+        payload.get("premiumValidUntil"),
+        "account-selection-policy-valid-until",
+    )
+    if generated_at < observed_at or valid_until != _add_calendar_months(
+        observed_at, PREMIUM_VALIDITY_CALENDAR_MONTHS
+    ):
+        raise ConfigError("account-selection-policy-calendar-invalid")
+    now = _utc_now().astimezone(dt.timezone.utc)
+    if now < observed_at or now >= valid_until:
+        raise ConfigError("account-selection-policy-expired")
+
+    grants = payload.get("grants")
+    if not isinstance(grants, list) or not grants:
+        raise ConfigError("account-selection-policy-grants-invalid")
+    grant_refs: list[str] = []
+    for grant in grants:
+        if not isinstance(grant, dict) or set(grant) != {
+            "accountRefSha256", "qualificationRemainingMinutes",
+            "qualificationObservedAt", "premiumValidUntil",
+        }:
+            raise ConfigError("account-selection-policy-grants-invalid")
+        account_ref = grant.get("accountRefSha256")
+        remaining = grant.get("qualificationRemainingMinutes")
+        if (
+            not isinstance(account_ref, str)
+            or SHA256.fullmatch(account_ref) is None
+            or isinstance(remaining, bool)
+            or not isinstance(remaining, (int, float))
+            or float(remaining) <= PREMIUM_THRESHOLD_MINUTES
+            or grant.get("qualificationObservedAt") != payload["qualificationObservedAt"]
+            or grant.get("premiumValidUntil") != payload["premiumValidUntil"]
+        ):
+            raise ConfigError("account-selection-policy-grants-invalid")
+        grant_refs.append(account_ref)
+    if len(set(grant_refs)) != len(grant_refs):
+        raise ConfigError("account-selection-policy-grants-invalid")
+    unqualified = payload.get("unqualifiedAccountRefs")
+    if (
+        not isinstance(unqualified, list)
+        or any(not isinstance(value, str) or SHA256.fullmatch(value) is None for value in unqualified)
+        or len(set(unqualified)) != len(unqualified)
+        or set(grant_refs) & set(unqualified)
+        or set(grant_refs) | set(unqualified) != set(account_refs)
+    ):
+        raise ConfigError("account-selection-policy-identity-mismatch")
+    if payload.get("preferredAccountRef") != preferred_account_ref or preferred_account_ref not in grant_refs:
+        raise ConfigError("account-selection-policy-preferred-account-invalid")
+    expected_booleans = {
+        "preferredOrganizationMembershipVerified": True,
+        "readyForAccountSelection": True,
+        "readyForResourceBinding": False,
+        "resourceOwnershipVerified": False,
+        "laterBalanceDropRevokesBeforeExpiry": False,
+        "identityMismatchRequiresRequalification": True,
+        "expiryRequiresRequalification": True,
+        "runtimeGatesChanged": False,
+        "providerActivationPerformed": False,
+        "rawCredentialsPersisted": False,
+        "rawIdentifiersPersisted": False,
+    }
+    if any(payload.get(key) is not value for key, value in expected_booleans.items()):
+        raise ConfigError("account-selection-policy-posture-invalid")
+    return {
+        "digest": expected_digest,
+        "evidence_digest": internal_digest,
+        "grant_refs_digest": _digest(_canonical({"account_refs": sorted(grant_refs)})),
+        "grant_count": len(grant_refs),
+        "valid_until": payload["premiumValidUntil"],
+    }
+
+
 def _validated_contract(payload: dict[str, Any], expected_digest: str) -> None:
     required = {
         "schema", "provider_key", "base_url", "source_type", "verified_at",
@@ -287,10 +448,17 @@ def _validated_config(
         _capture_owned_file(config_path, "operator-config", MAX_CONFIG_BYTES),
         "operator-config",
     )
-    if set(payload) != {
+    required_config_keys = {
         "schema", "account_slots", "preferred_account_ref", "candidate_refs",
         "read_only_contract",
-    } or payload.get("schema") != CONFIG_SCHEMA:
+    }
+    if (
+        set(payload) not in (
+            required_config_keys,
+            required_config_keys | {"account_selection_policy"},
+        )
+        or payload.get("schema") != CONFIG_SCHEMA
+    ):
         raise ConfigError("operator-config-schema-invalid")
 
     slots = payload.get("account_slots")
@@ -340,9 +508,17 @@ def _validated_config(
     candidates = payload.get("candidate_refs")
     if not isinstance(candidates, dict) or set(candidates) != set(CANDIDATE_KINDS):
         raise ConfigError("candidate-refs-schema-invalid")
+    if any(not isinstance(candidates.get(kind), str) for kind in CANDIDATE_KINDS):
+        raise ConfigError("candidate-refs-schema-invalid")
+    candidate_configured = [bool(candidates[kind]) for kind in CANDIDATE_KINDS]
+    if any(candidate_configured) and not all(candidate_configured):
+        raise ConfigError("candidate-refs-partial")
+    binding_candidates_configured = all(candidate_configured)
     candidate_digests: dict[str, str] = {}
     for kind in CANDIDATE_KINDS:
         value = candidates.get(kind)
+        if not binding_candidates_configured and value == "":
+            continue
         if (
             not isinstance(value, str)
             or value != value.strip()
@@ -351,6 +527,35 @@ def _validated_config(
         ):
             raise ConfigError(f"candidate-{kind.replace('_', '-')}-ref-invalid")
         candidate_digests[kind] = _candidate_digest(value)
+
+    policy_config = payload.get("account_selection_policy")
+    account_selection_policy: dict[str, Any] | None = None
+    if policy_config is not None:
+        if not isinstance(policy_config, dict) or set(policy_config) != {"path", "digest"}:
+            raise ConfigError("account-selection-policy-config-invalid")
+        policy_path_value = policy_config.get("path")
+        policy_digest = policy_config.get("digest")
+        if (
+            not isinstance(policy_path_value, str)
+            or SAFE_ABSOLUTE_PATH.fullmatch(policy_path_value) is None
+        ):
+            raise ConfigError("account-selection-policy-path-invalid")
+        policy_payload = _json_object(
+            _capture_owned_file(
+                Path(policy_path_value),
+                "account-selection-policy",
+                MAX_ACCOUNT_SELECTION_POLICY_BYTES,
+            ),
+            "account-selection-policy",
+        )
+        account_selection_policy = _validated_account_selection_policy(
+            policy_payload,
+            policy_digest,
+            account_refs,
+            preferred,
+        )
+    if not binding_candidates_configured and account_selection_policy is None:
+        raise ConfigError("account-selection-policy-required")
 
     contract = payload.get("read_only_contract")
     if not isinstance(contract, dict) or set(contract) != {"path", "digest"}:
@@ -389,6 +594,11 @@ def _validated_config(
             {
                 "preferred_account_ref": preferred,
                 "candidate_refs": dict(sorted(candidate_digests.items())),
+                "account_selection_policy_digest": (
+                    account_selection_policy["digest"]
+                    if account_selection_policy is not None
+                    else ""
+                ),
             }
         )
     )
@@ -412,8 +622,48 @@ def _validated_config(
         ),
         "preferredAccountRef": preferred,
         "candidateRefDigests": dict(sorted(candidate_digests.items())),
+        "candidateRefCount": len(candidate_digests),
+        "bindingCandidatesConfigured": binding_candidates_configured,
         "expectationDigest": expectation_digest,
         "readOnlyContractDigest": contract_digest,
+        "accountSelectionPolicyDigest": (
+            account_selection_policy["digest"]
+            if account_selection_policy is not None
+            else ""
+        ),
+        "accountSelectionPolicyEvidenceDigest": (
+            account_selection_policy["evidence_digest"]
+            if account_selection_policy is not None
+            else ""
+        ),
+        "accountSelectionPolicySource": (
+            "user_authority" if account_selection_policy is not None else ""
+        ),
+        "premiumBasis": PREMIUM_BASIS if account_selection_policy is not None else "",
+        "premiumThresholdMinutes": (
+            PREMIUM_THRESHOLD_MINUTES if account_selection_policy is not None else None
+        ),
+        "premiumValidityCalendarMonths": (
+            PREMIUM_VALIDITY_CALENDAR_MONTHS if account_selection_policy is not None else None
+        ),
+        "premiumValidUntil": (
+            account_selection_policy["valid_until"]
+            if account_selection_policy is not None
+            else ""
+        ),
+        "premiumGrantCount": (
+            account_selection_policy["grant_count"]
+            if account_selection_policy is not None
+            else 0
+        ),
+        "premiumGrantAccountRefsDigest": (
+            account_selection_policy["grant_refs_digest"]
+            if account_selection_policy is not None
+            else ""
+        ),
+        "readyForAccountSelection": account_selection_policy is not None,
+        "readyForResourceBinding": False,
+        "providerPlanLabelReadbackVerified": False,
         "providerReadbackVerified": False,
         "providerActivationAuthorized": False,
         "providerMutationPerformed": False,
@@ -421,7 +671,11 @@ def _validated_config(
         "rawCandidateRefsInReceipt": False,
         "environmentContainsCredentials": True,
         "environmentMode": "0600",
-        "nextAction": "run-fresh-ea-live-ops-read-only-binding-probe",
+        "nextAction": (
+            "deploy-private-account-audit-only-runtime-with-all-gates-false"
+            if not binding_candidates_configured
+            else "run-fresh-ea-live-ops-read-only-binding-probe"
+        ),
         "evidenceDigestContract": "sha256-canonical-json-without-evidenceDigest",
     }
     receipt["evidenceDigest"] = _digest(_canonical(receipt))

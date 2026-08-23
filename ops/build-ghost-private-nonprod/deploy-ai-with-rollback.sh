@@ -246,6 +246,22 @@ prepare_operator_runtime_config() {
          and .providerReadbackVerified == false
          and .providerActivationAuthorized == false
          and .providerMutationPerformed == false
+         and .readyForResourceBinding == false
+         and .providerPlanLabelReadbackVerified == false
+         and (
+           .bindingCandidatesConfigured == true
+           or (
+             .bindingCandidatesConfigured == false
+             and .candidateRefCount == 0
+             and .candidateRefDigests == {}
+             and .readyForAccountSelection == true
+             and .accountSelectionPolicySource == "user_authority"
+             and .premiumBasis == "operator_policy_available_minutes_gt_threshold"
+             and .premiumThresholdMinutes == 1100
+             and .premiumValidityCalendarMonths == 11
+             and .premiumGrantCount > 0
+           )
+         )
          and .rawCredentialsInReceipt == false
          and .rawCandidateRefsInReceipt == false' \
         "$runtime_receipt_file" >/dev/null \
