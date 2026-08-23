@@ -76,6 +76,29 @@ TOUGH_TONGUE_CANDIDATE_ENV = {
     "live_avatar": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID",
 }
 TOUGH_TONGUE_CONTRACT_DIGEST_ENV = "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST"
+TOUGH_TONGUE_CONTRACT_TARGET = "/run/secrets/tough-tongue-read-only-binding-contract.json"
+TOUGH_TONGUE_RUNTIME_RECEIPT_SCHEMA = (
+    "chummer.build_ghost.tough_tongue.runtime_config_receipt.v1"
+)
+TOUGH_TONGUE_RUNTIME_RECEIPT_NAME = "runtime-receipt.json"
+TOUGH_TONGUE_RUNTIME_RECEIPT_FIELDS = {
+    "schema", "generatedAt", "status", "providerKey", "accountRefCount",
+    "accountRefsDigest", "organizationContextCount", "organizationRefsDigest",
+    "preferredAccountRef", "candidateRefDigests", "candidateRefCount",
+    "bindingCandidatesConfigured", "expectationDigest", "readOnlyContractDigest",
+    "accountSelectionPolicyDigest", "accountSelectionPolicyEvidenceDigest",
+    "accountSelectionPolicySource", "premiumBasis", "premiumThresholdMinutes",
+    "premiumValidityCalendarMonths", "premiumValidUntil", "premiumGrantCount",
+    "premiumGrantAccountRefsDigest", "readyForAccountSelection",
+    "readyForResourceBinding", "providerPlanLabelReadbackVerified",
+    "providerReadbackVerified", "providerActivationAuthorized",
+    "providerMutationPerformed", "rawCredentialsInReceipt",
+    "rawCandidateRefsInReceipt", "environmentContainsCredentials",
+    "environmentMode", "contractSnapshotMode", "readOnlyContractFileDigest",
+    "environmentFileDigest", "publicationOrder", "outputDirectoryDevice",
+    "outputDirectoryInode", "nextAction", "evidenceDigestContract",
+    "evidenceDigest",
+}
 TEAM_TRUTH_TOP_LEVEL_FIELDS = {
     "schema", "generated_at", "provider_key", "probe_mode", "status", "ready",
     "probe_ok", "reason", "blockers", "next_action", "source", "expectation_digest",
@@ -450,6 +473,7 @@ def _deployed_tough_tongue_binding(
         preferred = ""
 
     candidate_digests: dict[str, str] = {}
+    candidate_values: dict[str, str] = {}
     for kind, name in TOUGH_TONGUE_CANDIDATE_ENV.items():
         raw = _single_environment_value(
             inspect,
@@ -457,14 +481,22 @@ def _deployed_tough_tongue_binding(
             blockers,
             f"deployed-tough-tongue-{kind.replace('_', '-')}-ref-invalid",
         )
-        if (
+        if raw and (
             raw != raw.strip()
             or PROVIDER_REF.fullmatch(raw) is None
             or SHA256.fullmatch(raw.lower()) is not None
         ):
             _add(blockers, f"deployed-tough-tongue-{kind.replace('_', '-')}-ref-invalid")
             raw = ""
+        candidate_values[kind] = raw
         candidate_digests[kind] = _candidate_ref_digest(raw)
+
+    configured_candidate_count = sum(bool(value) for value in candidate_values.values())
+    if configured_candidate_count not in {0, len(TOUGH_TONGUE_CANDIDATE_ENV)}:
+        _add(blockers, "deployed-tough-tongue-candidate-refs-partial")
+    binding_candidates_configured = (
+        configured_candidate_count == len(TOUGH_TONGUE_CANDIDATE_ENV)
+    )
 
     contract_digest = _single_environment_value(
         inspect,
@@ -480,15 +512,11 @@ def _deployed_tough_tongue_binding(
         "preferred_account_ref": preferred,
         "candidate_refs": dict(sorted(candidate_digests.items())),
     }
-    configured = bool(
-        account_refs
-        and credential_slots
-        and preferred
-        and contract_digest
-        and all(candidate_digests.values())
-    )
+    configured = bool(account_refs and credential_slots and preferred and contract_digest)
     return {
         "configured": configured,
+        "bindingCandidatesConfigured": binding_candidates_configured,
+        "candidateRefCount": configured_candidate_count,
         "accountRefCount": len(account_refs),
         "credentialSlotCount": len(credential_slots),
         "accountRefs": sorted(account_refs),
@@ -499,6 +527,191 @@ def _deployed_tough_tongue_binding(
         "readOnlyContractDigest": contract_digest,
         "rawCandidateRefsPersisted": False,
         "rawCredentialsPersisted": False,
+    }
+
+
+def _blocked_account_selection_policy() -> dict[str, Any]:
+    return {
+        "checked": False,
+        "ready": False,
+        "status": BLOCKED_STATUS,
+        "source": "runtime-config-receipt:user-authority",
+        "accountRefCount": 0,
+        "premiumGrantCount": 0,
+        "premiumValidUntil": "",
+        "bindingCandidatesConfigured": False,
+        "readyForResourceBinding": False,
+        "providerPlanLabelReadbackVerified": False,
+        "providerReadbackVerified": False,
+        "providerMutationObserved": None,
+        "receiptFileSha256": "",
+    }
+
+
+def _runtime_account_selection_policy(
+    inspect: Mapping[str, Any],
+    deployed_binding: Mapping[str, Any],
+    blockers: list[str],
+    clock: Callable[[], dt.datetime],
+) -> dict[str, Any]:
+    """Validate the retained account-audit policy without reading credentials.
+
+    The all-empty candidate posture deliberately proves only account selection.
+    Provider execution and resource ownership remain unclaimed and all runtime
+    gates stay false.
+    """
+
+    projection = _blocked_account_selection_policy()
+    mounts = inspect.get("Mounts")
+    matches = [
+        row
+        for row in mounts if isinstance(row, dict)
+        and row.get("Destination") == TOUGH_TONGUE_CONTRACT_TARGET
+    ] if isinstance(mounts, list) else []
+    if len(matches) != 1:
+        _add(blockers, "tough-tongue-runtime-contract-mount-invalid")
+        return projection
+    mount = matches[0]
+    source_text = mount.get("Source")
+    if (
+        mount.get("Type") != "bind"
+        or mount.get("RW") is not False
+        or not isinstance(source_text, str)
+        or not source_text.startswith("/")
+    ):
+        _add(blockers, "tough-tongue-runtime-contract-mount-invalid")
+        return projection
+    contract_path = Path(os.path.normpath(source_text))
+    if str(contract_path) != source_text:
+        _add(blockers, "tough-tongue-runtime-contract-mount-invalid")
+        return projection
+    receipt_path = contract_path.parent / TOUGH_TONGUE_RUNTIME_RECEIPT_NAME
+    try:
+        parent = os.stat(contract_path.parent, follow_symlinks=False)
+        if (
+            stat.S_ISLNK(parent.st_mode)
+            or not stat.S_ISDIR(parent.st_mode)
+            or parent.st_uid != os.geteuid()
+            or stat.S_IMODE(parent.st_mode) != 0o700
+        ):
+            raise AttestationError("runtime evidence directory authority invalid")
+        contract_binding = _source_binding(contract_path, "Tough Tongue runtime contract")
+        receipt_binding = _source_binding(receipt_path, "Tough Tongue runtime receipt")
+        if contract_binding["mode"] != "0400" or receipt_binding["mode"] != "0600":
+            raise AttestationError("runtime evidence modes invalid")
+        raw = receipt_path.read_bytes()
+        if _digest(raw) != receipt_binding["sha256"]:
+            raise AttestationError("runtime receipt changed while read")
+        receipt = _json_object(raw, "Tough Tongue runtime receipt")
+        if _source_binding(receipt_path, "Tough Tongue runtime receipt") != receipt_binding:
+            raise AttestationError("runtime receipt changed after read")
+    except (OSError, AttestationError):
+        _add(blockers, "tough-tongue-runtime-account-selection-receipt-unverifiable")
+        return projection
+
+    schema_valid = set(receipt) == TOUGH_TONGUE_RUNTIME_RECEIPT_FIELDS
+    evidence_digest = receipt.get("evidenceDigest")
+    without_evidence = dict(receipt)
+    without_evidence.pop("evidenceDigest", None)
+    evidence_valid = (
+        isinstance(evidence_digest, str)
+        and SHA256.fullmatch(evidence_digest) is not None
+        and evidence_digest == _digest(_canonical(without_evidence))
+    )
+    generated_at = _parse_timestamp(receipt.get("generatedAt"))
+    premium_valid_until = _parse_timestamp(receipt.get("premiumValidUntil"))
+    observed_at = clock().astimezone(dt.timezone.utc)
+    expected_candidates = {
+        kind: value
+        for kind, value in dict(deployed_binding.get("candidateRefDigests") or {}).items()
+        if value
+    }
+    policy_digest = receipt.get("accountSelectionPolicyDigest")
+    expected_expectation_digest = _upstream_digest(
+        {
+            "preferred_account_ref": deployed_binding.get("preferredAccountRef"),
+            "candidate_refs": dict(sorted(expected_candidates.items())),
+            "account_selection_policy_digest": policy_digest,
+        }
+    )
+    premium_grant_count = receipt.get("premiumGrantCount")
+    account_count = receipt.get("accountRefCount")
+    organization_context_count = receipt.get("organizationContextCount")
+    valid = all(
+        (
+            schema_valid,
+            evidence_valid,
+            receipt.get("schema") == TOUGH_TONGUE_RUNTIME_RECEIPT_SCHEMA,
+            receipt.get("status") == "ready-for-read-only-probe",
+            receipt.get("providerKey") == "tough_tongue",
+            type(account_count) is int and account_count == 6,
+            account_count == deployed_binding.get("accountRefCount"),
+            receipt.get("accountRefsDigest") == deployed_binding.get("accountRefsDigest"),
+            type(organization_context_count) is int
+            and 0 <= organization_context_count <= 6,
+            receipt.get("preferredAccountRef") == deployed_binding.get("preferredAccountRef"),
+            receipt.get("candidateRefDigests") == expected_candidates == {},
+            receipt.get("candidateRefCount") == 0,
+            receipt.get("bindingCandidatesConfigured") is False,
+            receipt.get("expectationDigest") == expected_expectation_digest,
+            receipt.get("readOnlyContractDigest") == deployed_binding.get("readOnlyContractDigest"),
+            receipt.get("readOnlyContractFileDigest") == contract_binding["sha256"],
+            receipt.get("contractSnapshotMode") == "0400",
+            isinstance(receipt.get("environmentFileDigest"), str)
+            and SHA256.fullmatch(str(receipt.get("environmentFileDigest"))) is not None,
+            receipt.get("environmentMode") == "0600",
+            receipt.get("publicationOrder") == ["contract-snapshot", "receipt", "environment"],
+            receipt.get("outputDirectoryDevice") == parent.st_dev,
+            receipt.get("outputDirectoryInode") == parent.st_ino,
+            receipt.get("accountSelectionPolicySource") == "user_authority",
+            isinstance(policy_digest, str) and SHA256.fullmatch(policy_digest) is not None,
+            isinstance(receipt.get("accountSelectionPolicyEvidenceDigest"), str)
+            and SHA256.fullmatch(str(receipt.get("accountSelectionPolicyEvidenceDigest"))) is not None,
+            receipt.get("premiumBasis") == "operator_policy_available_minutes_gt_threshold",
+            receipt.get("premiumThresholdMinutes") == 1100.0,
+            receipt.get("premiumValidityCalendarMonths") == 11,
+            type(premium_grant_count) is int
+            and type(account_count) is int
+            and 1 <= premium_grant_count <= account_count,
+            isinstance(receipt.get("premiumGrantAccountRefsDigest"), str)
+            and SHA256.fullmatch(str(receipt.get("premiumGrantAccountRefsDigest"))) is not None,
+            generated_at is not None and generated_at <= observed_at,
+            premium_valid_until is not None and observed_at < premium_valid_until,
+            receipt.get("readyForAccountSelection") is True,
+            receipt.get("readyForResourceBinding") is False,
+            receipt.get("providerPlanLabelReadbackVerified") is False,
+            receipt.get("providerReadbackVerified") is False,
+            receipt.get("providerActivationAuthorized") is False,
+            receipt.get("providerMutationPerformed") is False,
+            receipt.get("rawCredentialsInReceipt") is False,
+            receipt.get("rawCandidateRefsInReceipt") is False,
+            receipt.get("environmentContainsCredentials") is True,
+            receipt.get("nextAction")
+            == "deploy-private-account-audit-only-runtime-with-all-gates-false",
+            receipt.get("evidenceDigestContract")
+            == "sha256-canonical-json-without-evidenceDigest",
+            deployed_binding.get("configured") is True,
+            deployed_binding.get("bindingCandidatesConfigured") is False,
+        )
+    )
+    if not valid:
+        _add(blockers, "tough-tongue-runtime-account-selection-policy-invalid")
+    return {
+        "checked": True,
+        "ready": valid,
+        "status": "account-selection-ready" if valid else BLOCKED_STATUS,
+        "source": "runtime-config-receipt:user-authority",
+        "accountRefCount": account_count if type(account_count) is int else 0,
+        "premiumGrantCount": premium_grant_count if type(premium_grant_count) is int else 0,
+        "premiumValidUntil": (
+            receipt.get("premiumValidUntil") if premium_valid_until is not None else ""
+        ),
+        "bindingCandidatesConfigured": False,
+        "readyForResourceBinding": False,
+        "providerPlanLabelReadbackVerified": False,
+        "providerReadbackVerified": False,
+        "providerMutationObserved": receipt.get("providerMutationPerformed") is not False,
+        "receiptFileSha256": receipt_binding["sha256"],
     }
 
 
@@ -610,6 +823,7 @@ def _collect_runtime(
     expected_compose_sha: str,
     expected_caddy_sha: str,
     project: str,
+    clock: Callable[[], dt.datetime],
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     runtime: dict[str, Any] = {"project": project, "containers": {}, "confinement": {}}
     raw_inspects: dict[str, dict[str, Any]] = {}
@@ -858,9 +1072,25 @@ def _collect_runtime(
             ai_inspect,
             blockers,
         )
+        if not runtime["toughTongueOpaqueBinding"]["bindingCandidatesConfigured"]:
+            runtime["toughTongueAccountSelectionPolicy"] = (
+                _runtime_account_selection_policy(
+                    ai_inspect,
+                    runtime["toughTongueOpaqueBinding"],
+                    blockers,
+                    clock,
+                )
+            )
+        else:
+            runtime["toughTongueAccountSelectionPolicy"] = {
+                **_blocked_account_selection_policy(),
+                "status": "resource-binding-configured",
+            }
     if "toughTongueOpaqueBinding" not in runtime:
         runtime["toughTongueOpaqueBinding"] = {
             "configured": False,
+            "bindingCandidatesConfigured": False,
+            "candidateRefCount": 0,
             "accountRefCount": 0,
             "credentialSlotCount": 0,
             "accountRefs": [],
@@ -872,6 +1102,10 @@ def _collect_runtime(
             "rawCandidateRefsPersisted": False,
             "rawCredentialsPersisted": False,
         }
+    if "toughTongueAccountSelectionPolicy" not in runtime:
+        runtime["toughTongueAccountSelectionPolicy"] = (
+            _blocked_account_selection_policy()
+        )
     presentation_inspect = raw_inspects.get("presentation")
     if presentation_inspect is not None:
         if _environment_values(
@@ -1190,6 +1424,7 @@ def _probe_team_truth(
     max_age_seconds: int,
     clock: Callable[[], dt.datetime],
     deployed_binding: Mapping[str, Any],
+    account_selection_policy: Mapping[str, Any],
     blockers: list[str],
 ) -> dict[str, Any]:
     summary: dict[str, Any] = {
@@ -1201,6 +1436,65 @@ def _probe_team_truth(
         "blockers": [],
         "bindingMatchesDeployedConfiguration": False,
     }
+    if deployed_binding.get("bindingCandidatesConfigured") is False:
+        ready = bool(
+            deployed_binding.get("configured") is True
+            and account_selection_policy.get("checked") is True
+            and account_selection_policy.get("ready") is True
+            and account_selection_policy.get("providerMutationObserved") is False
+            and account_selection_policy.get("readyForResourceBinding") is False
+        )
+        if not ready:
+            _add(blockers, "tough-tongue-team-account-truth-not-ready")
+        return {
+            "schema": TOUGH_TONGUE_RUNTIME_RECEIPT_SCHEMA,
+            "fresh": ready,
+            "generatedAt": "",
+            "ageSeconds": None,
+            "redacted": True,
+            "strictReadOnlyGet": False,
+            "providerMutationObserved": account_selection_policy.get(
+                "providerMutationObserved"
+            ),
+            "ready": ready,
+            "status": (
+                "account-selection-ready" if ready else BLOCKED_STATUS
+            ),
+            "source": "runtime-config-receipt:user-authority",
+            "configuredAccountCount": account_selection_policy.get(
+                "accountRefCount"
+            ),
+            "distinctAccountCount": deployed_binding.get("accountRefCount"),
+            "preferredAccountConfigured": bool(
+                deployed_binding.get("preferredAccountRef")
+            ),
+            "preferredAccountOwnershipVerified": ready,
+            "premiumVerified": ready,
+            "liveAvatarVerified": False,
+            "organizationOwnershipVerified": None,
+            "candidateResourcesOwnershipVerified": False,
+            "probeRequestCount": 0,
+            "probeMutationRequestCount": 0,
+            "bindingMatchesDeployedConfiguration": ready,
+            "deployedAccountRefCount": deployed_binding.get("accountRefCount"),
+            "expectationDigestMatchesDeployed": ready,
+            "readOnlyContractDigestMatchesDeployed": ready,
+            "premiumGrantCount": account_selection_policy.get(
+                "premiumGrantCount"
+            ),
+            "premiumValidUntil": account_selection_policy.get(
+                "premiumValidUntil"
+            ),
+            "readyForResourceBinding": False,
+            "providerPlanLabelReadbackVerified": False,
+            "providerReadbackVerified": False,
+            "upstreamEvidenceDigest": "",
+            "upstreamReceiptDigest": "",
+            "receiptFileSha256": account_selection_policy.get(
+                "receiptFileSha256", ""
+            ),
+            "blockers": [],
+        }
     with tempfile.TemporaryDirectory(prefix="chummer-build-ghost-team-truth-") as directory:
         receipt_path = Path(directory) / "tough-tongue-binding-receipt.json"
         try:
@@ -1751,6 +2045,7 @@ def _attest(
         sources["compose"]["sha256"],
         sources["caddy"]["sha256"],
         project,
+        clock,
     )
     runtime_added_blockers = blockers[runtime_blockers_before:]
     team_truth = _probe_team_truth(
@@ -1760,6 +2055,7 @@ def _attest(
         team_truth_max_age,
         clock,
         runtime_before["toughTongueOpaqueBinding"],
+        runtime_before["toughTongueAccountSelectionPolicy"],
         blockers,
     )
     presentation_id = raw_before.get("presentation", {}).get("Id", "")
@@ -1798,6 +2094,7 @@ def _attest(
         sources["compose"]["sha256"],
         sources["caddy"]["sha256"],
         project,
+        clock,
     )
     if _canonical(runtime_before) != _canonical(runtime_after):
         _add(blockers, "runtime-identity-drift-during-attestation")

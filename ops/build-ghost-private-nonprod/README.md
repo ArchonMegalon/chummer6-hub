@@ -181,7 +181,7 @@ removal or prune operations.
 Use `deploy-presentation-with-rollback.sh` only after the six source paths and
 six exact 40-character revision variables above identify clean isolated
 checkouts. This release helper additionally requires Presentation revision
-`8090e53f6dd64794145d81d7698394e4881d0c02`, the exact remote-main squash being
+`1c492202ac708f302b59f47c2bb1e4c67e352328`, the exact remote-main squash being
 deployed, and revalidates all six clean source trees after the build immediately
 before activation. The helper and the AI deployer deliberately acquire the same
 nonblocking host-local lock, so their activations cannot overlap. It applies
@@ -347,10 +347,19 @@ binds all of the following:
 * the bounded local packet-access canary plus a direct authenticated AI canary
   whose exact fallback text is returned with `remoteExecutionEnabled=false`
   and `remoteAttempted=false`; and
-* a fresh receipt from EA live ops' `probe-tough-tongue-bindings` GET-only
-  probe, including Premium/live-avatar entitlement and account, organization,
-  agent, voice, function, and scenario ownership truth without raw credentials
-  or provider resource identifiers.
+* one of two non-interchangeable team-truth modes: an account-audit-only
+  runtime must retain the materializer's digest-bound, unexpired
+  `ea.tough_tongue.operator_premium_grants.v1` user-authority policy with six
+  exact opaque account slots, the uniquely selected qualified account,
+  `readyForAccountSelection=true`, `readyForResourceBinding=false`, no provider
+  plan-label claim, and every provider gate false; a future resource-bound
+  runtime still requires a fresh EA live-ops GET-only ownership receipt.
+
+The account-audit-only mode does not call Tough Tongue during attestation and
+does not claim live-avatar, function, voice, scenario, or remote-execution
+readiness. It proves only the still-valid user-authority account-selection
+policy and deterministic local fallback. Empty candidates are valid only as a
+complete set; a partial candidate set remains a hard blocker.
 
 The production CLI has no repository, Compose project, canary, or live-ops
 path override. Those authorities are fixed to this reviewed checkout, the
