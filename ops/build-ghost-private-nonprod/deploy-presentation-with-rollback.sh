@@ -264,6 +264,22 @@ prepare_operator_runtime_config() {
          and .providerReadbackVerified == false
          and .providerActivationAuthorized == false
          and .providerMutationPerformed == false
+         and .readyForResourceBinding == false
+         and .providerPlanLabelReadbackVerified == false
+         and (
+           .bindingCandidatesConfigured == true
+           or (
+             .bindingCandidatesConfigured == false
+             and .candidateRefCount == 0
+             and .candidateRefDigests == {}
+             and .readyForAccountSelection == true
+             and .accountSelectionPolicySource == "user_authority"
+             and .premiumBasis == "operator_policy_available_minutes_gt_threshold"
+             and .premiumThresholdMinutes == 1100
+             and .premiumValidityCalendarMonths == 11
+             and .premiumGrantCount > 0
+           )
+         )
          and .rawCredentialsInReceipt == false
          and .rawCandidateRefsInReceipt == false' \
         "$runtime_receipt_file" >/dev/null \
@@ -648,14 +664,27 @@ verify_rendered_compose() {
             '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS != ""
              and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS != ""
              and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF != ""
-             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID != ""
-             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID != ""
-             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID != ""
-             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID != ""
-             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID != ""
              and (.services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
                   | test("^sha256:[0-9a-f]{64}$"))' \
             "$rendered" >/dev/null || fail "compose-operator-runtime-drift"
+        if jq -e '.bindingCandidatesConfigured == false' \
+            "$runtime_receipt_file" >/dev/null; then
+            jq -e --arg service "$ai_service" \
+                '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID == ""' \
+                "$rendered" >/dev/null || fail "compose-audit-only-candidates-drift"
+        else
+            jq -e --arg service "$ai_service" \
+                '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID != ""' \
+                "$rendered" >/dev/null || fail "compose-binding-candidates-drift"
+        fi
     fi
     if rg --fixed-strings '/api/v1/ai/build-ghost/explain' "$script_root/Caddyfile" >/dev/null; then
         fail "public-explain-route-present"
