@@ -225,6 +225,84 @@ def team_truth() -> dict[str, object]:
     return seal_truth(payload)
 
 
+def account_audit_receipt(evidence_dir: Path, contract: Path) -> dict[str, object]:
+    policy_digest = "sha256:" + "6" * 64
+    payload: dict[str, object] = {
+        "schema": MODULE.TOUGH_TONGUE_RUNTIME_RECEIPT_SCHEMA,
+        "generatedAt": "2026-08-23T05:00:00Z",
+        "status": "ready-for-read-only-probe",
+        "providerKey": "tough_tongue",
+        "accountRefCount": 6,
+        "accountRefsDigest": MODULE._upstream_digest(
+            {"account_refs": sorted(ACCOUNT_REFS)}
+        ),
+        "organizationContextCount": 0,
+        "organizationRefsDigest": "",
+        "preferredAccountRef": PREFERRED_ACCOUNT_REF,
+        "candidateRefDigests": {},
+        "candidateRefCount": 0,
+        "bindingCandidatesConfigured": False,
+        "expectationDigest": MODULE._upstream_digest(
+            {
+                "preferred_account_ref": PREFERRED_ACCOUNT_REF,
+                "candidate_refs": {},
+                "account_selection_policy_digest": policy_digest,
+            }
+        ),
+        "readOnlyContractDigest": CONTRACT_DIGEST,
+        "accountSelectionPolicyDigest": policy_digest,
+        "accountSelectionPolicyEvidenceDigest": "sha256:" + "5" * 64,
+        "accountSelectionPolicySource": "user_authority",
+        "premiumBasis": "operator_policy_available_minutes_gt_threshold",
+        "premiumThresholdMinutes": 1100.0,
+        "premiumValidityCalendarMonths": 11,
+        "premiumValidUntil": "2027-07-23T13:01:17Z",
+        "premiumGrantCount": 4,
+        "premiumGrantAccountRefsDigest": "sha256:" + "4" * 64,
+        "readyForAccountSelection": True,
+        "readyForResourceBinding": False,
+        "providerPlanLabelReadbackVerified": False,
+        "providerReadbackVerified": False,
+        "providerActivationAuthorized": False,
+        "providerMutationPerformed": False,
+        "rawCredentialsInReceipt": False,
+        "rawCandidateRefsInReceipt": False,
+        "environmentContainsCredentials": True,
+        "environmentMode": "0600",
+        "contractSnapshotMode": "0400",
+        "readOnlyContractFileDigest": MODULE._digest(contract.read_bytes()),
+        "environmentFileDigest": "sha256:" + "3" * 64,
+        "publicationOrder": ["contract-snapshot", "receipt", "environment"],
+        "outputDirectoryDevice": evidence_dir.stat().st_dev,
+        "outputDirectoryInode": evidence_dir.stat().st_ino,
+        "nextAction": "deploy-private-account-audit-only-runtime-with-all-gates-false",
+        "evidenceDigestContract": "sha256-canonical-json-without-evidenceDigest",
+    }
+    payload["evidenceDigest"] = MODULE._digest(MODULE._canonical(payload))
+    return payload
+
+
+def enable_account_audit_only(tmp_path: Path, runner: "FakeRunner") -> Path:
+    evidence_dir = tmp_path / "runtime-evidence"
+    evidence_dir.mkdir(mode=0o700)
+    contract = evidence_dir / "read-only-contract.json"
+    contract.write_text('{"schema":"operator-verified-read-only-v2"}\n', encoding="utf-8")
+    os.chmod(contract, 0o400)
+    receipt = evidence_dir / MODULE.TOUGH_TONGUE_RUNTIME_RECEIPT_NAME
+    receipt.write_text(
+        json.dumps(
+            account_audit_receipt(evidence_dir, contract),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    os.chmod(receipt, 0o600)
+    runner.account_audit_contract = contract
+    return receipt
+
+
 def canary_output() -> bytes:
     values = dict(MODULE.CANARY_EXPECTED)
     values.update(
@@ -248,6 +326,8 @@ class FakeRunner:
         self.raise_live_probe = False
         self.packet_canary_called = False
         self.fallback_canary_called = False
+        self.live_probe_called = False
+        self.account_audit_contract: Path | None = None
 
     def result(self, stdout: bytes | str = b"", returncode: int = 0, stderr: bytes = b""):
         if isinstance(stdout, str):
@@ -256,6 +336,12 @@ class FakeRunner:
 
     def container(self, role: str) -> dict[str, object]:
         env = environment(role)
+        if role == "ai" and self.account_audit_contract is not None:
+            candidate_names = set(MODULE.TOUGH_TONGUE_CANDIDATE_ENV.values())
+            env = [
+                f"{name}=" if (name := row.partition("=")[0]) in candidate_names else row
+                for row in env
+            ]
         if role == "ai" and self.candidate_overrides:
             replacements = {
                 MODULE.TOUGH_TONGUE_CANDIDATE_ENV[kind]: value
@@ -282,6 +368,13 @@ class FakeRunner:
             mounts = [{
                 "Type": "bind", "Source": str(self.caddy),
                 "Destination": "/etc/caddy/Caddyfile", "RW": False,
+            }]
+        elif role == "ai" and self.account_audit_contract is not None:
+            mounts = [{
+                "Type": "bind",
+                "Source": str(self.account_audit_contract),
+                "Destination": MODULE.TOUGH_TONGUE_CONTRACT_TARGET,
+                "RW": False,
             }]
         started = "2026-08-23T04:00:00Z"
         if self.drift_after_canary and self.runtime_round > 1 and role == "ai":
@@ -319,6 +412,7 @@ class FakeRunner:
         if args[:4] == ["git", "-C", str(self.compose.parent), "status"]:
             return self.result()
         if "probe-tough-tongue-bindings" in args:
+            self.live_probe_called = True
             if self.raise_live_probe:
                 raise MODULE.AttestationError("simulated bounded probe failure")
             receipt = Path(args[args.index("--receipt-path") + 1])
@@ -417,6 +511,67 @@ def test_all_evidence_emits_only_digest_bound_private_nonprod_claim(tmp_path: Pa
     assert all(value not in serialized for value in CANDIDATE_REFS.values())
 
 
+def test_account_audit_only_policy_proves_private_fallback_without_provider_probe(
+    tmp_path: Path,
+):
+    _, _, _, output, runner = fixture(tmp_path)
+    enable_account_audit_only(tmp_path, runner)
+
+    payload = invoke(tmp_path, runner)
+
+    assert payload["status"] == "deployed-private-nonprod"
+    assert payload["claim"] == "deployed-private-nonprod"
+    assert payload["blockers"] == []
+    truth = payload["toughTongueTeamAccountTruth"]
+    assert truth["ready"] is True
+    assert truth["status"] == "account-selection-ready"
+    assert truth["premiumVerified"] is True
+    assert truth["premiumGrantCount"] == 4
+    assert truth["readyForResourceBinding"] is False
+    assert truth["liveAvatarVerified"] is False
+    assert truth["candidateResourcesOwnershipVerified"] is False
+    assert truth["providerReadbackVerified"] is False
+    assert truth["providerMutationObserved"] is False
+    assert runner.live_probe_called is False
+    serialized = output.read_text(encoding="utf-8")
+    assert "secret-slot-" not in serialized
+    assert all(value not in serialized for value in CANDIDATE_REFS.values())
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("providerMutationPerformed", True),
+        ("premiumValidUntil", "2026-08-23T00:00:00Z"),
+        ("premiumThresholdMinutes", 1099.0),
+    ),
+)
+def test_account_audit_policy_drift_blocks_before_canaries(
+    field: str,
+    value: object,
+    tmp_path: Path,
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    receipt = enable_account_audit_only(tmp_path, runner)
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    payload[field] = value
+    payload.pop("evidenceDigest")
+    payload["evidenceDigest"] = MODULE._digest(MODULE._canonical(payload))
+    receipt.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    attestation = invoke(tmp_path, runner)
+
+    assert "tough-tongue-runtime-account-selection-policy-invalid" in attestation["blockers"]
+    assert "tough-tongue-team-account-truth-not-ready" in attestation["blockers"]
+    assert "canaries-skipped-unsafe-runtime" in attestation["blockers"]
+    assert attestation["claim"] is None
+    assert runner.packet_canary_called is False
+    assert runner.live_probe_called is False
+
+
 @pytest.mark.parametrize("role", ["presentation", "ai", "edge"])
 def test_every_runtime_compose_source_mismatch_blocks(role: str, tmp_path: Path):
     _, _, _, _, runner = fixture(tmp_path)
@@ -498,7 +653,7 @@ def test_precomputed_live_candidate_digest_in_container_is_rejected(
 
     label = kind.replace("_", "-")
     assert f"deployed-tough-tongue-{label}-ref-invalid" in payload["blockers"]
-    assert "tough-tongue-deployed-candidate-binding-mismatch" in payload["blockers"]
+    assert "deployed-tough-tongue-candidate-refs-partial" in payload["blockers"]
     assert "canaries-skipped-unsafe-runtime" in payload["blockers"]
     assert payload["status"] == "blocked"
     assert payload["claim"] is None

@@ -347,10 +347,19 @@ binds all of the following:
 * the bounded local packet-access canary plus a direct authenticated AI canary
   whose exact fallback text is returned with `remoteExecutionEnabled=false`
   and `remoteAttempted=false`; and
-* a fresh receipt from EA live ops' `probe-tough-tongue-bindings` GET-only
-  probe, including Premium/live-avatar entitlement and account, organization,
-  agent, voice, function, and scenario ownership truth without raw credentials
-  or provider resource identifiers.
+* one of two non-interchangeable team-truth modes: an account-audit-only
+  runtime must retain the materializer's digest-bound, unexpired
+  `ea.tough_tongue.operator_premium_grants.v1` user-authority policy with six
+  exact opaque account slots, the uniquely selected qualified account,
+  `readyForAccountSelection=true`, `readyForResourceBinding=false`, no provider
+  plan-label claim, and every provider gate false; a future resource-bound
+  runtime still requires a fresh EA live-ops GET-only ownership receipt.
+
+The account-audit-only mode does not call Tough Tongue during attestation and
+does not claim live-avatar, function, voice, scenario, or remote-execution
+readiness. It proves only the still-valid user-authority account-selection
+policy and deterministic local fallback. Empty candidates are valid only as a
+complete set; a partial candidate set remains a hard blocker.
 
 The production CLI has no repository, Compose project, canary, or live-ops
 path override. Those authorities are fixed to this reviewed checkout, the
