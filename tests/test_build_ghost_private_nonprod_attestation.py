@@ -42,7 +42,7 @@ CANDIDATE_REFS = {
     "live_avatar": "live-avatar-review-1",
 }
 CANDIDATE_DIGESTS = {
-    kind: MODULE._opaque_ref(value) for kind, value in CANDIDATE_REFS.items()
+    kind: MODULE._candidate_ref_digest(value) for kind, value in CANDIDATE_REFS.items()
 }
 CONTRACT_DIGEST = "sha256:" + "7" * 64
 PRIVATE_NETWORK = MODULE.PROJECT + "_build-ghost-private"
@@ -242,6 +242,7 @@ class FakeRunner:
         self.packet = {"authority": "v2", "pending": 0, "claims": 0, "audit": 8, "revocations": 2}
         self.host_ip = "127.0.0.1"
         self.remote_gate = "false"
+        self.candidate_overrides: dict[str, str] = {}
         self.runtime_round = 0
         self.drift_after_canary = False
         self.raise_live_probe = False
@@ -255,6 +256,16 @@ class FakeRunner:
 
     def container(self, role: str) -> dict[str, object]:
         env = environment(role)
+        if role == "ai" and self.candidate_overrides:
+            replacements = {
+                MODULE.TOUGH_TONGUE_CANDIDATE_ENV[kind]: value
+                for kind, value in self.candidate_overrides.items()
+            }
+            env = [
+                f"{name}={replacements[name]}"
+                if (name := row.partition("=")[0]) in replacements else row
+                for row in env
+            ]
         if role == "ai" and self.remote_gate != "false":
             env = [
                 f"{MODULE.PROVIDER_GATES[0]}={self.remote_gate}"
@@ -474,6 +485,25 @@ def test_deployed_live_avatar_expectation_mismatch_blocks(tmp_path: Path):
     seal_truth(runner.truth)
     payload = invoke(tmp_path, runner)
     assert "tough-tongue-deployed-expectation-digest-mismatch" in payload["blockers"]
+
+
+@pytest.mark.parametrize("kind", ["agent", "voice", "function", "scenario", "live_avatar"])
+def test_precomputed_live_candidate_digest_in_container_is_rejected(
+    kind: str, tmp_path: Path
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    runner.candidate_overrides[kind] = CANDIDATE_DIGESTS[kind]
+
+    payload = invoke(tmp_path, runner)
+
+    label = kind.replace("_", "-")
+    assert f"deployed-tough-tongue-{label}-ref-invalid" in payload["blockers"]
+    assert "tough-tongue-deployed-candidate-binding-mismatch" in payload["blockers"]
+    assert "canaries-skipped-unsafe-runtime" in payload["blockers"]
+    assert payload["status"] == "blocked"
+    assert payload["claim"] is None
+    assert runner.packet_canary_called is False
+    assert runner.fallback_canary_called is False
 
 
 def test_deployed_readback_contract_digest_mismatch_blocks(tmp_path: Path):

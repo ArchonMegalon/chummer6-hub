@@ -262,6 +262,9 @@ candidate refs, binds the resulting expectation digest and account count/set to
 the live receipt, verifies that receipt's canonical evidence and receipt
 digests, and requires the read-only contract digest to equal the deployed
 opaque value. Missing or mismatched inputs cannot mint a deployment claim.
+Candidate resource inputs are raw provider IDs, not opaque account refs: each
+exact raw value is always hashed, and a pre-shaped `sha256:` candidate value is
+rejected instead of being accepted as the digest of a different raw resource.
 
 Any missing, stale, ambiguous, drifting, non-redacted, or non-passing evidence
 produces status `blocked`, a null claim, a nonzero exit, and explicit

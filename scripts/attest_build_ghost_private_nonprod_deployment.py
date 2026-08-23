@@ -386,11 +386,9 @@ def _upstream_digest(value: Mapping[str, Any]) -> str:
     return _digest(raw)
 
 
-def _opaque_ref(value: str) -> str:
-    normalized = value.strip()
-    if SHA256.fullmatch(normalized.lower()):
-        return normalized.lower()
-    return _digest(normalized.encode("utf-8")) if normalized else ""
+def _candidate_ref_digest(value: str) -> str:
+    """Hash an exact raw candidate ID; never interpret it as an account ref."""
+    return _digest(value.encode("utf-8")) if value else ""
 
 
 def _single_environment_value(
@@ -459,10 +457,14 @@ def _deployed_tough_tongue_binding(
             blockers,
             f"deployed-tough-tongue-{kind.replace('_', '-')}-ref-invalid",
         )
-        if raw != raw.strip() or PROVIDER_REF.fullmatch(raw) is None:
+        if (
+            raw != raw.strip()
+            or PROVIDER_REF.fullmatch(raw) is None
+            or SHA256.fullmatch(raw.lower()) is not None
+        ):
             _add(blockers, f"deployed-tough-tongue-{kind.replace('_', '-')}-ref-invalid")
             raw = ""
-        candidate_digests[kind] = _opaque_ref(raw)
+        candidate_digests[kind] = _candidate_ref_digest(raw)
 
     contract_digest = _single_environment_value(
         inspect,
