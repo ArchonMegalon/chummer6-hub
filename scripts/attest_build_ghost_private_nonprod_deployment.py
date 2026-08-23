@@ -30,10 +30,20 @@ PROJECT = "chummer-build-ghost-private-nonprod"
 DEPLOYED_STATUS = "deployed-private-nonprod"
 BLOCKED_STATUS = "blocked"
 FALLBACK_TEXT = "Deterministic private Rook deployment attestation."
+CANONICAL_REPO_ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_CANARY = CANONICAL_REPO_ROOT / "ops" / "build-ghost-private-nonprod" / "run-local-canary.sh"
+CANONICAL_EA_LIVE_OPS = Path("/docker/EA/scripts/ea_live_ops.py")
 GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 CONTAINER_ID = re.compile(r"^[0-9a-f]{64}$")
+COMPOSE_CONFIG_HASH = re.compile(r"^[0-9a-f]{64}$")
+DOCKER_TIMESTAMP = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z$"
+)
+REPO_DIGEST = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,511}@sha256:[0-9a-f]{64}$")
 SAFE_REASON = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,159}$")
+UTC_TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+PROVIDER_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,511}$")
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 MAX_COMMAND_BYTES = 2 * 1024 * 1024
 MAX_RECEIPT_BYTES = 512 * 1024
@@ -49,6 +59,92 @@ PROVIDER_GATES = (
     "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED",
     "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED",
 )
+PROVIDER_ACTIVATION_FIELDS = {
+    "sessions_created",
+    "grants_created",
+    "agents_mutated",
+    "voices_mutated",
+    "functions_mutated",
+    "scenarios_mutated",
+    "provider_resources_mutated",
+}
+TOUGH_TONGUE_CANDIDATE_ENV = {
+    "agent": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID",
+    "voice": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID",
+    "function": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID",
+    "scenario": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID",
+    "live_avatar": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID",
+}
+TOUGH_TONGUE_CONTRACT_DIGEST_ENV = "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST"
+TEAM_TRUTH_TOP_LEVEL_FIELDS = {
+    "schema", "generated_at", "provider_key", "probe_mode", "status", "ready",
+    "probe_ok", "reason", "blockers", "next_action", "source", "expectation_digest",
+    "contract", "accounts", "entitlements", "bindings", "ownership", "requests",
+    "provider_activation", "raw_credentials_exposed", "raw_account_identifiers_exposed",
+    "raw_candidate_identifiers_exposed", "evidence_digest", "receipt_digest",
+}
+TEAM_TRUTH_SOURCES = {
+    "local_fail_closed_preflight",
+    "tough_tongue_public_api:digest_bound_verified_get_contract",
+}
+TEAM_TRUTH_STATUSES = {
+    "blocked", "verified", "unverified", "auth_failed", "provider_error", "unavailable", "probe_failed",
+}
+TEAM_TRUTH_REASONS = {
+    "",
+    "tough_tongue_readback_contract_not_configured",
+    "tough_tongue_accounts_not_configured",
+    "tough_tongue_preferred_account_ref_missing",
+    "tough_tongue_preferred_account_ref_invalid",
+    "tough_tongue_preferred_account_ref_not_found",
+    "tough_tongue_preferred_account_ref_ambiguous",
+    "tough_tongue_candidate_agent_ref_missing",
+    "tough_tongue_candidate_voice_ref_missing",
+    "tough_tongue_candidate_function_ref_missing",
+    "tough_tongue_candidate_scenario_ref_missing",
+    "tough_tongue_candidate_live_avatar_ref_missing",
+    "tough_tongue_readback_auth_failed",
+    "tough_tongue_readback_http_error",
+    "tough_tongue_readback_unreachable",
+    "tough_tongue_readback_invalid_response",
+    "tough_tongue_binding_evidence_mismatch",
+}
+TEAM_TRUTH_NEXT_ACTIONS = {
+    "",
+    "supply_operator_verified_tough_tongue_readback_contract",
+    "verify_tough_tongue_read_only_credentials_and_contract",
+    "reprobe_tough_tongue_read_only_bindings",
+    "inspect_tough_tongue_read_only_contract_drift",
+    "review_tough_tongue_binding_readback_mismatch",
+}
+TEAM_TRUTH_CONTRACT_FIELDS = {
+    "schema", "configured", "verified", "digest", "source_type",
+    "source_ref_sha256", "verified_at", "methods",
+}
+TEAM_TRUTH_ACCOUNT_FIELDS = {
+    "configured_count", "distinct_count", "opaque_account_refs",
+    "preferred_account_ref", "preferred_account_ref_configured",
+    "preferred_account_ref_valid", "preferred_match_count",
+    "preferred_ownership_verified",
+}
+TEAM_TRUTH_ENTITLEMENT_FIELDS = {
+    "plan_readback", "premium_verified", "live_avatar_verified",
+    "observed_plan_ref_sha256",
+}
+TEAM_TRUTH_BINDING_FIELDS = {
+    "configured", "ref_sha256", "readback", "reference_match",
+    "account_owner_match", "organization_owner_match",
+}
+TEAM_TRUTH_SCENARIO_FIELDS = TEAM_TRUTH_BINDING_FIELDS | {
+    "live_avatar_match", "live_avatar_provider_allowed", "voice_match",
+    "function_match", "observed_live_avatar_provider_ref_sha256",
+}
+TEAM_TRUTH_OWNERSHIP_FIELDS = {
+    "account_verified", "organization_verified", "all_candidate_resources_verified",
+}
+TEAM_TRUTH_REQUEST_FIELDS = {
+    "attempted_count", "methods", "mutation_request_count", "response_bodies_persisted",
+}
 PRESENTATION_SOURCE_LABELS = {
     "hub": "run.chummer.build-ghost.hub-revision",
     "presentation": "org.opencontainers.image.revision",
@@ -280,6 +376,130 @@ def _environment_values(inspect: Mapping[str, Any], name: str) -> list[str]:
     return [row[len(prefix) :] for row in rows if isinstance(row, str) and row.startswith(prefix)]
 
 
+def _upstream_digest(value: Mapping[str, Any]) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return _digest(raw)
+
+
+def _opaque_ref(value: str) -> str:
+    normalized = value.strip()
+    if SHA256.fullmatch(normalized.lower()):
+        return normalized.lower()
+    return _digest(normalized.encode("utf-8")) if normalized else ""
+
+
+def _single_environment_value(
+    inspect: Mapping[str, Any],
+    name: str,
+    blockers: list[str],
+    reason: str,
+) -> str:
+    values = _environment_values(inspect, name)
+    if len(values) != 1:
+        _add(blockers, reason)
+        return ""
+    return values[0]
+
+
+def _deployed_tough_tongue_binding(
+    inspect: Mapping[str, Any],
+    blockers: list[str],
+) -> dict[str, Any]:
+    account_raw = _single_environment_value(
+        inspect,
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS",
+        blockers,
+        "deployed-tough-tongue-account-refs-invalid",
+    )
+    credential_raw = _single_environment_value(
+        inspect,
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS",
+        blockers,
+        "deployed-tough-tongue-credential-slots-invalid",
+    )
+    account_refs = account_raw.split(";") if account_raw else []
+    credential_slots = credential_raw.split(";") if credential_raw else []
+    account_refs_valid = (
+        3 <= len(account_refs) <= 32
+        and all(SHA256.fullmatch(value) for value in account_refs)
+        and len(set(account_refs)) == len(account_refs)
+    )
+    credential_slots_valid = (
+        len(credential_slots) == len(account_refs)
+        and all(value and value == value.strip() for value in credential_slots)
+        and len(set(credential_slots)) == len(credential_slots)
+    )
+    if not account_refs_valid:
+        _add(blockers, "deployed-tough-tongue-account-refs-invalid")
+        account_refs = []
+    if not credential_slots_valid:
+        _add(blockers, "deployed-tough-tongue-credential-slots-invalid")
+        credential_slots = []
+
+    preferred = _single_environment_value(
+        inspect,
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF",
+        blockers,
+        "deployed-tough-tongue-preferred-account-ref-invalid",
+    )
+    if SHA256.fullmatch(preferred) is None or preferred not in account_refs:
+        _add(blockers, "deployed-tough-tongue-preferred-account-ref-invalid")
+        preferred = ""
+
+    candidate_digests: dict[str, str] = {}
+    for kind, name in TOUGH_TONGUE_CANDIDATE_ENV.items():
+        raw = _single_environment_value(
+            inspect,
+            name,
+            blockers,
+            f"deployed-tough-tongue-{kind.replace('_', '-')}-ref-invalid",
+        )
+        if raw != raw.strip() or PROVIDER_REF.fullmatch(raw) is None:
+            _add(blockers, f"deployed-tough-tongue-{kind.replace('_', '-')}-ref-invalid")
+            raw = ""
+        candidate_digests[kind] = _opaque_ref(raw)
+
+    contract_digest = _single_environment_value(
+        inspect,
+        TOUGH_TONGUE_CONTRACT_DIGEST_ENV,
+        blockers,
+        "deployed-tough-tongue-readback-contract-digest-invalid",
+    )
+    if SHA256.fullmatch(contract_digest) is None:
+        _add(blockers, "deployed-tough-tongue-readback-contract-digest-invalid")
+        contract_digest = ""
+
+    expectation_payload = {
+        "preferred_account_ref": preferred,
+        "candidate_refs": dict(sorted(candidate_digests.items())),
+    }
+    configured = bool(
+        account_refs
+        and credential_slots
+        and preferred
+        and contract_digest
+        and all(candidate_digests.values())
+    )
+    return {
+        "configured": configured,
+        "accountRefCount": len(account_refs),
+        "credentialSlotCount": len(credential_slots),
+        "accountRefs": sorted(account_refs),
+        "accountRefsDigest": _upstream_digest({"account_refs": sorted(account_refs)}),
+        "preferredAccountRef": preferred,
+        "candidateRefDigests": candidate_digests,
+        "expectationDigest": _upstream_digest(expectation_payload),
+        "readOnlyContractDigest": contract_digest,
+        "rawCandidateRefsPersisted": False,
+        "rawCredentialsPersisted": False,
+    }
+
+
 def _docker_object(
     runner: CommandRunner,
     args: Sequence[str],
@@ -302,12 +522,22 @@ def _safe_image_projection(
     role: str,
 ) -> dict[str, Any]:
     image_id = image.get("Id")
-    if image_id != expected_id or not isinstance(image_id, str) or SHA256.fullmatch(image_id) is None:
+    image_id_valid = (
+        image_id == expected_id
+        and isinstance(image_id, str)
+        and SHA256.fullmatch(image_id) is not None
+    )
+    if not image_id_valid:
         _add(blockers, f"{role}-image-identity-invalid")
     repo_digests = image.get("RepoDigests")
     if repo_digests is None:
         repo_digests = []
-    if not isinstance(repo_digests, list) or not all(isinstance(value, str) for value in repo_digests):
+    if (
+        not isinstance(repo_digests, list)
+        or len(repo_digests) > 32
+        or any(not isinstance(value, str) or REPO_DIGEST.fullmatch(value) is None for value in repo_digests)
+        or (repo_digests and sorted(set(repo_digests)) != sorted(repo_digests))
+    ):
         _add(blockers, f"{role}-image-repo-digests-invalid")
         repo_digests = []
     rootfs = image.get("RootFS")
@@ -318,7 +548,7 @@ def _safe_image_projection(
         _add(blockers, f"{role}-image-layer-digests-invalid")
         layers = []
     projection = {
-        "imageId": image_id if isinstance(image_id, str) else "",
+        "imageId": image_id if image_id_valid else "",
         "repoDigests": sorted(repo_digests),
         "rootFsLayerDigests": layers,
     }
@@ -453,12 +683,26 @@ def _collect_runtime(
                 blockers,
             )
             compose_binding["matchesAttesterSource"] = compose_binding["sha256"] == expected_compose_sha
+            if not compose_binding["matchesAttesterSource"]:
+                _add(blockers, f"{role}-runtime-compose-source-drift")
+            started_at = state.get("StartedAt")
+            if not isinstance(started_at, str) or DOCKER_TIMESTAMP.fullmatch(started_at) is None:
+                _add(blockers, f"{role}-container-started-at-invalid")
+                started_at = ""
+            compose_config_hash = labels.get("com.docker.compose.config-hash")
+            if (
+                not isinstance(compose_config_hash, str)
+                or COMPOSE_CONFIG_HASH.fullmatch(compose_config_hash) is None
+            ):
+                _add(blockers, f"{role}-compose-config-hash-invalid")
+                compose_config_hash = ""
+            safe_health = health_status if health_status in {"healthy", "none"} else "invalid"
             projection: dict[str, Any] = {
                 "containerId": f"sha256:{container_id}",
                 "image": _safe_image_projection(image, image_id, blockers, role),
-                "health": health_status,
-                "startedAt": state.get("StartedAt") if isinstance(state.get("StartedAt"), str) else "",
-                "composeConfigHash": labels.get("com.docker.compose.config-hash", ""),
+                "health": safe_health,
+                "startedAt": started_at,
+                "composeConfigHash": compose_config_hash,
                 "composeSource": compose_binding,
             }
             if role == "presentation":
@@ -573,8 +817,16 @@ def _collect_runtime(
             if not caddy_binding["matchesAttesterSource"]:
                 _add(blockers, "edge-runtime-caddy-source-drift")
             confinement["privateNetworkInternal"] = private.get("Internal") is True
-            confinement["privateNetworkId"] = private.get("Id", "")
-            confinement["loopbackNetworkId"] = loopback.get("Id", "")
+            private_network_id = private.get("Id")
+            loopback_network_id = loopback.get("Id")
+            if not isinstance(private_network_id, str) or CONTAINER_ID.fullmatch(private_network_id) is None:
+                _add(blockers, "private-network-id-invalid")
+                private_network_id = ""
+            if not isinstance(loopback_network_id, str) or CONTAINER_ID.fullmatch(loopback_network_id) is None:
+                _add(blockers, "loopback-network-id-invalid")
+                loopback_network_id = ""
+            confinement["privateNetworkId"] = private_network_id
+            confinement["loopbackNetworkId"] = loopback_network_id
             confinement["loopbackOnly"] = valid_bindings
         except (AttestationError, OSError):
             _add(blockers, "runtime-network-inspection-failed")
@@ -600,6 +852,24 @@ def _collect_runtime(
         for name, expected in required_ai.items():
             if _environment_values(ai_inspect, name) != [expected]:
                 _add(blockers, f"ai-runtime-contract-{name.lower()}-invalid")
+        runtime["toughTongueOpaqueBinding"] = _deployed_tough_tongue_binding(
+            ai_inspect,
+            blockers,
+        )
+    if "toughTongueOpaqueBinding" not in runtime:
+        runtime["toughTongueOpaqueBinding"] = {
+            "configured": False,
+            "accountRefCount": 0,
+            "credentialSlotCount": 0,
+            "accountRefs": [],
+            "accountRefsDigest": _upstream_digest({"account_refs": []}),
+            "preferredAccountRef": "",
+            "candidateRefDigests": {kind: "" for kind in TOUGH_TONGUE_CANDIDATE_ENV},
+            "expectationDigest": "",
+            "readOnlyContractDigest": "",
+            "rawCandidateRefsPersisted": False,
+            "rawCredentialsPersisted": False,
+        }
     presentation_inspect = raw_inspects.get("presentation")
     if presentation_inspect is not None:
         if _environment_values(
@@ -917,6 +1187,7 @@ def _probe_team_truth(
     timeout: int,
     max_age_seconds: int,
     clock: Callable[[], dt.datetime],
+    deployed_binding: Mapping[str, Any],
     blockers: list[str],
 ) -> dict[str, Any]:
     summary: dict[str, Any] = {
@@ -926,6 +1197,7 @@ def _probe_team_truth(
         "ready": False,
         "status": BLOCKED_STATUS,
         "blockers": [],
+        "bindingMatchesDeployedConfiguration": False,
     }
     with tempfile.TemporaryDirectory(prefix="chummer-build-ghost-team-truth-") as directory:
         receipt_path = Path(directory) / "tough-tongue-binding-receipt.json"
@@ -970,8 +1242,76 @@ def _probe_team_truth(
             _add(blockers, "tough-tongue-redacted-receipt-unverifiable")
             return summary
 
-        activation = payload.get("provider_activation")
-        requests = payload.get("requests")
+        schema_errors: list[str] = []
+
+        def exact_mapping(name: str, fields: set[str]) -> dict[str, Any]:
+            value = payload.get(name)
+            if not isinstance(value, dict) or set(value) != fields:
+                schema_errors.append(f"{name}-fields")
+                return {}
+            return value
+
+        if set(payload) != TEAM_TRUTH_TOP_LEVEL_FIELDS:
+            schema_errors.append("top-level-fields")
+
+        receipt_digest = payload.get("receipt_digest")
+        receipt_body = dict(payload)
+        receipt_body.pop("receipt_digest", None)
+        receipt_digest_valid = (
+            isinstance(receipt_digest, str)
+            and SHA256.fullmatch(receipt_digest) is not None
+            and receipt_digest == _upstream_digest(receipt_body)
+        )
+        if not receipt_digest_valid:
+            schema_errors.append("receipt-digest")
+
+        evidence_digest = payload.get("evidence_digest")
+        evidence = {
+            "contract": payload.get("contract"),
+            "expectation_digest": payload.get("expectation_digest"),
+            "accounts": payload.get("accounts"),
+            "entitlements": payload.get("entitlements"),
+            "bindings": payload.get("bindings"),
+            "ownership": payload.get("ownership"),
+            "requests": payload.get("requests"),
+            "provider_activation": payload.get("provider_activation"),
+        }
+        evidence_digest_valid = (
+            isinstance(evidence_digest, str)
+            and SHA256.fullmatch(evidence_digest) is not None
+            and evidence_digest == _upstream_digest(evidence)
+        )
+        if not evidence_digest_valid:
+            schema_errors.append("evidence-digest")
+
+        status_value = payload.get("status")
+        source_value = payload.get("source")
+        reason_value = payload.get("reason")
+        next_action_value = payload.get("next_action")
+        generated_value = payload.get("generated_at")
+        expectation_digest = payload.get("expectation_digest")
+        if payload.get("schema") != "ea.tough_tongue.read_only_binding_receipt.v1":
+            schema_errors.append("schema")
+        if payload.get("provider_key") != "tough_tongue":
+            schema_errors.append("provider-key")
+        if payload.get("probe_mode") != "strict_read_only_get":
+            schema_errors.append("probe-mode")
+        if not isinstance(status_value, str) or status_value not in TEAM_TRUTH_STATUSES:
+            schema_errors.append("status")
+        if not isinstance(source_value, str) or source_value not in TEAM_TRUTH_SOURCES:
+            schema_errors.append("source")
+        if not isinstance(reason_value, str) or reason_value not in TEAM_TRUTH_REASONS:
+            schema_errors.append("reason")
+        if not isinstance(next_action_value, str) or next_action_value not in TEAM_TRUTH_NEXT_ACTIONS:
+            schema_errors.append("next-action")
+        if not isinstance(generated_value, str) or UTC_TIMESTAMP.fullmatch(generated_value) is None:
+            schema_errors.append("generated-at")
+        if not isinstance(expectation_digest, str) or SHA256.fullmatch(expectation_digest) is None:
+            schema_errors.append("expectation-digest")
+        for name in ("ready", "probe_ok"):
+            if type(payload.get(name)) is not bool:
+                schema_errors.append(name)
+
         raw_safe = all(
             payload.get(name) is False
             for name in (
@@ -980,105 +1320,333 @@ def _probe_team_truth(
                 "raw_credentials_exposed",
             )
         )
-        activation_safe = isinstance(activation, dict) and activation and all(
-            value is False for value in activation.values()
-        )
-        request_safe = (
-            isinstance(requests, dict)
-            and requests.get("mutation_request_count") == 0
-            and requests.get("response_bodies_persisted") is False
-            and isinstance(requests.get("methods"), list)
-            and all(method == "GET" for method in requests["methods"])
-        )
         if not raw_safe:
             _add(blockers, "tough-tongue-live-ops-receipt-not-redacted")
+
+        upstream_raw = payload.get("blockers")
+        safe_upstream: list[str] = []
+        if (
+            not isinstance(upstream_raw, list)
+            or any(not isinstance(reason, str) or reason not in TEAM_TRUTH_REASONS - {""} for reason in upstream_raw)
+            or (
+                all(isinstance(reason, str) for reason in upstream_raw)
+                and len(upstream_raw) != len(set(upstream_raw))
+            )
+        ):
+            schema_errors.append("blockers")
+        else:
+            safe_upstream = list(upstream_raw)
+            for reason in safe_upstream:
+                _add(blockers, f"tough-tongue:{reason}")
+
+        activation = exact_mapping("provider_activation", PROVIDER_ACTIVATION_FIELDS)
+        activation_safe = bool(activation) and all(
+            activation.get(name) is False for name in PROVIDER_ACTIVATION_FIELDS
+        )
         if not activation_safe:
             _add(blockers, "tough-tongue-live-ops-provider-activation-observed")
-        if not request_safe or payload.get("probe_mode") != "strict_read_only_get":
+
+        requests = exact_mapping("requests", TEAM_TRUTH_REQUEST_FIELDS)
+        attempted_count = requests.get("attempted_count")
+        request_safe = (
+            type(attempted_count) is int
+            and 0 <= attempted_count <= 5
+            and requests.get("methods") == (["GET"] if attempted_count else [])
+            and requests.get("mutation_request_count") == 0
+            and type(requests.get("mutation_request_count")) is int
+            and requests.get("response_bodies_persisted") is False
+        )
+        if not request_safe:
+            schema_errors.append("requests")
             _add(blockers, "tough-tongue-live-ops-probe-not-read-only")
-        generated = _parse_timestamp(payload.get("generated_at"))
+
+        contract = exact_mapping("contract", TEAM_TRUTH_CONTRACT_FIELDS)
+        contract_configured = contract.get("configured")
+        contract_verified = contract.get("verified")
+        contract_configured_valid = (
+            type(contract_configured) is bool
+            and type(contract_verified) is bool
+            and contract.get("schema") == "ea.tough_tongue.read_only_binding_contract.v1"
+            and (
+                (
+                    contract_configured is True
+                    and contract_verified is True
+                    and isinstance(contract.get("digest"), str)
+                    and SHA256.fullmatch(contract["digest"]) is not None
+                    and isinstance(contract.get("source_type"), str)
+                    and contract.get("source_type") in {
+                        "provider_documentation", "captured_read_only_api"
+                    }
+                    and isinstance(contract.get("source_ref_sha256"), str)
+                    and SHA256.fullmatch(contract["source_ref_sha256"]) is not None
+                    and isinstance(contract.get("verified_at"), str)
+                    and UTC_TIMESTAMP.fullmatch(contract["verified_at"]) is not None
+                    and _parse_timestamp(contract["verified_at"]) is not None
+                    and contract.get("methods") == ["GET"]
+                )
+                or (
+                    contract_configured is False
+                    and contract_verified is False
+                    and contract.get("digest") == ""
+                    and contract.get("source_type") == ""
+                    and contract.get("source_ref_sha256") == ""
+                    and contract.get("verified_at") == ""
+                    and contract.get("methods") == []
+                )
+            )
+        )
+        if not contract_configured_valid:
+            schema_errors.append("contract")
+
+        accounts = exact_mapping("accounts", TEAM_TRUTH_ACCOUNT_FIELDS)
+        account_count = accounts.get("configured_count")
+        distinct_count = accounts.get("distinct_count")
+        account_refs = accounts.get("opaque_account_refs")
+        preferred_ref = accounts.get("preferred_account_ref")
+        account_schema_valid = (
+            type(account_count) is int
+            and type(distinct_count) is int
+            and 0 <= distinct_count <= account_count <= 32
+            and isinstance(account_refs, list)
+            and all(isinstance(value, str) for value in account_refs)
+            and account_refs == sorted(set(account_refs))
+            and len(account_refs) == distinct_count
+            and all(SHA256.fullmatch(value) for value in account_refs)
+            and isinstance(preferred_ref, str)
+            and (preferred_ref == "" or SHA256.fullmatch(preferred_ref) is not None)
+            and accounts.get("preferred_account_ref_configured") is bool(preferred_ref)
+            and accounts.get("preferred_account_ref_valid") is bool(
+                preferred_ref and SHA256.fullmatch(preferred_ref)
+            )
+            and type(accounts.get("preferred_match_count")) is int
+            and 0 <= accounts.get("preferred_match_count", -1) <= account_count
+            and type(accounts.get("preferred_ownership_verified")) is bool
+        )
+        if not account_schema_valid:
+            schema_errors.append("accounts")
+
+        entitlements = exact_mapping("entitlements", TEAM_TRUTH_ENTITLEMENT_FIELDS)
+        observed_plan_ref = entitlements.get("observed_plan_ref_sha256")
+        entitlement_schema_valid = (
+            all(type(entitlements.get(name)) is bool for name in (
+                "plan_readback", "premium_verified", "live_avatar_verified"
+            ))
+            and isinstance(observed_plan_ref, str)
+            and (observed_plan_ref == "" or SHA256.fullmatch(observed_plan_ref) is not None)
+        )
+        if not entitlement_schema_valid:
+            schema_errors.append("entitlements")
+
+        ownership = exact_mapping("ownership", TEAM_TRUTH_OWNERSHIP_FIELDS)
+        ownership_schema_valid = bool(ownership) and all(
+            type(ownership.get(name)) is bool for name in TEAM_TRUTH_OWNERSHIP_FIELDS
+        )
+        if not ownership_schema_valid:
+            schema_errors.append("ownership")
+
+        bindings_value = payload.get("bindings")
+        bindings = bindings_value if isinstance(bindings_value, dict) else {}
+        binding_schema_valid = set(bindings) == {"agent", "voice", "function", "scenario"}
+        for kind in ("agent", "voice", "function", "scenario"):
+            row = bindings.get(kind)
+            expected_fields = (
+                TEAM_TRUTH_SCENARIO_FIELDS
+                if kind == "scenario" and payload.get("probe_ok") is True
+                else TEAM_TRUTH_BINDING_FIELDS
+            )
+            if not isinstance(row, dict) or set(row) != expected_fields:
+                binding_schema_valid = False
+                continue
+            ref_digest = row.get("ref_sha256")
+            if (
+                not isinstance(ref_digest, str)
+                or (ref_digest == "" and row.get("configured") is not False)
+                or (ref_digest != "" and SHA256.fullmatch(ref_digest) is None)
+                or any(type(row.get(name)) is not bool for name in (
+                    "configured", "readback", "reference_match",
+                    "account_owner_match", "organization_owner_match",
+                ))
+            ):
+                binding_schema_valid = False
+            if kind == "scenario" and expected_fields == TEAM_TRUTH_SCENARIO_FIELDS:
+                provider_digest = row.get("observed_live_avatar_provider_ref_sha256")
+                if (
+                    any(type(row.get(name)) is not bool for name in (
+                        "live_avatar_match", "live_avatar_provider_allowed",
+                        "voice_match", "function_match",
+                    ))
+                    or not isinstance(provider_digest, str)
+                    or (provider_digest != "" and SHA256.fullmatch(provider_digest) is None)
+                ):
+                    binding_schema_valid = False
+        if not binding_schema_valid:
+            schema_errors.append("bindings")
+
+        generated = _parse_timestamp(generated_value)
         observed_at = clock().astimezone(dt.timezone.utc)
         age = (observed_at - generated).total_seconds() if generated else None
         fresh = age is not None and -5 <= age <= max_age_seconds
         if not fresh:
             _add(blockers, "tough-tongue-live-ops-receipt-not-fresh")
 
-        upstream = payload.get("blockers")
-        upstream = upstream if isinstance(upstream, list) else []
-        safe_upstream: list[str] = []
-        for reason in upstream:
-            if isinstance(reason, str) and SAFE_REASON.fullmatch(reason):
-                safe_upstream.append(reason)
-                _add(blockers, f"tough-tongue:{reason}")
-            else:
-                _add(blockers, "tough-tongue:unsafe-upstream-blocker")
-        accounts = payload.get("accounts") if isinstance(payload.get("accounts"), dict) else {}
-        bindings = payload.get("bindings") if isinstance(payload.get("bindings"), dict) else {}
-        entitlements = payload.get("entitlements") if isinstance(payload.get("entitlements"), dict) else {}
-        ownership = payload.get("ownership") if isinstance(payload.get("ownership"), dict) else {}
-        contract = payload.get("contract") if isinstance(payload.get("contract"), dict) else {}
-        account_count = accounts.get("configured_count")
-        distinct_count = accounts.get("distinct_count")
+        deployed_account_refs = deployed_binding.get("accountRefs")
+        deployed_candidates = deployed_binding.get("candidateRefDigests")
+        account_binding_match = (
+            deployed_binding.get("configured") is True
+            and account_schema_valid
+            and account_count == deployed_binding.get("accountRefCount")
+            and distinct_count == deployed_binding.get("accountRefCount")
+            and account_refs == deployed_account_refs
+        )
+        preferred_binding_match = (
+            account_schema_valid
+            and preferred_ref == deployed_binding.get("preferredAccountRef")
+        )
+        expectation_binding_match = (
+            isinstance(expectation_digest, str)
+            and expectation_digest == deployed_binding.get("expectationDigest")
+        )
+        contract_binding_match = (
+            isinstance(contract.get("digest"), str)
+            and contract.get("digest") == deployed_binding.get("readOnlyContractDigest")
+        )
+        candidate_binding_match = binding_schema_valid and isinstance(deployed_candidates, dict)
+        if candidate_binding_match:
+            candidate_binding_match = all(
+                bindings[kind].get("ref_sha256") == deployed_candidates.get(kind)
+                for kind in ("agent", "voice", "function", "scenario")
+            )
+        if not account_binding_match:
+            _add(blockers, "tough-tongue-deployed-account-set-mismatch")
+        if not preferred_binding_match:
+            _add(blockers, "tough-tongue-deployed-preferred-account-mismatch")
+        if not expectation_binding_match:
+            _add(blockers, "tough-tongue-deployed-expectation-digest-mismatch")
+        if not contract_binding_match:
+            _add(blockers, "tough-tongue-deployed-readback-contract-digest-mismatch")
+        if not candidate_binding_match:
+            _add(blockers, "tough-tongue-deployed-candidate-binding-mismatch")
+        binding_match = all((
+            account_binding_match,
+            preferred_binding_match,
+            expectation_binding_match,
+            contract_binding_match,
+            candidate_binding_match,
+        ))
+
+        if schema_errors:
+            _add(blockers, "tough-tongue-live-ops-receipt-schema-invalid")
         ready = (
-            payload.get("schema") == "ea.tough_tongue.read_only_binding_receipt.v1"
-            and payload.get("provider_key") == "tough_tongue"
+            not schema_errors
+            and result.returncode == 0
+            and receipt_digest_valid
+            and evidence_digest_valid
+            and fresh
+            and raw_safe
+            and activation_safe
+            and request_safe
+            and binding_match
+            and status_value == "verified"
+            and source_value == "tough_tongue_public_api:digest_bound_verified_get_contract"
             and payload.get("probe_ok") is True
             and payload.get("ready") is True
-            and payload.get("status") in {"ready", "pass", "passed"}
-            and not safe_upstream
+            and reason_value == ""
+            and next_action_value == ""
+            and safe_upstream == []
+            and account_count == distinct_count
             and isinstance(account_count, int)
             and 3 <= account_count <= 32
-            and distinct_count == account_count
+            and accounts.get("preferred_account_ref_configured") is True
             and accounts.get("preferred_account_ref_valid") is True
             and accounts.get("preferred_match_count") == 1
             and accounts.get("preferred_ownership_verified") is True
+            and contract_configured_valid
+            and contract.get("configured") is True
+            and contract.get("verified") is True
+            and entitlements.get("plan_readback") is True
             and entitlements.get("premium_verified") is True
             and entitlements.get("live_avatar_verified") is True
             and ownership.get("account_verified") is True
             and ownership.get("organization_verified") is True
             and ownership.get("all_candidate_resources_verified") is True
-            and contract.get("configured") is True
-            and contract.get("verified") is True
-            and contract.get("methods") == ["GET"]
-            and requests.get("attempted_count", 0) > 0
-            and requests.get("methods") == ["GET"]
-            and isinstance(bindings, dict)
-            and set(bindings) == {"agent", "voice", "function", "scenario"}
+            and attempted_count == 5
             and all(
-                isinstance(value, dict)
-                and value.get("configured") is True
-                and value.get("readback") is True
-                and value.get("reference_match") is True
-                and value.get("account_owner_match") is True
-                and value.get("organization_owner_match") is True
-                for value in bindings.values()
+                bindings[kind].get(name) is True
+                for kind in ("agent", "voice", "function", "scenario")
+                for name in (
+                    "configured", "readback", "reference_match",
+                    "account_owner_match", "organization_owner_match",
+                )
             )
+            and all(bindings["scenario"].get(name) is True for name in (
+                "live_avatar_match", "live_avatar_provider_allowed", "voice_match", "function_match"
+            ))
+            and isinstance(bindings["scenario"].get("observed_live_avatar_provider_ref_sha256"), str)
+            and SHA256.fullmatch(bindings["scenario"]["observed_live_avatar_provider_ref_sha256"])
+            is not None
         )
         if not ready:
             _add(blockers, "tough-tongue-team-account-truth-not-ready")
         summary = {
-            "schema": payload.get("schema", ""),
+            "schema": (
+                "ea.tough_tongue.read_only_binding_receipt.v1"
+                if payload.get("schema") == "ea.tough_tongue.read_only_binding_receipt.v1"
+                else ""
+            ),
             "fresh": fresh,
-            "generatedAt": payload.get("generated_at", ""),
+            "generatedAt": generated_value if generated is not None else "",
             "ageSeconds": int(age) if age is not None else None,
             "redacted": raw_safe,
             "strictReadOnlyGet": request_safe and payload.get("probe_mode") == "strict_read_only_get",
             "providerMutationObserved": not activation_safe,
             "ready": ready,
-            "status": payload.get("status", BLOCKED_STATUS),
-            "source": payload.get("source", ""),
-            "configuredAccountCount": accounts.get("configured_count"),
-            "distinctAccountCount": accounts.get("distinct_count"),
-            "preferredAccountConfigured": accounts.get("preferred_account_ref_configured"),
-            "preferredAccountOwnershipVerified": accounts.get("preferred_ownership_verified"),
-            "premiumVerified": entitlements.get("premium_verified"),
-            "liveAvatarVerified": entitlements.get("live_avatar_verified"),
-            "organizationOwnershipVerified": ownership.get("organization_verified"),
-            "candidateResourcesOwnershipVerified": ownership.get("all_candidate_resources_verified"),
-            "probeRequestCount": requests.get("attempted_count") if isinstance(requests, dict) else None,
-            "probeMutationRequestCount": requests.get("mutation_request_count") if isinstance(requests, dict) else None,
-            "upstreamEvidenceDigest": payload.get("evidence_digest", ""),
-            "upstreamReceiptDigest": payload.get("receipt_digest", ""),
+            "status": (
+                status_value
+                if isinstance(status_value, str) and status_value in TEAM_TRUTH_STATUSES
+                else BLOCKED_STATUS
+            ),
+            "source": (
+                source_value
+                if isinstance(source_value, str) and source_value in TEAM_TRUTH_SOURCES
+                else "invalid"
+            ),
+            "configuredAccountCount": account_count if type(account_count) is int else None,
+            "distinctAccountCount": distinct_count if type(distinct_count) is int else None,
+            "preferredAccountConfigured": (
+                accounts.get("preferred_account_ref_configured")
+                if type(accounts.get("preferred_account_ref_configured")) is bool else None
+            ),
+            "preferredAccountOwnershipVerified": (
+                accounts.get("preferred_ownership_verified")
+                if type(accounts.get("preferred_ownership_verified")) is bool else None
+            ),
+            "premiumVerified": (
+                entitlements.get("premium_verified")
+                if type(entitlements.get("premium_verified")) is bool else None
+            ),
+            "liveAvatarVerified": (
+                entitlements.get("live_avatar_verified")
+                if type(entitlements.get("live_avatar_verified")) is bool else None
+            ),
+            "organizationOwnershipVerified": (
+                ownership.get("organization_verified")
+                if type(ownership.get("organization_verified")) is bool else None
+            ),
+            "candidateResourcesOwnershipVerified": (
+                ownership.get("all_candidate_resources_verified")
+                if type(ownership.get("all_candidate_resources_verified")) is bool else None
+            ),
+            "probeRequestCount": attempted_count if type(attempted_count) is int else None,
+            "probeMutationRequestCount": (
+                requests.get("mutation_request_count")
+                if type(requests.get("mutation_request_count")) is int else None
+            ),
+            "bindingMatchesDeployedConfiguration": binding_match,
+            "deployedAccountRefCount": deployed_binding.get("accountRefCount"),
+            "expectationDigestMatchesDeployed": expectation_binding_match,
+            "readOnlyContractDigestMatchesDeployed": contract_binding_match,
+            "upstreamEvidenceDigest": evidence_digest if evidence_digest_valid else "",
+            "upstreamReceiptDigest": receipt_digest if receipt_digest_valid else "",
             "receiptFileSha256": _digest(receipt_raw),
             "blockers": sorted(set(safe_upstream)),
         }
@@ -1133,7 +1701,7 @@ def _write_new_receipt(path: Path, payload: Mapping[str, Any]) -> None:
         os.close(parent_fd)
 
 
-def attest(
+def _attest(
     *,
     repo_root: Path,
     output: Path,
@@ -1166,15 +1734,6 @@ def attest(
             _add(blockers, f"source-{name.lower()}-unverifiable")
     sources["git"] = _collect_git_source(repo_root, runner, blockers)
 
-    team_truth = _probe_team_truth(
-        runner,
-        live_ops,
-        live_ops_timeout,
-        team_truth_max_age,
-        clock,
-        blockers,
-    )
-
     runtime_blockers_before = len(blockers)
     runtime_before, raw_before = _collect_runtime(
         runner,
@@ -1184,6 +1743,15 @@ def attest(
         project,
     )
     runtime_added_blockers = blockers[runtime_blockers_before:]
+    team_truth = _probe_team_truth(
+        runner,
+        live_ops,
+        live_ops_timeout,
+        team_truth_max_age,
+        clock,
+        runtime_before["toughTongueOpaqueBinding"],
+        blockers,
+    )
     presentation_id = raw_before.get("presentation", {}).get("Id", "")
     packet_before = _packet_store_state(runner, presentation_id, blockers, "before") \
         if presentation_id else {"authority": "unverified", "pending": -1, "claims": -1, "audit": -1, "revocations": -1}
@@ -1264,23 +1832,11 @@ def attest(
 
 
 def _arguments() -> argparse.Namespace:
-    repo_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(
-        description="Generate a fail-closed Build Ghost private nonprod deployment attestation."
+        description="Generate a fail-closed Build Ghost private nonprod deployment attestation.",
+        allow_abbrev=False,
     )
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--repo-root", type=Path, default=repo_root)
-    parser.add_argument(
-        "--canary",
-        type=Path,
-        default=repo_root / "ops" / "build-ghost-private-nonprod" / "run-local-canary.sh",
-    )
-    parser.add_argument(
-        "--ea-live-ops",
-        type=Path,
-        default=Path("/docker/EA/scripts/ea_live_ops.py"),
-    )
-    parser.add_argument("--project", default=PROJECT)
     parser.add_argument("--canary-timeout-seconds", type=int, default=900)
     parser.add_argument("--live-ops-timeout-seconds", type=int, default=30)
     parser.add_argument("--team-truth-max-age-seconds", type=int, default=120)
@@ -1293,17 +1849,16 @@ def main() -> int:
         not 30 <= args.canary_timeout_seconds <= 900
         or not 5 <= args.live_ops_timeout_seconds <= 120
         or not 30 <= args.team_truth_max_age_seconds <= 300
-        or not SAFE_REASON.fullmatch(args.project)
     ):
         print("build_ghost_private_nonprod_attestation=failed stage=arguments", file=sys.stderr)
         return 2
     try:
-        payload = attest(
-            repo_root=args.repo_root.resolve(),
-            output=args.output,
-            canary=args.canary.resolve(),
-            live_ops=args.ea_live_ops.resolve(),
-            project=args.project,
+        payload = _attest(
+            repo_root=CANONICAL_REPO_ROOT,
+            output=args.output.resolve(),
+            canary=CANONICAL_CANARY,
+            live_ops=CANONICAL_EA_LIVE_OPS,
+            project=PROJECT,
             canary_timeout=args.canary_timeout_seconds,
             live_ops_timeout=args.live_ops_timeout_seconds,
             team_truth_max_age=args.team_truth_max_age_seconds,

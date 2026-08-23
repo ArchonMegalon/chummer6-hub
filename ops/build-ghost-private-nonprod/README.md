@@ -251,6 +251,18 @@ binds all of the following:
   agent, voice, function, and scenario ownership truth without raw credentials
   or provider resource identifiers.
 
+The production CLI has no repository, Compose project, canary, or live-ops
+path override. Those authorities are fixed to this reviewed checkout, the
+literal `chummer-build-ghost-private-nonprod` project, its checked-in canary,
+and `/docker/EA/scripts/ea_live_ops.py`. The AI container must carry the exact
+opaque account-ref set and preferred account ref plus candidate agent, voice,
+function, scenario, and live-avatar refs. It must also carry
+`EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST`. The attester hashes the
+candidate refs, binds the resulting expectation digest and account count/set to
+the live receipt, verifies that receipt's canonical evidence and receipt
+digests, and requires the read-only contract digest to equal the deployed
+opaque value. Missing or mismatched inputs cannot mint a deployment claim.
+
 Any missing, stale, ambiguous, drifting, non-redacted, or non-passing evidence
 produces status `blocked`, a null claim, a nonzero exit, and explicit
 machine-safe blocker codes. The attester never changes a Compose service,
