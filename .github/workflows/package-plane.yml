@@ -9,6 +9,46 @@ permissions:
   contents: read
 
 jobs:
+  observe-skill-group-package-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Install the digest-locked private .NET SDK
+        shell: bash
+        run: |
+          hub_dotnet_script="${RUNNER_TEMP}/chummer-hub-dotnet-install.sh"
+          hub_dotnet_root="${RUNNER_TEMP}/chummer-hub-dotnet"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            https://dot.net/v1/dotnet-install.sh --output "${hub_dotnet_script}"
+          echo "082f7685e156738a1b2e2ed8381a621870d4ce8e8c59278034556f05c186eb2e  ${hub_dotnet_script}" \
+            | sha256sum --check --strict
+          bash "${hub_dotnet_script}" \
+            --version 10.0.103 \
+            --install-dir "${hub_dotnet_root}" \
+            --no-path
+          echo "${hub_dotnet_root}" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=${hub_dotnet_root}" >> "${GITHUB_ENV}"
+      - name: Observe the deterministic Skill-Group package bytes
+        shell: bash
+        run: |
+          test "$(dotnet --version)" = "10.0.103"
+          python3 scripts/ai/bootstrap-hub-package-feed.py \
+            --repo-root . \
+            --feed "${RUNNER_TEMP}/observed-hub-feed" \
+            --dotnet dotnet \
+            --observe-package-authority
+      - name: Upload the observed feed without selecting it as authority
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: observed-skill-group-package-authority-${{ github.sha }}
+          path: ${{ runner.temp }}/observed-hub-feed
+          if-no-files-found: error
+          retention-days: 1
+
   no-siblings:
     runs-on: ubuntu-latest
     timeout-minutes: 30
