@@ -20,9 +20,20 @@ if (!HasValidArguments(args))
         + "transport-proof, prove-authority-ready [runtime-role], "
         + "prove-empty-authority [runtime-role], "
         + "prove-runtime-role [runtime-role], prove-local-store-state, "
-        + "prove-local-store-absent, "
+        + "prove-local-store-absent, preflight-local-recovery, "
+        + "prove-local-import-acknowledged, "
         + "or import-local --confirm-empty-authority");
     return 64;
+}
+
+if (args[0] == "preflight-local-recovery")
+{
+    return PreflightLocalRecovery();
+}
+
+if (args[0] == "prove-local-import-acknowledged")
+{
+    return await ProveLocalImportAcknowledgedAsync();
 }
 
 if (args[0] == "import-local")
@@ -184,6 +195,8 @@ static bool HasValidArguments(string[] values)
         ["transport-proof"] => true,
         ["prove-local-store-state"] => true,
         ["prove-local-store-absent"] => true,
+        ["preflight-local-recovery"] => true,
+        ["prove-local-import-acknowledged"] => true,
         ["grant-runtime" or "prepare"] => true,
         ["grant-runtime" or "prepare", _] => true,
         ["prove-authority-ready" or "prove-empty-authority" or "prove-runtime-role"] => true,
@@ -191,6 +204,162 @@ static bool HasValidArguments(string[] values)
         ["import-local", "--confirm-empty-authority"] => true,
         _ => false
     };
+
+static int PreflightLocalRecovery()
+{
+    try
+    {
+        IConfiguration configuration = RecoveryConfiguration();
+        var environment = new ImportHostEnvironment();
+        using ServiceProvider services = BuildRecoveryDataProtection(
+            configuration,
+            environment);
+        string storagePath = InstallLinkingStore.ResolveStoragePath(configuration);
+        if (!string.Equals(
+                storagePath,
+                InstallLinkingLocalStoreAbsenceProof.CanonicalStorePath,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The InstallLinking local recovery preflight requires the canonical state path.");
+        }
+
+        InstallLinkingLocalRecoveryPreflightProof proof =
+            InstallLinkingLocalRecoveryInspector.Inspect(
+                storagePath,
+                services.GetRequiredService<IDataProtectionProvider>());
+        WriteCanonicalJson(
+            new SortedDictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["contractName"] =
+                    "chummer.install_linking_local_recovery_preflight.v1",
+                ["dataProtectionReady"] = true,
+                ["floorGeneration"] = proof.FloorGeneration,
+                ["floorPresent"] = proof.FloorPresent,
+                ["floorSnapshotSha256"] = proof.FloorSnapshotSha256,
+                ["intentPresent"] = proof.IntentPresent,
+                ["intentSha256"] = proof.IntentSha256,
+                ["intentState"] = proof.IntentState,
+                ["localStorePresent"] = true,
+                ["retainedSnapshotSha256"] = proof.RetainedSnapshotSha256,
+                ["sourceEnvelopeSha256"] = proof.SourceEnvelopeSha256,
+                ["sourceGeneration"] = proof.SourceGeneration,
+                ["sourceSnapshotSha256"] = proof.SourceSnapshotSha256,
+                ["status"] = "pass"
+            });
+        return 0;
+    }
+    catch (Exception exception) when (exception is
+        InvalidOperationException or InvalidDataException or CryptographicException
+        or IOException or UnauthorizedAccessException or JsonException
+        or FormatException or NotSupportedException)
+    {
+        Console.Error.WriteLine(
+            $"InstallLinking local recovery preflight failed ({exception.GetType().Name}).");
+        return 1;
+    }
+}
+
+static async Task<int> ProveLocalImportAcknowledgedAsync()
+{
+    try
+    {
+        IConfiguration configuration = RecoveryConfiguration();
+        var environment = new ImportHostEnvironment();
+        using ServiceProvider services = BuildRecoveryDataProtection(
+            configuration,
+            environment);
+        string storagePath = InstallLinkingStore.ResolveStoragePath(configuration);
+        if (!string.Equals(
+                storagePath,
+                InstallLinkingLocalStoreAbsenceProof.CanonicalStorePath,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The InstallLinking local recovery acknowledgement requires the canonical state path.");
+        }
+
+        string runtimeConnectionString =
+            InstallLinkingPostgresConnectionConfiguration
+                .LoadRuntimeConnectionString(configuration, environment);
+        await using NpgsqlDataSource dataSource =
+            NpgsqlDataSource.Create(runtimeConnectionString);
+        var authority = new NpgsqlInstallLinkingSnapshotAuthority(dataSource);
+        using InstallLinkingAuthoritativeEnvelope envelope =
+            await authority.ReadCurrentAsync();
+        InstallLinkingLocalRecoveryAcknowledgementProof proof =
+            InstallLinkingLocalRecoveryInspector.ProveAcknowledged(
+                storagePath,
+                services.GetRequiredService<IDataProtectionProvider>(),
+                envelope);
+        await using NpgsqlConnection connection = await dataSource.OpenConnectionAsync();
+        string authorityIdentitySha256 =
+            await InstallLinkingPostgresAuthorityIdentity.ComputeSha256Async(connection);
+        WriteCanonicalJson(
+            new SortedDictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["authorityIdentitySha256"] = authorityIdentitySha256,
+                ["contractName"] =
+                    "chummer.install_linking_local_recovery_acknowledgement.v1",
+                ["envelopeSha256"] = proof.EnvelopeSha256,
+                ["floorSnapshotSha256"] = proof.FloorSnapshotSha256,
+                ["generation"] = proof.Generation,
+                ["localAcknowledged"] = true,
+                ["localStoreSha256"] = proof.LocalStoreSha256,
+                ["snapshotSha256"] = proof.SnapshotSha256,
+                ["status"] = "pass"
+            });
+        return 0;
+    }
+    catch (Exception exception) when (exception is
+        NpgsqlException or InvalidOperationException or InvalidDataException
+        or CryptographicException or IOException or UnauthorizedAccessException
+        or JsonException or FormatException or NotSupportedException)
+    {
+        Console.Error.WriteLine(
+            $"InstallLinking local recovery acknowledgement failed ({exception.GetType().Name}).");
+        return 1;
+    }
+}
+
+static IConfiguration RecoveryConfiguration()
+    => new ConfigurationBuilder()
+        .AddEnvironmentVariables()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ASPNETCORE_ENVIRONMENT"] = Environments.Production
+        })
+        .Build();
+
+static ServiceProvider BuildRecoveryDataProtection(
+    IConfiguration configuration,
+    IHostEnvironment environment)
+{
+    if (string.IsNullOrWhiteSpace(
+            configuration["CHUMMER_DATA_PROTECTION_KEYS_PATH"]))
+    {
+        throw new InvalidOperationException(
+            "The recovery probe requires an explicit data-protection key-ring path.");
+    }
+
+    var services = new ServiceCollection();
+    string keyRingPath = HubRuntimePathDefaults.ResolveDataProtectionKeysPath(
+        configuration,
+        environment);
+    DataProtectionKeyProtectionStatus protection =
+        DataProtectionKeyProtectionConfigurator.Configure(
+            services,
+            configuration,
+            environment,
+            keyRingPath);
+    if (!protection.Ready)
+    {
+        throw new CryptographicException(
+            "The recovery probe could not open the encrypted data-protection key ring.");
+    }
+
+    return services.BuildServiceProvider();
+}
 
 static async Task<int> ProveRuntimeAuthorityAsync(
     string command,

@@ -443,6 +443,54 @@ mirror over PostgreSQL, weaken TLS or role separation, or blind-retry an ambiguo
 the PostgreSQL authority and data-protection key material separately; both are required to recover
 linked-account records.
 
+### Exceptional fresh-authority recovery
+
+The local PostgreSQL container name or a `private-stage` label never makes InstallLinking data
+disposable. Prefer a hash-bound PostgreSQL restore that preserves the prior authority identity,
+state digest, generation, and commit chain. Use the fresh-authority lane only after the operator has
+explicitly accepted that the old append-only history and authority-state identity cannot be
+restored and that the decryptable, floor-valid retained local mirror is the sole seed.
+
+`scripts/run_install_linking_fresh_authority_recovery.py` defaults to a non-networked, read-only
+preflight. It mounts the exact existing state volume read-only and proves the canonical mirror,
+Data Protection custody, protected floor, and any retained import intent without writing a writer
+lock or reading protected contents into a receipt. Missing, unsafe, undecryptable, malformed, or
+behind-floor state fails closed. Pin an existing tool image by image ID; the dedicated recovery
+Compose file has `pull_policy: never` and never builds or pulls an image.
+
+The mutation lane additionally requires all of the following:
+
+1. A caller-owned, single-link, regular mode-`0400` operator decision receipt and its externally
+   supplied SHA-256. Its exact v1 contract binds the recovery ID, old identity/state/generation/
+   commit count, expected new authority identity, tool image ID, state volume, bounded approval
+   timestamps, and four explicit acknowledgements: no usable old backup, accepted identity/history
+   reset, accepted retained-mirror sole seed, and portal/tunnel stopped.
+2. The unmistakable `--confirm-new-authority-and-history-reset` argument. Supplying decision or old/
+   new authority inputs without this argument is rejected.
+3. A fresh mode-`0700` receipt root, the exact external network and state volume, owner-only env and
+   credential files, and independently stopped portal/tunnel containers with no running state-volume
+   consumer.
+
+Before `prepare`, the wrapper fsyncs an immutable mutation intent and acquires the shared public-edge
+mutation lease. It proves authenticated TLS, prepares schema and grants, and proves the authority is
+exactly empty generation 0 with zero commits before invoking the tool's only mutating command:
+
+```text
+import-local --confirm-empty-authority
+```
+
+The import coordinator persists the exact no-clobber import intent before its PostgreSQL compare-
+and-swap. An ambiguous outcome retains that intent, the receipt chain, and the shared lease. Resume
+is permitted only with `--resume-unknown`, the same immutable decision and mutation intent, and an
+authority that is still either empty generation 0 or the exact generation-1 result. Never create a
+second intent or release the retained lease by hand.
+
+Success requires post-import TLS and schema proofs, exact runtime-role grants, a nonempty authority
+at generation 1 with one commit, and a read-only proof that the local protected envelope and floor
+exactly acknowledge that PostgreSQL head. The resulting recovery receipt is not a deployment
+boundary. Run the normal cutover afterward in a new receipt root; it remains seeded-only and must
+record `import_not_required_seeded_authority`.
+
 ## Mode A: Legacy/dev filesystem source candidate (shared mount; never production)
 
 This lane exists only for legacy development, isolated source candidates, and migration rehearsal.

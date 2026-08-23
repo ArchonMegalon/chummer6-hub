@@ -1,0 +1,168 @@
+services:
+  install-linking-fresh-recovery-preflight:
+    image: "${CHUMMER_INSTALL_LINKING_RECOVERY_TOOL_IMAGE:?Pin the exact recovery tool image ID}"
+    pull_policy: never
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys-v2
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH: /run/chummer-secrets/data-protection-key-encryption.pfx
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
+      CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
+    volumes:
+      - chummer-install-linking-recovery-state:/app/state:ro
+      - "${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the owner-only PKCS#12 recovery certificate}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro"
+      - "${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the owner-only certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro"
+    command:
+      - preflight-local-recovery
+    network_mode: none
+
+  install-linking-fresh-recovery-admin:
+    image: "${CHUMMER_INSTALL_LINKING_RECOVERY_TOOL_IMAGE:?Pin the exact recovery tool image ID}"
+    pull_policy: never
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    environment:
+      CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-migrator.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the reviewed PostgreSQL DNS name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: "${CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE:?Set the reviewed PostgreSQL database name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: "${CHUMMER_INSTALL_LINKING_POSTGRES_PORT:?Set the reviewed PostgreSQL port}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the pre-existing runtime role}"
+    volumes:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_MIGRATOR_CONNECTION_FILE:?Set the owner-only migrator connection file}:/run/chummer-secrets/install-linking-postgres-migrator.connection-string:ro"
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the reviewed PostgreSQL server CA}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro"
+    command:
+      - refuse-recovery-admin-without-wrapper
+    networks:
+      - chummer-install-linking-recovery-network
+
+  install-linking-fresh-recovery-runtime-proof:
+    image: "${CHUMMER_INSTALL_LINKING_RECOVERY_TOOL_IMAGE:?Pin the exact recovery tool image ID}"
+    pull_policy: never
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the reviewed PostgreSQL DNS name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: "${CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE:?Set the reviewed PostgreSQL database name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: "${CHUMMER_INSTALL_LINKING_POSTGRES_PORT:?Set the reviewed PostgreSQL port}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the pre-existing runtime role}"
+    volumes:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the owner-only runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro"
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the reviewed PostgreSQL server CA}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro"
+    command:
+      - refuse-recovery-runtime-proof-without-wrapper
+    networks:
+      - chummer-install-linking-recovery-network
+
+  install-linking-fresh-recovery-import:
+    image: "${CHUMMER_INSTALL_LINKING_RECOVERY_TOOL_IMAGE:?Pin the exact recovery tool image ID}"
+    pull_policy: never
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys-v2
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH: /run/chummer-secrets/data-protection-key-encryption.pfx
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
+      CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
+      CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the reviewed PostgreSQL DNS name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: "${CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE:?Set the reviewed PostgreSQL database name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: "${CHUMMER_INSTALL_LINKING_POSTGRES_PORT:?Set the reviewed PostgreSQL port}"
+    volumes:
+      - chummer-install-linking-recovery-state:/app/state
+      - "${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the owner-only PKCS#12 recovery certificate}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro"
+      - "${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the owner-only certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro"
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the owner-only runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro"
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the reviewed PostgreSQL server CA}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro"
+    command:
+      - refuse-import-without-recovery-wrapper
+    networks:
+      - chummer-install-linking-recovery-network
+
+  install-linking-fresh-recovery-acknowledgement:
+    image: "${CHUMMER_INSTALL_LINKING_RECOVERY_TOOL_IMAGE:?Pin the exact recovery tool image ID}"
+    pull_policy: never
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys-v2
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH: /run/chummer-secrets/data-protection-key-encryption.pfx
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
+      CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
+      CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the reviewed PostgreSQL DNS name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: "${CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE:?Set the reviewed PostgreSQL database name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: "${CHUMMER_INSTALL_LINKING_POSTGRES_PORT:?Set the reviewed PostgreSQL port}"
+    volumes:
+      - chummer-install-linking-recovery-state:/app/state:ro
+      - "${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the owner-only PKCS#12 recovery certificate}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro"
+      - "${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the owner-only certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro"
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the owner-only runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro"
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the reviewed PostgreSQL server CA}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro"
+    command:
+      - prove-local-import-acknowledged
+    networks:
+      - chummer-install-linking-recovery-network
+
+volumes:
+  chummer-install-linking-recovery-state:
+    external: true
+    name: "${CHUMMER_INSTALL_LINKING_RECOVERY_STATE_VOLUME:?Pin the exact existing state volume}"
+
+networks:
+  chummer-install-linking-recovery-network:
+    external: true
+    name: "${CHUMMER_INSTALL_LINKING_RECOVERY_NETWORK:?Pin the exact existing recovery network}"
