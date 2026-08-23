@@ -181,7 +181,7 @@ removal or prune operations.
 Use `deploy-presentation-with-rollback.sh` only after the six source paths and
 six exact 40-character revision variables above identify clean isolated
 checkouts. This release helper additionally requires Presentation revision
-`8090e53f6dd64794145d81d7698394e4881d0c02`, the exact remote-main squash being
+`1c492202ac708f302b59f47c2bb1e4c67e352328`, the exact remote-main squash being
 deployed, and revalidates all six clean source trees after the build immediately
 before activation. The helper and the AI deployer deliberately acquire the same
 nonblocking host-local lock, so their activations cannot overlap. It applies
