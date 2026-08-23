@@ -27,8 +27,8 @@
       "project": "Chummer.Contracts/Chummer.Contracts.csproj",
       "license_type": "expression",
       "license_value": "GPL-3.0-only",
-      "nupkg_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "nupkg_size_bytes": 1
+      "nupkg_sha256": "dedf322dd26ba5aed99f6471cc7a199c84432683db97ab9b82e041b7f980f11d",
+      "nupkg_size_bytes": 2567362
     },
     {
       "id": "Chummer.Hub.Registry.Contracts",
@@ -79,7 +79,7 @@
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "18c7123b5dcd5c67de8fac1afd8bddd1776dcab533713f6a7f07321bd1663a69",
+      "nupkg_sha256": "e21c2fe40a34938cf0a7c3788d358bf7b1fdefb9bda3d2d4bb31f88fa9952966",
       "nupkg_size_bytes": 1450256
     },
     {
@@ -91,8 +91,8 @@
       "project": "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
       "license_type": "expression",
       "license_value": "GPL-3.0-only",
-      "nupkg_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "nupkg_size_bytes": 1
+      "nupkg_sha256": "295d0cd421bae074ec2abde209dd666aa56c493d8a01b51463847f1cdd1a01fc",
+      "nupkg_size_bytes": 1870430
     }
   ]
 }
