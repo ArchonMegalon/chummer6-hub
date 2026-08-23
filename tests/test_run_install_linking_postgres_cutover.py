@@ -1085,6 +1085,127 @@ def test_context_provenance_accepts_reviewable_source_paths(path: str) -> None:
     )
 
 
+TRUSTED_PUBLIC_KEY_PEM = b"""-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEArgIeUuDTWhbN/3cuKgjgnirg3WnHfUKjaDb83DKBUt8=
+-----END PUBLIC KEY-----
+"""
+
+
+def test_context_provenance_accepts_only_parsed_exact_trusted_public_pem(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    expected_path = module.TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATH
+    public_key = tmp_path / expected_path
+    public_key.parent.mkdir(parents=True)
+    public_key.write_bytes(TRUSTED_PUBLIC_KEY_PEM)
+
+    def callback(arguments, _timeout, check):
+        assert arguments == [
+            module.TRUSTED_OPENSSL,
+            "pkey",
+            "-pubin",
+            "-inform",
+            "PEM",
+            "-in",
+            str(public_key),
+            "-noout",
+        ]
+        assert not check
+        completed = subprocess.run(
+            arguments,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        return module.CommandResult(
+            completed.returncode,
+            completed.stdout,
+            completed.stderr,
+        )
+
+    commands = FakeCommands(callback)
+    runner = make_runner(module, tmp_path, commands)
+
+    assert not runner._tracked_context_entry_is_rejected(
+        tmp_path,
+        expected_path,
+    )
+    assert len(commands.calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "contents", "expected_openssl_calls"),
+    (
+        (
+            "ops/trusted-observability-attesters/other.public.pem",
+            TRUSTED_PUBLIC_KEY_PEM,
+            0,
+        ),
+        (
+            "ops/trusted-observability-attesters/"
+            "local-observability-operator-2026.public.pem",
+            b"""-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEINzQLP0TUl8Zb48DnJf0WfBB0fD5O2OhI9k0lPhdVkOa
+-----END PRIVATE KEY-----
+""",
+            0,
+        ),
+        (
+            "ops/trusted-observability-attesters/"
+            "local-observability-operator-2026.public.pem",
+            b"""-----BEGIN PUBLIC KEY-----
+not-valid-base64***
+-----END PUBLIC KEY-----
+""",
+            0,
+        ),
+        (
+            "ops/trusted-observability-attesters/"
+            "local-observability-operator-2026.public.pem",
+            b"""-----BEGIN PUBLIC KEY-----
+bm90LWFuLWFzbi4xLXB1YmxpYy1rZXk=
+-----END PUBLIC KEY-----
+""",
+            1,
+        ),
+    ),
+)
+def test_context_provenance_rejects_untrusted_or_invalid_pem(
+    tmp_path: Path,
+    relative_path: str,
+    contents: bytes,
+    expected_openssl_calls: int,
+) -> None:
+    module = load_module()
+    candidate = tmp_path / relative_path
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    candidate.write_bytes(contents)
+    def callback(arguments, _timeout, _check):
+        completed = subprocess.run(
+            arguments,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        return module.CommandResult(
+            completed.returncode,
+            completed.stdout,
+            completed.stderr,
+        )
+
+    commands = FakeCommands(callback)
+    runner = make_runner(module, tmp_path, commands)
+
+    assert runner._tracked_context_entry_is_rejected(
+        tmp_path,
+        relative_path,
+    )
+    assert len(commands.calls) == expected_openssl_calls
+
+
 def admin_inspection(module, runner) -> dict:
     mounts = [
         {
