@@ -112,6 +112,14 @@ custody as separately protected assets. A database restore behind the local prot
 failed closed; restore the matching/newer PITR point or follow a governed recovery procedure. Never
 delete the floor or promote the local mirror to make readiness green.
 
+The exceptional fresh-authority recovery controller does not make the mirror an ordinary rollback
+authority. Its default command is a read-only mirror/key-ring/floor preflight. A new authority and
+history reset requires an immutable, externally digest-pinned operator decision plus the explicit
+`--confirm-new-authority-and-history-reset` flag. It imports only after an exact empty-generation-0
+proof, retains an exact durable intent across ambiguity, and requires generation-1/one-commit and
+local-envelope/floor acknowledgement proofs before it can pass. This recovery receipt seeds the
+database only; the ordinary public-edge cutover remains seeded-authority-only.
+
 The flagship certificate cutover is a non-destructive path rotation. The candidate portal and
 import job use `/app/state/data-protection-keys-v2`, while the exact incumbent retains
 `/app/state/data-protection-keys` for rollback. Do not copy, rewrite, or delete the legacy XML during

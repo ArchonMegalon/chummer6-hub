@@ -843,6 +843,487 @@ internal sealed class InstallLinkingOneShotImportSession : IDisposable
     public void Dispose() => _writerLease.Dispose();
 }
 
+internal sealed record InstallLinkingLocalRecoveryPreflightProof(
+    long SourceGeneration,
+    string SourceEnvelopeSha256,
+    string SourceSnapshotSha256,
+    string RetainedSnapshotSha256,
+    bool FloorPresent,
+    long? FloorGeneration,
+    string? FloorSnapshotSha256,
+    bool IntentPresent,
+    string? IntentState,
+    string? IntentSha256);
+
+internal sealed record InstallLinkingLocalRecoveryAcknowledgementProof(
+    long Generation,
+    string SnapshotSha256,
+    string EnvelopeSha256,
+    string LocalStoreSha256,
+    string FloorSnapshotSha256);
+
+/// <summary>
+/// Performs the fresh-authority recovery probes without opening a writer lease or writing local
+/// state. The caller must still provide an independently configured Data Protection provider.
+/// </summary>
+internal static class InstallLinkingLocalRecoveryInspector
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(
+        JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+
+    public static InstallLinkingLocalRecoveryPreflightProof Inspect(
+        string storagePath,
+        IDataProtectionProvider dataProtectionProvider,
+        TimeProvider? timeProvider = null,
+        string trustedStateRoot = InstallLinkingLocalStoreAbsenceProof.TrustedStateRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(storagePath);
+        ArgumentNullException.ThrowIfNull(dataProtectionProvider);
+        RequireState(storagePath, required: true, trustedStateRoot);
+        IDataProtector protector = dataProtectionProvider.CreateProtector(
+            InstallLinkingStore.DataProtectionPurpose);
+        IDataProtector legacyProtector = dataProtectionProvider.CreateProtector(
+            InstallLinkingStore.LegacyDataProtectionPurpose);
+        IDataProtector floorProtector = dataProtectionProvider.CreateProtector(
+            InstallLinkingStore.FloorDataProtectionPurpose);
+        byte[] envelopeBytes = InstallLinkingImportFileSystem.ReadOwnerOnlyFile(
+            storagePath,
+            InstallLinkingStore.MaxSnapshotBytes);
+        byte[]? snapshotBytes = null;
+        byte[]? retainedBytes = null;
+        try
+        {
+            (long sourceGeneration, bool migrating, InstallLinkingStoreSnapshot snapshot) =
+                ReadSnapshot(envelopeBytes, protector, legacyProtector, out snapshotBytes);
+            InstallLinkingStore.ValidateSnapshot(snapshot);
+            string floorPath = $"{storagePath}.floor";
+            FloorState? floor = ReadFloor(
+                floorPath,
+                floorProtector,
+                trustedStateRoot);
+            ValidateFloor(sourceGeneration, snapshotBytes, migrating, floor);
+            InstallLinkingStoreSnapshot retained = InstallLinkingStore.BuildRetainedSnapshot(
+                snapshot,
+                (timeProvider ?? TimeProvider.System).GetUtcNow());
+            InstallLinkingStore.ValidateSnapshot(retained);
+            retainedBytes = JsonSerializer.SerializeToUtf8Bytes(retained, JsonOptions);
+
+            string intentPath = $"{storagePath}.postgres-import.intent";
+            InstallLinkingLocalStoreEntryState intentState = RequireState(
+                intentPath,
+                required: false,
+                trustedStateRoot);
+            string? intentLifecycle = null;
+            string? intentSha256 = null;
+            if (intentState == InstallLinkingLocalStoreEntryState.Present)
+            {
+                byte[] intentBytes = InstallLinkingImportFileSystem.ReadOwnerOnlyFile(
+                    intentPath,
+                    InstallLinkingPostgresImportIntent.MaximumSerializedBytes);
+                try
+                {
+                    using InstallLinkingPostgresImportIntent intent =
+                        InstallLinkingPostgresImportIntent.Deserialize(intentBytes, JsonOptions);
+                    ValidateIntentEnvelope(intent, protector);
+                    intentLifecycle = intent.State;
+                    intentSha256 = HexSha256(intentBytes);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(intentBytes);
+                }
+            }
+
+            return new(
+                sourceGeneration,
+                HexSha256(envelopeBytes),
+                HexSha256(snapshotBytes),
+                HexSha256(retainedBytes),
+                floor is not null,
+                floor?.Generation,
+                floor?.SnapshotSha256,
+                intentState == InstallLinkingLocalStoreEntryState.Present,
+                intentLifecycle,
+                intentSha256);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(envelopeBytes);
+            if (snapshotBytes is not null)
+            {
+                CryptographicOperations.ZeroMemory(snapshotBytes);
+            }
+
+            if (retainedBytes is not null)
+            {
+                CryptographicOperations.ZeroMemory(retainedBytes);
+            }
+        }
+    }
+
+    public static InstallLinkingLocalRecoveryAcknowledgementProof
+        ProveAcknowledged(
+            string storagePath,
+            IDataProtectionProvider dataProtectionProvider,
+            InstallLinkingAuthoritativeEnvelope authority,
+            string trustedStateRoot = InstallLinkingLocalStoreAbsenceProof.TrustedStateRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(storagePath);
+        ArgumentNullException.ThrowIfNull(dataProtectionProvider);
+        ArgumentNullException.ThrowIfNull(authority);
+        if (authority.Generation != 1
+            || authority.CommitId is null
+            || authority.CommitId == Guid.Empty
+            || authority.EnvelopeVersion != InstallLinkingStore.EnvelopeVersion
+            || authority.SnapshotSha256 is not { Length: SHA256.HashSizeInBytes }
+            || authority.EnvelopeSha256 is not { Length: SHA256.HashSizeInBytes }
+            || authority.ProtectedEnvelope is not
+                { Length: > 0 and <= InstallLinkingStore.MaxSnapshotBytes })
+        {
+            throw new InvalidDataException(
+                "The InstallLinking recovery authority is not an exact generation-one result.");
+        }
+
+        RequireState(storagePath, required: true, trustedStateRoot);
+        if (RequireState(
+                $"{storagePath}.postgres-import.intent",
+                required: false,
+                trustedStateRoot) != InstallLinkingLocalStoreEntryState.Absent)
+        {
+            throw new InvalidDataException(
+                "The InstallLinking recovery import intent is not fully acknowledged.");
+        }
+
+        byte[] storeBytes = InstallLinkingImportFileSystem.ReadOwnerOnlyFile(
+            storagePath,
+            InstallLinkingStore.MaxSnapshotBytes);
+        byte[]? snapshotBytes = null;
+        try
+        {
+            if (!FixedEquals(storeBytes, authority.ProtectedEnvelope)
+                || !DigestMatches(storeBytes, authority.EnvelopeSha256))
+            {
+                throw new InvalidDataException(
+                    "The InstallLinking recovery mirror does not match PostgreSQL.");
+            }
+
+            IDataProtector protector = dataProtectionProvider.CreateProtector(
+                InstallLinkingStore.DataProtectionPurpose);
+            using JsonDocument document = StrictDocument(storeBytes);
+            ProtectedEnvelopeDescriptor descriptor =
+                InstallLinkingStore.ReadStrictProtectedPayload(document.RootElement);
+            if (descriptor.Version != InstallLinkingStore.EnvelopeVersion
+                || descriptor.Generation != 1)
+            {
+                throw new InvalidDataException(
+                    "The InstallLinking recovery mirror generation is invalid.");
+            }
+
+            snapshotBytes = Convert.FromBase64String(
+                protector.Unprotect(descriptor.ProtectedPayload));
+            InstallLinkingStoreSnapshot snapshot =
+                InstallLinkingStore.DeserializeImportSnapshot(snapshotBytes, JsonOptions);
+            InstallLinkingStore.ValidateSnapshot(snapshot);
+            if (!DigestMatches(snapshotBytes, authority.SnapshotSha256))
+            {
+                throw new InvalidDataException(
+                    "The InstallLinking recovery snapshot does not match PostgreSQL.");
+            }
+
+            IDataProtector floorProtector = dataProtectionProvider.CreateProtector(
+                InstallLinkingStore.FloorDataProtectionPurpose);
+            FloorState floor = ReadFloor(
+                    $"{storagePath}.floor",
+                    floorProtector,
+                    trustedStateRoot)
+                ?? throw new InvalidDataException(
+                    "The InstallLinking recovery floor is missing.");
+            string snapshotSha256 = Convert.ToHexStringLower(
+                authority.SnapshotSha256);
+            if (floor.Generation != 1
+                || !string.Equals(
+                    floor.SnapshotSha256,
+                    snapshotSha256,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "The InstallLinking recovery floor does not acknowledge PostgreSQL.");
+            }
+
+            return new(
+                1,
+                snapshotSha256,
+                Convert.ToHexStringLower(authority.EnvelopeSha256),
+                HexSha256(storeBytes),
+                floor.SnapshotSha256);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(storeBytes);
+            if (snapshotBytes is not null)
+            {
+                CryptographicOperations.ZeroMemory(snapshotBytes);
+            }
+        }
+    }
+
+    private static (
+        long Generation,
+        bool Migrating,
+        InstallLinkingStoreSnapshot Snapshot) ReadSnapshot(
+            byte[] envelopeBytes,
+            IDataProtector protector,
+            IDataProtector legacyProtector,
+            out byte[] snapshotBytes)
+    {
+        using JsonDocument document = StrictDocument(envelopeBytes);
+        JsonElement root = document.RootElement;
+        if (InstallLinkingStore.ContainsAnyEnvelopeProperty(root))
+        {
+            ProtectedEnvelopeDescriptor descriptor =
+                InstallLinkingStore.ReadStrictProtectedPayload(root);
+            string encodedSnapshot = descriptor.Version
+                == InstallLinkingStore.LegacyEnvelopeVersion
+                ? legacyProtector.Unprotect(descriptor.ProtectedPayload)
+                : protector.Unprotect(descriptor.ProtectedPayload);
+            snapshotBytes = Convert.FromBase64String(encodedSnapshot);
+            return (
+                descriptor.Generation,
+                descriptor.Version == InstallLinkingStore.LegacyEnvelopeVersion,
+                InstallLinkingStore.DeserializeImportSnapshot(snapshotBytes, JsonOptions));
+        }
+
+        InstallLinkingStore.ValidateLegacySnapshotShape(root);
+        snapshotBytes = envelopeBytes.ToArray();
+        return (
+            0,
+            true,
+            InstallLinkingStore.DeserializeImportSnapshot(snapshotBytes, JsonOptions));
+    }
+
+    private static FloorState? ReadFloor(
+        string floorPath,
+        IDataProtector floorProtector,
+        string trustedStateRoot)
+    {
+        InstallLinkingLocalStoreEntryState state = RequireState(
+            floorPath,
+            required: false,
+            trustedStateRoot);
+        if (state == InstallLinkingLocalStoreEntryState.Absent)
+        {
+            return null;
+        }
+
+        byte[] envelopeBytes = InstallLinkingImportFileSystem.ReadOwnerOnlyFile(
+            floorPath,
+            InstallLinkingStore.MaxSnapshotBytes);
+        try
+        {
+            using JsonDocument document = StrictDocument(envelopeBytes);
+            RequireExactProperties(
+                document.RootElement,
+                ["format", "version", "protectedPayload"],
+                "Install-linking local floor envelope");
+            JsonElement root = document.RootElement;
+            if (root.GetProperty("format").GetString()
+                    != InstallLinkingStore.FloorFormat
+                || !root.GetProperty("version").TryGetInt32(out int version)
+                || version != 1)
+            {
+                throw new InvalidDataException(
+                    "The InstallLinking local recovery floor is invalid.");
+            }
+
+            string? protectedPayload = root.GetProperty("protectedPayload").GetString();
+            if (string.IsNullOrWhiteSpace(protectedPayload))
+            {
+                throw new InvalidDataException(
+                    "The InstallLinking local recovery floor is invalid.");
+            }
+
+            byte[] payloadBytes = Convert.FromBase64String(
+                floorProtector.Unprotect(protectedPayload));
+            try
+            {
+                using JsonDocument payloadDocument = StrictDocument(payloadBytes);
+                RequireExactProperties(
+                    payloadDocument.RootElement,
+                    ["minimumEnvelopeVersion", "generation", "snapshotSha256"],
+                    "Install-linking local floor payload");
+                InstallLinkingStoreFloorPayload payload =
+                    JsonSerializer.Deserialize<InstallLinkingStoreFloorPayload>(
+                        payloadBytes,
+                        JsonOptions)
+                    ?? throw new InvalidDataException(
+                        "The InstallLinking local recovery floor is invalid.");
+                if (payload.MinimumEnvelopeVersion < InstallLinkingStore.EnvelopeVersion
+                    || payload.Generation < 1
+                    || payload.SnapshotSha256 is not { Length: 64 }
+                    || !payload.SnapshotSha256.All(Uri.IsHexDigit))
+                {
+                    throw new InvalidDataException(
+                        "The InstallLinking local recovery floor is invalid.");
+                }
+
+                return new(
+                    payload.Generation,
+                    payload.SnapshotSha256.ToLowerInvariant());
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(payloadBytes);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(envelopeBytes);
+        }
+    }
+
+    private static void ValidateFloor(
+        long sourceGeneration,
+        byte[] snapshotBytes,
+        bool migrating,
+        FloorState? floor)
+    {
+        if (floor is null)
+        {
+            return;
+        }
+
+        if (migrating || sourceGeneration < floor.Generation)
+        {
+            throw new InvalidDataException(
+                "The InstallLinking local recovery source is behind its floor.");
+        }
+
+        if (sourceGeneration == floor.Generation
+            && !string.Equals(
+                HexSha256(snapshotBytes),
+                floor.SnapshotSha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "The InstallLinking local recovery source does not match its floor.");
+        }
+    }
+
+    private static void ValidateIntentEnvelope(
+        InstallLinkingPostgresImportIntent intent,
+        IDataProtector protector)
+    {
+        using JsonDocument document = StrictDocument(intent.ProtectedEnvelope);
+        ProtectedEnvelopeDescriptor descriptor =
+            InstallLinkingStore.ReadStrictProtectedPayload(document.RootElement);
+        if (descriptor.Version != InstallLinkingStore.EnvelopeVersion
+            || descriptor.Generation != 1)
+        {
+            throw new InvalidDataException(
+                "The InstallLinking recovery import intent envelope is invalid.");
+        }
+
+        byte[] snapshotBytes = Convert.FromBase64String(
+            protector.Unprotect(descriptor.ProtectedPayload));
+        try
+        {
+            InstallLinkingStoreSnapshot snapshot =
+                InstallLinkingStore.DeserializeImportSnapshot(snapshotBytes, JsonOptions);
+            InstallLinkingStore.ValidateSnapshot(snapshot);
+            if (!DigestMatches(snapshotBytes, intent.SnapshotSha256))
+            {
+                throw new InvalidDataException(
+                    "The InstallLinking recovery import intent snapshot is invalid.");
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(snapshotBytes);
+        }
+    }
+
+    private static InstallLinkingLocalStoreEntryState RequireState(
+        string path,
+        bool required,
+        string trustedStateRoot)
+    {
+        InstallLinkingLocalStoreEntryState state =
+            InstallLinkingLocalStoreAbsenceProof.InspectRetainedEntry(
+                path,
+                trustedStateRoot);
+        if (state == InstallLinkingLocalStoreEntryState.Unsafe
+            || (required && state != InstallLinkingLocalStoreEntryState.Present))
+        {
+            throw new InvalidDataException(
+                "The InstallLinking local recovery path is missing or unsafe.");
+        }
+
+        return state;
+    }
+
+    private static JsonDocument StrictDocument(ReadOnlyMemory<byte> bytes)
+        => JsonDocument.Parse(
+            bytes,
+            new JsonDocumentOptions
+            {
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow,
+                MaxDepth = 128
+            });
+
+    private static void RequireExactProperties(
+        JsonElement root,
+        IReadOnlyCollection<string> expected,
+        string label)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException($"{label} is invalid.");
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonProperty property in root.EnumerateObject())
+        {
+            if (!expected.Contains(property.Name) || !seen.Add(property.Name))
+            {
+                throw new InvalidDataException($"{label} is invalid.");
+            }
+        }
+
+        if (seen.Count != expected.Count)
+        {
+            throw new InvalidDataException($"{label} is invalid.");
+        }
+    }
+
+    private static string HexSha256(ReadOnlySpan<byte> bytes)
+        => Convert.ToHexStringLower(SHA256.HashData(bytes));
+
+    private static bool DigestMatches(ReadOnlySpan<byte> bytes, byte[] expected)
+    {
+        byte[] actual = SHA256.HashData(bytes);
+        try
+        {
+            return FixedEquals(actual, expected);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(actual);
+        }
+    }
+
+    private static bool FixedEquals(byte[]? left, byte[]? right)
+        => left is not null
+           && right is not null
+           && left.Length == right.Length
+           && CryptographicOperations.FixedTimeEquals(left, right);
+
+    private sealed record FloorState(long Generation, string SnapshotSha256);
+}
+
 internal sealed class InstallLinkingPostgresImportIntent : IDisposable
 {
     public const int MaximumSerializedBytes =
