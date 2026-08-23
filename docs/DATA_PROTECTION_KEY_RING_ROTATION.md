@@ -38,10 +38,24 @@ host-side chown. The runtime attestation requires the portal, initializer, and b
 images to resolve the same positive numeric identity. `1654:1654` remains the Compose default for
 other installations, not a production override for this host.
 
-The offline-generated flagship custody certificate is RSA 3072, has critical key-encipherment and
-data-encipherment usage, remains valid through 2028-10-25, and is stored with its password as
-owner-`1000`, mode-`0600` files. Preserve those modes; do not copy either secret into the volume or
-receipts.
+The production custody bundle must contain only RSA private-key certificates with at least 2048-bit
+keys and encryption-capable key usage. The certificate with the unique latest expiry is the primary
+encryptor; it must already be valid and retain more than seven days of lifetime. Every other
+private-key certificate is decrypt-only rotation custody. The application accepts at most eight
+unique private-key certificates, performs its startup round trip against the exact mixed ring, and
+fails closed on an ambiguous latest expiry, duplicate identity, unsupported key, or near-expiry
+primary. Do not infer current custody validity from a date in source documentation; the exact
+mounted bundle is the runtime authority.
+
+For non-destructive certificate rotation, export the new primary certificate and every still-needed
+prior certificate, including each private key, into one PKCS#12 collection protected by the existing
+owner-only password-file contract. Keep the same container mount targets. New keys are protected by
+the unique latest-expiry primary while existing keys can still be decrypted by the retained prior
+certificates. A renewed certificate alone is not sufficient, even when it reuses the same RSA key,
+because Data Protection resolves the certificate identity recorded in each encrypted key file.
+Retain prior certificates until every supported protected payload and rollback window that depends
+on them has expired. Preserve owner-`1000`, mode-`0400` or `0600` files; do not copy the bundle,
+password, or private keys into the state volume or receipts.
 
 ## Consumer impact
 
