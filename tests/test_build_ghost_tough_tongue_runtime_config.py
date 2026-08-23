@@ -29,13 +29,8 @@ def canonical(value: object) -> bytes:
 
 
 def contract_payload() -> dict[str, object]:
-    common = {
-        "resource_ref": "id",
-        "account_ref": "owner.account",
-        "organization_ref": "owner.organization",
-    }
     return {
-        "schema": "ea.tough_tongue.read_only_binding_contract.v1",
+        "schema": "chummer.build_ghost.tough_tongue.read_only_binding_contract.v2",
         "provider_key": "tough_tongue",
         "base_url": "https://api.toughtongueai.com/api/public",
         "source_type": "provider_documentation",
@@ -44,45 +39,34 @@ def contract_payload() -> dict[str, object]:
             "operator_verified": True,
             "source_ref_sha256": "sha256:" + "a" * 64,
         },
+        "slot_cardinality": 6,
+        "maximum_snapshot_age_seconds": 900,
         "premium_plan_values": ["premium"],
-        "live_avatar_providers": ["anam", "liveavatar"],
-        "routes": {
-            "account": {
-                "method": "GET",
-                "path": "account",
-                "selectors": {
-                    "account_ref": "account.ref",
-                    "organization_ref": "account.organization",
-                    "plan_name": "subscription.plan",
-                    "live_avatar_entitled": "entitlements.live_avatar",
-                },
-            },
-            "agent": {"method": "GET", "path": "agents/{resource_ref}", "selectors": common},
-            "voice": {"method": "GET", "path": "voices/{resource_ref}", "selectors": common},
-            "function": {"method": "GET", "path": "functions/{resource_ref}", "selectors": common},
-            "scenario": {
-                "method": "GET",
-                "path": "scenarios/{resource_ref}",
-                "selectors": {
-                    **common,
-                    "live_avatar_ref": "appearance.live_avatar_id",
-                    "live_avatar_provider": "appearance.live_avatar_provider",
-                    "voice_ref": "voice.id",
-                    "function_refs": "functions.ids",
-                },
-            },
+        "live_avatar_providers": ["anam", "heygen"],
+        "documented_get_allowlist": {
+            "balance": {"method": "GET", "path": "balance"},
+            "subscriptions": {"method": "GET", "path": "subscriptions"},
+            "organizations": {"method": "GET", "path": "v2/organizations"},
+            "scenario": {"method": "GET", "path": "scenarios/{resource_ref}"},
         },
+        "normalization": {
+            "plan": "subscriptions.active.product_name",
+            "remaining_minutes": "balance.available_minutes",
+            "refresh_at": "balance.last_updated",
+            "organization": "organizations.id",
+            "resource_ownership": "organization_scoped_scenario_readback",
+        },
+        "unsupported_direct_resources": ["agent", "voice", "function", "avatar"],
     }
 
 
 def operator_payload(contract_path: Path, contract: dict[str, object]) -> dict[str, object]:
-    refs = ["sha256:" + character * 64 for character in "123"]
+    refs = ["sha256:" + character * 64 for character in "123456"]
     return {
         "schema": "chummer.build_ghost.tough_tongue.runtime_config.v1",
         "account_slots": [
-            {"account_ref": refs[0], "api_key": "private-read-only-key-one"},
-            {"account_ref": refs[1], "api_key": "private-read-only-key-two"},
-            {"account_ref": refs[2], "api_key": "private-read-only-key-three"},
+            {"account_ref": ref, "api_key": f"private-read-only-key-{index}", "organization_ref": f"org-{index}"}
+            for index, ref in enumerate(refs, start=1)
         ],
         "preferred_account_ref": refs[1],
         "candidate_refs": {
@@ -141,6 +125,9 @@ def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path
     environment_raw = environment.read_bytes()
     contract_raw = snapshot.read_bytes()
     assert receipt["status"] == "ready-for-read-only-probe"
+    assert receipt["accountRefCount"] == 6
+    assert receipt["organizationContextCount"] == 6
+    assert receipt["organizationRefsDigest"].startswith("sha256:")
     assert receipt["providerReadbackVerified"] is False
     assert receipt["providerActivationAuthorized"] is False
     assert receipt["providerMutationPerformed"] is False
@@ -155,6 +142,7 @@ def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path
     assert json.loads(contract_raw) == contract_payload()
     environment_text = environment_raw.decode()
     assert f"CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE={snapshot}" in environment_text
+    assert "TOUGH_TONGUE_ORGANIZATION_IDS=org-1;org-2;org-3;org-4;org-5;org-6" in environment_text
     rendered_receipt = receipt_path.read_text(encoding="utf-8")
     for slot in payload["account_slots"]:  # type: ignore[index]
         assert slot["api_key"] not in rendered_receipt
@@ -279,7 +267,7 @@ def test_preshaped_candidate_digest_is_never_accepted_as_a_raw_ref(
     assert source_contract.exists()
 
 
-@pytest.mark.parametrize("invalidity", ("authority", "method"))
+@pytest.mark.parametrize("invalidity", ("authority", "method", "path", "cardinality"))
 def test_contract_must_be_exact_get_only_and_operator_verified(
     tmp_path: Path, invalidity: str
 ):
@@ -288,14 +276,43 @@ def test_contract_must_be_exact_get_only_and_operator_verified(
     if invalidity == "authority":
         contract["authority"]["operator_verified"] = False  # type: ignore[index]
         expected = "read-only-contract-authority-invalid"
-    else:
-        contract["routes"]["scenario"]["method"] = "POST"  # type: ignore[index]
+    elif invalidity == "method":
+        contract["documented_get_allowlist"]["scenario"]["method"] = "POST"  # type: ignore[index]
         expected = "read-only-contract-route-scenario-invalid"
+    elif invalidity == "path":
+        contract["documented_get_allowlist"]["scenario"]["path"] = "agents/{resource_ref}"  # type: ignore[index]
+        expected = "read-only-contract-route-scenario-invalid"
+    else:
+        contract["slot_cardinality"] = 5
+        expected = "read-only-contract-cardinality-invalid"
     write_private_json(source_contract, contract)
     payload["read_only_contract"]["digest"] = digest(canonical(contract))  # type: ignore[index]
     write_private_json(config, payload)
 
     with pytest.raises(MODULE.ConfigError, match=expected):
+        MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert not environment.exists()
+
+
+def test_operator_config_requires_exactly_six_slots_before_any_output(tmp_path: Path):
+    config, environment, snapshot, receipt, _, payload = inputs(tmp_path)
+    payload["account_slots"] = payload["account_slots"][:5]  # type: ignore[index]
+    write_private_json(config, payload)
+
+    with pytest.raises(MODULE.ConfigError, match="account-slots-invalid"):
+        MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert not environment.exists()
+    assert not snapshot.exists()
+
+
+def test_optional_organization_context_is_all_or_none_to_preserve_slot_alignment(tmp_path: Path):
+    config, environment, snapshot, receipt, _, payload = inputs(tmp_path)
+    del payload["account_slots"][0]["organization_ref"]  # type: ignore[index]
+    write_private_json(config, payload)
+
+    with pytest.raises(MODULE.ConfigError, match="organization-refs-partial"):
         MODULE.materialize(config, environment, snapshot, receipt)
 
     assert not environment.exists()

@@ -21,28 +21,33 @@ from typing import Any, Mapping
 
 CONFIG_SCHEMA = "chummer.build_ghost.tough_tongue.runtime_config.v1"
 RECEIPT_SCHEMA = "chummer.build_ghost.tough_tongue.runtime_config_receipt.v1"
-CONTRACT_SCHEMA = "ea.tough_tongue.read_only_binding_contract.v1"
+CONTRACT_SCHEMA = "chummer.build_ghost.tough_tongue.read_only_binding_contract.v2"
 STATUS = "ready-for-read-only-probe"
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 PROVIDER_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,511}$")
 CREDENTIAL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._~+/@:=-]{15,511}$")
 SAFE_ABSOLUTE_PATH = re.compile(r"^/(?:[A-Za-z0-9._@:+~-]+/?)+$")
-SAFE_SELECTOR = re.compile(r"^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$")
 SAFE_LOWER_VALUE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
-SAFE_ROUTE_PATH = re.compile(r"^[A-Za-z0-9._~/-]*(?:\{resource_ref\})?[A-Za-z0-9._~/-]*$")
 VERIFIED_AT = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 MAX_CONFIG_BYTES = 256 * 1024
 MAX_ENVIRONMENT_BYTES = 256 * 1024
 MAX_CONTRACT_BYTES = 512 * 1024
 CANDIDATE_KINDS = ("agent", "voice", "function", "scenario", "live_avatar")
-ROUTE_NAMES = ("account", "agent", "voice", "function", "scenario")
-RESOURCE_SELECTORS = {"resource_ref", "account_ref", "organization_ref"}
-ACCOUNT_SELECTORS = {
-    "account_ref", "organization_ref", "plan_name", "live_avatar_entitled",
+EXPECTED_SLOT_COUNT = 6
+DOCUMENTED_GET_ROUTES = {
+    "balance": "balance",
+    "subscriptions": "subscriptions",
+    "organizations": "v2/organizations",
+    "scenario": "scenarios/{resource_ref}",
 }
-SCENARIO_SELECTORS = RESOURCE_SELECTORS | {
-    "live_avatar_ref", "live_avatar_provider", "voice_ref", "function_refs",
+NORMALIZATION = {
+    "plan": "subscriptions.active.product_name",
+    "remaining_minutes": "balance.available_minutes",
+    "refresh_at": "balance.last_updated",
+    "organization": "organizations.id",
+    "resource_ownership": "organization_scoped_scenario_readback",
 }
+UNSUPPORTED_DIRECT_RESOURCES = ["agent", "voice", "function", "avatar"]
 ENVIRONMENT_NAMES = {
     "agent": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID",
     "voice": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID",
@@ -206,7 +211,10 @@ def _candidate_digest(value: str) -> str:
 def _validated_contract(payload: dict[str, Any], expected_digest: str) -> None:
     required = {
         "schema", "provider_key", "base_url", "source_type", "verified_at",
-        "authority", "premium_plan_values", "live_avatar_providers", "routes",
+        "authority", "slot_cardinality", "maximum_snapshot_age_seconds",
+        "premium_plan_values", "live_avatar_providers",
+        "documented_get_allowlist", "normalization",
+        "unsupported_direct_resources",
     }
     if set(payload) != required:
         raise ConfigError("read-only-contract-schema-invalid")
@@ -214,8 +222,7 @@ def _validated_contract(payload: dict[str, Any], expected_digest: str) -> None:
         payload.get("schema") != CONTRACT_SCHEMA
         or payload.get("provider_key") != "tough_tongue"
         or payload.get("base_url") != "https://api.toughtongueai.com/api/public"
-        or payload.get("source_type")
-        not in {"provider_documentation", "captured_read_only_api"}
+        or payload.get("source_type") != "provider_documentation"
     ):
         raise ConfigError("read-only-contract-schema-invalid")
     verified_at = payload.get("verified_at")
@@ -250,46 +257,24 @@ def _validated_contract(payload: dict[str, Any], expected_digest: str) -> None:
         ):
             raise ConfigError("read-only-contract-entitlements-invalid")
 
-    routes = payload.get("routes")
-    if not isinstance(routes, dict) or set(routes) != set(ROUTE_NAMES):
+    if payload.get("slot_cardinality") != EXPECTED_SLOT_COUNT:
+        raise ConfigError("read-only-contract-cardinality-invalid")
+    maximum_age = payload.get("maximum_snapshot_age_seconds")
+    if not isinstance(maximum_age, int) or not 60 <= maximum_age <= 86400:
+        raise ConfigError("read-only-contract-freshness-invalid")
+    routes = payload.get("documented_get_allowlist")
+    if not isinstance(routes, dict) or set(routes) != set(DOCUMENTED_GET_ROUTES):
         raise ConfigError("read-only-contract-routes-invalid")
-    expected_selectors = {
-        "account": ACCOUNT_SELECTORS,
-        "agent": RESOURCE_SELECTORS,
-        "voice": RESOURCE_SELECTORS,
-        "function": RESOURCE_SELECTORS,
-        "scenario": SCENARIO_SELECTORS,
-    }
-    for name in ROUTE_NAMES:
+    for name, expected_path in DOCUMENTED_GET_ROUTES.items():
         route = routes.get(name)
-        if not isinstance(route, dict) or set(route) != {"method", "path", "selectors"}:
+        if not isinstance(route, dict) or set(route) != {"method", "path"}:
             raise ConfigError(f"read-only-contract-route-{name}-invalid")
-        path = route.get("path")
-        if (
-            route.get("method") != "GET"
-            or not isinstance(path, str)
-            or SAFE_ROUTE_PATH.fullmatch(path) is None
-            or path.startswith("/")
-            or ".." in path.split("/")
-            or path.count("{resource_ref}") != (0 if name == "account" else 1)
-            or (name == "account" and ("{" in path or "}" in path))
-            or (
-                name != "account"
-                and ("{" in path.replace("{resource_ref}", "") or "}" in path.replace("{resource_ref}", ""))
-            )
-        ):
+        if route.get("method") != "GET" or route.get("path") != expected_path:
             raise ConfigError(f"read-only-contract-route-{name}-invalid")
-        selectors = route.get("selectors")
-        if (
-            not isinstance(selectors, dict)
-            or set(selectors) != expected_selectors[name]
-            or any(
-                not isinstance(value, str)
-                or SAFE_SELECTOR.fullmatch(value) is None
-                for value in selectors.values()
-            )
-        ):
-            raise ConfigError(f"read-only-contract-route-{name}-invalid")
+    if payload.get("normalization") != NORMALIZATION:
+        raise ConfigError("read-only-contract-normalization-invalid")
+    if payload.get("unsupported_direct_resources") != UNSUPPORTED_DIRECT_RESOURCES:
+        raise ConfigError("read-only-contract-unsupported-resources-invalid")
 
     if _digest(_canonical(payload)) != expected_digest:
         raise ConfigError("read-only-contract-digest-mismatch")
@@ -309,25 +294,42 @@ def _validated_config(
         raise ConfigError("operator-config-schema-invalid")
 
     slots = payload.get("account_slots")
-    if not isinstance(slots, list) or not 3 <= len(slots) <= 32:
+    if not isinstance(slots, list) or len(slots) != EXPECTED_SLOT_COUNT:
         raise ConfigError("account-slots-invalid")
     account_refs: list[str] = []
     credentials: list[str] = []
+    organization_refs: list[str] = []
     for slot in slots:
-        if not isinstance(slot, dict) or set(slot) != {"account_ref", "api_key"}:
+        if (
+            not isinstance(slot, dict)
+            or set(slot) not in (
+                {"account_ref", "api_key"},
+                {"account_ref", "api_key", "organization_ref"},
+            )
+        ):
             raise ConfigError("account-slot-schema-invalid")
         account_ref = slot.get("account_ref")
         api_key = slot.get("api_key")
+        organization_ref = slot.get("organization_ref", "")
         if not isinstance(account_ref, str) or SHA256.fullmatch(account_ref) is None:
             raise ConfigError("account-ref-invalid")
         if not isinstance(api_key, str) or CREDENTIAL.fullmatch(api_key) is None:
             raise ConfigError("account-credential-invalid")
+        if (
+            not isinstance(organization_ref, str)
+            or organization_ref != organization_ref.strip()
+            or (organization_ref and PROVIDER_REF.fullmatch(organization_ref) is None)
+        ):
+            raise ConfigError("organization-ref-invalid")
         account_refs.append(account_ref)
         credentials.append(api_key)
+        organization_refs.append(organization_ref)
     if len(set(account_refs)) != len(account_refs):
         raise ConfigError("account-refs-not-distinct")
     if len(set(credentials)) != len(credentials):
         raise ConfigError("account-credentials-not-distinct")
+    if any(organization_refs) and not all(organization_refs):
+        raise ConfigError("organization-refs-partial")
 
     preferred = payload.get("preferred_account_ref")
     if not isinstance(preferred, str) or SHA256.fullmatch(preferred) is None:
@@ -372,6 +374,7 @@ def _validated_config(
     environment = {
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS": ";".join(credentials),
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS": ";".join(account_refs),
+        "TOUGH_TONGUE_ORGANIZATION_IDS": ";".join(organization_refs),
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF": preferred,
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE": str(
             contract_snapshot_path
@@ -400,6 +403,12 @@ def _validated_config(
         "accountRefCount": len(account_refs),
         "accountRefsDigest": _digest(
             _canonical({"account_refs": sorted(account_refs)})
+        ),
+        "organizationContextCount": sum(1 for value in organization_refs if value),
+        "organizationRefsDigest": (
+            _digest(_canonical({"organization_refs": sorted(organization_refs)}))
+            if any(organization_refs)
+            else ""
         ),
         "preferredAccountRef": preferred,
         "candidateRefDigests": dict(sorted(candidate_digests.items())),

@@ -111,7 +111,7 @@ def test_default_unconfigured_contract_renders_every_service_fail_closed_without
     secret = rendered["secrets"]["build-ghost-tough-tongue-read-only-binding-contract"]
     assert Path(secret["file"]).resolve() == SENTINEL.resolve()
     assert json.loads(SENTINEL.read_text(encoding="utf-8")) == {
-        "schema": "chummer.build_ghost.tough_tongue.read_only_binding_contract.unconfigured.v1",
+        "schema": "chummer.build_ghost.tough_tongue.read_only_binding_contract.unconfigured.v2",
         "status": "blocked",
     }
 
