@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import importlib.util
 import json
@@ -13,6 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/materialize_build_ghost_tough_tongue_runtime_config.py"
+DEPLOY_HELPER = ROOT / "ops/build-ghost-private-nonprod/deploy-ai-with-rollback.sh"
 COMPOSE = ROOT / "docker-compose.build-ghost-private-nonprod.yml"
 SPEC = importlib.util.spec_from_file_location("tough_tongue_runtime_config", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -83,6 +85,54 @@ def operator_payload(contract_path: Path, contract: dict[str, object]) -> dict[s
     }
 
 
+def account_selection_policy(account_refs: list[str]) -> dict[str, object]:
+    observed_at = "2026-08-23T13:01:17Z"
+    valid_until = "2027-07-23T13:01:17Z"
+    qualifying = [account_refs[index] for index in (1, 3, 4, 5)]
+    payload: dict[str, object] = {
+        "schema": "ea.tough_tongue.operator_premium_grants.v1",
+        "generatedAt": "2026-08-23T13:10:00Z",
+        "status": "active",
+        "sourceType": "user_authority",
+        "decisionSequence": 2,
+        "decisionEvidenceDigest": "sha256:" + "b" * 64,
+        "supersededDecisionEvidenceDigest": "sha256:" + "c" * 64,
+        "premiumBasis": "operator_policy_available_minutes_gt_threshold",
+        "thresholdComparison": "strictly_greater_than",
+        "thresholdMinutes": 1100.0,
+        "validityCalendarMonths": 11,
+        "identityBasis": "stable_account_ref_sha256",
+        "providerPlanLabelBasis": "unproven_by_documented_api",
+        "inputAuditEvidenceDigest": "sha256:" + "d" * 64,
+        "qualificationObservedAt": observed_at,
+        "premiumValidUntil": valid_until,
+        "grants": [
+            {
+                "accountRefSha256": account_ref,
+                "qualificationRemainingMinutes": 2425.0,
+                "qualificationObservedAt": observed_at,
+                "premiumValidUntil": valid_until,
+            }
+            for account_ref in qualifying
+        ],
+        "unqualifiedAccountRefs": sorted([account_refs[0], account_refs[2]]),
+        "preferredAccountRef": account_refs[3],
+        "preferredOrganizationMembershipVerified": True,
+        "readyForAccountSelection": True,
+        "readyForResourceBinding": False,
+        "resourceOwnershipVerified": False,
+        "laterBalanceDropRevokesBeforeExpiry": False,
+        "identityMismatchRequiresRequalification": True,
+        "expiryRequiresRequalification": True,
+        "runtimeGatesChanged": False,
+        "providerActivationPerformed": False,
+        "rawCredentialsPersisted": False,
+        "rawIdentifiersPersisted": False,
+    }
+    payload["evidenceDigest"] = digest(canonical(payload))
+    return payload
+
+
 def write_private_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     path.chmod(0o600)
@@ -100,6 +150,29 @@ def inputs(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path, dict[str, obje
     snapshot = tmp_path / "runtime-contract.json"
     receipt = tmp_path / "runtime-receipt.json"
     return config, environment, snapshot, receipt, source_contract, payload
+
+
+def audit_only_inputs(
+    tmp_path: Path,
+) -> tuple[Path, Path, Path, Path, Path, Path, dict[str, object], dict[str, object]]:
+    config, environment, snapshot, receipt, source_contract, payload = inputs(tmp_path)
+    refs = [slot["account_ref"] for slot in payload["account_slots"]]  # type: ignore[index]
+    policy = account_selection_policy(refs)
+    policy_path = tmp_path / "account-selection-policy.json"
+    write_private_json(policy_path, policy)
+    payload["preferred_account_ref"] = refs[3]
+    payload["candidate_refs"] = {kind: "" for kind in MODULE.CANDIDATE_KINDS}
+    payload["account_selection_policy"] = {
+        "path": str(policy_path),
+        "digest": digest(canonical(policy)),
+    }
+    for slot in payload["account_slots"]:  # type: ignore[index]
+        slot.pop("organization_ref", None)
+    write_private_json(config, payload)
+    return (
+        config, environment, snapshot, receipt, source_contract, policy_path,
+        payload, policy,
+    )
 
 
 def usable(path: Path, mode: int) -> bool:
@@ -148,6 +221,152 @@ def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path
         assert slot["api_key"] not in rendered_receipt
     for candidate in payload["candidate_refs"].values():  # type: ignore[union-attr]
         assert candidate not in rendered_receipt
+
+
+def test_materializes_account_audit_only_policy_without_resource_candidates(tmp_path: Path):
+    config, environment, snapshot, receipt_path, _, _, payload, policy = audit_only_inputs(tmp_path)
+
+    receipt = MODULE.materialize(config, environment, snapshot, receipt_path)
+
+    assert receipt["status"] == "ready-for-read-only-probe"
+    assert receipt["bindingCandidatesConfigured"] is False
+    assert receipt["candidateRefCount"] == 0
+    assert receipt["candidateRefDigests"] == {}
+    assert receipt["readyForAccountSelection"] is True
+    assert receipt["readyForResourceBinding"] is False
+    assert receipt["providerPlanLabelReadbackVerified"] is False
+    assert receipt["accountSelectionPolicySource"] == "user_authority"
+    assert receipt["premiumBasis"] == "operator_policy_available_minutes_gt_threshold"
+    assert receipt["premiumThresholdMinutes"] == 1100.0
+    assert receipt["premiumValidityCalendarMonths"] == 11
+    assert receipt["premiumValidUntil"] == "2027-07-23T13:01:17Z"
+    assert receipt["premiumGrantCount"] == 4
+    assert receipt["providerReadbackVerified"] is False
+    assert receipt["providerActivationAuthorized"] is False
+    assert receipt["providerMutationPerformed"] is False
+    assert receipt["organizationContextCount"] == 0
+    environment_text = environment.read_text(encoding="utf-8")
+    for name in MODULE.ENVIRONMENT_NAMES.values():
+        assert f"{name}=\n" in environment_text
+    assert policy["providerPlanLabelBasis"] == "unproven_by_documented_api"
+    assert policy["laterBalanceDropRevokesBeforeExpiry"] is False
+    assert policy["readyForResourceBinding"] is False
+    rendered = receipt_path.read_text(encoding="utf-8")
+    for slot in payload["account_slots"]:  # type: ignore[index]
+        assert slot["api_key"] not in rendered
+
+
+def test_account_audit_only_rejects_partial_resource_candidates(tmp_path: Path):
+    config, environment, snapshot, receipt, _, _, payload, _ = audit_only_inputs(tmp_path)
+    payload["candidate_refs"]["scenario"] = "partial-scenario-ref"  # type: ignore[index]
+    write_private_json(config, payload)
+
+    with pytest.raises(MODULE.ConfigError, match="candidate-refs-partial"):
+        MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert not environment.exists()
+    assert not snapshot.exists()
+
+
+def test_account_audit_only_requires_an_active_policy_receipt(tmp_path: Path):
+    config, environment, snapshot, receipt, _, payload = inputs(tmp_path)
+    payload["candidate_refs"] = {kind: "" for kind in MODULE.CANDIDATE_KINDS}
+    write_private_json(config, payload)
+
+    with pytest.raises(MODULE.ConfigError, match="account-selection-policy-required"):
+        MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert not environment.exists()
+
+
+def test_account_audit_only_policy_is_stable_across_slot_reordering(tmp_path: Path):
+    config, environment, snapshot, receipt, _, _, payload, _ = audit_only_inputs(tmp_path)
+    payload["account_slots"] = list(reversed(payload["account_slots"]))  # type: ignore[index]
+    write_private_json(config, payload)
+
+    materialized = MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert materialized["readyForAccountSelection"] is True
+    assert materialized["premiumGrantCount"] == 4
+
+
+def test_account_audit_only_identity_mismatch_requires_requalification(tmp_path: Path):
+    config, environment, snapshot, receipt, _, _, payload, _ = audit_only_inputs(tmp_path)
+    payload["account_slots"][0]["account_ref"] = "sha256:" + "9" * 64  # type: ignore[index]
+    write_private_json(config, payload)
+
+    with pytest.raises(MODULE.ConfigError, match="account-selection-policy-identity-mismatch"):
+        MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert not environment.exists()
+
+
+def test_account_selection_policy_clock_boundary_and_expiry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    config, environment, snapshot, receipt, _, _, _, _ = audit_only_inputs(tmp_path)
+    monkeypatch.setattr(
+        MODULE,
+        "_utc_now",
+        lambda: dt.datetime(2027, 7, 23, 13, 1, 16, tzinfo=dt.timezone.utc),
+    )
+    assert MODULE.materialize(config, environment, snapshot, receipt)[
+        "readyForAccountSelection"
+    ] is True
+
+    expired_root = tmp_path / "expired"
+    expired_root.mkdir(mode=0o700)
+    config, environment, snapshot, receipt, _, _, _, _ = audit_only_inputs(expired_root)
+    monkeypatch.setattr(
+        MODULE,
+        "_utc_now",
+        lambda: dt.datetime(2027, 7, 23, 13, 1, 17, tzinfo=dt.timezone.utc),
+    )
+    with pytest.raises(MODULE.ConfigError, match="account-selection-policy-expired"):
+        MODULE.materialize(config, environment, snapshot, receipt)
+
+
+def test_calendar_month_arithmetic_clamps_month_end() -> None:
+    assert MODULE._add_calendar_months(
+        dt.datetime(2027, 1, 31, 8, tzinfo=dt.timezone.utc), 1
+    ) == dt.datetime(2027, 2, 28, 8, tzinfo=dt.timezone.utc)
+    assert MODULE._add_calendar_months(
+        dt.datetime(2028, 1, 31, 8, tzinfo=dt.timezone.utc), 1
+    ) == dt.datetime(2028, 2, 29, 8, tzinfo=dt.timezone.utc)
+
+
+def test_superseded_policy_is_never_accepted(tmp_path: Path):
+    config, environment, snapshot, receipt, _, policy_path, payload, policy = audit_only_inputs(tmp_path)
+    policy["status"] = "superseded_before_activation"
+    policy["evidenceDigest"] = digest(
+        canonical({key: value for key, value in policy.items() if key != "evidenceDigest"})
+    )
+    write_private_json(policy_path, policy)
+    payload["account_selection_policy"]["digest"] = digest(canonical(policy))  # type: ignore[index]
+    write_private_json(config, payload)
+
+    with pytest.raises(MODULE.ConfigError, match="account-selection-policy-authority-invalid"):
+        MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert not environment.exists()
+
+
+def test_deploy_helper_requires_policy_bound_audit_only_posture() -> None:
+    helper = DEPLOY_HELPER.read_text(encoding="utf-8")
+
+    for clause in (
+        ".readyForResourceBinding == false",
+        ".providerPlanLabelReadbackVerified == false",
+        ".bindingCandidatesConfigured == false",
+        ".candidateRefCount == 0",
+        ".candidateRefDigests == {}",
+        ".readyForAccountSelection == true",
+        '.accountSelectionPolicySource == "user_authority"',
+        '.premiumBasis == "operator_policy_available_minutes_gt_threshold"',
+        ".premiumThresholdMinutes == 1100",
+        ".premiumValidityCalendarMonths == 11",
+    ):
+        assert clause in helper
 
 
 def test_cli_materializes_the_complete_pair_without_printing_private_inputs(tmp_path: Path):

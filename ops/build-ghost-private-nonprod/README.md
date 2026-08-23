@@ -35,8 +35,9 @@ The sentinel is blocked evidence, never a readback or provider-readiness claim.
 An operator may instead prepare one caller-owned mode-0600 JSON file with
 schema `chummer.build_ghost.tough_tongue.runtime_config.v1`. It must contain
 exactly six distinct `{account_ref, api_key, organization_ref?}` slots, one preferred opaque
-account ref present exactly once in those slots, raw provider refs for
-`agent`, `voice`, `function`, `scenario`, and `live_avatar`, and the absolute
+account ref present exactly once in those slots, either raw provider refs for
+all of `agent`, `voice`, `function`, `scenario`, and `live_avatar` or empty
+strings for all five, and the absolute
 mode-0600 path plus canonical SHA-256 digest of an operator-verified
 `chummer.build_ghost.tough_tongue.read_only_binding_contract.v2` contract. The materializer
 accepts only the documented `balance`, `subscriptions`, `v2/organizations`,
@@ -46,6 +47,21 @@ slots (so slot alignment cannot drift),
 requires `authority.operator_verified=true`, rejects pre-shaped candidate
 digests, duplicate JSON keys, links, weak file modes, and unsafe dotenv
 characters, and never contacts a provider.
+
+The all-empty candidate form is an account-audit-only deployment and also
+requires `account_selection_policy` to name the absolute mode-0600 path and
+canonical digest of an active
+`ea.tough_tongue.operator_premium_grants.v1` receipt. That receipt is
+user-authority policy, not a provider plan-label readback. The current policy
+qualifies a stable opaque account-ref hash after a grounded balance strictly
+above 1100 minutes, retains that qualification for exactly 11 calendar months,
+and expires at the exact boundary. Slot reordering cannot change ownership;
+identity drift, an account-ref replacement, an expired grant, a superseded
+decision, partial resource candidates, or invalid calendar arithmetic all fail
+closed. A later balance drop during the validity interval does not revoke the
+policy grant. This posture may set `readyForAccountSelection=true`, but always
+keeps `readyForResourceBinding=false`, provider plan-label readback unproven,
+and every runtime/provider gate false.
 
 Keep that file outside the repository in a caller-owned mode-0700 directory.
 For a full-lane Compose operation, materialize into the same private run
