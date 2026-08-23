@@ -1499,18 +1499,26 @@ def _probe_team_truth(
             and account_refs == deployed_account_refs
         )
         preferred_binding_match = (
-            account_schema_valid
+            deployed_binding.get("configured") is True
+            and account_schema_valid
             and preferred_ref == deployed_binding.get("preferredAccountRef")
         )
         expectation_binding_match = (
-            isinstance(expectation_digest, str)
+            deployed_binding.get("configured") is True
+            and isinstance(expectation_digest, str)
             and expectation_digest == deployed_binding.get("expectationDigest")
         )
         contract_binding_match = (
-            isinstance(contract.get("digest"), str)
+            deployed_binding.get("configured") is True
+            and contract_configured_valid
+            and isinstance(contract.get("digest"), str)
             and contract.get("digest") == deployed_binding.get("readOnlyContractDigest")
         )
-        candidate_binding_match = binding_schema_valid and isinstance(deployed_candidates, dict)
+        candidate_binding_match = (
+            deployed_binding.get("configured") is True
+            and binding_schema_valid
+            and isinstance(deployed_candidates, dict)
+        )
         if candidate_binding_match:
             candidate_binding_match = all(
                 bindings[kind].get("ref_sha256") == deployed_candidates.get(kind)
