@@ -93,6 +93,30 @@ def test_all_three_compose_paths_use_one_complete_operator_config_or_stay_blocke
 
 
 @pytest.mark.parametrize("helper", HELPERS)
+def test_every_bounded_deployer_accepts_only_complete_binding_or_exact_account_audit_only(
+    helper: Path,
+):
+    script = helper.read_text(encoding="utf-8")
+    assert '.readyForResourceBinding == false' in script
+    assert '.providerPlanLabelReadbackVerified == false' in script
+    assert '.bindingCandidatesConfigured == true' in script
+    assert '.bindingCandidatesConfigured == false' in script
+    assert '.candidateRefCount == 0' in script
+    assert '.candidateRefDigests == {}' in script
+    assert '.readyForAccountSelection == true' in script
+    assert '.accountSelectionPolicySource == "user_authority"' in script
+    assert '.premiumBasis == "operator_policy_available_minutes_gt_threshold"' in script
+    assert '.premiumThresholdMinutes == 1100' in script
+    assert '.premiumValidityCalendarMonths == 11' in script
+    assert '.premiumGrantCount > 0' in script
+    assert "compose-audit-only-candidates-drift" in script
+    assert "compose-binding-candidates-drift" in script
+    for variable in RUNTIME_VARIABLES[3:8]:
+        assert f".services[$service].environment.{variable} == \"\"" in script
+        assert f".services[$service].environment.{variable} != \"\"" in script
+
+
+@pytest.mark.parametrize("helper", HELPERS)
 def test_configured_contract_and_receipt_are_durable_but_credentials_are_scrubbed(
     helper: Path,
 ):
