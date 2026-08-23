@@ -20,12 +20,12 @@ PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
 PACKAGE_VERSION = "0.1.0-preview"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha451459e1092d",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shab375ad0b0e24",
     "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
     "Chummer.Run.Registry": "0.1.0-preview",
     "Chummer.Play.Contracts": "0.1.0-preview",
     "Chummer.Run.Contracts": "0.1.0-preview",
-    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sha451459e1092d",
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shab375ad0b0e24",
 }
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
