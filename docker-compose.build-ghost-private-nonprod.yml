@@ -85,8 +85,13 @@ services:
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID:-}
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID:-}
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID:-}
+      EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH: /run/secrets/tough-tongue-read-only-binding-contract.json
       EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST: ${EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST:-}
       SSL_CERT_FILE: /caddy-trust/root.crt
+    secrets:
+      - source: build-ghost-tough-tongue-read-only-binding-contract
+        target: tough-tongue-read-only-binding-contract.json
+        mode: 0400
     volumes:
       - caddy-trust:/caddy-trust:ro
     healthcheck:
@@ -142,6 +147,10 @@ volumes:
   caddy-data:
   caddy-config:
   caddy-trust:
+
+secrets:
+  build-ghost-tough-tongue-read-only-binding-contract:
+    file: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE:-./ops/build-ghost-private-nonprod/tough-tongue-read-only-binding-contract.unconfigured.json}
 
 networks:
   build-ghost-private:

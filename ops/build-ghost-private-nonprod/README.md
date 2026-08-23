@@ -23,6 +23,70 @@ docker compose -f docker-compose.build-ghost-private-nonprod.yml config --quiet
 docker compose -f docker-compose.build-ghost-private-nonprod.yml up --build -d
 ```
 
+### Operator-verified Tough Tongue read-only configuration
+
+With no operator input, Compose mounts
+`tough-tongue-read-only-binding-contract.unconfigured.json`. That regular,
+non-secret sentinel lets the four services start, but its schema is
+deliberately invalid for EA live ops, the contract digest and all candidate
+inputs remain empty, and all four provider gates remain literal `false`.
+The sentinel is blocked evidence, never a readback or provider-readiness claim.
+
+An operator may instead prepare one caller-owned mode-0600 JSON file with
+schema `chummer.build_ghost.tough_tongue.runtime_config.v1`. It must contain
+three or more exact `{account_ref, api_key}` slots, one preferred opaque
+account ref present exactly once in those slots, raw provider refs for
+`agent`, `voice`, `function`, `scenario`, and `live_avatar`, and the absolute
+mode-0600 path plus canonical SHA-256 digest of an operator-verified
+`ea.tough_tongue.read_only_binding_contract.v1` contract. The materializer
+accepts only the exact GET-only route/selector schema used by EA live ops,
+requires `authority.operator_verified=true`, rejects pre-shaped candidate
+digests, duplicate JSON keys, links, weak file modes, and unsafe dotenv
+characters, and never contacts a provider.
+
+Keep that file outside the repository in a caller-owned mode-0700 directory.
+For a full-lane Compose operation, materialize into the same private run
+directory and use only the resulting env file:
+
+```sh
+python3 scripts/materialize_build_ghost_tough_tongue_runtime_config.py \
+  --config /absolute/private/operator-runtime-config.json \
+  --output-contract /absolute/private/run/runtime-contract.json \
+  --receipt /absolute/private/run/runtime-receipt.json \
+  --output-env /absolute/private/run/runtime.env
+docker compose --env-file /absolute/private/run/runtime.env \
+  -f docker-compose.build-ghost-private-nonprod.yml config --quiet
+```
+
+The materializer atomically publishes the mode-0400 contract snapshot first,
+then a mode-0600 receipt binding the exact contract-file and environment-file
+digests, and the credential-bearing mode-0600 environment file last. All
+three outputs must be new paths in the same private directory. A crash cannot
+leave a usable single-link env file without its already-durable matching
+receipt. Do not source the Docker dotenv file into an interactive shell, print
+it, commit it, or reuse the run directory after any failed materialization.
+
+Both bounded deploy helpers implement the same path without leaving the
+materialized files behind. Set only the path to the operator config before
+running either helper:
+
+```sh
+export CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE=/absolute/private/operator-runtime-config.json
+./ops/build-ghost-private-nonprod/deploy-ai-with-rollback.sh
+```
+
+They verify owner, mode, single-link inode identity, receipt evidence digest,
+environment digest, and contract snapshot digest immediately before adding
+the private env file to Compose. If an already running AI carries a nonempty
+contract digest, a deploy without this complete operator config fails closed;
+the helpers never reconstruct a partial contract from container environment.
+They still keep all provider gates false and do not run the provider probe.
+The materializer receipt status `ready-for-read-only-probe` means only that
+local inputs are internally consistent. A fresh EA live-ops
+`probe-tough-tongue-bindings` GET-only receipt is still required before the
+attester can accept provider readback; missing identifiers or contract truth
+must remain blocked with zero provider mutations.
+
 The AI image records its four exact clean source revisions as OCI labels. The
 Presentation image records all six sources in its compatibility-tree build:
 Hub, Presentation, Core, Hub Registry, UI Kit, and Media Factory. A running
@@ -38,8 +102,10 @@ After the full lane exists, use `deploy-ai-with-rollback.sh` for an AI-only
 revision change. Run the helper from the exact clean Hub worktree named by
 `CHUMMER_RUN_SERVICES_SOURCE`; provide the same six absolute source paths and
 four exact 40-character revision variables shown above. The helper obtains the
-two internal tokens and the five optional governed-provider bindings from the
-single running AI container without printing them. It refuses a dirty or
+two internal tokens from the single running AI container without printing
+them. When no verified operator config is supplied it carries only the
+existing blocked provider inputs; it refuses to reconstruct a configured
+readback contract from partial container environment. It refuses a dirty or
 revision-drifted source, a rendered provider gate other than literal `false`,
 IO `full avg10` above 10, less than 20 GiB free under `/docker`, or a build poll
 interval above 15 seconds.
@@ -172,23 +238,23 @@ This helper is deploy tooling, not deployment evidence. Static tests do not
 prove an image build, container recreation, store initialization, or rollback;
 those receipts require a separately authorized serialized run.
 
-Governed Tough Tongue credentials and opaque SHA-256 account references may be
-injected only through the five `CHUMMER_BUILD_GHOST_TOUGH_TONGUE_*` runtime
-variables declared by the Compose service. Never put their values in this file
-or Compose source. Supplying credentials does not activate provider use: remote
-execution and all three canary gates remain literal `false`, while agent and
-voice identifiers remain empty until their separate read-verification gates pass.
-The optional `CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF` is a
-non-secret exact pin and accepts only lowercase `sha256:` plus 64 hexadecimal
-characters. It must match exactly one aligned account reference. Invalid,
-missing, duplicate, cooling-down, or quota-exhausted pins fail closed without
-falling back to a different account.
+Governed Tough Tongue credentials, opaque account references, preferred
+account pin, and all five raw candidate refs may be injected only as one
+complete materialized config described above. Never put their values in this
+file or Compose source, and do not bypass the materializer with individually
+exported provider variables. Supplying a complete config does not activate
+provider use: remote execution and all three canary gates remain literal
+`false`. The preferred account pin accepts only lowercase `sha256:` plus 64
+hexadecimal characters and must match exactly one supplied account reference.
+Invalid, missing, duplicate, cooling-down, quota-exhausted, contract-drifted,
+or ownership-drifted inputs fail closed without falling back to another
+account.
 
-The source contract pins the read-only Tough Tongue client evidence observed on
-2026-08-22 at deployment `dpl_2hoTJxqMKHBPTX9eyHoXX7cZ1o9i`. Premium live
-avatars remain private-candidate-only: Anam uses provider value `anam`, HeyGen
-uses `liveavatar`, both declare a `2x` minute multiplier, and both require the
-`Landmass` model provider. Scenario readback must preserve the exact
+A historical client-bundle or subscription review is not current provider
+truth. Premium live avatars remain private-candidate-only: an operator-verified
+contract may admit the provider values `anam` and `liveavatar`, but a fresh
+GET-only readback must still prove the selected provider and entitlement.
+Scenario readback must preserve the exact
 `appearance.live_avatar_id` and `appearance.live_avatar_provider` values; the
 session runtime must derive `avatar_config.enabled`, `avatar_config.avatar_id`,
 and `avatar_config.provider` from them. Raw provider avatar identifiers are

@@ -8,6 +8,8 @@ umask 077
 script_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd -- "$script_root/../.." && pwd -P)"
 compose_file="$repo_root/docker-compose.build-ghost-private-nonprod.yml"
+runtime_config_materializer="$repo_root/scripts/materialize_build_ghost_tough_tongue_runtime_config.py"
+operator_runtime_config_file="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE:-}"
 packet_preflight="$script_root/preflight-packet-access-state.sh"
 canary_script="$script_root/run-local-canary.sh"
 project_name="chummer-build-ghost-private-nonprod"
@@ -45,6 +47,19 @@ edge_id_before=""
 deploy_lock_fd=""
 last_packet_store_state=""
 initial_packet_store_state=""
+compose_environment_args=()
+tough_tongue_runtime_variables=(
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE
+    EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
+)
 
 fail() {
     printf 'presentation_deploy=failed stage=%s\n' "$1" >&2
@@ -67,7 +82,7 @@ acquire_deploy_lock() {
 }
 
 compose() {
-    docker compose \
+    docker compose "${compose_environment_args[@]}" \
         --project-name "$project_name" \
         --project-directory "$repo_root" \
         --file "$compose_file" \
@@ -173,6 +188,99 @@ read_existing_environment() {
     printf -v "$destination" '%s' "$value"
 }
 
+read_existing_environment_or_empty() {
+    local container_id="$1"
+    local variable_name="$2"
+    local destination="$3"
+    local environment line matches value=""
+    environment="$(docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}')"
+    line="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { print }')"
+    matches="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { count++ } END { print count + 0 }')"
+    [ "$matches" -le 1 ] || fail "runtime-env-$variable_name-ambiguous"
+    if [ "$matches" -eq 1 ]; then
+        value="${line#*=}"
+    fi
+    printf -v "$destination" '%s' "$value"
+}
+
+prepare_operator_runtime_config() {
+    local environment_file contract_file receipt_file materializer_log variable_name
+    [ -n "$operator_runtime_config_file" ] || return 0
+    [ -x "$runtime_config_materializer" ] \
+        || fail "operator-tough-tongue-materializer-unavailable"
+    environment_file="$deploy_tmp/tough-tongue-runtime.env"
+    contract_file="$deploy_tmp/tough-tongue-read-only-contract.json"
+    receipt_file="$deploy_tmp/tough-tongue-runtime-receipt.json"
+    materializer_log="$deploy_tmp/tough-tongue-runtime-materializer.log"
+    if ! python3 "$runtime_config_materializer" \
+        --config "$operator_runtime_config_file" \
+        --output-env "$environment_file" \
+        --output-contract "$contract_file" \
+        --receipt "$receipt_file" >"$materializer_log" 2>&1; then
+        chmod 0600 "$materializer_log" 2>/dev/null || true
+        fail "operator-tough-tongue-config-invalid"
+    fi
+    chmod 0600 "$materializer_log"
+    verify_materialized_runtime_pair "$environment_file" "$contract_file" "$receipt_file"
+    jq -e \
+        '.schema == "chummer.build_ghost.tough_tongue.runtime_config_receipt.v1"
+         and .status == "ready-for-read-only-probe"
+         and .providerReadbackVerified == false
+         and .providerActivationAuthorized == false
+         and .providerMutationPerformed == false
+         and .rawCredentialsInReceipt == false
+         and .rawCandidateRefsInReceipt == false' \
+        "$receipt_file" >/dev/null \
+        || fail "operator-tough-tongue-receipt-invalid"
+    compose_environment_args=(--env-file "$environment_file")
+    for variable_name in "${tough_tongue_runtime_variables[@]}"; do
+        unset "$variable_name"
+    done
+}
+
+verify_materialized_runtime_pair() {
+    local environment_file="$1"
+    local contract_file="$2"
+    local receipt_file="$3"
+    local owner identity_before identity_after environment_digest contract_digest
+    local receipt_evidence expected_evidence receipt_without_evidence
+    owner="$(id -u)"
+    if [ ! -f "$environment_file" ] || [ -L "$environment_file" ] \
+        || [ "$(stat -c '%a:%u:%h' -- "$environment_file")" != "600:$owner:1" ]; then
+        fail "operator-tough-tongue-environment-authority-invalid"
+    fi
+    if [ ! -f "$contract_file" ] || [ -L "$contract_file" ] \
+        || [ "$(stat -c '%a:%u:%h' -- "$contract_file")" != "400:$owner:1" ]; then
+        fail "operator-tough-tongue-contract-authority-invalid"
+    fi
+    if [ ! -f "$receipt_file" ] || [ -L "$receipt_file" ] \
+        || [ "$(stat -c '%a:%u:%h' -- "$receipt_file")" != "600:$owner:1" ]; then
+        fail "operator-tough-tongue-receipt-authority-invalid"
+    fi
+    identity_before="$(stat -c '%d:%i:%s:%y:%z:%f:%u:%h' -- \
+        "$environment_file" "$contract_file" "$receipt_file")"
+    environment_digest="sha256:$(sha256sum -- "$environment_file" | awk '{print $1}')"
+    contract_digest="sha256:$(sha256sum -- "$contract_file" | awk '{print $1}')"
+    receipt_evidence="$(jq -er '.evidenceDigest' "$receipt_file")"
+    receipt_without_evidence="$(jq -cS 'del(.evidenceDigest)' "$receipt_file")"
+    expected_evidence="sha256:$(printf '%s' "$receipt_without_evidence" | sha256sum | awk '{print $1}')"
+    jq -e \
+        --arg environment_digest "$environment_digest" \
+        --arg contract_digest "$contract_digest" \
+        '.environmentFileDigest == $environment_digest
+         and .readOnlyContractFileDigest == $contract_digest
+         and .contractSnapshotMode == "0400"
+         and .publicationOrder == ["contract-snapshot", "receipt", "environment"]' \
+        "$receipt_file" >/dev/null \
+        || fail "operator-tough-tongue-pair-digest-invalid"
+    [ "$receipt_evidence" = "$expected_evidence" ] \
+        || fail "operator-tough-tongue-receipt-digest-invalid"
+    identity_after="$(stat -c '%d:%i:%s:%y:%z:%f:%u:%h' -- \
+        "$environment_file" "$contract_file" "$receipt_file")"
+    [ "$identity_before" = "$identity_after" ] \
+        || fail "operator-tough-tongue-pair-changed"
+}
+
 load_runtime_environment_without_output() {
     local ai_service_token
     read_existing_environment "$old_presentation_id" \
@@ -187,6 +295,9 @@ load_runtime_environment_without_output() {
 
     read_existing_environment "$ai_id_before" CHUMMER_AI_INTERNAL_API_TOKEN required CHUMMER_AI_INTERNAL_API_TOKEN
     export CHUMMER_AI_INTERNAL_API_TOKEN
+    if [ -n "$operator_runtime_config_file" ]; then
+        return 0
+    fi
     for variable_name in \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS \
@@ -196,6 +307,16 @@ load_runtime_environment_without_output() {
         read_existing_environment "$ai_id_before" "$variable_name" optional "$variable_name"
         export "${variable_name?}"
     done
+    for variable_name in \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID \
+        EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST; do
+        read_existing_environment_or_empty "$ai_id_before" "$variable_name" "$variable_name"
+        export "${variable_name?}"
+    done
+    [ -z "$EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST" ] \
+        || fail "configured-readback-contract-requires-operator-config"
 }
 
 securely_remove_temp() {
@@ -449,8 +570,26 @@ verify_rendered_compose() {
          and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED == "false"
          and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED == "false"
          and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED == "false"
-         and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED == "false"' \
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED == "false"
+         and .services[$ai].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH == "/run/secrets/tough-tongue-read-only-binding-contract.json"
+         and any(.services[$ai].secrets[]?;
+             .source == "build-ghost-tough-tongue-read-only-binding-contract"
+             and .target == "tough-tongue-read-only-binding-contract.json")' \
         "$rendered" >/dev/null || fail "compose-render-drift"
+    if [ -n "$operator_runtime_config_file" ]; then
+        jq -e --arg service "$ai_service" \
+            '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID != ""
+             and (.services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
+                  | test("^sha256:[0-9a-f]{64}$"))' \
+            "$rendered" >/dev/null || fail "compose-operator-runtime-drift"
+    fi
     if rg --fixed-strings '/api/v1/ai/build-ghost/explain' "$script_root/Caddyfile" >/dev/null; then
         fail "public-explain-route-present"
     fi
@@ -460,7 +599,7 @@ build_candidate_under_limits() {
     local build_status
     ensure_hard_limits
     setsid bash -c 'exec "$@"' deploy-build \
-        docker compose \
+        docker compose "${compose_environment_args[@]}" \
         --project-name "$project_name" \
         --project-directory "$repo_root" \
         --file "$compose_file" \
@@ -1053,7 +1192,7 @@ main() {
         require_command "$lock_required"
     done
     acquire_deploy_lock "$deploy_lock_file"
-    for required in awk bash cat curl cut date df docker find git jq mktemp mv openssl realpath rg rmdir sed seq setsid shred sleep timeout truncate unlink wc; do
+    for required in awk bash cat curl cut date df docker find git id jq mktemp mv openssl python3 realpath rg rmdir sed seq setsid sha256sum shred sleep stat timeout truncate unlink wc; do
         require_command "$required"
     done
     [ -x "$packet_preflight" ] || fail "packet-store-preflight-not-executable"
@@ -1061,6 +1200,7 @@ main() {
     validate_control_values
     deploy_tmp="$(mktemp -d)"
     chmod 0700 "$deploy_tmp"
+    prepare_operator_runtime_config
     validate_sources_and_labels
     ensure_hard_limits
 
