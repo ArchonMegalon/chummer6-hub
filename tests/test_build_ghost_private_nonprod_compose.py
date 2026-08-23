@@ -1,10 +1,14 @@
+import json
+import os
 from pathlib import Path
+import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = (ROOT / "docker-compose.build-ghost-private-nonprod.yml").read_text(encoding="utf-8")
 CADDY = (ROOT / "ops/build-ghost-private-nonprod/Caddyfile").read_text(encoding="utf-8")
 CANARY = (ROOT / "ops/build-ghost-private-nonprod/run-local-canary.sh").read_text(encoding="utf-8")
+SENTINEL = ROOT / "ops/build-ghost-private-nonprod/tough-tongue-read-only-binding-contract.unconfigured.json"
 
 
 def service_block(name: str, next_name: str) -> str:
@@ -41,6 +45,75 @@ def test_governed_provider_slots_are_runtime_only_and_cannot_enable_remote_execu
     assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"' in ai
     assert "toughtongue@" not in COMPOSE
     assert "PREFERRED_ACCOUNT_REF: sha256:" not in ai
+
+
+def test_default_unconfigured_contract_renders_every_service_fail_closed_without_provider_io():
+    environment = os.environ.copy()
+    for index, name in enumerate(
+        (
+            "CHUMMER_RUN_SERVICES_REVISION",
+            "CHUMMER_PRESENTATION_REVISION",
+            "CHUMMER_CORE_ENGINE_REVISION",
+            "CHUMMER_HUB_REGISTRY_REVISION",
+            "CHUMMER_UI_KIT_REVISION",
+            "CHUMMER_MEDIA_FACTORY_REVISION",
+        ),
+        start=1,
+    ):
+        environment[name] = str(index) * 40
+    for name in (
+        "CHUMMER_RUN_SERVICES_SOURCE",
+        "CHUMMER_PRESENTATION_SOURCE",
+        "CHUMMER_CORE_ENGINE_SOURCE",
+        "CHUMMER_HUB_REGISTRY_SOURCE",
+        "CHUMMER_UI_KIT_SOURCE",
+        "CHUMMER_MEDIA_FACTORY_SOURCE",
+    ):
+        environment[name] = str(ROOT)
+    environment["CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN"] = "test-tool-token-" + "a" * 32
+    environment["CHUMMER_AI_INTERNAL_API_TOKEN"] = "test-ai-token-" + "b" * 32
+    for name in tuple(environment):
+        if name.startswith("CHUMMER_BUILD_GHOST_TOUGH_TONGUE_") or name == "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST":
+            environment.pop(name, None)
+
+    result = subprocess.run(
+        [
+            "docker", "compose", "--project-directory", str(ROOT),
+            "--file", str(ROOT / "docker-compose.build-ghost-private-nonprod.yml"),
+            "config", "--format", "json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert result.returncode == 0, result.stderr
+    rendered = json.loads(result.stdout)
+    assert set(rendered["services"]) == {
+        "chummer-build-ghost-presentation",
+        "chummer-build-ghost-ai",
+        "build-ghost-private-edge",
+        "build-ghost-private-trust-export",
+    }
+    ai = rendered["services"]["chummer-build-ghost-ai"]
+    for gate in (
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED",
+    ):
+        assert ai["environment"][gate] == "false"
+    assert ai["environment"]["EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST"] == ""
+    assert ai["environment"]["EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH"] == (
+        "/run/secrets/tough-tongue-read-only-binding-contract.json"
+    )
+    secret = rendered["secrets"]["build-ghost-tough-tongue-read-only-binding-contract"]
+    assert Path(secret["file"]).resolve() == SENTINEL.resolve()
+    assert json.loads(SENTINEL.read_text(encoding="utf-8")) == {
+        "schema": "chummer.build_ghost.tough_tongue.read_only_binding_contract.unconfigured.v1",
+        "status": "blocked",
+    }
 
 
 def test_runtime_secret_is_required_but_never_defaulted_or_committed():
