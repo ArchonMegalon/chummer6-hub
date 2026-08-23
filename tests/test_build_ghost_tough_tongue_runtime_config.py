@@ -256,6 +256,53 @@ def test_materializes_account_audit_only_policy_without_resource_candidates(tmp_
         assert slot["api_key"] not in rendered
 
 
+def test_account_audit_only_compose_renders_all_candidates_empty_and_gates_false(tmp_path: Path):
+    config, environment_file, snapshot, receipt, _, _, _, _ = audit_only_inputs(tmp_path)
+    MODULE.materialize(config, environment_file, snapshot, receipt)
+    environment = os.environ.copy()
+    for index, name in enumerate(
+        (
+            "CHUMMER_RUN_SERVICES_REVISION", "CHUMMER_PRESENTATION_REVISION",
+            "CHUMMER_CORE_ENGINE_REVISION", "CHUMMER_HUB_REGISTRY_REVISION",
+            "CHUMMER_UI_KIT_REVISION", "CHUMMER_MEDIA_FACTORY_REVISION",
+        ),
+        start=1,
+    ):
+        environment[name] = str(index) * 40
+    for name in (
+        "CHUMMER_RUN_SERVICES_SOURCE", "CHUMMER_PRESENTATION_SOURCE",
+        "CHUMMER_CORE_ENGINE_SOURCE", "CHUMMER_HUB_REGISTRY_SOURCE",
+        "CHUMMER_UI_KIT_SOURCE", "CHUMMER_MEDIA_FACTORY_SOURCE",
+    ):
+        environment[name] = str(ROOT)
+    environment["CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN"] = "test-tool-token-" + "a" * 32
+    environment["CHUMMER_AI_INTERNAL_API_TOKEN"] = "test-ai-token-" + "b" * 32
+
+    result = subprocess.run(
+        [
+            "docker", "compose", "--env-file", str(environment_file),
+            "--project-directory", str(ROOT), "--file", str(COMPOSE),
+            "config", "--format", "json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert result.returncode == 0, result.stderr
+    ai = json.loads(result.stdout)["services"]["chummer-build-ghost-ai"]
+    for variable_name in MODULE.ENVIRONMENT_NAMES.values():
+        assert ai["environment"][variable_name] == ""
+    for gate in (
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED",
+    ):
+        assert ai["environment"][gate] == "false"
+
+
 def test_account_audit_only_rejects_partial_resource_candidates(tmp_path: Path):
     config, environment, snapshot, receipt, _, _, payload, _ = audit_only_inputs(tmp_path)
     payload["candidate_refs"]["scenario"] = "partial-scenario-ref"  # type: ignore[index]
@@ -367,6 +414,10 @@ def test_deploy_helper_requires_policy_bound_audit_only_posture() -> None:
         ".premiumValidityCalendarMonths == 11",
     ):
         assert clause in helper
+    assert "if jq -e '.bindingCandidatesConfigured == false'" in helper
+    for variable_name in MODULE.ENVIRONMENT_NAMES.values():
+        assert f".services[$service].environment.{variable_name} == \"\"" in helper
+        assert f".services[$service].environment.{variable_name} != \"\"" in helper
 
 
 def test_cli_materializes_the_complete_pair_without_printing_private_inputs(tmp_path: Path):
