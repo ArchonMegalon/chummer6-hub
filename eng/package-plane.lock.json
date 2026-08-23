@@ -20,15 +20,15 @@
   "packages": [
     {
       "id": "Chummer.Engine.Contracts",
-      "version": "0.0.0-packageplane.candidate.sha7b0ee284b845",
+      "version": "0.0.0-packageplane.candidate.sha451459e1092d",
       "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
-      "commit": "7b0ee284b84523c43b6d4fa0ee0ae818226ae331",
+      "commit": "451459e1092d328b13c87d425a8994ba2a89309d",
       "checkout_directory": "chummer-core-engine",
       "project": "Chummer.Contracts/Chummer.Contracts.csproj",
       "license_type": "expression",
       "license_value": "GPL-3.0-only",
-      "nupkg_sha256": "c06e0e6412a4a2183d1130c42babf1a8cd33e005248b7d42fc2309c9b2900181",
-      "nupkg_size_bytes": 2303682
+      "nupkg_sha256": "77b674d37b96d1b44af38c1330dd59a38684d90febe9a601c418172414410abe",
+      "nupkg_size_bytes": 2484418
     },
     {
       "id": "Chummer.Hub.Registry.Contracts",
@@ -79,20 +79,20 @@
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "6bab7ac2865f0a23d1791a2669a36a61c924fb2c0a159bd5fbdd3fc2c14f79a8",
+      "nupkg_sha256": "b3b9430acb298f3839ba31fc3202be3aebef680cba3730d02dab7c3e9b77f329",
       "nupkg_size_bytes": 1450256
     },
     {
       "id": "Chummer.Engine.GmCharacterEdits",
-      "version": "0.0.0-packageplane.candidate.sha7b0ee284b845",
+      "version": "0.0.0-packageplane.candidate.sha451459e1092d",
       "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
-      "commit": "7b0ee284b84523c43b6d4fa0ee0ae818226ae331",
+      "commit": "451459e1092d328b13c87d425a8994ba2a89309d",
       "checkout_directory": "chummer-core-engine",
       "project": "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
       "license_type": "expression",
       "license_value": "GPL-3.0-only",
-      "nupkg_sha256": "ccf295051e609e304fdf1499716b826f1d5d8b13c6f80c6c85f2890d4d515671",
-      "nupkg_size_bytes": 1588830
+      "nupkg_sha256": "22e33b819f4f92906c4e179439cb12b8bdc39ae80928c2ef9270a63abe52d9de",
+      "nupkg_size_bytes": 1802334
     }
   ]
 }
