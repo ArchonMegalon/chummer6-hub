@@ -10,6 +10,7 @@ repo_root="$(cd -- "$script_root/../.." && pwd -P)"
 compose_file="$repo_root/docker-compose.build-ghost-private-nonprod.yml"
 runtime_config_materializer="$repo_root/scripts/materialize_build_ghost_tough_tongue_runtime_config.py"
 operator_runtime_config_file="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE:-}"
+operator_runtime_evidence_root="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT:-}"
 packet_preflight="$script_root/preflight-packet-access-state.sh"
 canary_script="$script_root/run-local-canary.sh"
 project_name="chummer-build-ghost-private-nonprod"
@@ -47,6 +48,10 @@ edge_id_before=""
 deploy_lock_fd=""
 last_packet_store_state=""
 initial_packet_store_state=""
+runtime_evidence_dir=""
+runtime_environment_file=""
+runtime_contract_file=""
+runtime_receipt_file=""
 compose_environment_args=()
 tough_tongue_runtime_variables=(
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS
@@ -204,24 +209,49 @@ read_existing_environment_or_empty() {
 }
 
 prepare_operator_runtime_config() {
-    local environment_file contract_file receipt_file materializer_log variable_name
-    [ -n "$operator_runtime_config_file" ] || return 0
+    local materializer_log owner resolved_root variable_name
+    if [ -z "$operator_runtime_config_file" ]; then
+        [ -z "$operator_runtime_evidence_root" ] \
+            || fail "operator-tough-tongue-evidence-without-config"
+        return 0
+    fi
     [ -x "$runtime_config_materializer" ] \
         || fail "operator-tough-tongue-materializer-unavailable"
-    environment_file="$deploy_tmp/tough-tongue-runtime.env"
-    contract_file="$deploy_tmp/tough-tongue-read-only-contract.json"
-    receipt_file="$deploy_tmp/tough-tongue-runtime-receipt.json"
+    [ -n "$operator_runtime_evidence_root" ] \
+        || fail "operator-tough-tongue-evidence-root-required"
+    case "$operator_runtime_evidence_root" in
+        /*) ;;
+        *) fail "operator-tough-tongue-evidence-root-invalid" ;;
+    esac
+    resolved_root="$(realpath -e -- "$operator_runtime_evidence_root")" \
+        || fail "operator-tough-tongue-evidence-root-unavailable"
+    [ "$resolved_root" = "$operator_runtime_evidence_root" ] \
+        || fail "operator-tough-tongue-evidence-root-authority-invalid"
+    owner="$(id -u)"
+    if [ ! -d "$operator_runtime_evidence_root" ] \
+        || [ -L "$operator_runtime_evidence_root" ] \
+        || [ "$(stat -c '%a:%u' -- "$operator_runtime_evidence_root")" != "700:$owner" ]; then
+        fail "operator-tough-tongue-evidence-root-authority-invalid"
+    fi
+    runtime_evidence_dir="$(mktemp -d -- \
+        "$operator_runtime_evidence_root/runtime.XXXXXXXXXXXX")" \
+        || fail "operator-tough-tongue-evidence-directory-unavailable"
+    chmod 0700 "$runtime_evidence_dir"
+    runtime_environment_file="$runtime_evidence_dir/runtime.env"
+    runtime_contract_file="$runtime_evidence_dir/read-only-contract.json"
+    runtime_receipt_file="$runtime_evidence_dir/runtime-receipt.json"
     materializer_log="$deploy_tmp/tough-tongue-runtime-materializer.log"
     if ! python3 "$runtime_config_materializer" \
         --config "$operator_runtime_config_file" \
-        --output-env "$environment_file" \
-        --output-contract "$contract_file" \
-        --receipt "$receipt_file" >"$materializer_log" 2>&1; then
+        --output-env "$runtime_environment_file" \
+        --output-contract "$runtime_contract_file" \
+        --receipt "$runtime_receipt_file" >"$materializer_log" 2>&1; then
         chmod 0600 "$materializer_log" 2>/dev/null || true
         fail "operator-tough-tongue-config-invalid"
     fi
     chmod 0600 "$materializer_log"
-    verify_materialized_runtime_pair "$environment_file" "$contract_file" "$receipt_file"
+    verify_materialized_runtime_pair \
+        "$runtime_environment_file" "$runtime_contract_file" "$runtime_receipt_file"
     jq -e \
         '.schema == "chummer.build_ghost.tough_tongue.runtime_config_receipt.v1"
          and .status == "ready-for-read-only-probe"
@@ -230,12 +260,22 @@ prepare_operator_runtime_config() {
          and .providerMutationPerformed == false
          and .rawCredentialsInReceipt == false
          and .rawCandidateRefsInReceipt == false' \
-        "$receipt_file" >/dev/null \
+        "$runtime_receipt_file" >/dev/null \
         || fail "operator-tough-tongue-receipt-invalid"
-    compose_environment_args=(--env-file "$environment_file")
+    compose_environment_args=(--env-file "$runtime_environment_file")
     for variable_name in "${tough_tongue_runtime_variables[@]}"; do
         unset "$variable_name"
     done
+}
+
+securely_remove_runtime_environment() {
+    [ -n "$runtime_environment_file" ] || return 0
+    if ! python3 "$runtime_config_materializer" \
+        --destroy-environment "$runtime_environment_file" >/dev/null 2>&1; then
+        printf 'presentation_deploy=failed stage=operator-tough-tongue-environment-cleanup-failed\n' >&2
+        return 1
+    fi
+    compose_environment_args=()
 }
 
 verify_materialized_runtime_pair() {
@@ -1178,6 +1218,9 @@ on_exit() {
     if ! (restore_pre_activation_tag_if_needed); then
         status=1
     fi
+    if ! securely_remove_runtime_environment; then
+        status=1
+    fi
     securely_remove_temp
     exit "$status"
 }
@@ -1226,6 +1269,10 @@ main() {
     deploy_succeeded="true"
     printf 'presentation_deploy=passed rollback_ref=%s old_image=%s candidate_recovery_ref=%s candidate_image=%s recovery_mode=%s sources=exact packet_store=keyed-v2 auth=401 lifecycle=one-use-replay-revocation gates=false neighbors=unchanged public_explain=404\n' \
         "$rollback_ref" "$old_presentation_image" "$candidate_recovery_ref" "$candidate_image" "$recovery_mode"
+    if [ -n "$runtime_receipt_file" ]; then
+        printf 'presentation_deploy_runtime_contract=retained receipt=%s contract=%s credentials_retained=false\n' \
+            "$runtime_receipt_file" "$runtime_contract_file"
+    fi
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

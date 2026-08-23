@@ -76,8 +76,9 @@ def verify(helper: Path, environment: Path, contract: Path, receipt: Path) -> su
 def test_all_three_compose_paths_use_one_complete_operator_config_or_stay_blocked(helper: Path):
     script = helper.read_text(encoding="utf-8")
     assert 'operator_runtime_config_file="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE:-}"' in script
-    assert '--output-contract "$contract_file"' in script
-    assert 'compose_environment_args=(--env-file "$environment_file")' in script
+    assert 'operator_runtime_evidence_root="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT:-}"' in script
+    assert '--output-contract "$runtime_contract_file"' in script
+    assert 'compose_environment_args=(--env-file "$runtime_environment_file")' in script
     assert 'docker compose "${compose_environment_args[@]}"' in script
     assert 'prepare_operator_runtime_config\n    validate_sources_and_labels' in script
     assert 'configured-readback-contract-requires-operator-config' in script
@@ -87,6 +88,25 @@ def test_all_three_compose_paths_use_one_complete_operator_config_or_stay_blocke
     assert 'EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH == "/run/secrets/tough-tongue-read-only-binding-contract.json"' in script
     for variable in RUNTIME_VARIABLES:
         assert variable in script
+
+
+@pytest.mark.parametrize("helper", HELPERS)
+def test_configured_contract_and_receipt_are_durable_but_credentials_are_scrubbed(
+    helper: Path,
+):
+    script = helper.read_text(encoding="utf-8")
+    assert 'fail "operator-tough-tongue-evidence-root-required"' in script
+    assert 'resolved_root="$(realpath -e -- "$operator_runtime_evidence_root")"' in script
+    assert '"$operator_runtime_evidence_root/runtime.XXXXXXXXXXXX"' in script
+    assert 'runtime_environment_file="$runtime_evidence_dir/runtime.env"' in script
+    assert 'runtime_contract_file="$runtime_evidence_dir/read-only-contract.json"' in script
+    assert 'runtime_receipt_file="$runtime_evidence_dir/runtime-receipt.json"' in script
+    assert 'securely_remove_runtime_environment' in script
+    assert '--destroy-environment "$runtime_environment_file"' in script
+    assert "environment-cleanup-failed" in script
+    assert 'credentials_retained=false' in script
+    assert 'shred --force --remove=unlink --zero "$runtime_contract_file"' not in script
+    assert 'shred --force --remove=unlink --zero "$runtime_receipt_file"' not in script
 
 
 @pytest.mark.parametrize("helper", HELPERS)

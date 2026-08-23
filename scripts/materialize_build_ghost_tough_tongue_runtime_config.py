@@ -33,6 +33,7 @@ SAFE_LOWER_VALUE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 SAFE_ROUTE_PATH = re.compile(r"^[A-Za-z0-9._~/-]*(?:\{resource_ref\})?[A-Za-z0-9._~/-]*$")
 VERIFIED_AT = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 MAX_CONFIG_BYTES = 256 * 1024
+MAX_ENVIRONMENT_BYTES = 256 * 1024
 MAX_CONTRACT_BYTES = 512 * 1024
 CANDIDATE_KINDS = ("agent", "voice", "function", "scenario", "live_avatar")
 ROUTE_NAMES = ("account", "agent", "voice", "function", "scenario")
@@ -79,37 +80,90 @@ def _identity(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
-def _capture_owned_file(path: Path, label: str, maximum: int) -> bytes:
+def _validated_absolute_path(path: Path, label: str) -> tuple[str, ...]:
     if (
         not path.is_absolute()
         or Path(os.path.normpath(path)) != path
         or SAFE_ABSOLUTE_PATH.fullmatch(str(path)) is None
     ):
         raise ConfigError(f"{label}-path-invalid")
+    parts = path.parts[1:]
+    if not parts:
+        raise ConfigError(f"{label}-path-invalid")
+    return parts
+
+
+def _open_directory_chain(path: Path, label: str) -> int:
+    """Open an absolute directory without following any path-component link."""
+
+    parts = () if path == Path("/") else _validated_absolute_path(path, label)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
     try:
-        linked = os.stat(path, follow_symlinks=False)
+        descriptor = os.open("/", flags)
     except OSError as error:
         raise ConfigError(f"{label}-unavailable") from error
-    if (
-        stat.S_ISLNK(linked.st_mode)
-        or not stat.S_ISREG(linked.st_mode)
-        or linked.st_uid != os.geteuid()
-        or linked.st_nlink != 1
-        or stat.S_IMODE(linked.st_mode) not in {0o400, 0o600}
-        or not 1 <= linked.st_size <= maximum
-    ):
-        raise ConfigError(f"{label}-authority-invalid")
     try:
-        descriptor = os.open(
-            path,
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
-        )
-    except OSError as error:
-        raise ConfigError(f"{label}-unavailable") from error
+        for part in parts:
+            try:
+                next_descriptor = os.open(part, flags, dir_fd=descriptor)
+            except OSError as error:
+                raise ConfigError(f"{label}-authority-invalid") from error
+            os.close(descriptor)
+            descriptor = next_descriptor
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _open_owned_file(path: Path, label: str, maximum: int) -> tuple[int, os.stat_result]:
+    parts = _validated_absolute_path(path, label)
+    parent = Path("/").joinpath(*parts[:-1]) if len(parts) > 1 else Path("/")
+    parent_fd = _open_directory_chain(parent, label)
     try:
-        before = os.fstat(descriptor)
-        if _identity(before) != _identity(linked):
-            raise ConfigError(f"{label}-changed")
+        try:
+            linked = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+            if stat.S_ISLNK(linked.st_mode):
+                raise ConfigError(f"{label}-authority-invalid")
+            descriptor = os.open(
+                parts[-1],
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent_fd,
+            )
+        except ConfigError:
+            raise
+        except OSError as error:
+            raise ConfigError(f"{label}-unavailable") from error
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                _identity(opened) != _identity(linked)
+                or stat.S_ISLNK(opened.st_mode)
+                or not stat.S_ISREG(opened.st_mode)
+                or opened.st_uid != os.geteuid()
+                or opened.st_nlink != 1
+                or stat.S_IMODE(opened.st_mode) not in {0o400, 0o600}
+                or not 1 <= opened.st_size <= maximum
+            ):
+                raise ConfigError(f"{label}-authority-invalid")
+            return descriptor, opened
+        except BaseException:
+            os.close(descriptor)
+            raise
+    finally:
+        os.close(parent_fd)
+
+
+def _capture_owned_file(path: Path, label: str, maximum: int) -> bytes:
+    descriptor, before = _open_owned_file(path, label, maximum)
+    try:
         chunks: list[bytes] = []
         total = 0
         while True:
@@ -123,11 +177,7 @@ def _capture_owned_file(path: Path, label: str, maximum: int) -> bytes:
         after = os.fstat(descriptor)
     finally:
         os.close(descriptor)
-    try:
-        rebound = os.stat(path, follow_symlinks=False)
-    except OSError as error:
-        raise ConfigError(f"{label}-changed") from error
-    if _identity(before) != _identity(after) or _identity(after) != _identity(rebound):
+    if _identity(before) != _identity(after):
         raise ConfigError(f"{label}-changed")
     return b"".join(chunks)
 
@@ -370,37 +420,40 @@ def _validated_config(
     return environment, receipt, _canonical(contract_payload) + b"\n"
 
 
-def _private_output_parent(path: Path) -> os.stat_result:
-    if (
-        not path.is_absolute()
-        or Path(os.path.normpath(path)) != path
-        or SAFE_ABSOLUTE_PATH.fullmatch(str(path)) is None
-    ):
-        raise ConfigError("output-path-invalid")
+def _open_private_output_parent(path: Path) -> int:
+    _validated_absolute_path(path, "output")
     try:
-        parent = os.stat(path.parent, follow_symlinks=False)
-    except OSError as error:
-        raise ConfigError("output-parent-unavailable") from error
+        descriptor = _open_directory_chain(path.parent, "output-parent")
+    except ConfigError as error:
+        if str(error) == "output-parent-path-invalid":
+            raise ConfigError("output-path-invalid") from error
+        raise
+    parent = os.fstat(descriptor)
     if (
-        stat.S_ISLNK(parent.st_mode)
-        or not stat.S_ISDIR(parent.st_mode)
+        not stat.S_ISDIR(parent.st_mode)
         or parent.st_uid != os.geteuid()
         or stat.S_IMODE(parent.st_mode) & 0o077
     ):
+        os.close(descriptor)
         raise ConfigError("output-parent-authority-invalid")
-    return parent
+    return descriptor
 
 
-def _publish_new(path: Path, raw: bytes, mode: int) -> None:
-    _private_output_parent(path)
-    parent_fd = os.open(
-        path.parent,
-        os.O_RDONLY
-        | getattr(os, "O_CLOEXEC", 0)
-        | getattr(os, "O_DIRECTORY", 0)
-        | getattr(os, "O_NOFOLLOW", 0),
-    )
-    temporary_name = f".{path.name}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
+def _assert_output_parent_binding(path: Path, expected_fd: int) -> None:
+    rebound_fd = _open_private_output_parent(path)
+    try:
+        expected = os.fstat(expected_fd)
+        rebound = os.fstat(rebound_fd)
+        if (expected.st_dev, expected.st_ino) != (rebound.st_dev, rebound.st_ino):
+            raise ConfigError("output-parent-changed")
+    finally:
+        os.close(rebound_fd)
+
+
+def _publish_new(parent_fd: int, name: str, raw: bytes, mode: int) -> None:
+    if not name or "/" in name or name in {".", ".."}:
+        raise ConfigError("output-name-invalid")
+    temporary_name = f".{name}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
     linked = False
     try:
         descriptor = os.open(
@@ -426,7 +479,7 @@ def _publish_new(path: Path, raw: bytes, mode: int) -> None:
             os.close(descriptor)
         os.link(
             temporary_name,
-            path.name,
+            name,
             src_dir_fd=parent_fd,
             dst_dir_fd=parent_fd,
             follow_symlinks=False,
@@ -442,6 +495,62 @@ def _publish_new(path: Path, raw: bytes, mode: int) -> None:
                 os.unlink(temporary_name, dir_fd=parent_fd)
             except OSError:
                 pass
+
+
+def destroy_environment(path: Path) -> bool:
+    """Zero and unlink one owned runtime env without following path links."""
+
+    parts = _validated_absolute_path(path, "environment-destroy")
+    parent = Path("/").joinpath(*parts[:-1]) if len(parts) > 1 else Path("/")
+    parent_fd = _open_directory_chain(parent, "environment-destroy-parent")
+    descriptor = -1
+    try:
+        try:
+            linked = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        if stat.S_ISLNK(linked.st_mode):
+            raise ConfigError("environment-destroy-authority-invalid")
+        try:
+            descriptor = os.open(
+                parts[-1],
+                os.O_RDWR
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent_fd,
+            )
+        except OSError as error:
+            raise ConfigError("environment-destroy-unavailable") from error
+        opened = os.fstat(descriptor)
+        if (
+            _identity(opened) != _identity(linked)
+            or not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != os.geteuid()
+            or opened.st_nlink != 1
+            or stat.S_IMODE(opened.st_mode) != 0o600
+            or not 0 <= opened.st_size <= MAX_ENVIRONMENT_BYTES
+        ):
+            raise ConfigError("environment-destroy-authority-invalid")
+        remaining = opened.st_size
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        zeroes = b"\0" * min(64 * 1024, max(1, remaining))
+        while remaining:
+            written = os.write(descriptor, zeroes[: min(len(zeroes), remaining)])
+            if written <= 0:
+                raise ConfigError("environment-destroy-short-write")
+            remaining -= written
+        os.fsync(descriptor)
+        os.ftruncate(descriptor, 0)
+        os.fsync(descriptor)
+        rebound = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+        if (opened.st_dev, opened.st_ino) != (rebound.st_dev, rebound.st_ino):
+            raise ConfigError("environment-destroy-changed")
+        os.unlink(parts[-1], dir_fd=parent_fd)
+        os.fsync(parent_fd)
+        return True
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
         os.close(parent_fd)
 
 
@@ -454,8 +563,6 @@ def materialize(
     output_paths = (environment_path, contract_snapshot_path, receipt_path)
     if len(set(output_paths)) != len(output_paths):
         raise ConfigError("output-paths-not-distinct")
-    for path in output_paths:
-        _private_output_parent(path)
     if len({path.parent for path in output_paths}) != 1:
         raise ConfigError("output-paths-not-same-private-directory")
     environment, receipt, contract_raw = _validated_config(
@@ -474,12 +581,20 @@ def materialize(
     receipt_raw = json.dumps(
         receipt, indent=2, ensure_ascii=True, sort_keys=True
     ).encode("utf-8") + b"\n"
-    _publish_new(contract_snapshot_path, contract_raw, 0o400)
-    _publish_new(receipt_path, receipt_raw, 0o600)
-    # The credential-bearing file is the commit marker and is published last.
-    # A killed process can leave harmless contract/receipt evidence, but never a
-    # usable env file without the already-durable matching receipt.
-    _publish_new(environment_path, environment_raw, 0o600)
+    parent_fd = _open_private_output_parent(environment_path)
+    try:
+        _assert_output_parent_binding(contract_snapshot_path, parent_fd)
+        _publish_new(parent_fd, contract_snapshot_path.name, contract_raw, 0o400)
+        _assert_output_parent_binding(receipt_path, parent_fd)
+        _publish_new(parent_fd, receipt_path.name, receipt_raw, 0o600)
+        # The credential-bearing file is the commit marker and is published last.
+        # A killed process can leave harmless contract/receipt evidence, but never a
+        # usable env file without the already-durable matching receipt.
+        _assert_output_parent_binding(environment_path, parent_fd)
+        _publish_new(parent_fd, environment_path.name, environment_raw, 0o600)
+        _assert_output_parent_binding(environment_path, parent_fd)
+    finally:
+        os.close(parent_fd)
     return receipt
 
 
@@ -488,16 +603,32 @@ def _arguments() -> argparse.Namespace:
         description="Materialize a complete read-only Tough Tongue runtime config.",
         allow_abbrev=False,
     )
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--output-env", type=Path, required=True)
-    parser.add_argument("--output-contract", type=Path, required=True)
-    parser.add_argument("--receipt", type=Path, required=True)
-    return parser.parse_args()
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--output-env", type=Path)
+    parser.add_argument("--output-contract", type=Path)
+    parser.add_argument("--receipt", type=Path)
+    parser.add_argument("--destroy-environment", type=Path)
+    args = parser.parse_args()
+    materialize_values = (
+        args.config, args.output_env, args.output_contract, args.receipt
+    )
+    if args.destroy_environment is not None:
+        if any(value is not None for value in materialize_values):
+            parser.error("--destroy-environment cannot be combined with materialization")
+    elif any(value is None for value in materialize_values):
+        parser.error(
+            "--config, --output-env, --output-contract, and --receipt are required"
+        )
+    return args
 
 
 def main() -> int:
     args = _arguments()
     try:
+        if args.destroy_environment is not None:
+            removed = destroy_environment(args.destroy_environment)
+            print(f"tough_tongue_runtime_environment_destroyed={str(removed).lower()}")
+            return 0
         receipt = materialize(
             args.config, args.output_env, args.output_contract, args.receipt
         )

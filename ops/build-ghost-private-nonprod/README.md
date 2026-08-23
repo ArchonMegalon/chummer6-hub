@@ -66,21 +66,32 @@ leave a usable single-link env file without its already-durable matching
 receipt. Do not source the Docker dotenv file into an interactive shell, print
 it, commit it, or reuse the run directory after any failed materialization.
 
-Both bounded deploy helpers implement the same path without leaving the
-materialized files behind. Set only the path to the operator config before
-running either helper:
+Both bounded deploy helpers implement the same path while retaining only the
+secret-free receipt and exact Compose contract. Create one caller-owned,
+canonical, mode-0700 evidence root outside the repository, then set its path
+and the operator config before running either helper:
 
 ```sh
+install -d -m 0700 /absolute/private/build-ghost-runtime-evidence
 export CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE=/absolute/private/operator-runtime-config.json
+export CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT=/absolute/private/build-ghost-runtime-evidence
 ./ops/build-ghost-private-nonprod/deploy-ai-with-rollback.sh
 ```
 
 They verify owner, mode, single-link inode identity, receipt evidence digest,
 environment digest, and contract snapshot digest immediately before adding
-the private env file to Compose. If an already running AI carries a nonempty
-contract digest, a deploy without this complete operator config fails closed;
-the helpers never reconstruct a partial contract from container environment.
-They still keep all provider gates false and do not run the provider probe.
+the private env file to Compose. Every input and output path component is
+opened without following symbolic links, and all three outputs are published
+through one held private-directory descriptor; an intermediate path retarget
+therefore cannot split the contract, receipt, and environment commit. The
+credential-bearing environment is securely removed on every helper exit. Its
+mode-0400 contract and secret-free mode-0600 receipt remain together in the
+unique evidence subdirectory printed after a successful deploy, so Docker can
+recreate the secret mount and an operator can audit its exact digest later.
+If an already running AI carries a nonempty contract digest, a deploy without
+this complete operator config fails closed; the helpers never reconstruct a
+partial contract from container environment. They still keep all provider
+gates false and do not run the provider probe.
 The materializer receipt status `ready-for-read-only-probe` means only that
 local inputs are internally consistent. A fresh EA live-ops
 `probe-tough-tongue-bindings` GET-only receipt is still required before the

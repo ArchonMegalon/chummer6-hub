@@ -13,6 +13,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/materialize_build_ghost_tough_tongue_runtime_config.py"
+COMPOSE = ROOT / "docker-compose.build-ghost-private-nonprod.yml"
 SPEC = importlib.util.spec_from_file_location("tough_tongue_runtime_config", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -199,10 +200,10 @@ def test_fault_before_each_publication_never_leaves_a_usable_environment(
         "environment": environment.name,
     }
 
-    def fail_selected(path: Path, raw: bytes, mode: int) -> None:
-        if path.name == names[failed_publication]:
+    def fail_selected(parent_fd: int, name: str, raw: bytes, mode: int) -> None:
+        if name == names[failed_publication]:
             raise OSError("injected-publication-fault")
-        real_publish(path, raw, mode)
+        real_publish(parent_fd, name, raw, mode)
 
     monkeypatch.setattr(MODULE, "_publish_new", fail_selected)
     with pytest.raises(OSError, match="injected-publication-fault"):
@@ -326,3 +327,190 @@ def test_operator_config_link_and_weak_mode_are_rejected(tmp_path: Path):
     with pytest.raises(MODULE.ConfigError, match="operator-config-authority-invalid"):
         MODULE.materialize(config, environment, snapshot, receipt)
     assert not environment.exists()
+
+
+def test_intermediate_input_symlink_is_rejected_without_reading_config(tmp_path: Path):
+    real = tmp_path / "real"
+    real.mkdir(mode=0o700)
+    private = real / "private"
+    private.mkdir(mode=0o700)
+    config, environment, snapshot, receipt, _, _ = inputs(private)
+    alias = tmp_path / "alias"
+    alias.symlink_to(real, target_is_directory=True)
+
+    with pytest.raises(MODULE.ConfigError, match="operator-config-authority-invalid"):
+        MODULE.materialize(
+            alias / "private" / config.name,
+            environment,
+            snapshot,
+            receipt,
+        )
+
+    assert not environment.exists()
+
+
+def test_intermediate_output_symlink_is_rejected_before_publication(tmp_path: Path):
+    config, _, _, _, _, _ = inputs(tmp_path)
+    real = tmp_path / "real-output"
+    real.mkdir(mode=0o700)
+    private = real / "private"
+    private.mkdir(mode=0o700)
+    alias = tmp_path / "output-alias"
+    alias.symlink_to(real, target_is_directory=True)
+
+    with pytest.raises(MODULE.ConfigError, match="output-parent-authority-invalid"):
+        MODULE.materialize(
+            config,
+            alias / "private" / "runtime.env",
+            alias / "private" / "runtime-contract.json",
+            alias / "private" / "runtime-receipt.json",
+        )
+
+    assert list(private.iterdir()) == []
+
+
+def test_parent_retarget_between_publications_never_reaches_environment_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    run = tmp_path / "run"
+    run.mkdir(mode=0o700)
+    config, environment, snapshot, receipt, _, _ = inputs(run)
+    moved = tmp_path / "moved"
+    real_publish = MODULE._publish_new
+    publications = 0
+
+    def retarget_after_first(parent_fd: int, name: str, raw: bytes, mode: int) -> None:
+        nonlocal publications
+        real_publish(parent_fd, name, raw, mode)
+        publications += 1
+        if publications == 1:
+            run.rename(moved)
+            run.mkdir(mode=0o700)
+
+    monkeypatch.setattr(MODULE, "_publish_new", retarget_after_first)
+    with pytest.raises(MODULE.ConfigError, match="output-parent-changed"):
+        MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert (moved / snapshot.name).is_file()
+    assert not (moved / environment.name).exists()
+    assert list(run.iterdir()) == []
+
+
+def test_destroy_environment_removes_only_credentials_and_retains_audit_pair(
+    tmp_path: Path,
+):
+    config, environment, snapshot, receipt, _, _ = inputs(tmp_path)
+    MODULE.materialize(config, environment, snapshot, receipt)
+
+    assert MODULE.destroy_environment(environment) is True
+
+    assert not environment.exists()
+    assert usable(snapshot, 0o400)
+    assert usable(receipt, 0o600)
+    assert MODULE.destroy_environment(environment) is False
+
+
+def test_destroy_environment_rejects_intermediate_symlink_without_touching_target(
+    tmp_path: Path,
+):
+    real = tmp_path / "real"
+    real.mkdir(mode=0o700)
+    environment = real / "runtime.env"
+    environment.write_text("PRIVATE_TEST_VALUE=opaque\n", encoding="utf-8")
+    environment.chmod(0o600)
+    alias = tmp_path / "alias"
+    alias.symlink_to(real, target_is_directory=True)
+
+    with pytest.raises(
+        MODULE.ConfigError,
+        match="environment-destroy-parent-authority-invalid",
+    ):
+        MODULE.destroy_environment(alias / environment.name)
+
+    assert environment.read_text(encoding="utf-8") == "PRIVATE_TEST_VALUE=opaque\n"
+
+
+def test_destroy_environment_cli_is_secret_quiet_and_keeps_contract_receipt(
+    tmp_path: Path,
+):
+    config, environment, snapshot, receipt, _, payload = inputs(tmp_path)
+    MODULE.materialize(config, environment, snapshot, receipt)
+
+    result = subprocess.run(
+        [str(SCRIPT), "--destroy-environment", str(environment)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "tough_tongue_runtime_environment_destroyed=true\n"
+    assert not environment.exists()
+    assert snapshot.exists()
+    assert receipt.exists()
+    rendered = result.stdout + result.stderr
+    for slot in payload["account_slots"]:  # type: ignore[index]
+        assert slot["api_key"] not in rendered
+
+
+def test_materialized_contract_is_the_exact_durable_compose_secret_source(
+    tmp_path: Path,
+):
+    config, environment_file, snapshot, receipt, _, payload = inputs(tmp_path)
+    MODULE.materialize(config, environment_file, snapshot, receipt)
+    environment = os.environ.copy()
+    for index, name in enumerate(
+        (
+            "CHUMMER_RUN_SERVICES_REVISION",
+            "CHUMMER_PRESENTATION_REVISION",
+            "CHUMMER_CORE_ENGINE_REVISION",
+            "CHUMMER_HUB_REGISTRY_REVISION",
+            "CHUMMER_UI_KIT_REVISION",
+            "CHUMMER_MEDIA_FACTORY_REVISION",
+        ),
+        start=1,
+    ):
+        environment[name] = str(index) * 40
+    for name in (
+        "CHUMMER_RUN_SERVICES_SOURCE",
+        "CHUMMER_PRESENTATION_SOURCE",
+        "CHUMMER_CORE_ENGINE_SOURCE",
+        "CHUMMER_HUB_REGISTRY_SOURCE",
+        "CHUMMER_UI_KIT_SOURCE",
+        "CHUMMER_MEDIA_FACTORY_SOURCE",
+    ):
+        environment[name] = str(ROOT)
+    environment["CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN"] = (
+        "test-tool-token-" + "a" * 32
+    )
+    environment["CHUMMER_AI_INTERNAL_API_TOKEN"] = "test-ai-token-" + "b" * 32
+
+    result = subprocess.run(
+        [
+            "docker", "compose", "--env-file", str(environment_file),
+            "--project-directory", str(ROOT), "--file", str(COMPOSE),
+            "config", "--format", "json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert result.returncode == 0, result.stderr
+    rendered = json.loads(result.stdout)
+    secret = rendered["secrets"][
+        "build-ghost-tough-tongue-read-only-binding-contract"
+    ]
+    assert Path(secret["file"]) == snapshot
+    ai = rendered["services"]["chummer-build-ghost-ai"]
+    assert ai["environment"][
+        "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST"
+    ] == payload["read_only_contract"]["digest"]  # type: ignore[index]
+    for gate in (
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED",
+    ):
+        assert ai["environment"][gate] == "false"
