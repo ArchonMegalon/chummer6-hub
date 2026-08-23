@@ -219,4 +219,44 @@ A positive provider request requires an owner-scoped workspace, a freshly issued
 ./ops/build-ghost-private-nonprod/run-local-canary.sh
 ```
 
+## Generated private deployment attestation
+
+Static tests and deploy-helper output are not a current deployment claim. Run
+the dedicated attester from a clean Hub checkout and give it a new path inside
+an existing caller-owned mode-0700 directory:
+
+```sh
+python3 scripts/attest_build_ghost_private_nonprod_deployment.py \
+  --output /absolute/private/receipt-directory/build-ghost-private-nonprod.json
+```
+
+The output is a new mode-0600 JSON receipt. The command exits zero and emits
+the literal status `deployed-private-nonprod` only when one stable observation
+binds all of the following:
+
+* the exact running Presentation, AI, and edge container IDs, image IDs, image
+  layer digests, and source-revision labels;
+* the current Compose and Caddy source digests, their runtime-mounted source
+  digests, the internal application network, and the sole
+  `127.0.0.1:PORT -> 443/tcp` host binding;
+* all four Tough Tongue execution/canary gates as exactly one literal `false`
+  value each, both before and after the canaries;
+* keyed-v2 packet authority with zero pending grants and zero claims before and
+  after the synthetic packet-access journey;
+* the bounded local packet-access canary plus a direct authenticated AI canary
+  whose exact fallback text is returned with `remoteExecutionEnabled=false`
+  and `remoteAttempted=false`; and
+* a fresh receipt from EA live ops' `probe-tough-tongue-bindings` GET-only
+  probe, including Premium/live-avatar entitlement and account, organization,
+  agent, voice, function, and scenario ownership truth without raw credentials
+  or provider resource identifiers.
+
+Any missing, stale, ambiguous, drifting, non-redacted, or non-passing evidence
+produces status `blocked`, a null claim, a nonzero exit, and explicit
+machine-safe blocker codes. The attester never changes a Compose service,
+provider gate, provider resource, external grant, route, or publication. Its
+packet canary creates and closes only the documented local synthetic workspace;
+the Tough Tongue probe is strictly read-only. A blocked receipt is evidence of
+the current blocker, not permission to activate a provider or widen access.
+
 Never print or persist the key in shell history, logs, or receipts. HTTP request serialization necessarily carries it only in the bounded v2 JSON body; controller errors and receipts contain fixed reason codes, never the submitted value. Presentation hashes it for filename lookup, atomically moves the pending grant before semantic packet validation, and deletes the consumed file. Possession therefore grants at most one resolution during the five-minute window, exactly as v1 did when it duplicated the same key in both body and bearer header. This script proves only the loopback Caddy route and local internal CA. External DNS, public certificate routing, provider scenario changes, and production deployment are outside this lane.
