@@ -195,6 +195,15 @@ def test_local_canary_is_single_use_private_and_self_cleaning():
     assert 'terminal_equivalent="true"' in CANARY
     assert 'cmp --silent "$canary_tmp/replay-response.json" "$canary_tmp/revoked-response.json"' in CANARY
     assert 'state-authority.v2.json' in CANARY
+    assert (
+        'find /app/state/build-ghost-packet-access/pending -maxdepth 1 '
+        '-type f -name "*.json"' in CANARY
+    )
+    assert (
+        'find /app/state/build-ghost-packet-access/claims -maxdepth 1 '
+        '-type f -name "*.json"' in CANARY
+    )
+    assert 'find /app/state/build-ghost-packet-access -type f' not in CANARY
     assert 'audit_records' in CANARY
     assert 'revocation_markers' in CANARY
     assert '"410"' in CANARY
