@@ -147,6 +147,8 @@ def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path
     assert receipt["environmentFileDigest"] == digest(environment_raw)
     assert receipt["readOnlyContractFileDigest"] == digest(contract_raw)
     assert receipt["publicationOrder"] == ["contract-snapshot", "receipt", "environment"]
+    assert receipt["outputDirectoryDevice"] == tmp_path.stat().st_dev
+    assert receipt["outputDirectoryInode"] == tmp_path.stat().st_ino
     assert receipt["evidenceDigest"] == digest(
         canonical({key: value for key, value in receipt.items() if key != "evidenceDigest"})
     )
@@ -215,7 +217,7 @@ def test_fault_before_each_publication_never_leaves_a_usable_environment(
 
 
 @pytest.mark.parametrize("failed_publication", ("contract", "receipt", "environment"))
-def test_fault_between_link_and_unlink_is_rejected_by_single_inode_authority(
+def test_fault_before_atomic_link_never_leaves_a_published_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failed_publication: str
 ):
     config, environment, snapshot, receipt, _, _ = inputs(tmp_path)
@@ -224,21 +226,42 @@ def test_fault_between_link_and_unlink_is_rejected_by_single_inode_authority(
         "receipt": receipt.name,
         "environment": environment.name,
     }[failed_publication]
-    real_unlink = MODULE.os.unlink
-    injected = False
+    real_link = MODULE._link_staged_file
 
-    def fail_selected(path: object, *args: object, **kwargs: object) -> None:
-        nonlocal injected
-        if not injected and isinstance(path, str) and path.startswith(f".{selected}."):
-            injected = True
-            raise OSError("injected-unlink-fault")
-        real_unlink(path, *args, **kwargs)
+    def fail_selected(parent_fd: int, descriptor: int, destination: str) -> None:
+        if destination == selected:
+            raise OSError("injected-link-fault")
+        real_link(parent_fd, descriptor, destination)
 
-    monkeypatch.setattr(MODULE.os, "unlink", fail_selected)
-    with pytest.raises(OSError, match="injected-unlink-fault"):
+    monkeypatch.setattr(MODULE, "_link_staged_file", fail_selected)
+    with pytest.raises(OSError, match="injected-link-fault"):
         MODULE.materialize(config, environment, snapshot, receipt)
 
     assert not usable(environment, 0o600)
+    assert not any(path.name.endswith(".tmp") for path in tmp_path.iterdir())
+
+
+def test_atomic_noreplace_publication_never_overwrites_an_existing_output(
+    tmp_path: Path,
+):
+    existing = tmp_path / "runtime.env"
+    existing.write_bytes(b"EXISTING=unchanged\n")
+    existing.chmod(0o600)
+
+    parent_fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(FileExistsError):
+            MODULE._publish_new(
+                parent_fd,
+                existing.name,
+                b"REPLACEMENT=blocked\n",
+                0o600,
+            )
+    finally:
+        os.close(parent_fd)
+
+    assert existing.read_bytes() == b"EXISTING=unchanged\n"
+    assert existing.stat().st_nlink == 1
 
 
 @pytest.mark.parametrize("kind", ("agent", "voice", "function", "scenario", "live_avatar"))
@@ -400,14 +423,19 @@ def test_destroy_environment_removes_only_credentials_and_retains_audit_pair(
     tmp_path: Path,
 ):
     config, environment, snapshot, receipt, _, _ = inputs(tmp_path)
-    MODULE.materialize(config, environment, snapshot, receipt)
+    receipt_payload = MODULE.materialize(config, environment, snapshot, receipt)
 
-    assert MODULE.destroy_environment(environment) is True
+    destroy_args = {
+        "expected_parent_device": receipt_payload["outputDirectoryDevice"],
+        "expected_parent_inode": receipt_payload["outputDirectoryInode"],
+        "expected_environment_digest": receipt_payload["environmentFileDigest"],
+    }
+    assert MODULE.destroy_environment(environment, **destroy_args) is True
 
     assert not environment.exists()
     assert usable(snapshot, 0o400)
     assert usable(receipt, 0o600)
-    assert MODULE.destroy_environment(environment) is False
+    assert MODULE.destroy_environment(environment, **destroy_args) is False
 
 
 def test_destroy_environment_rejects_intermediate_symlink_without_touching_target(
@@ -425,19 +453,56 @@ def test_destroy_environment_rejects_intermediate_symlink_without_touching_targe
         MODULE.ConfigError,
         match="environment-destroy-parent-authority-invalid",
     ):
-        MODULE.destroy_environment(alias / environment.name)
+        MODULE.destroy_environment(
+            alias / environment.name,
+            expected_parent_device=real.stat().st_dev,
+            expected_parent_inode=real.stat().st_ino,
+        )
 
     assert environment.read_text(encoding="utf-8") == "PRIVATE_TEST_VALUE=opaque\n"
+
+
+def test_destroy_environment_rejects_parent_retarget_without_touching_either_file(
+    tmp_path: Path,
+):
+    run = tmp_path / "run"
+    run.mkdir(mode=0o700)
+    config, environment, snapshot, receipt_path, _, _ = inputs(run)
+    receipt = MODULE.materialize(config, environment, snapshot, receipt_path)
+    original_raw = environment.read_bytes()
+    moved = tmp_path / "original"
+    run.rename(moved)
+    run.mkdir(mode=0o700)
+    replacement = run / environment.name
+    replacement_raw = b"VICTIM=must-not-be-followed\n"
+    replacement.write_bytes(replacement_raw)
+    replacement.chmod(0o600)
+
+    with pytest.raises(MODULE.ConfigError, match="environment-destroy-parent-changed"):
+        MODULE.destroy_environment(
+            environment,
+            expected_parent_device=receipt["outputDirectoryDevice"],
+            expected_parent_inode=receipt["outputDirectoryInode"],
+            expected_environment_digest=receipt["environmentFileDigest"],
+        )
+
+    assert (moved / environment.name).read_bytes() == original_raw
+    assert replacement.read_bytes() == replacement_raw
 
 
 def test_destroy_environment_cli_is_secret_quiet_and_keeps_contract_receipt(
     tmp_path: Path,
 ):
     config, environment, snapshot, receipt, _, payload = inputs(tmp_path)
-    MODULE.materialize(config, environment, snapshot, receipt)
+    receipt_payload = MODULE.materialize(config, environment, snapshot, receipt)
 
     result = subprocess.run(
-        [str(SCRIPT), "--destroy-environment", str(environment)],
+        [
+            str(SCRIPT), "--destroy-environment", str(environment),
+            "--expected-parent-device", str(receipt_payload["outputDirectoryDevice"]),
+            "--expected-parent-inode", str(receipt_payload["outputDirectoryInode"]),
+            "--expected-environment-digest", receipt_payload["environmentFileDigest"],
+        ],
         check=False,
         capture_output=True,
         text=True,

@@ -38,6 +38,9 @@ runtime_evidence_dir=""
 runtime_environment_file=""
 runtime_contract_file=""
 runtime_receipt_file=""
+runtime_evidence_device=""
+runtime_evidence_inode=""
+runtime_environment_digest=""
 compose_environment_args=()
 tough_tongue_runtime_variables=(
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS
@@ -222,6 +225,8 @@ prepare_operator_runtime_config() {
     runtime_environment_file="$runtime_evidence_dir/runtime.env"
     runtime_contract_file="$runtime_evidence_dir/read-only-contract.json"
     runtime_receipt_file="$runtime_evidence_dir/runtime-receipt.json"
+    runtime_evidence_device="$(stat -c '%d' -- "$runtime_evidence_dir")"
+    runtime_evidence_inode="$(stat -c '%i' -- "$runtime_evidence_dir")"
     materializer_log="$deploy_tmp/tough-tongue-runtime-materializer.log"
     if ! python3 "$runtime_config_materializer" \
         --config "$operator_runtime_config_file" \
@@ -234,6 +239,7 @@ prepare_operator_runtime_config() {
     chmod 0600 "$materializer_log"
     verify_materialized_runtime_pair \
         "$runtime_environment_file" "$runtime_contract_file" "$runtime_receipt_file"
+    runtime_environment_digest="$(jq -er '.environmentFileDigest' "$runtime_receipt_file")"
     jq -e \
         '.schema == "chummer.build_ghost.tough_tongue.runtime_config_receipt.v1"
          and .status == "ready-for-read-only-probe"
@@ -251,9 +257,16 @@ prepare_operator_runtime_config() {
 }
 
 securely_remove_runtime_environment() {
+    local cleanup_digest_args=()
     [ -n "$runtime_environment_file" ] || return 0
+    if [ -n "$runtime_environment_digest" ]; then
+        cleanup_digest_args=(--expected-environment-digest "$runtime_environment_digest")
+    fi
     if ! python3 "$runtime_config_materializer" \
-        --destroy-environment "$runtime_environment_file" >/dev/null 2>&1; then
+        --destroy-environment "$runtime_environment_file" \
+        --expected-parent-device "$runtime_evidence_device" \
+        --expected-parent-inode "$runtime_evidence_inode" \
+        "${cleanup_digest_args[@]}" >/dev/null 2>&1; then
         printf 'ai_deploy=failed stage=operator-tough-tongue-environment-cleanup-failed\n' >&2
         return 1
     fi
@@ -266,6 +279,7 @@ verify_materialized_runtime_pair() {
     local receipt_file="$3"
     local owner identity_before identity_after environment_digest contract_digest
     local receipt_evidence expected_evidence receipt_without_evidence
+    local output_device output_inode actual_output_identity
     owner="$(id -u)"
     if [ ! -f "$environment_file" ] || [ -L "$environment_file" ] \
         || [ "$(stat -c '%a:%u:%h' -- "$environment_file")" != "600:$owner:1" ]; then
@@ -286,6 +300,19 @@ verify_materialized_runtime_pair() {
     receipt_evidence="$(jq -er '.evidenceDigest' "$receipt_file")"
     receipt_without_evidence="$(jq -cS 'del(.evidenceDigest)' "$receipt_file")"
     expected_evidence="sha256:$(printf '%s' "$receipt_without_evidence" | sha256sum | awk '{print $1}')"
+    output_device="$(jq -er '.outputDirectoryDevice | numbers' "$receipt_file")"
+    output_inode="$(jq -er '.outputDirectoryInode | numbers' "$receipt_file")"
+    if ! [[ "$output_device" =~ ^[0-9]+$ ]] \
+        || ! [[ "$output_inode" =~ ^[1-9][0-9]*$ ]]; then
+        fail "operator-tough-tongue-output-directory-binding-invalid"
+    fi
+    actual_output_identity="$(stat -c '%d:%i' -- "$(dirname -- "$environment_file")")"
+    [ "$actual_output_identity" = "$output_device:$output_inode" ] \
+        || fail "operator-tough-tongue-output-directory-changed"
+    if [ -n "$runtime_evidence_device" ] || [ -n "$runtime_evidence_inode" ]; then
+        [ "$actual_output_identity" = "$runtime_evidence_device:$runtime_evidence_inode" ] \
+            || fail "operator-tough-tongue-output-directory-changed"
+    fi
     jq -e \
         --arg environment_digest "$environment_digest" \
         --arg contract_digest "$contract_digest" \

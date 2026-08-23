@@ -58,9 +58,11 @@ docker compose --env-file /absolute/private/run/runtime.env \
   -f docker-compose.build-ghost-private-nonprod.yml config --quiet
 ```
 
-The materializer atomically publishes the mode-0400 contract snapshot first,
-then a mode-0600 receipt binding the exact contract-file and environment-file
-digests, and the credential-bearing mode-0600 environment file last. All
+The materializer stages each output in an unnamed inode and gives it one final
+name with an atomic no-replace link:
+the mode-0400 contract snapshot first, then a mode-0600 receipt binding the
+exact contract-file, environment-file, and output-directory identities, and
+the credential-bearing mode-0600 environment file last. All
 three outputs must be new paths in the same private directory. A crash cannot
 leave a usable single-link env file without its already-durable matching
 receipt. Do not source the Docker dotenv file into an interactive shell, print
@@ -84,8 +86,11 @@ the private env file to Compose. Every input and output path component is
 opened without following symbolic links, and all three outputs are published
 through one held private-directory descriptor; an intermediate path retarget
 therefore cannot split the contract, receipt, and environment commit. The
-credential-bearing environment is securely removed on every helper exit. Its
-mode-0400 contract and secret-free mode-0600 receipt remain together in the
+credential-bearing environment is securely removed on helper exit only through
+the materializer-recorded directory identity and environment digest. If that
+directory path is retargeted, cleanup fails closed without erasing the
+replacement target or claiming credential removal. Its mode-0400 contract and
+secret-free mode-0600 receipt remain together in the
 unique evidence subdirectory printed after a successful deploy, so Docker can
 recreate the secret mount and an operator can audit its exact digest later.
 If an already running AI carries a nonempty contract digest, a deploy without

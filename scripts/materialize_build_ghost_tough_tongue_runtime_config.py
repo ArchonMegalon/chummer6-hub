@@ -14,7 +14,6 @@ import json
 import os
 from pathlib import Path
 import re
-import secrets
 import stat
 import sys
 from typing import Any, Mapping
@@ -453,58 +452,81 @@ def _assert_output_parent_binding(path: Path, expected_fd: int) -> None:
 def _publish_new(parent_fd: int, name: str, raw: bytes, mode: int) -> None:
     if not name or "/" in name or name in {".", ".."}:
         raise ConfigError("output-name-invalid")
-    temporary_name = f".{name}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
-    linked = False
+    temporary_flag = getattr(os, "O_TMPFILE", 0)
+    if not temporary_flag:
+        raise ConfigError("output-atomic-publication-unavailable")
     try:
         descriptor = os.open(
-            temporary_name,
+            ".",
             os.O_WRONLY
-            | os.O_CREAT
-            | os.O_EXCL
+            | temporary_flag
             | getattr(os, "O_CLOEXEC", 0)
             | getattr(os, "O_NOFOLLOW", 0),
             mode,
             dir_fd=parent_fd,
         )
-        try:
-            os.fchmod(descriptor, mode)
-            offset = 0
-            while offset < len(raw):
-                written = os.write(descriptor, raw[offset:])
-                if written <= 0:
-                    raise ConfigError("output-short-write")
-                offset += written
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-        os.link(
-            temporary_name,
-            name,
-            src_dir_fd=parent_fd,
-            dst_dir_fd=parent_fd,
-            follow_symlinks=False,
-        )
-        linked = True
-        os.fsync(parent_fd)
-        os.unlink(temporary_name, dir_fd=parent_fd)
-        linked = False
+    except OSError as error:
+        raise ConfigError("output-atomic-publication-unavailable") from error
+    try:
+        os.fchmod(descriptor, mode)
+        offset = 0
+        while offset < len(raw):
+            written = os.write(descriptor, raw[offset:])
+            if written <= 0:
+                raise ConfigError("output-short-write")
+            offset += written
+        os.fsync(descriptor)
+        _link_staged_file(parent_fd, descriptor, name)
         os.fsync(parent_fd)
     finally:
-        if not linked:
-            try:
-                os.unlink(temporary_name, dir_fd=parent_fd)
-            except OSError:
-                pass
+        os.close(descriptor)
 
 
-def destroy_environment(path: Path) -> bool:
+def _link_staged_file(parent_fd: int, descriptor: int, name: str) -> None:
+    """Atomically give an unnamed staged inode one non-replacing output name."""
+
+    os.link(
+        f"/proc/self/fd/{descriptor}",
+        name,
+        dst_dir_fd=parent_fd,
+        follow_symlinks=True,
+    )
+
+
+def destroy_environment(
+    path: Path,
+    *,
+    expected_parent_device: int,
+    expected_parent_inode: int,
+    expected_environment_digest: str | None = None,
+) -> bool:
     """Zero and unlink one owned runtime env without following path links."""
+
+    if (
+        expected_parent_device < 0
+        or expected_parent_inode <= 0
+    ):
+        raise ConfigError("environment-destroy-binding-invalid")
+    if (
+        expected_environment_digest is not None
+        and (
+            not isinstance(expected_environment_digest, str)
+            or SHA256.fullmatch(expected_environment_digest) is None
+        )
+    ):
+        raise ConfigError("environment-destroy-binding-invalid")
 
     parts = _validated_absolute_path(path, "environment-destroy")
     parent = Path("/").joinpath(*parts[:-1]) if len(parts) > 1 else Path("/")
     parent_fd = _open_directory_chain(parent, "environment-destroy-parent")
     descriptor = -1
     try:
+        parent_metadata = os.fstat(parent_fd)
+        if (
+            parent_metadata.st_dev != expected_parent_device
+            or parent_metadata.st_ino != expected_parent_inode
+        ):
+            raise ConfigError("environment-destroy-parent-changed")
         try:
             linked = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
         except FileNotFoundError:
@@ -531,6 +553,16 @@ def destroy_environment(path: Path) -> bool:
             or not 0 <= opened.st_size <= MAX_ENVIRONMENT_BYTES
         ):
             raise ConfigError("environment-destroy-authority-invalid")
+        if expected_environment_digest is not None:
+            hasher = hashlib.sha256()
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            while True:
+                chunk = os.read(descriptor, 64 * 1024)
+                if not chunk:
+                    break
+                hasher.update(chunk)
+            if f"sha256:{hasher.hexdigest()}" != expected_environment_digest:
+                raise ConfigError("environment-destroy-digest-mismatch")
         remaining = opened.st_size
         os.lseek(descriptor, 0, os.SEEK_SET)
         zeroes = b"\0" * min(64 * 1024, max(1, remaining))
@@ -575,14 +607,17 @@ def materialize(
     receipt["readOnlyContractFileDigest"] = _digest(contract_raw)
     receipt["contractSnapshotMode"] = "0400"
     receipt["publicationOrder"] = ["contract-snapshot", "receipt", "environment"]
-    receipt["evidenceDigest"] = _digest(_canonical({
-        key: value for key, value in receipt.items() if key != "evidenceDigest"
-    }))
-    receipt_raw = json.dumps(
-        receipt, indent=2, ensure_ascii=True, sort_keys=True
-    ).encode("utf-8") + b"\n"
     parent_fd = _open_private_output_parent(environment_path)
     try:
+        parent_metadata = os.fstat(parent_fd)
+        receipt["outputDirectoryDevice"] = parent_metadata.st_dev
+        receipt["outputDirectoryInode"] = parent_metadata.st_ino
+        receipt["evidenceDigest"] = _digest(_canonical({
+            key: value for key, value in receipt.items() if key != "evidenceDigest"
+        }))
+        receipt_raw = json.dumps(
+            receipt, indent=2, ensure_ascii=True, sort_keys=True
+        ).encode("utf-8") + b"\n"
         _assert_output_parent_binding(contract_snapshot_path, parent_fd)
         _publish_new(parent_fd, contract_snapshot_path.name, contract_raw, 0o400)
         _assert_output_parent_binding(receipt_path, parent_fd)
@@ -608,6 +643,9 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--output-contract", type=Path)
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--destroy-environment", type=Path)
+    parser.add_argument("--expected-parent-device", type=int)
+    parser.add_argument("--expected-parent-inode", type=int)
+    parser.add_argument("--expected-environment-digest")
     args = parser.parse_args()
     materialize_values = (
         args.config, args.output_env, args.output_contract, args.receipt
@@ -615,10 +653,24 @@ def _arguments() -> argparse.Namespace:
     if args.destroy_environment is not None:
         if any(value is not None for value in materialize_values):
             parser.error("--destroy-environment cannot be combined with materialization")
+        if args.expected_parent_device is None or args.expected_parent_inode is None:
+            parser.error(
+                "--destroy-environment requires --expected-parent-device "
+                "and --expected-parent-inode"
+            )
     elif any(value is None for value in materialize_values):
         parser.error(
             "--config, --output-env, --output-contract, and --receipt are required"
         )
+    elif any(
+        value is not None
+        for value in (
+            args.expected_parent_device,
+            args.expected_parent_inode,
+            args.expected_environment_digest,
+        )
+    ):
+        parser.error("expected cleanup bindings require --destroy-environment")
     return args
 
 
@@ -626,7 +678,12 @@ def main() -> int:
     args = _arguments()
     try:
         if args.destroy_environment is not None:
-            removed = destroy_environment(args.destroy_environment)
+            removed = destroy_environment(
+                args.destroy_environment,
+                expected_parent_device=args.expected_parent_device,
+                expected_parent_inode=args.expected_parent_inode,
+                expected_environment_digest=args.expected_environment_digest,
+            )
             print(f"tough_tongue_runtime_environment_destroyed={str(removed).lower()}")
             return 0
         receipt = materialize(

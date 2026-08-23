@@ -50,6 +50,8 @@ def write_pair(directory: Path) -> tuple[Path, Path, Path]:
         "readOnlyContractFileDigest": digest(contract_raw),
         "contractSnapshotMode": "0400",
         "publicationOrder": ["contract-snapshot", "receipt", "environment"],
+        "outputDirectoryDevice": directory.stat().st_dev,
+        "outputDirectoryInode": directory.stat().st_ino,
     }
     payload["evidenceDigest"] = digest(canonical(payload))
     receipt.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -103,6 +105,9 @@ def test_configured_contract_and_receipt_are_durable_but_credentials_are_scrubbe
     assert 'runtime_receipt_file="$runtime_evidence_dir/runtime-receipt.json"' in script
     assert 'securely_remove_runtime_environment' in script
     assert '--destroy-environment "$runtime_environment_file"' in script
+    assert '--expected-parent-device "$runtime_evidence_device"' in script
+    assert '--expected-parent-inode "$runtime_evidence_inode"' in script
+    assert '--expected-environment-digest "$runtime_environment_digest"' in script
     assert "environment-cleanup-failed" in script
     assert 'credentials_retained=false' in script
     assert 'shred --force --remove=unlink --zero "$runtime_contract_file"' not in script
@@ -147,6 +152,45 @@ def test_helper_rejects_linked_environment_left_by_interrupted_publication(
 
     assert result.returncode != 0
     assert "stage=operator-tough-tongue-environment-authority-invalid" in result.stderr
+
+
+@pytest.mark.parametrize("helper", HELPERS)
+def test_helper_cleanup_never_follows_a_retargeted_runtime_directory(
+    tmp_path: Path, helper: Path
+):
+    run = tmp_path / "run"
+    run.mkdir(mode=0o700)
+    environment, _, receipt = write_pair(run)
+    receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
+    original_raw = environment.read_bytes()
+    moved = tmp_path / "original"
+    run.rename(moved)
+    run.mkdir(mode=0o700)
+    replacement = run / environment.name
+    replacement_raw = b"VICTIM=must-not-be-followed\n"
+    replacement.write_bytes(replacement_raw)
+    replacement.chmod(0o600)
+
+    result = subprocess.run(
+        [
+            "bash", "-c",
+            'source "$1"; runtime_environment_file="$2"; '
+            'runtime_evidence_device="$3"; runtime_evidence_inode="$4"; '
+            'runtime_environment_digest="$5"; securely_remove_runtime_environment',
+            "runtime-cleanup-test", str(helper), str(environment),
+            str(receipt_payload["outputDirectoryDevice"]),
+            str(receipt_payload["outputDirectoryInode"]),
+            receipt_payload["environmentFileDigest"],
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "environment-cleanup-failed" in result.stderr
+    assert (moved / environment.name).read_bytes() == original_raw
+    assert replacement.read_bytes() == replacement_raw
 
 
 @pytest.mark.parametrize("helper", HELPERS)
