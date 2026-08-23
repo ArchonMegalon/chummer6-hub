@@ -16,6 +16,8 @@ immunity from an actor already running as the operator UID.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
@@ -253,6 +255,16 @@ CANONICAL_ORIGIN_URLS = {
         "https://github.com/ArchonMegalon/chummer6-media-factory.git"
     ),
 }
+TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATH = (
+    "ops/trusted-observability-attesters/"
+    "local-observability-operator-2026.public.pem"
+)
+TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATTERN = re.compile(
+    rb"\A-----BEGIN PUBLIC KEY-----\n"
+    rb"(?P<body>(?:[A-Za-z0-9+/]+={0,2}\n)+)"
+    rb"-----END PUBLIC KEY-----\n\Z"
+)
+TRUSTED_OPENSSL = "/usr/bin/openssl"
 SYNTHETIC_SOURCE_KIND = "standalone-git-repository"
 EXPECTED_NAMED_CONTEXT_COPY_INSTRUCTIONS_BY_STAGE = (
     PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE
@@ -1552,6 +1564,70 @@ class GovernedCutoverRunner:
             )
         )
 
+    def _tracked_context_entry_is_allowed_trusted_public_pem(
+        self,
+        repository: Path,
+        relative_path: str,
+    ) -> bool:
+        if relative_path != TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATH:
+            return False
+        public_key_path = repository / relative_path
+        try:
+            raw = read_regular_file_bytes(
+                public_key_path,
+                maximum_bytes=16 * 1024,
+            )
+        except (CutoverError, OSError):
+            return False
+        if b"PRIVATE KEY" in raw:
+            return False
+        match = TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATTERN.fullmatch(raw)
+        if match is None:
+            return False
+        try:
+            decoded = base64.b64decode(
+                match.group("body").replace(b"\n", b""),
+                validate=True,
+            )
+        except (binascii.Error, ValueError):
+            return False
+        if not decoded:
+            return False
+        try:
+            parsed = self.commands.run(
+                [
+                    TRUSTED_OPENSSL,
+                    "pkey",
+                    "-pubin",
+                    "-inform",
+                    "PEM",
+                    "-in",
+                    str(public_key_path),
+                    "-noout",
+                ],
+                check=False,
+            )
+            rebound = read_regular_file_bytes(
+                public_key_path,
+                maximum_bytes=16 * 1024,
+            )
+        except (CutoverError, OSError):
+            return False
+        return parsed.returncode == 0 and not parsed.stdout and rebound == raw
+
+    def _tracked_context_entry_is_rejected(
+        self,
+        repository: Path,
+        relative_path: str,
+    ) -> bool:
+        return (
+            self._tracked_context_entry_is_sensitive_or_output(relative_path)
+            and not self._tracked_context_entry_is_allowed_trusted_public_pem(
+                repository,
+                relative_path,
+            )
+        )
+
     def _git_source_provenance(
         self,
         *,
@@ -1676,7 +1752,7 @@ class GovernedCutoverRunner:
         sensitive_tracked_entries = [
             entry
             for entry in tracked_entries
-            if self._tracked_context_entry_is_sensitive_or_output(entry)
+            if self._tracked_context_entry_is_rejected(repository, entry)
         ]
         if (
             top_level != str(repository)
