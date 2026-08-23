@@ -100,6 +100,12 @@ writing a new unprotected production key. Activation requires an RSA private key
 bits whose key-usage extension permits encryption (when present), a live protect/unprotect round
 trip, and structurally valid certificate-encrypted key XML.
 
+The PKCS#12 file may be a bounded rotation bundle. Its unique latest-expiry RSA certificate is the
+primary encryptor and must retain more than seven days of validity; the other unique RSA
+private-key certificates are decrypt-only custody for existing key XML. Startup tests the exact
+mixed ring before registering the provider, so replacing a prior certificate without retaining it
+cannot silently strand protected InstallLinking envelopes.
+
 The PostgreSQL rows contain protected envelopes, not a substitute for the matching Data Protection
 key ring and certificate. Back up and test-restore the database/PITR stream and encrypted key-ring
 custody as separately protected assets. A database restore behind the local protected floor stays
