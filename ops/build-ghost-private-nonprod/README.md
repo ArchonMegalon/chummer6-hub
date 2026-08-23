@@ -34,12 +34,15 @@ The sentinel is blocked evidence, never a readback or provider-readiness claim.
 
 An operator may instead prepare one caller-owned mode-0600 JSON file with
 schema `chummer.build_ghost.tough_tongue.runtime_config.v1`. It must contain
-three or more exact `{account_ref, api_key}` slots, one preferred opaque
+exactly six distinct `{account_ref, api_key, organization_ref?}` slots, one preferred opaque
 account ref present exactly once in those slots, raw provider refs for
 `agent`, `voice`, `function`, `scenario`, and `live_avatar`, and the absolute
 mode-0600 path plus canonical SHA-256 digest of an operator-verified
-`ea.tough_tongue.read_only_binding_contract.v1` contract. The materializer
-accepts only the exact GET-only route/selector schema used by EA live ops,
+`chummer.build_ghost.tough_tongue.read_only_binding_contract.v2` contract. The materializer
+accepts only the documented `balance`, `subscriptions`, `v2/organizations`,
+and `scenarios/{resource_ref}` GET allowlist used by EA live ops,
+allows the optional organization context only when it is present on all six
+slots (so slot alignment cannot drift),
 requires `authority.operator_verified=true`, rejects pre-shaped candidate
 digests, duplicate JSON keys, links, weak file modes, and unsafe dotenv
 characters, and never contacts a provider.
@@ -99,7 +102,7 @@ partial contract from container environment. They still keep all provider
 gates false and do not run the provider probe.
 The materializer receipt status `ready-for-read-only-probe` means only that
 local inputs are internally consistent. A fresh EA live-ops
-`probe-tough-tongue-bindings` GET-only receipt is still required before the
+v2 six-slot GET-only receipt is still required before the
 attester can accept provider readback; missing identifiers or contract truth
 must remain blocked with zero provider mutations.
 
