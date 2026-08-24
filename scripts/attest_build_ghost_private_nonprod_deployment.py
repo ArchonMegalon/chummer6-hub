@@ -85,7 +85,8 @@ TOUGH_TONGUE_RUNTIME_RECEIPT_FIELDS = {
     "schema", "generatedAt", "status", "providerKey", "accountRefCount",
     "accountRefsDigest", "organizationContextCount", "organizationRefsDigest",
     "preferredAccountRef", "candidateRefDigests", "candidateRefCount",
-    "bindingCandidatesConfigured", "expectationDigest", "readOnlyContractDigest",
+    "bindingCandidatesConfigured", "stockAvatarMigrationConfigured",
+    "expectationDigest", "readOnlyContractDigest",
     "accountSelectionPolicyDigest", "accountSelectionPolicyEvidenceDigest",
     "accountSelectionPolicySource", "premiumBasis", "premiumThresholdMinutes",
     "premiumValidityCalendarMonths", "premiumValidUntil", "premiumGrantCount",
@@ -491,8 +492,15 @@ def _deployed_tough_tongue_binding(
         candidate_values[kind] = raw
         candidate_digests[kind] = _candidate_ref_digest(raw)
 
-    configured_candidate_count = sum(bool(value) for value in candidate_values.values())
-    if configured_candidate_count not in {0, len(TOUGH_TONGUE_CANDIDATE_ENV)}:
+    configured_candidate_kinds = {
+        kind for kind, value in candidate_values.items() if value
+    }
+    configured_candidate_count = len(configured_candidate_kinds)
+    stock_avatar_migration_configured = configured_candidate_kinds == {
+        "voice", "scenario", "live_avatar"
+    }
+    if configured_candidate_count not in {0, len(TOUGH_TONGUE_CANDIDATE_ENV)} \
+            and not stock_avatar_migration_configured:
         _add(blockers, "deployed-tough-tongue-candidate-refs-partial")
     binding_candidates_configured = (
         configured_candidate_count == len(TOUGH_TONGUE_CANDIDATE_ENV)
@@ -516,6 +524,7 @@ def _deployed_tough_tongue_binding(
     return {
         "configured": configured,
         "bindingCandidatesConfigured": binding_candidates_configured,
+        "stockAvatarMigrationConfigured": stock_avatar_migration_configured,
         "candidateRefCount": configured_candidate_count,
         "accountRefCount": len(account_refs),
         "credentialSlotCount": len(credential_slots),
@@ -1072,7 +1081,13 @@ def _collect_runtime(
             ai_inspect,
             blockers,
         )
-        if not runtime["toughTongueOpaqueBinding"]["bindingCandidatesConfigured"]:
+        if runtime["toughTongueOpaqueBinding"]["stockAvatarMigrationConfigured"]:
+            _add(blockers, "tough-tongue-stock-avatar-migration-grounding-incomplete")
+            runtime["toughTongueAccountSelectionPolicy"] = {
+                **_blocked_account_selection_policy(),
+                "status": "stock-avatar-migration-grounding-incomplete",
+            }
+        elif not runtime["toughTongueOpaqueBinding"]["bindingCandidatesConfigured"]:
             runtime["toughTongueAccountSelectionPolicy"] = (
                 _runtime_account_selection_policy(
                     ai_inspect,
@@ -1090,6 +1105,7 @@ def _collect_runtime(
         runtime["toughTongueOpaqueBinding"] = {
             "configured": False,
             "bindingCandidatesConfigured": False,
+            "stockAvatarMigrationConfigured": False,
             "candidateRefCount": 0,
             "accountRefCount": 0,
             "credentialSlotCount": 0,
@@ -1275,7 +1291,7 @@ def _fallback_request(now: dt.datetime) -> tuple[dict[str, Any], str, str]:
     packet: dict[str, Any] = {
         "schema": "chummer.build_ghost_analysis.v1",
         "personaId": "build-ghost-rook-v1",
-        "avatarId": "build-ghost-rook-avatar-v1",
+        "avatarId": "build-ghost-tough-tongue-stock-avatar-v1",
         "voiceId": "build-ghost-rook-voice-v1",
         "packetDigest": "",
         "locale": "en-US",

@@ -180,7 +180,7 @@ public sealed class BuildGhostExplainEndpointIntegrationTests
         {
             ["schema"] = ToughTongueBuildGhostContractVersions.AnalysisV1,
             ["personaId"] = ToughTongueBuildGhostPersonaIds.Rook,
-            ["avatarId"] = ToughTongueBuildGhostPersonaIds.RookAvatar,
+            ["avatarId"] = ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
             ["voiceId"] = ToughTongueBuildGhostPersonaIds.RookVoice,
             ["workspaceId"] = WorkspaceId,
             ["workspaceRevision"] = WorkspaceRevision,
@@ -275,7 +275,7 @@ public sealed class BuildGhostExplainEndpointIntegrationTests
         public BuildGhostPersonaReleaseProjection ResolveRook()
             => new(
                 ToughTongueBuildGhostPersonaIds.Rook,
-                ToughTongueBuildGhostPersonaIds.RookAvatar,
+                ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
                 ToughTongueBuildGhostPersonaIds.RookVoice,
                 "approved",
                 "disabled",

@@ -65,7 +65,7 @@ public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
     }
 
     [TestMethod]
-    public void Current_premium_live_avatar_schema_pins_anam_heygen_landmass_costs_and_runtime_fields()
+    public void Current_premium_live_avatar_schema_pins_anam_avatario_heygen_landmass_costs_and_runtime_fields()
     {
         BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt receipt = CurrentReceipt();
 
@@ -74,6 +74,7 @@ public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
             new[]
             {
                 ToughTongueBuildGhostLiveAvatarProviders.Anam,
+                ToughTongueBuildGhostLiveAvatarProviders.Avatario,
                 ToughTongueBuildGhostLiveAvatarProviders.HeyGen
             },
             receipt.AllowedProviders.ToArray());
@@ -89,12 +90,13 @@ public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
     }
 
     [TestMethod]
-    public void Anam_and_heygen_bindings_are_digest_bound_without_serializing_raw_avatar_ids()
+    public void Governed_provider_bindings_are_digest_bound_without_serializing_raw_avatar_ids()
     {
         BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt receipt = CurrentReceipt();
         foreach ((string provider, string avatarId) in new[]
                  {
                      (ToughTongueBuildGhostLiveAvatarProviders.Anam, "rook-anam-persona-v1"),
+                     (ToughTongueBuildGhostLiveAvatarProviders.Avatario, "11111111-2222-4333-8444-555555555555"),
                      (ToughTongueBuildGhostLiveAvatarProviders.HeyGen, "1c690fe7-23e0-49f9-bfba-14344450285b")
                  })
         {
@@ -123,11 +125,14 @@ public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
     {
         BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt receipt = CurrentReceipt();
 
-        Assert.ThrowsExactly<ArgumentException>(() =>
-            BuildGhostToughTonguePremiumLiveAvatarSchemaContract.CreateBinding(
-                receipt,
-                "avatario",
-                "rook-avatar"));
+        foreach (string provider in new[] { "avatari0", "arbitrary-provider" })
+        {
+            Assert.ThrowsExactly<ArgumentException>(() =>
+                BuildGhostToughTonguePremiumLiveAvatarSchemaContract.CreateBinding(
+                    receipt,
+                    provider,
+                    "rook-avatar"));
+        }
         IReadOnlyList<string> failures =
             BuildGhostToughTonguePremiumLiveAvatarSchemaContract.Validate(
                 receipt with { StudioBundleDigest = $"sha256:{new string('0', 64)}" });
@@ -199,7 +204,9 @@ public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
         ToughTongueBuildGhostScenarioCandidate candidate =
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookPremiumLiveAvatarCandidate(
                 deployment,
-                new Uri("https://cdn.chummer.run/build-ghost/rook.png"),
+                BuildGhostToughTongueStockAvatarBindingContract.CreateReadVerified(
+                    "11111111-2222-4333-8444-555555555555",
+                    $"sha256:{new string('a', 64)}"),
                 voiceBinding,
                 liveAvatarBinding,
                 receipt);

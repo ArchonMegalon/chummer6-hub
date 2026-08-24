@@ -356,7 +356,8 @@ account.
 
 A historical client-bundle or subscription review is not current provider
 truth. Premium live avatars remain private-candidate-only: an operator-verified
-contract may admit the provider values `anam` and `liveavatar`, but a fresh
+contract may admit only the governed provider values `anam`, `avatario`,
+`heygen`, and `liveavatar`, but a fresh
 GET-only readback must still prove the selected provider and entitlement.
 Scenario readback must preserve the exact
 `appearance.live_avatar_id` and `appearance.live_avatar_provider` values; the
@@ -366,9 +367,28 @@ excluded from binding receipts. This is provider-managed speech animation, not
 local lip-sync proof: MuseTalk and the local lip-sync lane are explicitly
 deferred.
 
+The ordinary scenario avatar is now a separate typed, provider-managed Tough
+Tongue stock binding. It replaces the former Chummer-owned Rook portrait while
+retaining the semantic packet alias
+`build-ghost-tough-tongue-stock-avatar-v1`. The exact current selection is
+`Amelia`, provider `avatario`, asset path
+`/live-avatars/avatars/Amelia.jpg`; its opaque provider identifier is supplied
+only through the existing materialized live-avatar environment input and is
+represented by a SHA-256 digest in the binding contract. It is never committed
+or serialized in receipts. Missing identifiers, provider misspellings, name or
+path drift, and a missing exact
+`CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST` all fail closed.
+
+The exact current model pair is `Landmass` / `gemini`. The historical
+`Landmass` / `cascade` path remains available only behind the explicit
+`CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE=true` migration flag;
+arbitrary providers or model names are rejected. Neither this source binding
+nor the compatibility flag authorizes provider reads or mutations. The Rook
+persona, packet/rules authority, and synthetic voice identity remain unchanged.
+
 Pinned client bundles and Premium account status do not authorize or perform a
-provider mutation. A Build Ghost live-avatar candidate still requires an exact
-Rook avatar binding, the digest-bound schema receipt, verified Cartesia voice
+provider mutation. A Build Ghost live-avatar candidate still requires the exact
+stock/default avatar binding, the digest-bound schema receipt, verified Cartesia voice
 binding, verified private custom-function binding, scenario readback, and all
 runtime canary gates. Missing or drifted evidence adds a blocker and leaves
 remote execution disabled. The 2026-08-22 read-only account review created no

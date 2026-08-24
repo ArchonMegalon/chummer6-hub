@@ -35,6 +35,10 @@ MAX_ENVIRONMENT_BYTES = 256 * 1024
 MAX_CONTRACT_BYTES = 512 * 1024
 MAX_ACCOUNT_SELECTION_POLICY_BYTES = 512 * 1024
 CANDIDATE_KINDS = ("agent", "voice", "function", "scenario", "live_avatar")
+STOCK_AVATAR_MIGRATION_KINDS = frozenset(("voice", "scenario", "live_avatar"))
+ALLOWED_LIVE_AVATAR_PROVIDERS = frozenset(
+    ("anam", "avatario", "heygen", "liveavatar")
+)
 EXPECTED_SLOT_COUNT = 6
 ACCOUNT_SELECTION_POLICY_SCHEMA = "ea.tough_tongue.operator_premium_grants.v1"
 PREMIUM_BASIS = "operator_policy_available_minutes_gt_threshold"
@@ -417,6 +421,11 @@ def _validated_contract(payload: dict[str, Any], expected_digest: str) -> None:
             or len(set(values)) != len(values)
         ):
             raise ConfigError("read-only-contract-entitlements-invalid")
+    if any(
+        provider not in ALLOWED_LIVE_AVATAR_PROVIDERS
+        for provider in payload["live_avatar_providers"]
+    ):
+        raise ConfigError("read-only-contract-live-avatar-provider-invalid")
 
     if payload.get("slot_cardinality") != EXPECTED_SLOT_COUNT:
         raise ConfigError("read-only-contract-cardinality-invalid")
@@ -510,10 +519,17 @@ def _validated_config(
         raise ConfigError("candidate-refs-schema-invalid")
     if any(not isinstance(candidates.get(kind), str) for kind in CANDIDATE_KINDS):
         raise ConfigError("candidate-refs-schema-invalid")
-    candidate_configured = [bool(candidates[kind]) for kind in CANDIDATE_KINDS]
-    if any(candidate_configured) and not all(candidate_configured):
+    configured_candidate_kinds = {
+        kind for kind in CANDIDATE_KINDS if bool(candidates[kind])
+    }
+    binding_candidates_configured = configured_candidate_kinds == set(CANDIDATE_KINDS)
+    stock_avatar_migration_configured = (
+        configured_candidate_kinds == STOCK_AVATAR_MIGRATION_KINDS
+    )
+    if configured_candidate_kinds and not (
+        binding_candidates_configured or stock_avatar_migration_configured
+    ):
         raise ConfigError("candidate-refs-partial")
-    binding_candidates_configured = all(candidate_configured)
     candidate_digests: dict[str, str] = {}
     for kind in CANDIDATE_KINDS:
         value = candidates.get(kind)
@@ -624,6 +640,7 @@ def _validated_config(
         "candidateRefDigests": dict(sorted(candidate_digests.items())),
         "candidateRefCount": len(candidate_digests),
         "bindingCandidatesConfigured": binding_candidates_configured,
+        "stockAvatarMigrationConfigured": stock_avatar_migration_configured,
         "expectationDigest": expectation_digest,
         "readOnlyContractDigest": contract_digest,
         "accountSelectionPolicyDigest": (
@@ -672,7 +689,9 @@ def _validated_config(
         "environmentContainsCredentials": True,
         "environmentMode": "0600",
         "nextAction": (
-            "deploy-private-account-audit-only-runtime-with-all-gates-false"
+            "attach-read-verified-grounded-custom-function-before-any-remote-execution"
+            if stock_avatar_migration_configured
+            else "deploy-private-account-audit-only-runtime-with-all-gates-false"
             if not binding_candidates_configured
             else "run-fresh-ea-live-ops-read-only-binding-probe"
         ),

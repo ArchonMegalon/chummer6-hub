@@ -566,6 +566,7 @@ public static class BuildGhostToughTonguePremiumLiveAvatarSchemaContract
     public static readonly IReadOnlyList<string> AllowedProviders =
     [
         ToughTongueBuildGhostLiveAvatarProviders.Anam,
+        ToughTongueBuildGhostLiveAvatarProviders.Avatario,
         ToughTongueBuildGhostLiveAvatarProviders.HeyGen
     ];
 
@@ -1587,6 +1588,163 @@ public static class BuildGhostToughTongueCustomFunctionContract
         => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
 }
 
+public static class BuildGhostToughTongueStockAvatarBindingContract
+{
+    public const string ProviderConfigurationKey =
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER";
+    public const string NameConfigurationKey =
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME";
+    public const string AssetPathConfigurationKey =
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH";
+    public const string ProviderAvatarIdConfigurationKey =
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID";
+    public const string ProviderReadbackDigestConfigurationKey =
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST";
+    public const string ModelProviderConfigurationKey =
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER";
+    public const string ModelIdConfigurationKey =
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID";
+    public const string AllowLegacyCascadeConfigurationKey =
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE";
+
+    public static BuildGhostToughTongueStockAvatarBinding CreateReadVerified(
+        string providerAvatarId,
+        string providerReadbackDigest,
+        string modelId = ToughTongueBuildGhostStockAvatarSelections.CurrentModelId,
+        bool allowLegacyCascade = false)
+    {
+        BuildGhostToughTongueStockAvatarBinding binding = new(
+            ToughTongueBuildGhostContractVersions.StockAvatarBindingV1,
+            ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace,
+            ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+            ToughTongueBuildGhostStockAvatarSelections.ProviderStock,
+            ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName,
+            ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath,
+            providerAvatarId,
+            DigestText(providerAvatarId),
+            ToughTongueBuildGhostStockAvatarSelections.RequiredModelProvider,
+            modelId,
+            allowLegacyCascade,
+            providerReadbackDigest,
+            ProviderReadVerified: true,
+            string.Empty);
+        IReadOnlyList<string> failures = ValidateShape(binding);
+        if (failures.Count != 0)
+        {
+            throw new ArgumentException(string.Join(',', failures), nameof(providerAvatarId));
+        }
+        return binding with { ContractDigest = Digest(BindingAuthority(binding)) };
+    }
+
+    public static BuildGhostToughTongueStockAvatarBindingValidation FromConfiguration(
+        IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        string provider = configuration[ProviderConfigurationKey]?.Trim()
+            ?? ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace;
+        string name = configuration[NameConfigurationKey]?.Trim()
+            ?? ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName;
+        string assetPath = configuration[AssetPathConfigurationKey]?.Trim()
+            ?? ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath;
+        string providerAvatarId = configuration[ProviderAvatarIdConfigurationKey]?.Trim() ?? string.Empty;
+        string providerReadbackDigest = configuration[ProviderReadbackDigestConfigurationKey]?.Trim() ?? string.Empty;
+        string modelProvider = configuration[ModelProviderConfigurationKey]?.Trim()
+            ?? ToughTongueBuildGhostStockAvatarSelections.RequiredModelProvider;
+        string modelId = configuration[ModelIdConfigurationKey]?.Trim()
+            ?? ToughTongueBuildGhostStockAvatarSelections.CurrentModelId;
+        bool allowLegacyCascade = bool.TryParse(
+            configuration[AllowLegacyCascadeConfigurationKey],
+            out bool legacyEnabled) && legacyEnabled;
+        List<string> failures = [];
+        if (provider != ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace) failures.Add("stock-avatar-provider-invalid");
+        if (name != ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName) failures.Add("stock-avatar-name-invalid");
+        if (assetPath != ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath) failures.Add("stock-avatar-asset-path-invalid");
+        if (!IsProviderAvatarId(providerAvatarId)) failures.Add("stock-avatar-provider-id-missing-or-invalid");
+        if (!IsSha256(providerReadbackDigest)) failures.Add("stock-avatar-provider-readback-digest-missing-or-invalid");
+        if (modelProvider != ToughTongueBuildGhostStockAvatarSelections.RequiredModelProvider) failures.Add("stock-avatar-model-provider-invalid");
+        if (modelId != ToughTongueBuildGhostStockAvatarSelections.CurrentModelId
+            && !(modelId == ToughTongueBuildGhostStockAvatarSelections.LegacyModelId && allowLegacyCascade))
+        {
+            failures.Add("stock-avatar-model-id-invalid");
+        }
+        if (failures.Count != 0)
+        {
+            return new BuildGhostToughTongueStockAvatarBindingValidation(
+                false,
+                null,
+                failures.OrderBy(static value => value, StringComparer.Ordinal).ToArray());
+        }
+
+        BuildGhostToughTongueStockAvatarBinding binding = CreateReadVerified(
+            providerAvatarId,
+            providerReadbackDigest,
+            modelId,
+            allowLegacyCascade);
+        return new BuildGhostToughTongueStockAvatarBindingValidation(true, binding, []);
+    }
+
+    public static IReadOnlyList<string> Validate(BuildGhostToughTongueStockAvatarBinding? binding)
+    {
+        if (binding is null) return ["stock-avatar-binding-missing"];
+        List<string> failures = [.. ValidateShape(binding)];
+        if (failures.Count == 0 && binding.ContractDigest != Digest(BindingAuthority(binding))) failures.Add("stock-avatar-binding-digest-invalid");
+        return failures.Distinct(StringComparer.Ordinal).OrderBy(static value => value, StringComparer.Ordinal).ToArray();
+    }
+
+    private static JsonObject BindingAuthority(BuildGhostToughTongueStockAvatarBinding binding)
+        => new()
+        {
+            ["schema"] = binding.Schema,
+            ["providerNamespace"] = binding.ProviderNamespace,
+            ["avatarAlias"] = binding.AvatarAlias,
+            ["selectionMode"] = binding.SelectionMode,
+            ["avatarName"] = binding.AvatarName,
+            ["avatarAssetPath"] = binding.AvatarAssetPath,
+            ["providerAvatarIdDigest"] = binding.ProviderAvatarIdDigest,
+            ["modelProvider"] = binding.ModelProvider,
+            ["modelId"] = binding.ModelId,
+            ["legacyModelCompatibilityEnabled"] = binding.LegacyModelCompatibilityEnabled,
+            ["providerReadbackDigest"] = binding.ProviderReadbackDigest,
+            ["providerReadVerified"] = binding.ProviderReadVerified
+        };
+
+    private static IReadOnlyList<string> ValidateShape(BuildGhostToughTongueStockAvatarBinding binding)
+    {
+        List<string> failures = [];
+        if (binding.Schema != ToughTongueBuildGhostContractVersions.StockAvatarBindingV1) failures.Add("stock-avatar-binding-schema-invalid");
+        if (binding.ProviderNamespace != ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace) failures.Add("stock-avatar-provider-invalid");
+        if (binding.AvatarAlias != ToughTongueBuildGhostPersonaIds.StockDefaultAvatar) failures.Add("stock-avatar-alias-invalid");
+        if (binding.SelectionMode != ToughTongueBuildGhostStockAvatarSelections.ProviderStock) failures.Add("stock-avatar-selection-mode-invalid");
+        if (binding.AvatarName != ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName) failures.Add("stock-avatar-name-invalid");
+        if (binding.AvatarAssetPath != ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath) failures.Add("stock-avatar-asset-path-invalid");
+        if (!IsProviderAvatarId(binding.ProviderAvatarId)
+            || binding.ProviderAvatarIdDigest != DigestText(binding.ProviderAvatarId)) failures.Add("stock-avatar-provider-id-invalid");
+        if (binding.ModelProvider != ToughTongueBuildGhostStockAvatarSelections.RequiredModelProvider) failures.Add("stock-avatar-model-provider-invalid");
+        if (binding.ModelId != ToughTongueBuildGhostStockAvatarSelections.CurrentModelId
+            && !(binding.ModelId == ToughTongueBuildGhostStockAvatarSelections.LegacyModelId
+                && binding.LegacyModelCompatibilityEnabled)) failures.Add("stock-avatar-model-id-invalid");
+        if (binding.ModelId == ToughTongueBuildGhostStockAvatarSelections.CurrentModelId
+            && binding.LegacyModelCompatibilityEnabled) failures.Add("stock-avatar-legacy-model-flag-invalid");
+        if (!IsSha256(binding.ProviderReadbackDigest)) failures.Add("stock-avatar-provider-readback-digest-invalid");
+        if (!binding.ProviderReadVerified) failures.Add("stock-avatar-provider-read-unverified");
+        return failures;
+    }
+
+    private static bool IsProviderAvatarId(string? value)
+        => Guid.TryParseExact(value, "D", out Guid parsed) && parsed != Guid.Empty;
+
+    private static bool IsSha256(string? value)
+        => value is { Length: 71 }
+            && value.StartsWith("sha256:", StringComparison.Ordinal)
+            && value.AsSpan(7).ToString().All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static string DigestText(string value)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
+
+    private static string Digest(JsonNode node)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
+}
+
 public interface IToughTongueBuildGhostScenarioClient
 {
     Task<ToughTongueBuildGhostScenarioValidation> VerifyPrivateScenarioAsync(
@@ -1613,12 +1771,13 @@ public static class ToughTongueBuildGhostScenarioContract
 
     public static ToughTongueBuildGhostScenarioCandidate CreatePrivateRookCandidate(
         BuildGhostPrivateToolDeploymentPackage deployment,
-        Uri avatarUrl,
+        BuildGhostToughTongueStockAvatarBinding avatarBinding,
         BuildGhostCascadePrivateVoiceBinding runtimeBinding,
         BuildGhostToughTongueCartesiaScenarioSchemaReceipt? scenarioSchemaReceipt = null,
         BuildGhostToughTongueCustomFunctionBinding? customFunctionBinding = null)
     {
         ArgumentNullException.ThrowIfNull(deployment);
+        ArgumentNullException.ThrowIfNull(avatarBinding);
         ArgumentNullException.ThrowIfNull(runtimeBinding);
         bool legacyV1 = deployment.Schema == ToughTongueBuildGhostContractVersions.PrivateToolDeploymentV1
             && deployment.ProviderNeutral
@@ -1638,7 +1797,12 @@ public static class ToughTongueBuildGhostScenarioContract
         {
             throw new ArgumentException(string.Join(',', bindingFailures), nameof(runtimeBinding));
         }
-        RequirePublicHttps(avatarUrl, nameof(avatarUrl));
+        IReadOnlyList<string> avatarBindingFailures =
+            BuildGhostToughTongueStockAvatarBindingContract.Validate(avatarBinding);
+        if (avatarBindingFailures.Count != 0)
+        {
+            throw new ArgumentException(string.Join(',', avatarBindingFailures), nameof(avatarBinding));
+        }
         BuildGhostPrivateToolDefinition tool = deployment.Tool;
         IReadOnlyList<string> scenarioSchemaFailures =
             BuildGhostToughTongueCartesiaScenarioSchemaContract.Validate(scenarioSchemaReceipt);
@@ -1672,7 +1836,9 @@ public static class ToughTongueBuildGhostScenarioContract
             ["appearance"] = new JsonObject
             {
                 ["voice"] = runtimeBinding.ProviderVoiceRef,
-                ["avatar_url"] = avatarUrl.AbsoluteUri,
+                ["avatar_url"] = avatarBinding.AvatarAssetPath,
+                ["live_avatar_id"] = avatarBinding.ProviderAvatarId,
+                ["live_avatar_provider"] = avatarBinding.ProviderNamespace,
                 ["language_code"] = "en-US"
             },
             ["memory"] = new JsonObject { ["is_memory"] = false },
@@ -1687,8 +1853,8 @@ public static class ToughTongueBuildGhostScenarioContract
             },
             ["ai_model_config"] = new JsonObject
             {
-                ["provider"] = runtimeBinding.ModelProvider,
-                ["model"] = runtimeBinding.ModelId
+                ["provider"] = avatarBinding.ModelProvider,
+                ["model"] = avatarBinding.ModelId
             },
             [BuildGhostToughTongueCustomFunctionContract.ScenarioAttachmentField] =
                 customFunctionBindingReadVerified
@@ -1710,7 +1876,18 @@ public static class ToughTongueBuildGhostScenarioContract
             {
                 ["chummer_contract"] = scenarioContract,
                 ["persona_id"] = ToughTongueBuildGhostPersonaIds.Rook,
-                ["avatar_id"] = ToughTongueBuildGhostPersonaIds.RookAvatar,
+                ["avatar_id"] = avatarBinding.AvatarAlias,
+                ["avatar_provider"] = avatarBinding.ProviderNamespace,
+                ["avatar_selection_mode"] = avatarBinding.SelectionMode,
+                ["avatar_name"] = avatarBinding.AvatarName,
+                ["avatar_asset_path"] = avatarBinding.AvatarAssetPath,
+                ["avatar_provider_id_digest"] = avatarBinding.ProviderAvatarIdDigest,
+                ["avatar_provider_readback_digest"] = avatarBinding.ProviderReadbackDigest,
+                ["avatar_binding_digest"] = avatarBinding.ContractDigest,
+                ["avatar_provider_read_verified"] = avatarBinding.ProviderReadVerified,
+                ["model_provider"] = avatarBinding.ModelProvider,
+                ["model_id"] = avatarBinding.ModelId,
+                ["legacy_model_compatibility_enabled"] = avatarBinding.LegacyModelCompatibilityEnabled,
                 ["voice_id"] = ToughTongueBuildGhostPersonaIds.RookVoice,
                 ["tool_contract_digest"] = tool.ContractDigest,
                 ["tool_deployment_digest"] = deployment.ContractDigest,
@@ -1761,12 +1938,13 @@ public static class ToughTongueBuildGhostScenarioContract
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(static reason => reason, StringComparer.Ordinal)
                 .ToArray(),
-            contractDigest);
+            contractDigest,
+            StockAvatarBinding: avatarBinding);
     }
 
     public static ToughTongueBuildGhostScenarioCandidate CreatePrivateRookPremiumLiveAvatarCandidate(
         BuildGhostPrivateToolDeploymentPackage deployment,
-        Uri avatarUrl,
+        BuildGhostToughTongueStockAvatarBinding avatarBinding,
         BuildGhostCascadePrivateVoiceBinding runtimeBinding,
         BuildGhostToughTonguePremiumLiveAvatarBinding liveAvatarBinding,
         BuildGhostToughTonguePremiumLiveAvatarSchemaReceipt? liveAvatarSchemaReceipt,
@@ -1776,7 +1954,7 @@ public static class ToughTongueBuildGhostScenarioContract
         ArgumentNullException.ThrowIfNull(liveAvatarBinding);
         ToughTongueBuildGhostScenarioCandidate candidate = CreatePrivateRookCandidate(
             deployment,
-            avatarUrl,
+            avatarBinding,
             runtimeBinding,
             scenarioSchemaReceipt,
             customFunctionBinding);
@@ -1833,16 +2011,21 @@ public static class ToughTongueBuildGhostScenarioContract
         ToughTongueBuildGhostScenarioCandidate expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
+        IReadOnlyList<string> stockAvatarFailures =
+            BuildGhostToughTongueStockAvatarBindingContract.Validate(expected.StockAvatarBinding);
         if (!expected.ProviderSchemaReadVerified
             || !expected.CustomFunctionBindingReadVerified
+            || stockAvatarFailures.Count != 0
             || (expected.LiveAvatarBinding is not null && !expected.LiveAvatarSchemaVerified)
             || expected.BlockingReasons.Count != 0)
         {
-            IReadOnlyList<string> blockers = expected.BlockingReasons.Count == 0
-                ? expected.LiveAvatarBinding is not null && !expected.LiveAvatarSchemaVerified
+            IReadOnlyList<string> blockers = stockAvatarFailures.Count != 0
+                ? stockAvatarFailures
+                : expected.BlockingReasons.Count == 0
+                    ? expected.LiveAvatarBinding is not null && !expected.LiveAvatarSchemaVerified
                     ? [BuildGhostToughTonguePremiumLiveAvatarSchemaContract.MissingOrUnverifiedBlocker]
                     : [BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker]
-                : expected.BlockingReasons;
+                    : expected.BlockingReasons;
             return new ToughTongueBuildGhostScenarioValidation(
                 false,
                 null,
@@ -1860,9 +2043,14 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireBoolean(scenario, "is_recording", expected: false, "scenario-recording-must-be-disabled", reasons);
         RequireText(scenario, "analysis_access", "never", "scenario-analysis-access-invalid", reasons);
         RequireText(Object(scenario, "appearance"), "voice", Text(Object(expected.Payload, "appearance"), "voice"), "scenario-voice-mismatch", reasons);
-        RequireText(Object(scenario, "appearance"), "avatar_url", Text(Object(expected.Payload, "appearance"), "avatar_url"), "scenario-avatar-mismatch", reasons);
+        RequireText(Object(scenario, "appearance"), "avatar_url", expected.StockAvatarBinding!.AvatarAssetPath, "scenario-avatar-path-mismatch", reasons);
         RequireText(Object(scenario, "appearance"), "language_code", "en-US", "scenario-base-locale-invalid", reasons);
-        if (expected.LiveAvatarBinding is not null)
+        if (expected.LiveAvatarBinding is null)
+        {
+            RequireText(Object(scenario, "appearance"), "live_avatar_id", expected.StockAvatarBinding.ProviderAvatarId, "scenario-stock-avatar-id-mismatch", reasons);
+            RequireText(Object(scenario, "appearance"), "live_avatar_provider", expected.StockAvatarBinding.ProviderNamespace, "scenario-stock-avatar-provider-mismatch", reasons);
+        }
+        else
         {
             if (expected.LiveAvatarIdFieldPath is null
                 || BuildGhostToughTonguePremiumLiveAvatarSchemaContract.Read(
@@ -1879,8 +2067,8 @@ public static class ToughTongueBuildGhostScenarioContract
                 reasons.Add("scenario-live-avatar-provider-mismatch");
             }
         }
-        RequireText(Object(scenario, "ai_model_config"), "provider", "Landmass", "scenario-model-provider-invalid", reasons);
-        RequireText(Object(scenario, "ai_model_config"), "model", "cascade", "scenario-model-invalid", reasons);
+        RequireText(Object(scenario, "ai_model_config"), "provider", expected.StockAvatarBinding.ModelProvider, "scenario-model-provider-invalid", reasons);
+        RequireText(Object(scenario, "ai_model_config"), "model", expected.StockAvatarBinding.ModelId, "scenario-model-invalid", reasons);
         if (expected.TtsProviderFieldPath is null
             || BuildGhostToughTongueCartesiaScenarioSchemaContract.Read(scenario, expected.TtsProviderFieldPath)
                 != ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider)
@@ -1911,7 +2099,18 @@ public static class ToughTongueBuildGhostScenarioContract
         JsonObject metadata = Object(scenario, "user_metadata");
         RequireText(metadata, "chummer_contract", expected.Schema, "scenario-contract-mismatch", reasons);
         RequireText(metadata, "persona_id", ToughTongueBuildGhostPersonaIds.Rook, "scenario-persona-mismatch", reasons);
-        RequireText(metadata, "avatar_id", ToughTongueBuildGhostPersonaIds.RookAvatar, "scenario-avatar-id-mismatch", reasons);
+        RequireText(metadata, "avatar_id", expected.StockAvatarBinding!.AvatarAlias, "scenario-avatar-id-mismatch", reasons);
+        RequireText(metadata, "avatar_provider", expected.StockAvatarBinding.ProviderNamespace, "scenario-avatar-provider-mismatch", reasons);
+        RequireText(metadata, "avatar_selection_mode", expected.StockAvatarBinding.SelectionMode, "scenario-avatar-selection-mode-mismatch", reasons);
+        RequireText(metadata, "avatar_name", expected.StockAvatarBinding.AvatarName, "scenario-avatar-name-mismatch", reasons);
+        RequireText(metadata, "avatar_asset_path", expected.StockAvatarBinding.AvatarAssetPath, "scenario-avatar-path-metadata-mismatch", reasons);
+        RequireText(metadata, "avatar_provider_id_digest", expected.StockAvatarBinding.ProviderAvatarIdDigest, "scenario-avatar-id-digest-mismatch", reasons);
+        RequireText(metadata, "avatar_provider_readback_digest", expected.StockAvatarBinding.ProviderReadbackDigest, "scenario-avatar-readback-digest-mismatch", reasons);
+        RequireText(metadata, "avatar_binding_digest", expected.StockAvatarBinding.ContractDigest, "scenario-avatar-binding-digest-mismatch", reasons);
+        RequireBoolean(metadata, "avatar_provider_read_verified", expected: true, "scenario-avatar-read-unverified", reasons);
+        RequireText(metadata, "model_provider", expected.StockAvatarBinding.ModelProvider, "scenario-model-provider-metadata-mismatch", reasons);
+        RequireText(metadata, "model_id", expected.StockAvatarBinding.ModelId, "scenario-model-id-metadata-mismatch", reasons);
+        RequireBoolean(metadata, "legacy_model_compatibility_enabled", expected.StockAvatarBinding.LegacyModelCompatibilityEnabled, "scenario-model-compatibility-mismatch", reasons);
         RequireText(metadata, "voice_id", ToughTongueBuildGhostPersonaIds.RookVoice, "scenario-voice-id-mismatch", reasons);
         RequireText(metadata, "tool_contract_digest", expected.Tool.ContractDigest, "tool-contract-digest-mismatch", reasons);
         JsonObject expectedMetadata = Object(expected.Payload, "user_metadata");
@@ -1965,6 +2164,7 @@ public static class ToughTongueBuildGhostScenarioContract
             throw new InvalidDataException("scenario-create-payload-provider-schema-unverified");
         }
         if (candidate.CustomFunctionBinding is null
+            || BuildGhostToughTongueStockAvatarBindingContract.Validate(candidate.StockAvatarBinding).Count != 0
             || !ExactStringArray(
                 candidate.Payload[BuildGhostToughTongueCustomFunctionContract.ScenarioAttachmentField] as JsonArray,
                 candidate.CustomFunctionBinding.ProviderCustomFunctionId)
@@ -1996,17 +2196,6 @@ public static class ToughTongueBuildGhostScenarioContract
 
     private static JsonObject Property(string type, string description)
         => new() { ["type"] = type, ["description"] = description };
-
-    private static void RequirePublicHttps(Uri uri, string parameterName)
-    {
-        if (!uri.IsAbsoluteUri
-            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            || !string.IsNullOrEmpty(uri.UserInfo)
-            || !string.IsNullOrEmpty(uri.Fragment))
-        {
-            throw new ArgumentException("A public absolute HTTPS URI without credentials or fragment is required.", parameterName);
-        }
-    }
 
     private static bool IsObjectId(string? value)
         => value is { Length: 24 }

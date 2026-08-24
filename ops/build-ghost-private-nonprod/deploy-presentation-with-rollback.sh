@@ -270,6 +270,15 @@ prepare_operator_runtime_config() {
            .bindingCandidatesConfigured == true
            or (
              .bindingCandidatesConfigured == false
+             and .stockAvatarMigrationConfigured == true
+             and .candidateRefCount == 3
+             and (.candidateRefDigests | keys == ["live_avatar", "scenario", "voice"])
+             and .readyForAccountSelection == true
+             and .accountSelectionPolicySource == "user_authority"
+           )
+           or (
+             .bindingCandidatesConfigured == false
+             and .stockAvatarMigrationConfigured == false
              and .candidateRefCount == 0
              and .candidateRefDigests == {}
              and .readyForAccountSelection == true
@@ -667,7 +676,16 @@ verify_rendered_compose() {
              and (.services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
                   | test("^sha256:[0-9a-f]{64}$"))' \
             "$rendered" >/dev/null || fail "compose-operator-runtime-drift"
-        if jq -e '.bindingCandidatesConfigured == false' \
+        if jq -e '.stockAvatarMigrationConfigured == true' \
+            "$runtime_receipt_file" >/dev/null; then
+            jq -e --arg service "$ai_service" \
+                '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID != ""' \
+                "$rendered" >/dev/null || fail "compose-stock-avatar-migration-candidates-drift"
+        elif jq -e '.bindingCandidatesConfigured == false' \
             "$runtime_receipt_file" >/dev/null; then
             jq -e --arg service "$ai_service" \
                 '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID == ""

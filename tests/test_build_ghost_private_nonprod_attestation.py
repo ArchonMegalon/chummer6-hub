@@ -242,6 +242,7 @@ def account_audit_receipt(evidence_dir: Path, contract: Path) -> dict[str, objec
         "candidateRefDigests": {},
         "candidateRefCount": 0,
         "bindingCandidatesConfigured": False,
+        "stockAvatarMigrationConfigured": False,
         "expectationDigest": MODULE._upstream_digest(
             {
                 "preferred_account_ref": PREFERRED_ACCOUNT_REF,

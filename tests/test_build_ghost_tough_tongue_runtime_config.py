@@ -44,7 +44,7 @@ def contract_payload() -> dict[str, object]:
         "slot_cardinality": 6,
         "maximum_snapshot_age_seconds": 900,
         "premium_plan_values": ["premium"],
-        "live_avatar_providers": ["anam", "heygen"],
+        "live_avatar_providers": ["anam", "avatario", "heygen", "liveavatar"],
         "documented_get_allowlist": {
             "balance": {"method": "GET", "path": "balance"},
             "subscriptions": {"method": "GET", "path": "subscriptions"},
@@ -202,6 +202,7 @@ def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path
     assert receipt["organizationContextCount"] == 6
     assert receipt["organizationRefsDigest"].startswith("sha256:")
     assert receipt["providerReadbackVerified"] is False
+    assert receipt["stockAvatarMigrationConfigured"] is False
     assert receipt["providerActivationAuthorized"] is False
     assert receipt["providerMutationPerformed"] is False
     assert receipt["environmentFileDigest"] == digest(environment_raw)
@@ -230,6 +231,7 @@ def test_materializes_account_audit_only_policy_without_resource_candidates(tmp_
 
     assert receipt["status"] == "ready-for-read-only-probe"
     assert receipt["bindingCandidatesConfigured"] is False
+    assert receipt["stockAvatarMigrationConfigured"] is False
     assert receipt["candidateRefCount"] == 0
     assert receipt["candidateRefDigests"] == {}
     assert receipt["readyForAccountSelection"] is True
@@ -313,6 +315,57 @@ def test_account_audit_only_rejects_partial_resource_candidates(tmp_path: Path):
 
     assert not environment.exists()
     assert not snapshot.exists()
+
+
+def test_stock_avatar_migration_accepts_only_voice_scenario_and_avatar_and_stays_unready(tmp_path: Path):
+    config, environment, snapshot, receipt_path, _, _, payload, _ = audit_only_inputs(tmp_path)
+    payload["candidate_refs"].update(  # type: ignore[union-attr]
+        {
+            "voice": "Aoede",
+            "scenario": "private-stock-scenario-ref",
+            "live_avatar": "11111111-2222-4333-8444-555555555555",
+        }
+    )
+    write_private_json(config, payload)
+
+    receipt = MODULE.materialize(config, environment, snapshot, receipt_path)
+
+    assert receipt["bindingCandidatesConfigured"] is False
+    assert receipt["stockAvatarMigrationConfigured"] is True
+    assert receipt["candidateRefCount"] == 3
+    assert set(receipt["candidateRefDigests"]) == {"voice", "scenario", "live_avatar"}
+    assert receipt["readyForResourceBinding"] is False
+    assert receipt["providerReadbackVerified"] is False
+    assert receipt["providerActivationAuthorized"] is False
+    assert receipt["providerMutationPerformed"] is False
+    assert receipt["nextAction"] == (
+        "attach-read-verified-grounded-custom-function-before-any-remote-execution"
+    )
+    environment_text = environment.read_text(encoding="utf-8")
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID=\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID=\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID=Aoede\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID=private-stock-scenario-ref\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID=11111111-2222-4333-8444-555555555555\n" in environment_text
+
+
+@pytest.mark.parametrize("provider", ["avatari0", "unknown-avatar-provider"])
+def test_read_only_contract_rejects_misspelled_or_arbitrary_live_avatar_providers(
+    tmp_path: Path,
+    provider: str,
+):
+    config, environment, snapshot, receipt, source_contract, payload = inputs(tmp_path)
+    contract = contract_payload()
+    contract["live_avatar_providers"] = [provider]
+    write_private_json(source_contract, contract)
+    payload["read_only_contract"]["digest"] = digest(canonical(contract))  # type: ignore[index]
+    write_private_json(config, payload)
+
+    with pytest.raises(
+        MODULE.ConfigError,
+        match="read-only-contract-live-avatar-provider-invalid",
+    ):
+        MODULE.materialize(config, environment, snapshot, receipt)
 
 
 def test_account_audit_only_requires_an_active_policy_receipt(tmp_path: Path):

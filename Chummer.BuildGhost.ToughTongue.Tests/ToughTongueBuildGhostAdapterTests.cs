@@ -21,6 +21,8 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private const string ProviderResponseDigest = "sha256:4e6db0b62942d0ca42575d86ac47599458190e29210e86cb503635e1f86204df";
     private const string CustomFunctionId = "custom-function-rook-private-v1";
     private const string CustomFunctionAccountRef = "sha256:689642aa853d240436dd28773f760a289be65a9ecf36783aae1ffe1934b74b15";
+    private const string StockAvatarId = "11111111-2222-4333-8444-555555555555";
+    private const string StockAvatarReadbackDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     [TestMethod]
     public async Task Remote_execution_is_disabled_by_default_and_returns_audited_deterministic_fallback()
@@ -389,7 +391,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
     {
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
-            new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+            StockAvatarBinding(),
             RuntimeBinding(),
             ScenarioSchemaReceipt(),
             CustomFunctionBinding());
@@ -403,7 +405,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.IsTrue(new[] { "is_auto_analysis", "is_auto_submit", "email_analysis", "email_transcript", "multimodal_analysis", "enable_extraction" }
             .All(field => sessionAnalysis[field]!.GetValue<bool>() == false));
         Assert.AreEqual("Landmass", candidate.Payload["ai_model_config"]!["provider"]!.GetValue<string>());
-        Assert.AreEqual("cascade", candidate.Payload["ai_model_config"]!["model"]!.GetValue<string>());
+        Assert.AreEqual("gemini", candidate.Payload["ai_model_config"]!["model"]!.GetValue<string>());
         Assert.AreEqual(CartesiaVoiceId, candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
         Assert.AreEqual("Cartesia", candidate.Payload["tts_provider"]!.GetValue<string>());
         Assert.AreEqual(CartesiaVoiceId, candidate.Payload["tts_voice_id"]!.GetValue<string>());
@@ -708,7 +710,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             "0123456789abcdef01234567",
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
                 ToolDeployment(),
-                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                StockAvatarBinding(),
                 RuntimeBinding(),
                 ScenarioSchemaReceipt(),
                 CustomFunctionBinding()),
@@ -759,7 +761,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         ToughTongueBuildGhostScenarioCandidate blockedCandidate =
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
                 ToolDeployment(),
-                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                StockAvatarBinding(),
                 RuntimeBinding());
 
         (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
@@ -787,7 +789,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         ToughTongueBuildGhostScenarioCandidate missing =
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
                 ToolDeployment(),
-                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                StockAvatarBinding(),
                 RuntimeBinding(),
                 ScenarioSchemaReceipt());
         (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
@@ -833,7 +835,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 ScenarioConfiguration(mutationsEnabled: true));
             ToughTongueBuildGhostScenarioCandidate blocked = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
                 ToolDeployment(),
-                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                StockAvatarBinding(),
                 RuntimeBinding(),
                 driftedReceipt,
                 CustomFunctionBinding());
@@ -858,7 +860,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ScenarioConfiguration(mutationsEnabled: false));
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
-            new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+            StockAvatarBinding(),
             RuntimeBinding(),
             ScenarioSchemaReceipt(),
             CustomFunctionBinding());
@@ -1170,7 +1172,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         ToughTongueBuildGhostScenarioCandidate candidate =
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
                 deployment,
-                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+                StockAvatarBinding(),
                 RuntimeBinding(),
                 ScenarioSchemaReceipt(),
                 binding);
@@ -1435,26 +1437,134 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
-    public void Persona_registry_requires_Chummer_owned_verified_releases_and_synthetic_voice_provenance()
+    public void Persona_registry_uses_provider_managed_stock_avatar_and_still_requires_synthetic_voice_provenance()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-19T12:00:00Z");
-        BuildGhostPersonaMediaRelease avatar = Release(ToughTongueBuildGhostPersonaIds.RookAvatar, "avatar", "generated-original", now);
         BuildGhostPersonaMediaRelease unverifiedVoice = Release(ToughTongueBuildGhostPersonaIds.RookVoice, "synthetic-voice", "human-recording", now) with
         {
             ProviderVerificationState = "pending-operator"
         };
-        BuildGhostPersonaReleaseProjection blocked = new BuildGhostPersonaReleaseRegistry([avatar, unverifiedVoice]).ResolveRook();
+        BuildGhostPersonaReleaseProjection blocked = new BuildGhostPersonaReleaseRegistry([unverifiedVoice], StockAvatarBinding()).ResolveRook();
 
         Assert.IsTrue(blocked.AvatarReady);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, blocked.AvatarId);
+        Assert.AreEqual("provider-managed-default", blocked.AvatarReleaseState);
         Assert.IsFalse(blocked.VoiceReady);
-        Assert.AreEqual("governed-avatar-and-text-only", blocked.FallbackPosture);
+        Assert.AreEqual("provider-managed-avatar-and-text-only", blocked.FallbackPosture);
         CollectionAssert.Contains(blocked.BlockingReasons.ToArray(), "voice-provenance-is-not-declared-synthetic");
 
         BuildGhostPersonaMediaRelease voice = Release(ToughTongueBuildGhostPersonaIds.RookVoice, "synthetic-voice", "synthetic-voice-generated-from-consented-seed", now);
-        BuildGhostPersonaReleaseProjection ready = new BuildGhostPersonaReleaseRegistry([avatar, voice]).ResolveRook();
+        BuildGhostPersonaReleaseProjection ready = new BuildGhostPersonaReleaseRegistry([voice], StockAvatarBinding()).ResolveRook();
         Assert.IsTrue(ready.AvatarReady);
         Assert.IsTrue(ready.VoiceReady);
-        Assert.AreEqual("governed-avatar-and-voice", ready.FallbackPosture);
+        Assert.AreEqual("provider-managed-avatar-and-voice", ready.FallbackPosture);
+    }
+
+    [TestMethod]
+    public void Stock_avatar_binding_requires_an_opaque_readback_id_and_defaults_to_exact_Amelia_Avatario_Gemini_semantics()
+    {
+        IConfiguration missingId = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>()).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation blocked =
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(missingId);
+        Assert.IsFalse(blocked.Accepted);
+        CollectionAssert.Contains(blocked.RejectionReasons.ToArray(), "stock-avatar-provider-id-missing-or-invalid");
+        CollectionAssert.Contains(blocked.RejectionReasons.ToArray(), "stock-avatar-provider-readback-digest-missing-or-invalid");
+
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest
+            }).Build();
+
+        BuildGhostToughTongueStockAvatarBindingValidation validation =
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(configuration);
+
+        Assert.IsTrue(validation.Accepted);
+        Assert.IsNotNull(validation.Binding);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace, validation.Binding.ProviderNamespace);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.ProviderStock, validation.Binding.SelectionMode);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName, validation.Binding.AvatarName);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath, validation.Binding.AvatarAssetPath);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.CurrentModelId, validation.Binding.ModelId);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, validation.Binding.AvatarAlias);
+        Assert.IsTrue(validation.Binding.ProviderReadVerified);
+        Assert.IsTrue(validation.Binding.ContractDigest.StartsWith("sha256:", StringComparison.Ordinal));
+        Assert.IsEmpty(BuildGhostToughTongueStockAvatarBindingContract.Validate(validation.Binding));
+        Assert.IsFalse(JsonSerializer.Serialize(validation.Binding).Contains(StockAvatarId, StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Stock_avatar_configuration_rejects_provider_misspellings_and_arbitrary_models_and_gates_legacy_Cascade_explicitly()
+    {
+        IConfiguration current = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest
+            }).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation accepted =
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(current);
+        Assert.IsTrue(accepted.Accepted);
+
+        IConfiguration misspelledProvider = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderConfigurationKey] = "avatari0"
+            }).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation rejected =
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(misspelledProvider);
+        Assert.IsFalse(rejected.Accepted);
+        Assert.IsNull(rejected.Binding);
+        CollectionAssert.Contains(rejected.RejectionReasons.ToArray(), "stock-avatar-provider-invalid");
+
+        IConfiguration arbitraryModel = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest,
+                [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = "future-model"
+            }).Build();
+        Assert.IsFalse(BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(arbitraryModel).Accepted);
+
+        IConfiguration explicitLegacy = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest,
+                [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = "cascade",
+                [BuildGhostToughTongueStockAvatarBindingContract.AllowLegacyCascadeConfigurationKey] = "true"
+            }).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation legacy =
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(explicitLegacy);
+        Assert.IsTrue(legacy.Accepted);
+        Assert.IsTrue(legacy.Binding!.LegacyModelCompatibilityEnabled);
+    }
+
+    [TestMethod]
+    public void Stock_avatar_scenario_binds_Amelia_by_path_and_opaque_id_and_rejects_post_creation_avatar_injection()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        JsonObject appearance = candidate.Payload["appearance"]!.AsObject();
+        JsonObject metadata = candidate.Payload["user_metadata"]!.AsObject();
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath, appearance["avatar_url"]!.GetValue<string>());
+        Assert.AreEqual(StockAvatarId, appearance["live_avatar_id"]!.GetValue<string>());
+        Assert.AreEqual("avatario", appearance["live_avatar_provider"]!.GetValue<string>());
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, metadata["avatar_id"]!.GetValue<string>());
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace, metadata["avatar_provider"]!.GetValue<string>());
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.ProviderStock, metadata["avatar_selection_mode"]!.GetValue<string>());
+        Assert.AreEqual("Amelia", metadata["avatar_name"]!.GetValue<string>());
+        Assert.AreEqual("gemini", metadata["model_id"]!.GetValue<string>());
+
+        JsonObject injected = ProviderScenario(candidate);
+        injected["appearance"]!["avatar_url"] = "https://attacker.invalid/rook.png";
+        ToughTongueBuildGhostScenarioValidation validation =
+            ToughTongueBuildGhostScenarioContract.Validate(injected, candidate);
+        Assert.IsFalse(validation.Accepted);
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-avatar-path-mismatch");
     }
 
     private static ToughTongueBuildGhostAdapter CreateAdapter(
@@ -1615,10 +1725,15 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private static ToughTongueBuildGhostScenarioCandidate ScenarioCandidate()
         => ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
-            new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
+            StockAvatarBinding(),
             RuntimeBinding(),
             ScenarioSchemaReceipt(),
             CustomFunctionBinding());
+
+    private static BuildGhostToughTongueStockAvatarBinding StockAvatarBinding()
+        => BuildGhostToughTongueStockAvatarBindingContract.CreateReadVerified(
+            StockAvatarId,
+            StockAvatarReadbackDigest);
 
     private static JsonObject ProviderScenario(ToughTongueBuildGhostScenarioCandidate candidate)
     {
@@ -1709,7 +1824,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         {
             ["schema"] = ToughTongueBuildGhostContractVersions.AnalysisV1,
             ["personaId"] = ToughTongueBuildGhostPersonaIds.Rook,
-            ["avatarId"] = ToughTongueBuildGhostPersonaIds.RookAvatar,
+            ["avatarId"] = ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
             ["voiceId"] = ToughTongueBuildGhostPersonaIds.RookVoice,
             ["locale"] = locale,
             ["localeFallbackChain"] = new JsonArray(locale, "en-US"),

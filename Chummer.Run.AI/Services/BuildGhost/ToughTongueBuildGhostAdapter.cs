@@ -334,7 +334,7 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
             {
                 Require(Text(packet, "schema"), ToughTongueBuildGhostContractVersions.AnalysisV1, "analysis-schema-mismatch", failures);
                 Require(Text(packet, "personaId"), ToughTongueBuildGhostPersonaIds.Rook, "persona-id-mismatch", failures);
-                Require(Text(packet, "avatarId"), ToughTongueBuildGhostPersonaIds.RookAvatar, "avatar-id-mismatch", failures);
+                Require(Text(packet, "avatarId"), ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, "avatar-id-mismatch", failures);
                 Require(Text(packet, "voiceId"), ToughTongueBuildGhostPersonaIds.RookVoice, "voice-id-mismatch", failures);
                 Require(Text(packet, "packetDigest"), request.PacketDigest, "packet-digest-binding-mismatch", failures);
                 if (!string.Equals(Text(packet, "locale"), request.Locale, StringComparison.OrdinalIgnoreCase)) failures.Add("packet-locale-mismatch");
