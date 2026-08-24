@@ -63,6 +63,19 @@ Only the JWT-validated normalized email is injected as `X-Chummer-Owner` at
 this isolated boundary. Request logs are disabled, the Access assertion is not
 forwarded, and every response is `Cache-Control: no-store`.
 
+Signing keys are cached for ten minutes. A missing `kid`, an expired cache, or
+a failed refresh admits no key from the old generation. Concurrent callers
+coalesce behind one generation refresh. Every refresh after a populated
+generation, successful negative lookup, or failed attempt establishes one
+global 30-second retry boundary. This is a constant-memory defense against
+attackers rotating arbitrary unsigned `kid` values: at most one certificate
+fetch is attempted in that interval, and no missing, failed, stale, or expired
+key is ever returned. A failed unknown-key refresh may retain only previously
+parsed keys whose original ten-minute lifetime is still current; a cold or
+expired failure retains none. The bounded retry can temporarily reject a
+just-rotated key after an earlier negative lookup; that is an intentional
+availability tradeoff at this authentication boundary.
+
 This grants an owner identity to the existing dev-header seam only for the
 allowlisted workspace routes. It never authorizes provider execution. The four
 Tough Tongue gates remain literal `false`, and neither this edge nor its
@@ -120,7 +133,12 @@ From a clean reviewed Hub checkout, run:
 The verifier runs static Compose/security tests, the dependency-free managed
 JWT/proxy test harness, and `git diff --check`. It does not start Compose,
 create or connect a network, contact Cloudflare, inspect credentials, or call a
-provider.
+provider. It fails closed unless the repository's `global.json` selects exact
+.NET SDK `10.0.103` with roll-forward disabled. It never changes directory away
+from that SDK authority before selecting or running the managed test project.
+The narrowly path-scoped pull-request workflow installs that exact SDK and runs
+the same canonical verifier. A local run with only another SDK is incomplete;
+merge requires the exact-SDK pull-request job to be green.
 
 Before any later activation, an operator must additionally prove all of the
 following in one change-controlled window:

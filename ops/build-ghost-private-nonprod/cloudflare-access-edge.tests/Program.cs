@@ -395,25 +395,93 @@ static async Task TestSigningKeyCacheAsync()
     True(cachedFirst is not null && cachedSecond is not null);
     Equal(1, cachedHandler.RequestedUris.Count);
 
-    int unknownRefreshCall = 0;
-    FixedResponseHandler unknownRefreshHandler = new(_ =>
-        JwksResponse(Interlocked.Increment(ref unknownRefreshCall) == 1
-            ? Jwks("key-1", first)
-            : Jwks("key-2", second)));
-    using HttpClient unknownRefreshClient = new(unknownRefreshHandler);
-    CloudflareAccessSigningKeyProvider unknownRefreshProvider = new(
+    GatedResponseHandler sameUnknownHandler = new(
+        _ => JwksResponse(Jwks("key-1", first)),
+        gatedCall: 2);
+    using HttpClient sameUnknownClient = new(sameUnknownHandler);
+    MutableTimeProvider sameUnknownClock = new(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000));
+    CloudflareAccessSigningKeyProvider sameUnknownProvider = new(
         configuration,
-        unknownRefreshClient,
-        new MutableTimeProvider(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000)));
-    True(await unknownRefreshProvider.GetAsync("key-1", CancellationToken.None) is not null);
-    True(await unknownRefreshProvider.GetAsync("key-2", CancellationToken.None) is not null);
-    Equal(2, unknownRefreshHandler.RequestedUris.Count);
+        sameUnknownClient,
+        sameUnknownClock);
+    True(await sameUnknownProvider.GetAsync("key-1", CancellationToken.None) is not null);
+    CloudflareAccessSigningKey?[] sameUnknown = await GetConcurrentWaveAsync(
+        sameUnknownProvider,
+        sameUnknownHandler,
+        _ => "unknown");
+    True(sameUnknown.All(static key => key is null));
+    Equal(2, sameUnknownHandler.Calls);
+    sameUnknownClock.Advance(TimeSpan.FromSeconds(
+        CloudflareAccessSigningKeyProvider.RefreshRetrySeconds - 1));
+    True(await sameUnknownProvider.GetAsync("unknown", CancellationToken.None) is null);
+    Equal(2, sameUnknownHandler.Calls);
+    sameUnknownClock.Advance(TimeSpan.FromSeconds(2));
+    True(await sameUnknownProvider.GetAsync("unknown", CancellationToken.None) is null);
+    Equal(3, sameUnknownHandler.Calls);
 
-    int rotationCall = 0;
-    FixedResponseHandler rotationHandler = new(_ =>
-        JwksResponse(Interlocked.Increment(ref rotationCall) == 1
+    GatedResponseHandler differentUnknownHandler = new(
+        _ => JwksResponse(Jwks("key-1", first)),
+        gatedCall: 2);
+    using HttpClient differentUnknownClient = new(differentUnknownHandler);
+    CloudflareAccessSigningKeyProvider differentUnknownProvider = new(
+        configuration,
+        differentUnknownClient,
+        new MutableTimeProvider(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000)));
+    True(await differentUnknownProvider.GetAsync("key-1", CancellationToken.None) is not null);
+    CloudflareAccessSigningKey?[] differentUnknown = await GetConcurrentWaveAsync(
+        differentUnknownProvider,
+        differentUnknownHandler,
+        index => $"unknown-{index}");
+    True(differentUnknown.All(static key => key is null));
+    Equal(2, differentUnknownHandler.Calls);
+
+    GatedResponseHandler failedInitialHandler = new(
+        _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
+        gatedCall: 1);
+    using HttpClient failedInitialClient = new(failedInitialHandler);
+    MutableTimeProvider failedInitialClock = new(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000));
+    CloudflareAccessSigningKeyProvider failedInitialProvider = new(
+        configuration,
+        failedInitialClient,
+        failedInitialClock);
+    CloudflareAccessSigningKey?[] failedInitial = await GetConcurrentWaveAsync(
+        failedInitialProvider,
+        failedInitialHandler,
+        index => $"initial-{index}");
+    True(failedInitial.All(static key => key is null));
+    Equal(1, failedInitialHandler.Calls);
+    failedInitialClock.Advance(TimeSpan.FromSeconds(
+        CloudflareAccessSigningKeyProvider.RefreshRetrySeconds - 1));
+    True(await failedInitialProvider.GetAsync("initial-retry", CancellationToken.None) is null);
+    Equal(1, failedInitialHandler.Calls);
+    failedInitialClock.Advance(TimeSpan.FromSeconds(2));
+    True(await failedInitialProvider.GetAsync("initial-retry", CancellationToken.None) is null);
+    Equal(2, failedInitialHandler.Calls);
+
+    GatedResponseHandler failedWarmUnknownHandler = new(
+        call => call == 1
+            ? JwksResponse(Jwks("key-1", first))
+            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
+        gatedCall: 2);
+    using HttpClient failedWarmUnknownClient = new(failedWarmUnknownHandler);
+    CloudflareAccessSigningKeyProvider failedWarmUnknownProvider = new(
+        configuration,
+        failedWarmUnknownClient,
+        new MutableTimeProvider(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000)));
+    True(await failedWarmUnknownProvider.GetAsync("key-1", CancellationToken.None) is not null);
+    CloudflareAccessSigningKey?[] failedWarmUnknown = await GetConcurrentWaveAsync(
+        failedWarmUnknownProvider,
+        failedWarmUnknownHandler,
+        _ => "unknown");
+    True(failedWarmUnknown.All(static key => key is null));
+    True(await failedWarmUnknownProvider.GetAsync("key-1", CancellationToken.None) is not null);
+    Equal(2, failedWarmUnknownHandler.Calls);
+
+    GatedResponseHandler rotationHandler = new(call =>
+        JwksResponse(call == 1
             ? Jwks("key-1", first)
-            : Jwks("key-1", second)));
+            : Jwks("key-1", second)),
+        gatedCall: 2);
     using HttpClient rotationClient = new(rotationHandler);
     MutableTimeProvider rotationClock = new(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000));
     CloudflareAccessSigningKeyProvider rotationProvider = new(
@@ -424,19 +492,20 @@ static async Task TestSigningKeyCacheAsync()
         "key-1",
         CancellationToken.None);
     rotationClock.Advance(TimeSpan.FromMinutes(11));
-    CloudflareAccessSigningKey? afterRotation = await rotationProvider.GetAsync(
-        "key-1",
-        CancellationToken.None);
-    True(beforeRotation is not null && afterRotation is not null);
+    CloudflareAccessSigningKey?[] afterRotation = await GetConcurrentWaveAsync(
+        rotationProvider,
+        rotationHandler,
+        _ => "key-1");
+    True(beforeRotation is not null && afterRotation.All(static key => key is not null));
     True(beforeRotation!.Modulus.SequenceEqual(first.Modulus!));
-    True(afterRotation!.Modulus.SequenceEqual(second.Modulus!));
-    Equal(2, rotationHandler.RequestedUris.Count);
+    True(afterRotation.All(key => key!.Modulus.SequenceEqual(second.Modulus!)));
+    Equal(2, rotationHandler.Calls);
 
-    int failedRefreshCall = 0;
-    FixedResponseHandler failedRefreshHandler = new(_ =>
-        Interlocked.Increment(ref failedRefreshCall) == 1
+    GatedResponseHandler failedRefreshHandler = new(call =>
+        call == 1
             ? JwksResponse(Jwks("key-1", first))
-            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
+        gatedCall: 2);
     using HttpClient failedRefreshClient = new(failedRefreshHandler);
     MutableTimeProvider failedRefreshClock = new(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000));
     CloudflareAccessSigningKeyProvider failedRefreshProvider = new(
@@ -445,57 +514,107 @@ static async Task TestSigningKeyCacheAsync()
         failedRefreshClock);
     True(await failedRefreshProvider.GetAsync("key-1", CancellationToken.None) is not null);
     failedRefreshClock.Advance(TimeSpan.FromMinutes(11));
+    CloudflareAccessSigningKey?[] failedRefresh = await GetConcurrentWaveAsync(
+        failedRefreshProvider,
+        failedRefreshHandler,
+        _ => "key-1");
+    True(failedRefresh.All(static key => key is null));
     True(await failedRefreshProvider.GetAsync("key-1", CancellationToken.None) is null);
-    Equal(2, failedRefreshHandler.RequestedUris.Count);
+    Equal(2, failedRefreshHandler.Calls);
 
-    FixedResponseHandler concurrentHandler = new(_ => JwksResponse(Jwks("key-1", first)));
+    GatedResponseHandler newKidHandler = new(call =>
+        JwksResponse(call == 1
+            ? Jwks("key-1", first)
+            : Jwks("key-2", second)),
+        gatedCall: 2);
+    using HttpClient newKidClient = new(newKidHandler);
+    CloudflareAccessSigningKeyProvider newKidProvider = new(
+        configuration,
+        newKidClient,
+        new MutableTimeProvider(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000)));
+    True(await newKidProvider.GetAsync("key-1", CancellationToken.None) is not null);
+    CloudflareAccessSigningKey?[] newKid = await GetConcurrentWaveAsync(
+        newKidProvider,
+        newKidHandler,
+        _ => "key-2");
+    True(newKid.All(static key => key is not null));
+    True(newKid.All(key => key!.Modulus.SequenceEqual(second.Modulus!)));
+    Equal(2, newKidHandler.Calls);
+
+    GatedResponseHandler concurrentHandler = new(
+        _ => JwksResponse(Jwks("key-1", first)),
+        gatedCall: 1);
     using HttpClient concurrentClient = new(concurrentHandler);
     CloudflareAccessSigningKeyProvider concurrentProvider = new(
         configuration,
         concurrentClient,
         new MutableTimeProvider(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000)));
-    CloudflareAccessSigningKey?[] concurrent = await Task.WhenAll(
-        Enumerable.Range(0, 32).Select(_ =>
-            concurrentProvider.GetAsync("key-1", CancellationToken.None).AsTask()));
+    CloudflareAccessSigningKey?[] concurrent = await GetConcurrentWaveAsync(
+        concurrentProvider,
+        concurrentHandler,
+        _ => "key-1");
     True(concurrent.All(static key => key is not null));
-    Equal(1, concurrentHandler.RequestedUris.Count);
+    Equal(1, concurrentHandler.Calls);
+}
+
+static async Task<CloudflareAccessSigningKey?[]> GetConcurrentWaveAsync(
+    CloudflareAccessSigningKeyProvider provider,
+    GatedResponseHandler handler,
+    Func<int, string> keyId)
+{
+    Task<CloudflareAccessSigningKey?> first = provider
+        .GetAsync(keyId(0), CancellationToken.None)
+        .AsTask();
+    await handler.WaitForGateAsync();
+    Task<CloudflareAccessSigningKey?>[] waiters = Enumerable.Range(1, 31)
+        .Select(index => provider.GetAsync(keyId(index), CancellationToken.None).AsTask())
+        .ToArray();
+    handler.ReleaseGate();
+    return await Task.WhenAll(waiters.Prepend(first));
 }
 
 static async Task TestActivityHeaderIsolationAsync()
 {
-    DefaultHttpContext incoming = AdmittedContext("/api/workspaces/import", "POST");
-    incoming.Request.ContentType = "application/json";
-    incoming.Request.Body = new MemoryStream("{}"u8.ToArray());
-    incoming.Request.Headers["traceparent"] =
-        "00-11111111111111111111111111111111-2222222222222222-01";
-    incoming.Request.Headers["tracestate"] = "vendor=hostile";
-    incoming.Request.Headers["baggage"] = "owner=hostile";
-    incoming.Request.Headers["Request-Id"] = "|hostile.request.";
-    incoming.Request.Headers["Correlation-Context"] = "owner=hostile";
-    True(BuildGhostAccessProxy.TryMatchRoute(
-        incoming.Request.Method,
-        incoming.Request.Path,
-        out BuildGhostAccessRoute route));
+    foreach (ActivityIdFormat format in new[]
+    {
+        ActivityIdFormat.W3C,
+        ActivityIdFormat.Hierarchical,
+    })
+    {
+        DefaultHttpContext incoming = AdmittedContext("/api/workspaces/import", "POST");
+        incoming.Request.ContentType = "application/json";
+        incoming.Request.Body = new MemoryStream("{}"u8.ToArray());
+        incoming.Request.Headers["traceparent"] =
+            "00-11111111111111111111111111111111-2222222222222222-01";
+        incoming.Request.Headers["tracestate"] = "vendor=hostile";
+        incoming.Request.Headers["baggage"] = "owner=hostile";
+        incoming.Request.Headers["Request-Id"] = "|hostile.request.";
+        incoming.Request.Headers["Correlation-Context"] = "owner=hostile";
+        True(BuildGhostAccessProxy.TryMatchRoute(
+            incoming.Request.Method,
+            incoming.Request.Path,
+            out BuildGhostAccessRoute route));
 
-    IReadOnlySet<string> presentationHeaders = await CaptureLoopbackHeadersAsync(
-        async endpoint =>
-        {
-            using SocketsHttpHandler handler = AccessEdgeHttpTransport.CreatePresentationHandler();
-            True(handler.ActivityHeadersPropagator is null);
-            using HttpClient client = new(handler);
-            using HttpRequestMessage request = BuildGhostAccessProxy.CreateUpstreamRequest(
-                incoming.Request,
-                "runner@example.com",
-                route);
-            request.RequestUri = endpoint;
-            await WithHostileActivityAsync(ActivityIdFormat.W3C, async () =>
+        IReadOnlySet<string> presentationHeaders = await CaptureLoopbackHeadersAsync(
+            async endpoint =>
             {
-                using HttpResponseMessage response = await client.SendAsync(request);
-                Equal(HttpStatusCode.OK, response.StatusCode);
-            });
-        },
-        "{\"ok\":true}");
-    AssertTraceHeadersAbsent(presentationHeaders);
+                using SocketsHttpHandler handler = AccessEdgeHttpTransport.CreatePresentationHandler();
+                True(handler.ActivityHeadersPropagator is null);
+                using HttpClient client = new(handler);
+                using HttpRequestMessage request = BuildGhostAccessProxy.CreateUpstreamRequest(
+                    incoming.Request,
+                    "runner@example.com",
+                    route);
+                request.RequestUri = endpoint;
+                await WithHostileActivityAsync(format, async () =>
+                {
+                    using HttpResponseMessage response = await client.SendAsync(request);
+                    Equal(HttpStatusCode.OK, response.StatusCode);
+                });
+            },
+            "{\"ok\":true}");
+        AssertTraceHeadersAbsent(presentationHeaders);
+    }
 
     using RSA rsa = RSA.Create(2048);
     RSAParameters key = rsa.ExportParameters(false);
@@ -912,6 +1031,36 @@ sealed class FixedResponseHandler(Func<HttpRequestMessage, HttpResponseMessage> 
         RequestedUris.Add(request.RequestUri!);
         Methods.Add(request.Method);
         return Task.FromResult(responseFactory(request));
+    }
+}
+
+sealed class GatedResponseHandler(
+    Func<int, HttpResponseMessage> responseFactory,
+    int gatedCall) : HttpMessageHandler
+{
+    private readonly TaskCompletionSource _gateEntered = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _gateReleased = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _calls;
+
+    public int Calls => Volatile.Read(ref _calls);
+
+    public Task WaitForGateAsync() => _gateEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+    public void ReleaseGate() => _gateReleased.TrySetResult();
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        int call = Interlocked.Increment(ref _calls);
+        if (call == gatedCall)
+        {
+            _gateEntered.TrySetResult();
+            await _gateReleased.Task.WaitAsync(cancellationToken);
+        }
+        return responseFactory(call);
     }
 }
 }
