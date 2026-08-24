@@ -18,7 +18,6 @@ from typing import Any, Mapping, Sequence
 
 AUTHORITY_CONTRACT = "chummer-hub.core-main-runtime-artifact-consumer-authority/v1"
 VERDICT_CONTRACT = "chummer-hub.core-main-runtime-artifact-verdict/v1"
-VALIDATION_V2 = "chummer-hub.core-runtime-package-artifact-validation/v2"
 VALIDATION_V3 = "chummer-hub.core-runtime-package-artifact-validation/v3"
 BYTE_SNAPSHOT_CONTRACT = "chummer-hub.core-runtime-package-byte-snapshot/v1"
 SELECTOR_CONTRACT = "github-actions.immutable-artifact-selector/v1"
@@ -588,8 +587,8 @@ def validation_summary(authority: Mapping[str, Any], result: Any) -> dict[str, A
     producer = authority["producer"]
     validator_authority = authority["validator_authority"]
     contract = result.get("contract")
-    if contract not in {VALIDATION_V2, VALIDATION_V3}:
-        raise ConsumerError("validator result contract is unsupported")
+    if contract != VALIDATION_V3:
+        raise ConsumerError("validator result must use the immutable-snapshot v3 contract")
     expected_common = {
         "status": "pass",
         "outer_artifact_selector": validator_authority["artifact_selector"],
@@ -633,19 +632,18 @@ def validation_summary(authority: Mapping[str, Any], result: Any) -> dict[str, A
         "ordered_package_ids": ordered_ids,
         "post_validation_consumption_authority": consumption,
     }
-    if contract == VALIDATION_V3:
-        if result.get("post_validation_consumption_authority") != consumption:
-            raise ConsumerError("v3 post-validation consumption authority differs")
-        snapshot = result.get("artifact_byte_snapshot")
-        expected_snapshot = {
-            "contract": BYTE_SNAPSHOT_CONTRACT,
-            "sha256": authority["archive"]["validator_byte_snapshot_sha256"],
-            "member_count": 11,
-            "source_path_posture": "not_attested_after_snapshot_capture",
-        }
-        if not isinstance(snapshot, dict) or snapshot != expected_snapshot:
-            raise ConsumerError("v3 immutable artifact byte snapshot differs")
-        summary["artifact_byte_snapshot"] = snapshot
+    if result.get("post_validation_consumption_authority") != consumption:
+        raise ConsumerError("v3 post-validation consumption authority differs")
+    snapshot = result.get("artifact_byte_snapshot")
+    expected_snapshot = {
+        "contract": BYTE_SNAPSHOT_CONTRACT,
+        "sha256": authority["archive"]["validator_byte_snapshot_sha256"],
+        "member_count": 11,
+        "source_path_posture": "not_attested_after_snapshot_capture",
+    }
+    if not isinstance(snapshot, dict) or snapshot != expected_snapshot:
+        raise ConsumerError("v3 immutable artifact byte snapshot differs")
+    summary["artifact_byte_snapshot"] = snapshot
     return summary
 
 

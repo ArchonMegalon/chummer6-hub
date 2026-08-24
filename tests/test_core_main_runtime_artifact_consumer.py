@@ -417,15 +417,17 @@ def validator_result(authority: dict[str, Any], contract: str) -> dict[str, Any]
     return result
 
 
-def test_verdict_is_current_v2_compatible_and_v3_snapshot_strict() -> None:
+def test_verdict_rejects_v2_and_requires_v3_snapshot() -> None:
     module = load_module()
     authority = module.load_authority(AUTHORITY_PATH)
-    v2 = module.validation_summary(authority, validator_result(authority, module.VALIDATION_V2))
-    assert v2["post_validation_consumption_authority"] == {
-        "contract": "github-actions.immutable-artifact-selector/v1",
-        "artifact_id": 9528212865,
-        "sha256": "048f5bbd927ba15f0b2e6ea0695e35ef9fceeef51b30afc6ad09c9ac60267d28",
-    }
+    with pytest.raises(module.ConsumerError, match="immutable-snapshot v3"):
+        module.validation_summary(
+            authority,
+            validator_result(
+                authority,
+                "chummer-hub.core-runtime-package-artifact-validation/v2",
+            ),
+        )
 
     v3_result = validator_result(authority, module.VALIDATION_V3)
     v3 = module.validation_summary(authority, v3_result)
