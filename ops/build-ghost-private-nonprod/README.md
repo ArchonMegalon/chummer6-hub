@@ -23,6 +23,30 @@ docker compose -f docker-compose.build-ghost-private-nonprod.yml config --quiet
 docker compose -f docker-compose.build-ghost-private-nonprod.yml up --build -d
 ```
 
+### Optional Cloudflare Access ingress (not activated)
+
+The default lane remains loopback-only. A separate
+`cloudflare-access-ingress` profile now defines a no-host-port edge that can be
+attached later to a dedicated external tunnel-ingress network. It validates the
+Cloudflare Access JWT locally against the configured team signing keys,
+issuer, application audience, lifetime, and exact authenticated-email claim;
+then it rebuilds the upstream request and injects only that normalized email
+through the existing isolated `X-Chummer-Owner` dev seam. The Access assertion,
+client owner/portal assertions, cookies, authorization, and forwarding headers
+never cross to Presentation.
+
+The edge routes only workspace import, exact workspace read/close, and
+ephemeral Build Ghost tool-access issuance. It cannot route either AI provider
+tool endpoint or `/api/internal/build-ghost/tool/resolve`. Its checked-in
+configuration is deliberately invalid, selecting no profile keeps it absent,
+and no provider gate is changed.
+
+See
+[`CLOUDFLARE_ACCESS_INGRESS_HANDOFF.md`](CLOUDFLARE_ACCESS_INGRESS_HANDOFF.md)
+for the credential-free later tunnel/Access-application handoff, explicit stop
+boundaries, and the offline verifier. No Cloudflare, tunnel, Docker-network, or
+runtime mutation is performed by this source lane.
+
 ### Operator-verified Tough Tongue read-only configuration
 
 With no operator input, Compose mounts

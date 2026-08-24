@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1.7
+FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a AS build
+WORKDIR /src
+COPY ops/build-ghost-private-nonprod/cloudflare-access-edge/Chummer.BuildGhost.CloudflareAccessEdge.csproj ./
+RUN --mount=type=cache,id=chummer-build-ghost-cloudflare-access-edge-nuget,target=/root/.nuget/packages,sharing=locked \
+    dotnet restore Chummer.BuildGhost.CloudflareAccessEdge.csproj \
+      -p:RestorePackagesPath=/root/.nuget/packages
+COPY ops/build-ghost-private-nonprod/cloudflare-access-edge/ ./
+RUN --mount=type=cache,id=chummer-build-ghost-cloudflare-access-edge-nuget,target=/root/.nuget/packages,sharing=locked \
+    dotnet publish Chummer.BuildGhost.CloudflareAccessEdge.csproj \
+      -c Release -o /app/publish --no-restore --nologo \
+      -p:RestorePackagesPath=/root/.nuget/packages
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7 AS final
+ARG CHUMMER_RUN_SERVICES_REVISION
+LABEL org.opencontainers.image.revision="${CHUMMER_RUN_SERVICES_REVISION}" \
+      run.chummer.build-ghost.profile="private-nonprod-cloudflare-access-ingress" \
+      run.chummer.build-ghost.provider-execution="disabled"
+WORKDIR /app
+COPY --from=build /app/publish .
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+USER $APP_UID:$APP_UID
+ENTRYPOINT ["dotnet", "Chummer.BuildGhost.CloudflareAccessEdge.dll"]

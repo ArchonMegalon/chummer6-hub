@@ -1,0 +1,438 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Primitives;
+
+namespace Chummer.BuildGhost.CloudflareAccessEdge;
+
+public enum BuildGhostAccessRouteKind
+{
+    WorkspaceImport,
+    WorkspaceLifecycle,
+    ToolAccess,
+}
+
+public readonly record struct BuildGhostAccessRoute(
+    BuildGhostAccessRouteKind Kind,
+    long MaximumBodyBytes);
+
+public sealed class BuildGhostAccessProxy
+{
+    public const string AuthenticatedEmailHeader =
+        "Cf-Access-Authenticated-User-Email";
+    public const string JwtAssertionHeader = "Cf-Access-Jwt-Assertion";
+    public const string OwnerHeader = "X-Chummer-Owner";
+    public const string PortalOwnerHeader = "X-Chummer-Portal-Owner";
+    public const string PortalOwnerTimestampHeader = "X-Chummer-Portal-Owner-Timestamp";
+    public const string PortalOwnerSignatureHeader = "X-Chummer-Portal-Owner-Signature";
+    public const string PortalModeratorSignatureHeader = "X-Chummer-Portal-Moderator-Signature";
+
+    private const long ImportBodyLimit = 64L * 1024 * 1024;
+    private const long ToolAccessBodyLimit = 1024 * 1024;
+    private static readonly Uri PresentationOrigin = new(
+        "http://chummer-build-ghost-presentation:8080",
+        UriKind.Absolute);
+    private static readonly Regex WorkspaceLifecyclePath = new(
+        "^/api/workspaces/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+    private static readonly Regex ToolAccessPath = new(
+        "^/api/workspaces/[A-Za-z0-9][A-Za-z0-9._-]{0,127}/build-ghost/tool-access$",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+    private static readonly Regex NormalizedEmailPattern = new(
+        "^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+    private static readonly HashSet<string> ForbiddenOwnerHeaders = new(
+        [
+            OwnerHeader,
+            PortalOwnerHeader,
+            PortalOwnerTimestampHeader,
+            PortalOwnerSignatureHeader,
+            PortalModeratorSignatureHeader,
+        ],
+        StringComparer.OrdinalIgnoreCase);
+
+    private readonly AccessEdgeConfiguration _configuration;
+    private readonly ICloudflareAccessTokenValidator _tokenValidator;
+    private readonly HttpClient _upstream;
+
+    public BuildGhostAccessProxy(
+        AccessEdgeConfiguration configuration,
+        ICloudflareAccessTokenValidator tokenValidator,
+        HttpClient upstream)
+    {
+        _configuration = configuration;
+        _tokenValidator = tokenValidator;
+        _upstream = upstream;
+    }
+
+    public async Task HandleAsync(HttpContext context)
+    {
+        ApplyNoStore(context.Response);
+        if (!HasExactHost(context.Request, _configuration.PublicHost)
+            || !HasCanonicalTarget(context.Request)
+            || !TryMatchRoute(
+                context.Request.Method,
+                context.Request.Path.Value ?? string.Empty,
+                out BuildGhostAccessRoute route))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        if (!TryReadAccessHeaders(
+                context.Request,
+                out string authenticatedEmail,
+                out string assertion)
+            || !await _tokenValidator.ValidateAsync(
+                assertion,
+                authenticatedEmail,
+                context.RequestAborted).ConfigureAwait(false))
+        {
+            await WriteFixedErrorAsync(
+                context.Response,
+                StatusCodes.Status401Unauthorized,
+                "cloudflare_access_required",
+                context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
+
+        if (context.Request.ContentLength is long contentLength
+            && contentLength > route.MaximumBodyBytes)
+        {
+            await WriteFixedErrorAsync(
+                context.Response,
+                StatusCodes.Status413PayloadTooLarge,
+                "request_body_too_large",
+                context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
+
+        if (route.Kind is BuildGhostAccessRouteKind.WorkspaceImport
+                or BuildGhostAccessRouteKind.ToolAccess
+            && !HasJsonContentType(context.Request))
+        {
+            await WriteFixedErrorAsync(
+                context.Response,
+                StatusCodes.Status415UnsupportedMediaType,
+                "application_json_required",
+                context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
+
+        try
+        {
+            using HttpRequestMessage upstreamRequest = CreateUpstreamRequest(
+                context.Request,
+                authenticatedEmail,
+                route);
+            using HttpResponseMessage upstreamResponse = await _upstream.SendAsync(
+                upstreamRequest,
+                HttpCompletionOption.ResponseHeadersRead,
+                context.RequestAborted).ConfigureAwait(false);
+            await CopyResponseAsync(
+                upstreamResponse,
+                context.Response,
+                context.RequestAborted).ConfigureAwait(false);
+        }
+        catch (RequestBodyLimitExceededException)
+        {
+            if (!context.Response.HasStarted)
+            {
+                await WriteFixedErrorAsync(
+                    context.Response,
+                    StatusCodes.Status413PayloadTooLarge,
+                    "request_body_too_large",
+                    context.RequestAborted).ConfigureAwait(false);
+            }
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException
+                or IOException
+                or TaskCanceledException)
+        {
+            if (!context.Response.HasStarted)
+            {
+                await WriteFixedErrorAsync(
+                    context.Response,
+                    StatusCodes.Status502BadGateway,
+                    "private_workspace_upstream_unavailable",
+                    context.RequestAborted).ConfigureAwait(false);
+            }
+        }
+    }
+
+    public static bool TryMatchRoute(
+        string method,
+        string path,
+        out BuildGhostAccessRoute route)
+    {
+        route = default;
+        if (string.Equals(method, "POST", StringComparison.Ordinal)
+            && string.Equals(path, "/api/workspaces/import", StringComparison.Ordinal))
+        {
+            route = new BuildGhostAccessRoute(
+                BuildGhostAccessRouteKind.WorkspaceImport,
+                ImportBodyLimit);
+            return true;
+        }
+
+        if (string.Equals(method, "POST", StringComparison.Ordinal)
+            && ToolAccessPath.IsMatch(path))
+        {
+            route = new BuildGhostAccessRoute(
+                BuildGhostAccessRouteKind.ToolAccess,
+                ToolAccessBodyLimit);
+            return true;
+        }
+
+        if ((string.Equals(method, "GET", StringComparison.Ordinal)
+                || string.Equals(method, "DELETE", StringComparison.Ordinal))
+            && WorkspaceLifecyclePath.IsMatch(path))
+        {
+            route = new BuildGhostAccessRoute(
+                BuildGhostAccessRouteKind.WorkspaceLifecycle,
+                0);
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool TryReadAccessHeaders(
+        HttpRequest request,
+        out string authenticatedEmail,
+        out string assertion)
+    {
+        authenticatedEmail = string.Empty;
+        assertion = string.Empty;
+        if (!TryReadExactlyOne(request.Headers, AuthenticatedEmailHeader, out string rawEmail)
+            || !TryReadExactlyOne(request.Headers, JwtAssertionHeader, out assertion)
+            || rawEmail.Length is < 3 or > 254
+            || !string.Equals(rawEmail, rawEmail.Trim(), StringComparison.Ordinal)
+            || !string.Equals(rawEmail, rawEmail.ToLowerInvariant(), StringComparison.Ordinal)
+            || !NormalizedEmailPattern.IsMatch(rawEmail)
+            || assertion.Length > CloudflareAccessJwtValidator.MaximumAssertionBytes)
+        {
+            return false;
+        }
+
+        authenticatedEmail = rawEmail;
+        return true;
+    }
+
+    public static HttpRequestMessage CreateUpstreamRequest(
+        HttpRequest request,
+        string authenticatedEmail,
+        BuildGhostAccessRoute route)
+    {
+        Uri destination = new(PresentationOrigin, request.Path.Value);
+        HttpRequestMessage outgoing = new(new HttpMethod(request.Method), destination);
+        outgoing.Headers.TryAddWithoutValidation(OwnerHeader, authenticatedEmail);
+        outgoing.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
+        CopySingleSafeHeader(request.Headers, outgoing.Headers, "Accept", 1024);
+        CopySingleSafeHeader(request.Headers, outgoing.Headers, "Accept-Language", 1024);
+        CopySingleSafeHeader(request.Headers, outgoing.Headers, "If-Match", 512);
+        CopySingleSafeHeader(request.Headers, outgoing.Headers, "If-None-Match", 512);
+
+        if (route.MaximumBodyBytes > 0)
+        {
+            outgoing.Content = new StreamContent(
+                new BoundedReadStream(request.Body, route.MaximumBodyBytes));
+            if (MediaTypeHeaderValue.TryParse(request.ContentType, out MediaTypeHeaderValue? contentType))
+            {
+                outgoing.Content.Headers.ContentType = contentType;
+            }
+        }
+
+        return outgoing;
+    }
+
+    public static bool IsForbiddenUpstreamHeader(string headerName)
+        => ForbiddenOwnerHeaders.Contains(headerName)
+            || string.Equals(headerName, AuthenticatedEmailHeader, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(headerName, JwtAssertionHeader, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(headerName, "Authorization", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(headerName, "Cookie", StringComparison.OrdinalIgnoreCase)
+            || headerName.StartsWith("X-Forwarded-", StringComparison.OrdinalIgnoreCase)
+            || headerName.StartsWith("Cf-", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasExactHost(HttpRequest request, string expectedHost)
+        => request.Headers.Host.Count == 1
+            && string.Equals(request.Headers.Host[0], expectedHost, StringComparison.Ordinal);
+
+    private static bool HasCanonicalTarget(HttpRequest request)
+    {
+        if (request.QueryString.HasValue)
+        {
+            return false;
+        }
+
+        string path = request.Path.Value ?? string.Empty;
+        string? rawTarget = request.HttpContext.Features.Get<IHttpRequestFeature>()?.RawTarget;
+        return rawTarget is not null
+            && string.Equals(rawTarget, path, StringComparison.Ordinal)
+            && !path.Contains('%', StringComparison.Ordinal)
+            && !path.Contains('\\', StringComparison.Ordinal)
+            && !path.Contains("//", StringComparison.Ordinal);
+    }
+
+    private static bool HasJsonContentType(HttpRequest request)
+        => MediaTypeHeaderValue.TryParse(request.ContentType, out MediaTypeHeaderValue? mediaType)
+            && string.Equals(mediaType.MediaType, "application/json", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryReadExactlyOne(
+        IHeaderDictionary headers,
+        string name,
+        out string value)
+    {
+        value = string.Empty;
+        if (!headers.TryGetValue(name, out StringValues values)
+            || values.Count != 1
+            || string.IsNullOrWhiteSpace(values[0]))
+        {
+            return false;
+        }
+
+        value = values[0]!;
+        return !value.Contains('\r', StringComparison.Ordinal)
+            && !value.Contains('\n', StringComparison.Ordinal)
+            && !value.Contains(',', StringComparison.Ordinal);
+    }
+
+    private static void CopySingleSafeHeader(
+        IHeaderDictionary source,
+        HttpRequestHeaders destination,
+        string name,
+        int maximumLength)
+    {
+        if (source.TryGetValue(name, out StringValues values)
+            && values.Count == 1
+            && values[0] is string value
+            && value.Length <= maximumLength
+            && !value.Contains('\r', StringComparison.Ordinal)
+            && !value.Contains('\n', StringComparison.Ordinal))
+        {
+            destination.TryAddWithoutValidation(name, value);
+        }
+    }
+
+    private static async Task CopyResponseAsync(
+        HttpResponseMessage source,
+        HttpResponse destination,
+        CancellationToken cancellationToken)
+    {
+        destination.StatusCode = (int)source.StatusCode;
+        ApplyNoStore(destination);
+        CopyResponseHeader(source, destination, "ETag");
+        CopyResponseHeader(source, destination, "Last-Modified");
+        CopyResponseHeader(source, destination, "Retry-After");
+        CopyResponseHeader(source, destination, "X-Chummer-Build-Ghost-Packet-Digest");
+        if (source.Content.Headers.ContentType is not null)
+        {
+            destination.ContentType = source.Content.Headers.ContentType.ToString();
+        }
+
+        await source.Content.CopyToAsync(destination.Body, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void CopyResponseHeader(
+        HttpResponseMessage source,
+        HttpResponse destination,
+        string name)
+    {
+        IEnumerable<string>? values = null;
+        if ((source.Headers.TryGetValues(name, out IEnumerable<string>? responseValues)
+                && (values = responseValues) is not null)
+            || (source.Content.Headers.TryGetValues(name, out IEnumerable<string>? contentValues)
+                && (values = contentValues) is not null))
+        {
+            string[] materialized = values.ToArray();
+            if (materialized.Length == 1)
+            {
+                destination.Headers[name] = materialized[0];
+            }
+        }
+    }
+
+    private static void ApplyNoStore(HttpResponse response)
+    {
+        response.Headers.CacheControl = "no-store";
+        response.Headers.Pragma = "no-cache";
+        response.Headers["X-Content-Type-Options"] = "nosniff";
+    }
+
+    private static async Task WriteFixedErrorAsync(
+        HttpResponse response,
+        int statusCode,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        if (response.HasStarted)
+        {
+            return;
+        }
+
+        response.StatusCode = statusCode;
+        response.ContentType = "application/json";
+        ApplyNoStore(response);
+        string body = $"{{\"error\":\"{error}\"}}";
+        await response.WriteAsync(body, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+    }
+
+    private sealed class BoundedReadStream : Stream
+    {
+        private readonly Stream _inner;
+        private readonly long _limit;
+        private long _read;
+
+        public BoundedReadStream(Stream inner, long limit)
+        {
+            _inner = inner;
+            _limit = limit;
+        }
+
+        public override bool CanRead => _inner.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => _read;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() => throw new NotSupportedException();
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int read = _inner.Read(buffer, offset, count);
+            Account(read);
+            return read;
+        }
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            int read = await _inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            Account(read);
+            return read;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        private void Account(int count)
+        {
+            _read = checked(_read + count);
+            if (_read > _limit)
+            {
+                throw new RequestBodyLimitExceededException();
+            }
+        }
+    }
+
+    private sealed class RequestBodyLimitExceededException : IOException;
+}
