@@ -290,15 +290,17 @@ public sealed class CloudflareAccessJwtValidator : ICloudflareAccessTokenValidat
 public sealed class CloudflareAccessSigningKeyProvider : ICloudflareAccessSigningKeyProvider
 {
     private const int MaximumJwksBytes = 1024 * 1024;
+    public const int RefreshRetrySeconds = 30;
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan RefreshRetryInterval =
+        TimeSpan.FromSeconds(RefreshRetrySeconds);
+    private static readonly TimeSpan RefreshAttemptTimeout = TimeSpan.FromSeconds(10);
 
     private readonly AccessEdgeConfiguration _configuration;
     private readonly HttpClient _httpClient;
     private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
-    private IReadOnlyDictionary<string, CloudflareAccessSigningKey> _keys =
-        new Dictionary<string, CloudflareAccessSigningKey>(StringComparer.Ordinal);
-    private DateTimeOffset _expiresAt = DateTimeOffset.MinValue;
+    private CacheState _state = CacheState.Empty;
 
     public CloudflareAccessSigningKeyProvider(
         AccessEdgeConfiguration configuration,
@@ -314,8 +316,11 @@ public sealed class CloudflareAccessSigningKeyProvider : ICloudflareAccessSignin
         string keyId,
         CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
         DateTimeOffset now = _timeProvider.GetUtcNow();
-        if (now < _expiresAt && _keys.TryGetValue(keyId, out CloudflareAccessSigningKey? cached))
+        CacheState observed = Volatile.Read(ref _state);
+        if (observed.IsFresh(now)
+            && observed.Keys.TryGetValue(keyId, out CloudflareAccessSigningKey? cached))
         {
             return cached;
         }
@@ -324,26 +329,85 @@ public sealed class CloudflareAccessSigningKeyProvider : ICloudflareAccessSignin
         try
         {
             now = _timeProvider.GetUtcNow();
-            bool cacheFresh = now < _expiresAt;
-            if (cacheFresh && _keys.TryGetValue(keyId, out cached))
+            CacheState current = Volatile.Read(ref _state);
+            if (current.IsFresh(now)
+                && current.Keys.TryGetValue(keyId, out cached))
             {
                 return cached;
             }
 
-            IReadOnlyDictionary<string, CloudflareAccessSigningKey>? refreshed =
-                await RefreshAsync(cancellationToken).ConfigureAwait(false);
-            if (refreshed is null)
+            // A refresh completed while this caller waited. That one generation
+            // is authoritative for every waiter, including different unknown
+            // kids; a waiter never launches a second fetch for the same wave.
+            if (current.Generation != observed.Generation)
             {
-                _keys = new Dictionary<string, CloudflareAccessSigningKey>(StringComparer.Ordinal);
-                _expiresAt = DateTimeOffset.MinValue;
+                return current.IsFresh(now)
+                    && current.Keys.TryGetValue(keyId, out CloudflareAccessSigningKey? coalesced)
+                        ? coalesced
+                        : null;
+            }
+
+            // A refresh after any populated generation, a successful negative
+            // lookup, or a failed attempt establishes one global retry
+            // boundary. It has constant memory and caps an attacker rotating
+            // arbitrary unsigned JWT kid values at one JWKS fetch per interval
+            // without ever admitting a missing/stale key.
+            if (now < current.RefreshNotBefore)
+            {
                 return null;
             }
 
-            _keys = refreshed;
-            _expiresAt = now.Add(CacheLifetime);
-            return _keys.TryGetValue(keyId, out CloudflareAccessSigningKey? found)
-                ? found
-                : null;
+            IReadOnlyDictionary<string, CloudflareAccessSigningKey>? refreshed;
+            using (CancellationTokenSource refreshTimeout = new(RefreshAttemptTimeout))
+            {
+                try
+                {
+                    refreshed = await RefreshAsync(refreshTimeout.Token).ConfigureAwait(false);
+                }
+                catch (Exception exception) when (
+                    exception is HttpRequestException
+                        or IOException
+                        or OperationCanceledException)
+                {
+                    refreshed = null;
+                }
+            }
+
+            DateTimeOffset completedAt = _timeProvider.GetUtcNow();
+            long nextGeneration = unchecked(current.Generation + 1);
+            if (refreshed is null)
+            {
+                // A failed refresh can never publish material from that
+                // response. Previously parsed keys may survive only while
+                // their original generation is still unexpired; cold and
+                // expired failures publish an empty state. This keeps an
+                // arbitrary unknown kid from evicting valid warm keys while
+                // still forbidding stale-key fallback.
+                Volatile.Write(
+                    ref _state,
+                    CacheState.AfterFailedRefresh(
+                        current,
+                        completedAt,
+                        nextGeneration,
+                        completedAt.Add(RefreshRetryInterval)));
+                cancellationToken.ThrowIfCancellationRequested();
+                return null;
+            }
+
+            bool foundRequestedKey = refreshed.TryGetValue(
+                keyId,
+                out CloudflareAccessSigningKey? found);
+            bool requiresRetryBoundary = current.Keys.Count > 0 || !foundRequestedKey;
+            CacheState next = new(
+                refreshed,
+                completedAt.Add(CacheLifetime),
+                requiresRetryBoundary
+                    ? completedAt.Add(RefreshRetryInterval)
+                    : DateTimeOffset.MinValue,
+                nextGeneration);
+            Volatile.Write(ref _state, next);
+            cancellationToken.ThrowIfCancellationRequested();
+            return foundRequestedKey ? found : null;
         }
         finally
         {
@@ -466,5 +530,40 @@ public sealed class CloudflareAccessSigningKeyProvider : ICloudflareAccessSignin
             CryptographicOperations.ZeroMemory(buffer);
             ArrayPool<byte>.Shared.Return(buffer);
         }
+    }
+
+    private sealed record CacheState(
+        IReadOnlyDictionary<string, CloudflareAccessSigningKey> Keys,
+        DateTimeOffset ExpiresAt,
+        DateTimeOffset RefreshNotBefore,
+        long Generation)
+    {
+        public static CacheState Empty { get; } = new(
+            new Dictionary<string, CloudflareAccessSigningKey>(StringComparer.Ordinal),
+            DateTimeOffset.MinValue,
+            DateTimeOffset.MinValue,
+            0);
+
+        public bool IsFresh(DateTimeOffset now) => now < ExpiresAt;
+
+        public static CacheState Failed(long generation, DateTimeOffset refreshNotBefore)
+            => new(
+                new Dictionary<string, CloudflareAccessSigningKey>(StringComparer.Ordinal),
+                DateTimeOffset.MinValue,
+                refreshNotBefore,
+                generation);
+
+        public static CacheState AfterFailedRefresh(
+            CacheState previous,
+            DateTimeOffset now,
+            long generation,
+            DateTimeOffset refreshNotBefore)
+            => previous.IsFresh(now)
+                ? new(
+                    previous.Keys,
+                    previous.ExpiresAt,
+                    refreshNotBefore,
+                    generation)
+                : Failed(generation, refreshNotBefore);
     }
 }

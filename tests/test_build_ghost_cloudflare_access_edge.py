@@ -12,6 +12,15 @@ PROXY = (EDGE_ROOT / "BuildGhostAccessProxy.cs").read_text(encoding="utf-8")
 JWT = (EDGE_ROOT / "CloudflareAccessJwtValidator.cs").read_text(encoding="utf-8")
 PROGRAM = (EDGE_ROOT / "Program.cs").read_text(encoding="utf-8")
 TRANSPORT = (EDGE_ROOT / "AccessEdgeHttpTransport.cs").read_text(encoding="utf-8")
+MANAGED_TESTS = (
+    ROOT / "ops/build-ghost-private-nonprod/cloudflare-access-edge.tests/Program.cs"
+).read_text(encoding="utf-8")
+VERIFIER = (
+    ROOT / "ops/build-ghost-private-nonprod/verify-cloudflare-access-edge.sh"
+).read_text(encoding="utf-8")
+WORKFLOW = (
+    ROOT / ".github/workflows/build-ghost-cloudflare-access-edge.yml"
+).read_text(encoding="utf-8")
 DOCKERFILE = (
     ROOT / "ops/build-ghost-private-nonprod/Dockerfile.cloudflare-access-edge"
 ).read_text(encoding="utf-8")
@@ -269,3 +278,53 @@ def test_operator_handoff_stops_before_live_mutation_and_preserves_provider_gate
     assert "httpHostHeader" in HANDOFF
     assert "never authorizes provider execution" in HANDOFF
     assert "false" in HANDOFF
+
+
+def test_jwks_refresh_is_generation_coalesced_and_retry_bounded_without_stale_keys():
+    assert "RefreshRetrySeconds = 30" in JWT
+    assert "current.Generation != observed.Generation" in JWT
+    assert "now < current.RefreshNotBefore" in JWT
+    assert "static CacheState Failed(" in JWT
+    assert "CacheState.AfterFailedRefresh(" in JWT
+    assert "DateTimeOffset.MinValue" in JWT
+    assert "current.IsFresh(now)" in JWT
+    assert "GetConcurrentWaveAsync" in MANAGED_TESTS
+    for scenario in (
+        "sameUnknown",
+        "differentUnknown",
+        "failedInitial",
+        "failedWarmUnknown",
+        "afterRotation",
+        "failedRefresh",
+        "newKid",
+        "concurrent",
+    ):
+        assert scenario in MANAGED_TESTS
+    assert "Enumerable.Range(1, 31)" in MANAGED_TESTS
+
+
+def test_canonical_verifier_cannot_escape_repo_locked_exact_sdk():
+    assert 'expected_sdk="10.0.103"' in VERIFIER
+    assert '"$repo_root/global.json"' in VERIFIER
+    assert 'locked_roll_forward' in VERIFIER
+    assert 'cd -- "$repo_root" && dotnet --version' in VERIFIER
+    assert 'cd -- "$verify_root"' not in VERIFIER
+    assert '--project "ops/build-ghost-private-nonprod/cloudflare-access-edge.tests/' in VERIFIER
+    assert '--artifacts-path "$verify_root/artifacts"' in VERIFIER
+
+
+def test_cloudflare_edge_pr_ci_is_narrow_hash_pinned_and_exact_sdk():
+    assert "pull_request:" in WORKFLOW
+    assert "push:" not in WORKFLOW
+    assert "workflow_dispatch:" not in WORKFLOW
+    assert "ops/build-ghost-private-nonprod/cloudflare-access-edge/**" in WORKFLOW
+    assert "tests/test_build_ghost_cloudflare_access_edge.py" in WORKFLOW
+    assert "./ops/build-ghost-private-nonprod/verify-cloudflare-access-edge.sh" in WORKFLOW
+    assert "--version 10.0.103" in WORKFLOW
+    assert 'test "$(dotnet --version)" = "10.0.103"' in WORKFLOW
+    action_lines = [line.strip() for line in WORKFLOW.splitlines() if "uses:" in line]
+    assert action_lines
+    for line in action_lines:
+        action = line.split("uses:", 1)[1].split("#", 1)[0].strip()
+        assert "@" in action
+        assert len(action.rsplit("@", 1)[1]) == 40

@@ -41,6 +41,12 @@ signed `exp - iat` interval to exactly 24 hours. Both outbound handlers disable
 cross either the Presentation or signing-key boundary. The dedicated external
 network name has no fallback and must be supplied explicitly.
 
+JWKS refresh is generation-coalesced and fail closed: negative or failed
+refreshes establish one constant-memory global 30-second retry boundary, while
+stale and expired keys are never returned. The canonical verifier requires the
+repo-locked exact .NET SDK `10.0.103`; the path-scoped pull-request job is the
+merge authority when that SDK is unavailable locally.
+
 The edge routes only workspace import, exact workspace read/close, and
 ephemeral Build Ghost tool-access issuance. It cannot route either AI provider
 tool endpoint or `/api/internal/build-ghost/tool/resolve`. Its checked-in
