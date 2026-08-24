@@ -122,6 +122,27 @@ v2 six-slot GET-only receipt is still required before the
 attester can accept provider readback; missing identifiers or contract truth
 must remain blocked with zero provider mutations.
 
+If any Tough Tongue credential may have been disclosed, do not use an ordinary
+deploy to carry the current provider environment forward. The AI-only helper has
+an explicit local quarantine mode:
+
+```sh
+unset CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE
+unset CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT
+export CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE=1
+./ops/build-ghost-private-nonprod/deploy-ai-with-rollback.sh
+```
+
+Quarantine is mutually exclusive with operator config/evidence. It never reads
+the old provider credentials, renders all credential/account/candidate/contract
+fields empty, pins the unconfigured sentinel, and requires the same posture on
+both successful activation and rollback while all four gates stay false. This
+only removes the credentials from the recreated local AI container; it does not
+revoke them at Tough Tongue or modify EA/Teable secret authorities. Deployment
+still requires independent review and approval. Follow
+[`TOUGH_TONGUE_CREDENTIAL_QUARANTINE.md`](TOUGH_TONGUE_CREDENTIAL_QUARANTINE.md)
+for the exact test, execution, postcheck, and provider-side rotation boundary.
+
 The AI image records its four exact clean source revisions as OCI labels. The
 Presentation image records all six sources in its compatibility-tree build:
 Hub, Presentation, Core, Hub Registry, UI Kit, and Media Factory. A running

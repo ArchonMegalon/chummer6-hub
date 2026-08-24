@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import subprocess
 
@@ -237,7 +238,7 @@ def test_neighbor_ids_and_public_404_are_required_without_widening_ingress():
     assert "public-explain-route-present" in SCRIPT
 
 
-def test_secrets_are_inherited_without_receipt_or_trace_output():
+def test_internal_secrets_are_inherited_without_receipt_or_trace_output():
     assert "set -x" not in SCRIPT
     assert "load_runtime_secrets_without_output" in SCRIPT
     assert 'CHUMMER_AI_INTERNAL_API_TOKEN required' in SCRIPT
@@ -247,3 +248,145 @@ def test_secrets_are_inherited_without_receipt_or_trace_output():
     assert 'shred --force --remove=unlink --zero "$path"' in SCRIPT
     assert 'printf \'%s\' "$CHUMMER_AI_INTERNAL_API_TOKEN"' not in SCRIPT
     assert "CHUMMER_AI_INTERNAL_API_TOKEN=" not in SCRIPT
+
+
+def test_explicit_quarantine_is_fail_closed_and_mutually_exclusive_with_operator_config():
+    assert 'quarantine_requested="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE:-0}"' in SCRIPT
+    assert '*) fail "tough-tongue-quarantine-flag-invalid" ;;' in SCRIPT
+    assert 'fail "tough-tongue-quarantine-conflicts-with-operator-config"' in SCRIPT
+    assert 'fail "tough-tongue-quarantine-conflicts-with-runtime-evidence"' in SCRIPT
+    assert "validate_quarantine_request\n    deploy_tmp=" in SCRIPT
+
+
+def test_quarantine_rejects_ambiguous_or_conflicting_requests_without_runtime_work():
+    cases = (
+        (
+            {"CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE": "true"},
+            "tough-tongue-quarantine-flag-invalid",
+        ),
+        (
+            {
+                "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE": "1",
+                "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE": "/private/config.json",
+            },
+            "tough-tongue-quarantine-conflicts-with-operator-config",
+        ),
+        (
+            {
+                "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE": "1",
+                "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT": "/private/evidence",
+            },
+            "tough-tongue-quarantine-conflicts-with-runtime-evidence",
+        ),
+    )
+    for values, expected_stage in cases:
+        environment = os.environ.copy()
+        for name in (
+            "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE",
+            "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE",
+            "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT",
+        ):
+            environment.pop(name, None)
+        environment.update(values)
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                'source "$1"; validate_quarantine_request',
+                "quarantine-validation-test",
+                str(DEPLOY),
+            ],
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1
+        assert result.stdout == ""
+        assert result.stderr.strip() == f"ai_deploy=failed stage={expected_stage}"
+
+
+def test_quarantine_never_reads_old_provider_credentials_and_retains_internal_auth(tmp_path):
+    environment = os.environ.copy()
+    environment["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE"] = "1"
+    environment.pop("CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE", None)
+    environment.pop("CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT", None)
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            r'''
+source "$1"
+load_existing_environment() {
+    local variable_name="$2"
+    case "$variable_name" in
+        CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN|CHUMMER_AI_INTERNAL_API_TOKEN)
+            printf -v "$variable_name" '%s' 'test-internal-auth-only'
+            export "${variable_name?}"
+            ;;
+        *) return 91 ;;
+    esac
+}
+load_existing_environment_or_empty() { return 92; }
+old_ai_id=test-container
+load_runtime_secrets_without_output
+[ "$CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN" = test-internal-auth-only ]
+[ "$CHUMMER_AI_INTERNAL_API_TOKEN" = test-internal-auth-only ]
+for variable_name in \
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS \
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS \
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF \
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID \
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID \
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID \
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID \
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID \
+    EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST; do
+    [ -z "${!variable_name}" ]
+done
+[ "$CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE" = \
+  "$script_root/tough-tongue-read-only-binding-contract.unconfigured.json" ]
+''',
+            "quarantine-function-test",
+            str(DEPLOY),
+        ],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+    assert result.stderr == ""
+
+
+def test_quarantine_render_postcheck_and_rollback_require_empty_provider_runtime():
+    render = SCRIPT.split("verify_rendered_compose()", 1)[1].split(
+        "build_candidate_under_limits()", 1
+    )[0]
+    for variable_name in (
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID",
+        "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST",
+    ):
+        assert f".services[$service].environment.{variable_name} == \"\"" in render
+        assert variable_name in SCRIPT.split("assert_provider_runtime_quarantined()", 1)[1]
+    assert '.secrets["build-ghost-tough-tongue-read-only-binding-contract"].file == $sentinel' in render
+    assert 'fail "compose-tough-tongue-quarantine-drift"' in render
+    postchecks = SCRIPT.split("run_postchecks()", 1)[1].split(
+        "verify_activation_authority_unchanged()", 1
+    )[0]
+    rollback = SCRIPT.split("rollback_if_needed()", 1)[1].split("on_exit()", 1)[0]
+    assert 'assert_provider_runtime_quarantined "$current_ai_id"' in postchecks
+    assert 'assert_provider_gates_false "$restored_ai_id"' in rollback
+    assert 'assert_provider_runtime_quarantined "$restored_ai_id"' in rollback
+    assert 'docker container inspect "$old_ai_id"' in SCRIPT
+    assert 'fail "postcheck-quarantine-superseded-container-retained"' in SCRIPT
+    assert 'credentials_present=false provider_side_revocation=false' in SCRIPT
