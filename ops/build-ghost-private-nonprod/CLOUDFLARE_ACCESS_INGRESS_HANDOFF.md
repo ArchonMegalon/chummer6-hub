@@ -74,9 +74,10 @@ The edge buffers only the 4 KiB grant request/16 KiB grant response and the
 exact 16 KiB v2 request/64 KiB v2 response ceilings. After a successful grant
 response, it retains only `SHA-256(packet_access_key)`, a domain-separated
 SHA-256 reference for the validated owner, packet digest, and expiry in a
-4,096-entry process-local registry. The raw key
-exists only in the bounded request/response buffers, which are zeroed after
-use. A matching owner/digest claim is removed before the one permitted AI
+4,096-entry process-local registry. The raw key is transiently materialized in
+bounded request/response buffers and short-lived JSON parsing values; it is
+never logged or retained in the registry, and the owned byte buffers are zeroed
+after use. A matching owner/digest claim is removed before the one permitted AI
 dispatch. Cross-owner attempts do not consume the binding. Restart, expiry,
 replay, malformed/unknown keys, and absent bindings fail closed. A restart or
 upstream failure after the Access claim can require issuing a fresh grant, an

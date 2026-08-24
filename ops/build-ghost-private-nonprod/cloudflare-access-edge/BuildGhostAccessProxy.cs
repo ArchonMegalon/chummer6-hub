@@ -355,20 +355,21 @@ public sealed class BuildGhostAccessProxy
                 HttpCompletionOption.ResponseHeadersRead,
                 context.RequestAborted).ConfigureAwait(false);
 
-            if (upstreamResponse.StatusCode != HttpStatusCode.OK)
-            {
-                await CopyResponseAsync(
-                    upstreamResponse,
-                    context.Response,
-                    context.RequestAborted).ConfigureAwait(false);
-                return;
-            }
-
             responseBody = await ReadBoundedBodyAsync(
                 await upstreamResponse.Content.ReadAsStreamAsync(context.RequestAborted).ConfigureAwait(false),
                 ToolAccessResponseBodyLimit,
                 context.RequestAborted,
                 isUpstreamResponse: true).ConfigureAwait(false);
+            if (upstreamResponse.StatusCode != HttpStatusCode.OK)
+            {
+                await CopyBufferedResponseAsync(
+                    upstreamResponse,
+                    context.Response,
+                    responseBody,
+                    context.RequestAborted).ConfigureAwait(false);
+                return;
+            }
+
             if (!HasJsonContentType(upstreamResponse.Content.Headers.ContentType)
                 || !BuildGhostProviderToolRequestContract.TryParseGrantResponse(
                     responseBody,

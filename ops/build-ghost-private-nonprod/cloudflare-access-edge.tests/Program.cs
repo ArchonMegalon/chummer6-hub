@@ -30,6 +30,8 @@ internal static class Program
             ("real outbound handlers suppress all activity propagation", TestActivityHeaderIsolationAsync),
             ("proxy rejects bypasses before upstream", TestProxyBypassesAsync),
             ("proxy forwards one admitted request without security header leakage", TestProxyForwardingAsync),
+            ("owner-bound registry caps lifetime cardinality and concurrent claims", TestOwnerBoundRegistryBoundsAsync),
+            ("owner-bound grant errors are bounded before status forwarding", TestOwnerBoundGrantResponseBoundsAsync),
             ("owner-bound v2 broker issues dispatches once and returns deterministic packet", TestOwnerBoundProviderToolAsync),
             ("owner-bound v2 broker fails closed across owner replay expiry restart and revocation", TestOwnerBoundProviderTerminalBehaviorAsync),
             ("owner-bound v2 broker rejects hostile contract and body ambiguity before dispatch", TestOwnerBoundProviderHostileInputsAsync),
@@ -757,6 +759,143 @@ static async Task TestProxyForwardingAsync()
     Equal("{\"ok\":true}", await reader.ReadToEndAsync());
 }
 
+static async Task TestOwnerBoundRegistryBoundsAsync()
+{
+    DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T11:00:00Z");
+    MutableTimeProvider clock = new(now);
+    string digest = $"sha256:{new string('9', 64)}";
+    const string owner = "runner@example.com";
+    BuildGhostOwnerBoundGrantRegistry registry = new(clock);
+
+    False(registry.TryRegister(
+        CanonicalPacketKey(0),
+        owner,
+        digest,
+        now));
+    False(registry.TryRegister(
+        CanonicalPacketKey(0),
+        owner,
+        digest,
+        now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime).AddTicks(1)));
+    True(registry.TryRegister(
+        CanonicalPacketKey(0),
+        owner,
+        digest,
+        now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)));
+    False(registry.TryRegister(
+        CanonicalPacketKey(0),
+        "other@example.com",
+        digest,
+        now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)));
+
+    for (int index = 1; index < BuildGhostOwnerBoundGrantRegistry.MaximumBindings; index++)
+    {
+        True(registry.TryRegister(
+            CanonicalPacketKey(index),
+            owner,
+            digest,
+            now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)),
+            $"binding {index} should fit exact registry capacity");
+    }
+    Equal(BuildGhostOwnerBoundGrantRegistry.MaximumBindings, registry.Count);
+    False(registry.TryRegister(
+        CanonicalPacketKey(BuildGhostOwnerBoundGrantRegistry.MaximumBindings),
+        owner,
+        digest,
+        now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)));
+
+    clock.Advance(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime);
+    True(registry.TryRegister(
+        CanonicalPacketKey(BuildGhostOwnerBoundGrantRegistry.MaximumBindings),
+        owner,
+        digest,
+        clock.GetUtcNow().Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)));
+    Equal(1, registry.Count);
+    False(registry.TryClaim(CanonicalPacketKey(0), owner, digest));
+
+    BuildGhostOwnerBoundGrantRegistry claimRegistry = new(clock);
+    string claimKey = CanonicalPacketKey(BuildGhostOwnerBoundGrantRegistry.MaximumBindings + 1);
+    True(claimRegistry.TryRegister(
+        claimKey,
+        owner,
+        digest,
+        clock.GetUtcNow().AddMinutes(1)));
+    bool[] claimResults = await Task.WhenAll(
+        Enumerable.Range(0, 64)
+            .Select(_ => Task.Run(() => claimRegistry.TryClaim(claimKey, owner, digest))));
+    Equal(1, claimResults.Count(static claimed => claimed));
+    Equal(0, claimRegistry.Count);
+
+    BuildGhostOwnerBoundGrantRegistry dispatchRegistry = new(clock);
+    string dispatchKey = CanonicalPacketKey(BuildGhostOwnerBoundGrantRegistry.MaximumBindings + 2);
+    True(dispatchRegistry.TryRegister(
+        dispatchKey,
+        owner,
+        digest,
+        clock.GetUtcNow().AddMinutes(1)));
+    using HttpClient presentation = new(new CountingHandler());
+    ConcurrentProviderToolHandler aiHandler = new(digest);
+    using HttpClient ai = new(aiHandler);
+    BuildGhostAccessProxy proxy = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        presentation,
+        ai,
+        dispatchRegistry);
+    DefaultHttpContext[] contexts = Enumerable.Range(0, 64)
+        .Select(_ => ProviderRequestContext(dispatchKey, digest))
+        .ToArray();
+    Task[] dispatches = contexts.Select(proxy.HandleAsync).ToArray();
+    await aiHandler.WaitForCallAsync();
+    aiHandler.Release();
+    await Task.WhenAll(dispatches);
+    Equal(1, aiHandler.Calls);
+    Equal(1, contexts.Count(static context => context.Response.StatusCode == StatusCodes.Status200OK));
+    Equal(63, contexts.Count(static context => context.Response.StatusCode == StatusCodes.Status410Gone));
+    Equal(0, dispatchRegistry.Count);
+}
+
+static async Task TestOwnerBoundGrantResponseBoundsAsync()
+{
+    DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T11:30:00Z");
+    MutableTimeProvider clock = new(now);
+    const string leakedKey = "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHc";
+    byte[] hostileBody = Encoding.UTF8.GetBytes(
+        $"{{\"packetAccessKey\":\"{leakedKey}\",\"padding\":\"{new string('x', 17 * 1024)}\"}}");
+    bool responseHadNoDeclaredLength = false;
+    FixedResponseHandler presentationHandler = new(_ =>
+    {
+        StreamContent content = new(new NonSeekableReadStream(hostileBody));
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        responseHadNoDeclaredLength = content.Headers.ContentLength is null;
+        return new HttpResponseMessage(HttpStatusCode.Conflict)
+        {
+            Content = content,
+        };
+    });
+    using HttpClient presentation = new(presentationHandler);
+    using HttpClient ai = new(new CountingHandler());
+    BuildGhostOwnerBoundGrantRegistry registry = new(clock);
+    BuildGhostAccessProxy proxy = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        presentation,
+        ai,
+        registry);
+    DefaultHttpContext context = GrantRequestContext();
+
+    await proxy.HandleAsync(context);
+
+    True(responseHadNoDeclaredLength);
+    Equal(StatusCodes.Status502BadGateway, context.Response.StatusCode);
+    Equal(0, registry.Count);
+    Equal(
+        "{\"error\":\"private_tool_upstream_response_invalid\"}",
+        await ResponseBodyAsync(context));
+    False((await ResponseBodyAsync(context)).Contains(leakedKey, StringComparison.Ordinal));
+    Equal("no-store", context.Response.Headers.CacheControl.ToString());
+}
+
 static async Task TestOwnerBoundProviderToolAsync()
 {
     DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T12:00:00Z");
@@ -1072,6 +1211,16 @@ static string ProviderBody(string key, string digest)
         ["request_kind"] = "current-build",
         ["question"] = "What should I improve?",
     });
+
+static string CanonicalPacketKey(int value)
+{
+    byte[] material = new byte[32];
+    material[^4] = (byte)(value >> 24);
+    material[^3] = (byte)(value >> 16);
+    material[^2] = (byte)(value >> 8);
+    material[^1] = (byte)value;
+    return Base64Url(material);
+}
 
 static async Task<string> ResponseBodyAsync(DefaultHttpContext context)
 {
@@ -1500,6 +1649,73 @@ sealed class ProviderToolHandler : HttpMessageHandler
         }
         response.Headers.TryAddWithoutValidation("Set-Cookie", "ai-cookie=blocked");
         return response;
+    }
+}
+
+sealed class ConcurrentProviderToolHandler(string packetDigest) : HttpMessageHandler
+{
+    private readonly TaskCompletionSource _callEntered = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _callReleased = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _calls;
+
+    public int Calls => Volatile.Read(ref _calls);
+
+    public Task WaitForCallAsync() => _callEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+    public void Release() => _callReleased.TrySetResult();
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref _calls);
+        _callEntered.TrySetResult();
+        await _callReleased.Task.WaitAsync(cancellationToken);
+        HttpResponseMessage response = new(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"ok\":true}", Encoding.UTF8, "application/json"),
+        };
+        response.Headers.TryAddWithoutValidation(
+            "X-Chummer-Build-Ghost-Packet-Digest",
+            packetDigest);
+        return response;
+    }
+}
+
+sealed class NonSeekableReadStream(byte[] body) : Stream
+{
+    private readonly MemoryStream _inner = new(body, writable: false);
+
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
+
+    public override void Flush() => throw new NotSupportedException();
+    public override int Read(byte[] buffer, int offset, int count)
+        => _inner.Read(buffer, offset, count);
+    public override ValueTask<int> ReadAsync(
+        Memory<byte> buffer,
+        CancellationToken cancellationToken = default)
+        => _inner.ReadAsync(buffer, cancellationToken);
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _inner.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }
 
