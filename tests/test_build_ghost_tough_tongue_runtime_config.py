@@ -309,6 +309,7 @@ def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path
     assert receipt["providerMutationPerformed"] is False
     assert receipt["environmentFileDigest"] == digest(environment_raw)
     assert receipt["readOnlyContractFileDigest"] == digest(contract_raw)
+    assert contract_raw == canonical(json.loads(contract_raw))
     assert receipt["publicationOrder"] == ["contract-snapshot", "receipt", "environment"]
     assert receipt["outputDirectoryDevice"] == tmp_path.stat().st_dev
     assert receipt["outputDirectoryInode"] == tmp_path.stat().st_ino

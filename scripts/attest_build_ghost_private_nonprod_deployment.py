@@ -491,9 +491,10 @@ def _validated_deployed_stock_avatar_receipt(
     live_avatar_ref: str,
     clock: Callable[[], dt.datetime],
 ) -> dict[str, Any] | None:
+    raw_receipt = receipt_json.encode("utf-8")
     try:
         receipt = _json_object(
-            receipt_json.encode("utf-8"), "deployed stock avatar readback receipt"
+            raw_receipt, "deployed stock avatar readback receipt"
         )
     except AttestationError:
         return None
@@ -549,6 +550,8 @@ def _validated_deployed_stock_avatar_receipt(
     }
     if receipt.get("ReceiptDigest") != _upstream_digest(receipt_authority):
         return None
+    if raw_receipt != _canonical(receipt):
+        return None
     exact_environment = {
         "provider": receipt["ObservedProvider"],
         "name": receipt["ObservedAvatarName"],
@@ -561,13 +564,78 @@ def _validated_deployed_stock_avatar_receipt(
     if dict(environment_values) != exact_environment:
         return None
     return {
-        "file_digest": _digest(_canonical(receipt)),
+        "file_digest": _digest(raw_receipt),
         "receipt_digest": receipt["ReceiptDigest"],
         "response_digest": receipt["CanonicalWhitelistedResponseDigest"],
         "observed_at": receipt["ObservedAtUtc"],
         "scenario_ref_digest": receipt["ScenarioRefDigest"],
         "legacy_opt_in": legacy_opt_in,
     }
+
+
+def _open_nofollow_file_chain(
+    path: Path,
+) -> tuple[int, list[int], list[tuple[int, ...]], os.stat_result]:
+    """Open every absolute path component without following a link."""
+
+    if not path.is_absolute() or Path(os.path.normpath(path)) != path:
+        raise AttestationError("mounted operator contract path invalid")
+    parts = path.parts[1:]
+    if not parts:
+        raise AttestationError("mounted operator contract path invalid")
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    file_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    directories: list[int] = []
+    descriptor = -1
+    try:
+        current = os.open("/", directory_flags)
+        directories.append(current)
+        for part in parts[:-1]:
+            current = os.open(part, directory_flags, dir_fd=current)
+            directories.append(current)
+        directory_identities = [_identity(os.fstat(value)) for value in directories]
+        if any(not stat.S_ISDIR(os.fstat(value).st_mode) for value in directories):
+            raise AttestationError("mounted operator contract parent invalid")
+        linked = os.stat(parts[-1], dir_fd=directories[-1], follow_symlinks=False)
+        descriptor = os.open(parts[-1], file_flags, dir_fd=directories[-1])
+        opened = os.fstat(descriptor)
+        if _identity(linked) != _identity(opened):
+            raise AttestationError("mounted operator contract entry changed")
+        return descriptor, directories, directory_identities, opened
+    except BaseException:
+        if descriptor >= 0:
+            os.close(descriptor)
+        for value in reversed(directories):
+            os.close(value)
+        raise
+
+
+def _close_descriptors(descriptors: Sequence[int]) -> None:
+    for descriptor in reversed(descriptors):
+        os.close(descriptor)
+
+
+def _read_exact_descriptor(descriptor: int, size: int) -> bytes:
+    chunks: list[bytes] = []
+    offset = 0
+    while offset < size:
+        chunk = os.pread(descriptor, min(64 * 1024, size - offset), offset)
+        if not chunk:
+            raise AttestationError("mounted operator contract short read")
+        chunks.append(chunk)
+        offset += len(chunk)
+    if os.pread(descriptor, 1, size):
+        raise AttestationError("mounted operator contract grew while read")
+    return b"".join(chunks)
 
 
 def _mounted_tough_tongue_operator_contract(
@@ -604,45 +672,67 @@ def _mounted_tough_tongue_operator_contract(
         return blocked
 
     descriptor = -1
+    directories: list[int] = []
     try:
-        descriptor = os.open(
-            source,
-            os.O_RDONLY
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0),
+        contract_path = Path(source)
+        descriptor, directories, directory_identities, opened = (
+            _open_nofollow_file_chain(contract_path)
         )
-        opened = os.fstat(descriptor)
-        linked = os.stat(source, follow_symlinks=False)
         if (
             not stat.S_ISREG(opened.st_mode)
-            or stat.S_ISLNK(linked.st_mode)
             or opened.st_uid != os.geteuid()
             or opened.st_nlink != 1
             or stat.S_IMODE(opened.st_mode) != 0o400
             or not 1 <= opened.st_size <= MAX_TOUGH_TONGUE_OPERATOR_CONTRACT_BYTES
-            or (opened.st_dev, opened.st_ino) != (linked.st_dev, linked.st_ino)
         ):
             raise AttestationError("mounted operator contract authority invalid")
-        chunks: list[bytes] = []
-        remaining = opened.st_size
-        while remaining:
-            chunk = os.read(descriptor, min(64 * 1024, remaining))
-            if not chunk:
-                raise AttestationError("mounted operator contract short read")
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        if os.read(descriptor, 1):
-            raise AttestationError("mounted operator contract grew while read")
-        raw = b"".join(chunks)
+        raw = _read_exact_descriptor(descriptor, opened.st_size)
         rebound = os.fstat(descriptor)
-        relinked = os.stat(source, follow_symlinks=False)
+        relinked = os.stat(
+            contract_path.name,
+            dir_fd=directories[-1],
+            follow_symlinks=False,
+        )
         if (
-            (opened.st_dev, opened.st_ino, opened.st_size)
-            != (rebound.st_dev, rebound.st_ino, rebound.st_size)
-            or (opened.st_dev, opened.st_ino)
-            != (relinked.st_dev, relinked.st_ino)
+            _identity(opened) != _identity(rebound)
+            or _identity(opened) != _identity(relinked)
+            or any(
+                _identity(os.fstat(value)) != expected
+                for value, expected in zip(
+                    directories, directory_identities, strict=True
+                )
+            )
         ):
             raise AttestationError("mounted operator contract changed while read")
+        check_descriptor, check_directories, check_directory_identities, check_opened = (
+            _open_nofollow_file_chain(contract_path)
+        )
+        try:
+            if (
+                check_directory_identities != directory_identities
+                or _identity(check_opened) != _identity(opened)
+            ):
+                raise AttestationError("mounted operator contract path changed")
+        finally:
+            os.close(check_descriptor)
+            _close_descriptors(check_directories)
+        if _read_exact_descriptor(descriptor, opened.st_size) != raw:
+            raise AttestationError("mounted operator contract bytes changed")
+        if (
+            _identity(os.fstat(descriptor)) != _identity(opened)
+            or _identity(os.stat(
+                contract_path.name,
+                dir_fd=directories[-1],
+                follow_symlinks=False,
+            )) != _identity(opened)
+            or any(
+                _identity(os.fstat(value)) != expected
+                for value, expected in zip(
+                    directories, directory_identities, strict=True
+                )
+            )
+        ):
+            raise AttestationError("mounted operator contract changed after resweep")
         payload = _json_object(raw, "mounted Tough Tongue operator contract")
     except (OSError, AttestationError):
         _add(blockers, "tough-tongue-runtime-contract-unverifiable")
@@ -650,6 +740,7 @@ def _mounted_tough_tongue_operator_contract(
     finally:
         if descriptor >= 0:
             os.close(descriptor)
+        _close_descriptors(directories)
 
     file_digest = _digest(raw)
     canonical_digest = _digest(_canonical(payload))

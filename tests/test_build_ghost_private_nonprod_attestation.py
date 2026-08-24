@@ -419,6 +419,7 @@ class FakeRunner:
         self.account_audit_contract: Path | None = None
         self.operator_contract: Path | None = None
         self.contract_digest_override: str | None = None
+        self.stock_receipt_json_override: str | None = None
 
     def result(self, stdout: bytes | str = b"", returncode: int = 0, stderr: bytes = b""):
         if isinstance(stdout, str):
@@ -431,6 +432,14 @@ class FakeRunner:
             env = [
                 f"{MODULE.TOUGH_TONGUE_CONTRACT_DIGEST_ENV}={self.contract_digest_override}"
                 if row.startswith(MODULE.TOUGH_TONGUE_CONTRACT_DIGEST_ENV + "=")
+                else row
+                for row in env
+            ]
+        if role == "ai" and self.stock_receipt_json_override is not None:
+            env = [
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_JSON_ENV}="
+                + self.stock_receipt_json_override
+                if row.startswith(MODULE.TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_JSON_ENV + "=")
                 else row
                 for row in env
             ]
@@ -827,6 +836,30 @@ def test_resealed_operator_contract_cannot_rebind_a_different_stock_receipt(
     assert payload["claim"] is None
 
 
+def test_resealed_operator_contract_with_wrong_schema_is_not_authority(
+    tmp_path: Path,
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    assert runner.operator_contract is not None
+    hostile = operator_contract_payload(STOCK_AVATAR_RECEIPT_FILE_DIGEST)
+    hostile["schema"] = "chummer.build_ghost.tough_tongue.read_only_binding_contract.v2"
+    hostile_raw = MODULE._canonical(hostile)
+    runner.operator_contract.chmod(0o600)
+    runner.operator_contract.write_bytes(hostile_raw)
+    runner.operator_contract.chmod(0o400)
+    hostile_digest = MODULE._digest(hostile_raw)
+    runner.contract_digest_override = hostile_digest
+    contract = runner.truth["contract"]
+    assert isinstance(contract, dict)
+    contract["digest"] = hostile_digest
+    seal_truth(runner.truth)
+
+    payload = invoke(tmp_path, runner)
+
+    assert "tough-tongue-runtime-contract-schema-invalid" in payload["blockers"]
+    assert payload["claim"] is None
+
+
 def test_symlink_swapped_operator_contract_is_never_accepted_as_the_mount_authority(
     tmp_path: Path,
 ):
@@ -840,6 +873,86 @@ def test_symlink_swapped_operator_contract_is_never_accepted_as_the_mount_author
 
     assert "tough-tongue-runtime-contract-unverifiable" in payload["blockers"]
     assert payload["claim"] is None
+
+
+def test_indented_stock_receipt_is_not_rebound_to_its_canonical_digest(
+    tmp_path: Path,
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    runner.stock_receipt_json_override = json.dumps(
+        stock_avatar_receipt(),
+        indent=2,
+        ensure_ascii=False,
+    )
+
+    payload = invoke(tmp_path, runner)
+
+    assert "deployed-tough-tongue-stock-avatar-readback-invalid" in payload["blockers"]
+    assert payload["claim"] is None
+
+
+def test_symlink_parent_of_operator_contract_is_never_followed(
+    tmp_path: Path,
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    real_parent = tmp_path / "real-contract-parent"
+    real_parent.mkdir()
+    real_contract = real_parent / "contract.json"
+    real_contract.write_bytes(OPERATOR_CONTRACT_RAW)
+    os.chmod(real_contract, 0o400)
+    linked_parent = tmp_path / "linked-contract-parent"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+    runner.operator_contract = linked_parent / "contract.json"
+
+    payload = invoke(tmp_path, runner)
+
+    assert "tough-tongue-runtime-contract-unverifiable" in payload["blockers"]
+    assert payload["claim"] is None
+
+
+def test_operator_contract_wrong_mode_is_not_runtime_authority(tmp_path: Path):
+    _, _, _, _, runner = fixture(tmp_path)
+    assert runner.operator_contract is not None
+    runner.operator_contract.chmod(0o600)
+
+    payload = invoke(tmp_path, runner)
+
+    assert "tough-tongue-runtime-contract-unverifiable" in payload["blockers"]
+    assert payload["claim"] is None
+
+
+def test_operator_contract_same_size_write_during_read_is_detected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    assert runner.operator_contract is not None
+    original_pread = MODULE.os.pread
+    mutated = False
+
+    def mutate_after_read(descriptor: int, count: int, offset: int) -> bytes:
+        nonlocal mutated
+        result = original_pread(descriptor, count, offset)
+        if not mutated and result:
+            mutated = True
+            hostile = bytearray(OPERATOR_CONTRACT_RAW)
+            hostile[-1] = ord(" ")
+            runner.operator_contract.chmod(0o600)
+            runner.operator_contract.write_bytes(hostile)
+            runner.operator_contract.chmod(0o400)
+        return result
+
+    monkeypatch.setattr(MODULE.os, "pread", mutate_after_read)
+    blockers: list[str] = []
+    result = MODULE._mounted_tough_tongue_operator_contract(
+        runner.container("ai"),
+        CONTRACT_DIGEST,
+        STOCK_AVATAR_RECEIPT_FILE_DIGEST,
+        blockers,
+    )
+
+    assert result["verified"] is False
+    assert "tough-tongue-runtime-contract-unverifiable" in blockers
 
 
 @pytest.mark.parametrize("mutation", ["missing", "extra", "true"])

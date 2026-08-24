@@ -23,7 +23,6 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private const string CustomFunctionAccountRef = "sha256:689642aa853d240436dd28773f760a289be65a9ecf36783aae1ffe1934b74b15";
     private const string StockAvatarId = "11111111-2222-4333-8444-555555555555";
     private const string StockScenarioRef = "private-stock-scenario-ref";
-    private const string TestOperatorContractDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static readonly string OperatorContractDirectory = Path.Combine(
         Path.GetTempPath(),
         $"chummer-stock-avatar-contract-tests-{Environment.ProcessId}");
@@ -834,7 +833,10 @@ public sealed class ToughTongueBuildGhostAdapterTests
             payload => payload["appearance"]!["live_avatar_provider"] = "attacker",
             payload => payload["ai_model_config"]!["provider"] = "attacker",
             payload => payload["ai_model_config"]!["model"] = "future-model",
-            payload => payload["user_metadata"]!["avatar_provider_response_digest"] = $"sha256:{new string('0', 64)}"
+            payload => payload["user_metadata"]!["avatar_provider_response_digest"] = $"sha256:{new string('0', 64)}",
+            payload => payload["user_metadata"]!["avatar_operator_read_only_contract_digest"] = $"sha256:{new string('1', 64)}",
+            payload => payload["user_metadata"]!["avatar_operator_read_only_contract_file_digest"] = $"sha256:{new string('2', 64)}",
+            payload => payload["user_metadata"]!["avatar_provider_readback_receipt_file_digest"] = $"sha256:{new string('3', 64)}"
         })
         {
             JsonObject payload = (JsonObject)candidate.Payload.DeepClone();
@@ -1516,7 +1518,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             StockAvatarConfiguration()).Build();
 
         BuildGhostToughTongueStockAvatarBindingValidation validation =
-            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(configuration);
+            ValidateStockAvatarConfiguration(configuration);
 
         Assert.IsTrue(validation.Accepted);
         Assert.IsNotNull(validation.Binding);
@@ -1549,7 +1551,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         resealed[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey] = hostilePath;
         resealed[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractDigestConfigurationKey] = TextDigest(hostileRaw);
         BuildGhostToughTongueStockAvatarBindingValidation resealedValidation =
-            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(
+            ValidateStockAvatarConfiguration(
                 new ConfigurationBuilder().AddInMemoryCollection(resealed).Build());
         Assert.IsFalse(resealedValidation.Accepted);
         CollectionAssert.Contains(
@@ -1568,7 +1570,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.IsFalse(swappedValidation.Accepted);
         CollectionAssert.Contains(
             swappedValidation.RejectionReasons.ToArray(),
-            "stock-avatar-operator-contract-file-authority-invalid");
+            "stock-avatar-operator-contract-path-missing-or-invalid");
     }
 
     [TestMethod]
@@ -1577,7 +1579,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         IConfiguration current = new ConfigurationBuilder().AddInMemoryCollection(
             StockAvatarConfiguration()).Build();
         BuildGhostToughTongueStockAvatarBindingValidation accepted =
-            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(current);
+            ValidateStockAvatarConfiguration(current);
         Assert.IsTrue(accepted.Accepted);
 
         IConfiguration misspelledProvider = new ConfigurationBuilder().AddInMemoryCollection(
@@ -1586,7 +1588,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 [BuildGhostToughTongueStockAvatarBindingContract.ProviderConfigurationKey] = "avatari0"
             })).Build();
         BuildGhostToughTongueStockAvatarBindingValidation rejected =
-            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(misspelledProvider);
+            ValidateStockAvatarConfiguration(misspelledProvider);
         Assert.IsFalse(rejected.Accepted);
         Assert.IsNull(rejected.Binding);
         CollectionAssert.Contains(rejected.RejectionReasons.ToArray(), "stock-avatar-provider-invalid");
@@ -1596,7 +1598,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             {
                 [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = "future-model"
             })).Build();
-        Assert.IsFalse(BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(arbitraryModel).Accepted);
+        Assert.IsFalse(ValidateStockAvatarConfiguration(arbitraryModel).Accepted);
 
         IConfiguration currentWithLegacyFlag = new ConfigurationBuilder().AddInMemoryCollection(
             StockAvatarConfiguration(new Dictionary<string, string?>
@@ -1604,7 +1606,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 [BuildGhostToughTongueStockAvatarBindingContract.AllowLegacyCascadeConfigurationKey] = "true"
             })).Build();
         BuildGhostToughTongueStockAvatarBindingValidation invalidCurrent =
-            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(currentWithLegacyFlag);
+            ValidateStockAvatarConfiguration(currentWithLegacyFlag);
         Assert.IsFalse(invalidCurrent.Accepted);
         CollectionAssert.Contains(invalidCurrent.RejectionReasons.ToArray(), "stock-avatar-legacy-model-flag-invalid");
 
@@ -1620,7 +1622,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] = BuildGhostToughTongueStockAvatarBindingContract.SerializeReadbackReceiptFile(legacyReceipt)
             })).Build();
         BuildGhostToughTongueStockAvatarBindingValidation legacy =
-            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(explicitLegacy);
+            ValidateStockAvatarConfiguration(explicitLegacy);
         Assert.IsTrue(legacy.Accepted);
         Assert.IsTrue(legacy.Binding!.LegacyModelCompatibilityEnabled);
     }
@@ -1648,7 +1650,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = sealedDrifted.ReceiptDigest,
                 [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] = BuildGhostToughTongueStockAvatarBindingContract.SerializeReadbackReceiptFile(sealedDrifted)
             });
-            Assert.IsFalse(BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(
+            Assert.IsFalse(ValidateStockAvatarConfiguration(
                 new ConfigurationBuilder().AddInMemoryCollection(values).Build()).Accepted);
         }
     }
@@ -1841,12 +1843,12 @@ public sealed class ToughTongueBuildGhostAdapterTests
 
     private static BuildGhostToughTongueStockAvatarBinding StockAvatarBinding()
     {
-        BuildGhostToughTongueStockAvatarReadbackReceipt receipt = StockAvatarReadbackReceipt();
-        return BuildGhostToughTongueStockAvatarBindingContract.CreateReadVerified(
-            receipt,
-            TestOperatorContractDigest,
-            TestOperatorContractDigest,
-            BuildGhostToughTongueStockAvatarBindingContract.ComputeReadbackReceiptFileDigest(receipt));
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration()).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation validation =
+            ValidateStockAvatarConfiguration(configuration);
+        Assert.IsTrue(validation.Accepted);
+        return validation.Binding!;
     }
 
     private static BuildGhostToughTongueStockAvatarReadbackReceipt StockAvatarReadbackReceipt(
@@ -1916,6 +1918,21 @@ public sealed class ToughTongueBuildGhostAdapterTests
         values[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey] = contractPath;
         values[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractDigestConfigurationKey] = contractDigest;
         return values;
+    }
+
+    private static BuildGhostToughTongueStockAvatarBindingValidation ValidateStockAvatarConfiguration(
+        IConfiguration configuration)
+    {
+        string path = configuration[
+            BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey]
+            ?? string.Empty;
+        if (!File.Exists(path))
+        {
+            return BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(configuration);
+        }
+        return BuildGhostToughTongueStockAvatarBindingContract.FromCanonicalOperatorContractForTesting(
+            configuration,
+            File.ReadAllBytes(path));
     }
 
     private static (string Path, string Digest) WriteOperatorContract(string receiptJson)

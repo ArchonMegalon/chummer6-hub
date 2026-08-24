@@ -1,8 +1,10 @@
 using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Win32.SafeHandles;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -1612,6 +1614,8 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE";
     public const string OperatorReadOnlyContractPathConfigurationKey =
         "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH";
+    public const string OperatorReadOnlyContractPath =
+        "/run/secrets/tough-tongue-read-only-binding-contract.json";
     public const string OperatorReadOnlyContractDigestConfigurationKey =
         "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST";
     public const string ScenarioIdConfigurationKey =
@@ -1649,11 +1653,9 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         ],
         StringComparer.Ordinal);
 
-    public static BuildGhostToughTongueStockAvatarBinding CreateReadVerified(
+    private static BuildGhostToughTongueStockAvatarBinding CreateReadVerified(
         BuildGhostToughTongueStockAvatarReadbackReceipt receipt,
-        string operatorReadOnlyContractDigest,
-        string operatorReadOnlyContractFileDigest,
-        string providerReadbackReceiptFileDigest,
+        OperatorContractAuthority operatorAuthority,
         DateTimeOffset? nowUtc = null)
     {
         ArgumentNullException.ThrowIfNull(receipt);
@@ -1666,15 +1668,15 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         {
             throw new ArgumentException(string.Join(',', receiptFailures), nameof(receipt));
         }
-        if (!IsSha256(operatorReadOnlyContractDigest)
-            || operatorReadOnlyContractDigest != operatorReadOnlyContractFileDigest)
+        if (!IsSha256(operatorAuthority.ContractDigest)
+            || operatorAuthority.ContractDigest != operatorAuthority.ContractFileDigest)
         {
-            throw new ArgumentException("stock-avatar-operator-contract-digest-invalid", nameof(operatorReadOnlyContractDigest));
+            throw new ArgumentException("stock-avatar-operator-contract-digest-invalid", nameof(operatorAuthority));
         }
-        if (!IsSha256(providerReadbackReceiptFileDigest)
-            || providerReadbackReceiptFileDigest != ComputeReadbackReceiptFileDigest(receipt))
+        if (!IsSha256(operatorAuthority.ReceiptFileDigest)
+            || operatorAuthority.ReceiptFileDigest != ComputeReadbackReceiptFileDigest(receipt))
         {
-            throw new ArgumentException("stock-avatar-provider-readback-receipt-file-digest-invalid", nameof(providerReadbackReceiptFileDigest));
+            throw new ArgumentException("stock-avatar-provider-readback-receipt-file-digest-invalid", nameof(operatorAuthority));
         }
         BuildGhostToughTongueStockAvatarBinding binding = new(
             ToughTongueBuildGhostContractVersions.StockAvatarBindingV1,
@@ -1695,9 +1697,9 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
             receipt.ObservedAtUtc,
             receipt.MaximumAgeSeconds,
             ProviderReadVerified: true,
-            operatorReadOnlyContractDigest,
-            operatorReadOnlyContractFileDigest,
-            providerReadbackReceiptFileDigest,
+            operatorAuthority.ContractDigest,
+            operatorAuthority.ContractFileDigest,
+            operatorAuthority.ReceiptFileDigest,
             string.Empty);
         IReadOnlyList<string> failures = ValidateShape(binding, nowUtc);
         if (failures.Count != 0)
@@ -1712,6 +1714,41 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         DateTimeOffset? nowUtc = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        return FromConfigurationCore(configuration, ValidateOperatorContract, nowUtc);
+    }
+
+    internal static BuildGhostToughTongueStockAvatarBindingValidation FromCanonicalOperatorContractForTesting(
+        IConfiguration configuration,
+        ReadOnlyMemory<byte> canonicalOperatorContract,
+        DateTimeOffset? nowUtc = null)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        if (canonicalOperatorContract.IsEmpty
+            || canonicalOperatorContract.Length > MaximumOperatorContractBytes)
+        {
+            throw new ArgumentException("Canonical operator contract bytes are required.", nameof(canonicalOperatorContract));
+        }
+        byte[] raw = canonicalOperatorContract.ToArray();
+        return FromConfigurationCore(
+            configuration,
+            (candidate, receiptJson, failures) =>
+            {
+                string expectedDigest = candidate[OperatorReadOnlyContractDigestConfigurationKey]?.Trim() ?? string.Empty;
+                if (!IsSha256(expectedDigest))
+                {
+                    failures.Add("stock-avatar-operator-contract-digest-missing-or-invalid");
+                    return null;
+                }
+                return ValidateOperatorContractBytes(raw, expectedDigest, receiptJson, failures);
+            },
+            nowUtc);
+    }
+
+    private static BuildGhostToughTongueStockAvatarBindingValidation FromConfigurationCore(
+        IConfiguration configuration,
+        Func<IConfiguration, string, List<string>, OperatorContractAuthority?> operatorContractResolver,
+        DateTimeOffset? nowUtc)
+    {
         string provider = configuration[ProviderConfigurationKey]?.Trim() ?? string.Empty;
         string name = configuration[NameConfigurationKey]?.Trim() ?? string.Empty;
         string assetPath = configuration[AssetPathConfigurationKey]?.Trim() ?? string.Empty;
@@ -1743,10 +1780,7 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         }
 
         BuildGhostToughTongueStockAvatarReadbackReceipt? receipt = ParseReceipt(receiptJson, failures);
-        OperatorContractAuthority? operatorAuthority = ValidateOperatorContract(
-            configuration,
-            receiptJson,
-            failures);
+        OperatorContractAuthority? operatorAuthority = operatorContractResolver(configuration, receiptJson, failures);
         if (receipt is not null)
         {
             string scenarioRefDigest = string.IsNullOrWhiteSpace(scenarioRef)
@@ -1771,9 +1805,7 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
 
         BuildGhostToughTongueStockAvatarBinding binding = CreateReadVerified(
             receipt!,
-            operatorAuthority!.ContractDigest,
-            operatorAuthority.ContractFileDigest,
-            operatorAuthority.ReceiptFileDigest,
+            operatorAuthority!,
             nowUtc);
         return new BuildGhostToughTongueStockAvatarBindingValidation(true, binding, []);
     }
@@ -1930,62 +1962,89 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
     {
         string path = configuration[OperatorReadOnlyContractPathConfigurationKey]?.Trim() ?? string.Empty;
         string expectedDigest = configuration[OperatorReadOnlyContractDigestConfigurationKey]?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+        if (path != OperatorReadOnlyContractPath)
         {
             failures.Add("stock-avatar-operator-contract-path-missing-or-invalid");
             return null;
         }
-        string normalized;
-        try
+        if (!IsSha256(expectedDigest))
         {
-            normalized = Path.GetFullPath(path);
-        }
-        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            failures.Add("stock-avatar-operator-contract-path-missing-or-invalid");
-            return null;
-        }
-        if (normalized != path || !IsSha256(expectedDigest))
-        {
-            failures.Add(normalized != path
-                ? "stock-avatar-operator-contract-path-missing-or-invalid"
-                : "stock-avatar-operator-contract-digest-missing-or-invalid");
+            failures.Add("stock-avatar-operator-contract-digest-missing-or-invalid");
             return null;
         }
 
-        byte[] raw;
+        if (!OperatingSystem.IsLinux())
+        {
+            failures.Add("stock-avatar-operator-contract-file-authority-invalid");
+            return null;
+        }
+
         try
         {
-            FileInfo file = new(path);
-            if (!file.Exists
-                || file.LinkTarget is not null
-                || file.Length is < 1 or > MaximumOperatorContractBytes
-                || (!OperatingSystem.IsWindows() && File.GetUnixFileMode(path) != UnixFileMode.UserRead))
+            using OpenOperatorContractChain chain = OpenOperatorContract();
+            LinuxFileIdentity[] openedDirectories = chain.DirectoryHandles
+                .Select(StatHandle)
+                .ToArray();
+            LinuxFileIdentity openedFile = StatHandle(chain.FileHandle);
+            LinuxFileIdentity linkedFile = StatEntry(
+                chain.DirectoryHandles[^1],
+                "tough-tongue-read-only-binding-contract.json");
+            if (!openedDirectories.All(static value => value.IsDirectory)
+                || !openedFile.IsRegularFile
+                || openedFile != linkedFile
+                || openedFile.UserId != GetEffectiveUserId()
+                || openedFile.LinkCount != 1
+                || openedFile.PermissionBits != 0x100
+                || openedFile.Size is < 1 or > MaximumOperatorContractBytes)
             {
                 failures.Add("stock-avatar-operator-contract-file-authority-invalid");
                 return null;
             }
-            using FileStream stream = new(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 4096,
-                FileOptions.SequentialScan);
-            raw = new byte[checked((int)stream.Length)];
-            stream.ReadExactly(raw);
-            if (raw.Length != file.Length)
+
+            byte[] raw = ReadExactOperatorContract(chain.FileHandle, openedFile.Size);
+
+            if (StatHandle(chain.FileHandle) != openedFile
+                || StatEntry(chain.DirectoryHandles[^1], "tough-tongue-read-only-binding-contract.json") != openedFile
+                || !DirectoryIdentitiesMatch(chain.DirectoryHandles, openedDirectories))
             {
                 failures.Add("stock-avatar-operator-contract-file-authority-invalid");
                 return null;
             }
+
+            using (OpenOperatorContractChain rebound = OpenOperatorContract())
+            {
+                if (!DirectoryIdentitiesMatch(rebound.DirectoryHandles, openedDirectories)
+                    || StatHandle(rebound.FileHandle) != openedFile
+                    || StatEntry(rebound.DirectoryHandles[^1], "tough-tongue-read-only-binding-contract.json") != openedFile)
+                {
+                    failures.Add("stock-avatar-operator-contract-file-authority-invalid");
+                    return null;
+                }
+            }
+
+            if (!ReadExactOperatorContract(chain.FileHandle, openedFile.Size).AsSpan().SequenceEqual(raw)
+                || StatHandle(chain.FileHandle) != openedFile
+                || StatEntry(chain.DirectoryHandles[^1], "tough-tongue-read-only-binding-contract.json") != openedFile
+                || !DirectoryIdentitiesMatch(chain.DirectoryHandles, openedDirectories))
+            {
+                failures.Add("stock-avatar-operator-contract-file-authority-invalid");
+                return null;
+            }
+            return ValidateOperatorContractBytes(raw, expectedDigest, receiptJson, failures);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or OverflowException)
         {
             failures.Add("stock-avatar-operator-contract-file-unreadable");
             return null;
         }
+    }
 
+    private static OperatorContractAuthority? ValidateOperatorContractBytes(
+        ReadOnlySpan<byte> raw,
+        string expectedDigest,
+        string receiptJson,
+        List<string> failures)
+    {
         string fileDigest = DigestText(raw);
         try
         {
@@ -2024,6 +2083,123 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
             return null;
         }
     }
+
+    private static OpenOperatorContractChain OpenOperatorContract()
+    {
+        List<SafeFileHandle> directories = [];
+        SafeFileHandle? file = null;
+        try
+        {
+            SafeFileHandle root = OpenPath("/", DirectoryOpenFlags);
+            directories.Add(root);
+            LinuxFileIdentity linkedRun = StatEntry(root, "run");
+            SafeFileHandle run = OpenAt(root, "run", DirectoryOpenFlags);
+            directories.Add(run);
+            if (StatHandle(run) != linkedRun) throw new IOException("Operator contract parent changed while opened.");
+            LinuxFileIdentity linkedSecrets = StatEntry(run, "secrets");
+            SafeFileHandle secrets = OpenAt(run, "secrets", DirectoryOpenFlags);
+            directories.Add(secrets);
+            if (StatHandle(secrets) != linkedSecrets) throw new IOException("Operator contract parent changed while opened.");
+            LinuxFileIdentity linkedFile = StatEntry(
+                secrets,
+                "tough-tongue-read-only-binding-contract.json");
+            file = OpenAt(
+                secrets,
+                "tough-tongue-read-only-binding-contract.json",
+                FileOpenFlags);
+            if (StatHandle(file) != linkedFile) throw new IOException("Operator contract entry changed while opened.");
+            return new OpenOperatorContractChain(directories, file);
+        }
+        catch
+        {
+            file?.Dispose();
+            foreach (SafeFileHandle directory in Enumerable.Reverse(directories)) directory.Dispose();
+            throw;
+        }
+    }
+
+    private static SafeFileHandle OpenPath(string path, int flags)
+    {
+        int descriptor = NativeOpen(path, flags);
+        return CheckedHandle(descriptor, path);
+    }
+
+    private static SafeFileHandle OpenAt(SafeFileHandle directory, string name, int flags)
+    {
+        int descriptor = NativeOpenAt(directory.DangerousGetHandle().ToInt32(), name, flags);
+        return CheckedHandle(descriptor, name);
+    }
+
+    private static SafeFileHandle CheckedHandle(int descriptor, string name)
+    {
+        if (descriptor < 0)
+        {
+            throw new IOException(
+                $"Unable to open operator contract component '{name}'.",
+                new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError()));
+        }
+        return new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
+    }
+
+    private static LinuxFileIdentity StatHandle(SafeFileHandle handle)
+    {
+        if (NativeStatx(
+                handle.DangerousGetHandle().ToInt32(),
+                string.Empty,
+                AtEmptyPath,
+                StatxBasicStats,
+                out LinuxStatx metadata) != 0
+            || (metadata.Mask & StatxBasicStats) != StatxBasicStats)
+        {
+            throw new IOException(
+                "Unable to stat operator contract descriptor.",
+                new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError()));
+        }
+        return LinuxFileIdentity.From(metadata);
+    }
+
+    private static LinuxFileIdentity StatEntry(SafeFileHandle directory, string name)
+    {
+        if (NativeStatx(
+                directory.DangerousGetHandle().ToInt32(),
+                name,
+                AtSymlinkNoFollow,
+                StatxBasicStats,
+                out LinuxStatx metadata) != 0
+            || (metadata.Mask & StatxBasicStats) != StatxBasicStats)
+        {
+            throw new IOException(
+                "Unable to stat operator contract entry.",
+                new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError()));
+        }
+        return LinuxFileIdentity.From(metadata);
+    }
+
+    private static bool DirectoryIdentitiesMatch(
+        IReadOnlyList<SafeFileHandle> directories,
+        IReadOnlyList<LinuxFileIdentity> expected)
+        => directories.Count == expected.Count
+            && directories.Select(StatHandle).SequenceEqual(expected);
+
+    private static byte[] ReadExactOperatorContract(SafeFileHandle file, ulong expectedSize)
+    {
+        byte[] raw = new byte[checked((int)expectedSize)];
+        int offset = 0;
+        while (offset < raw.Length)
+        {
+            int read = RandomAccess.Read(file, raw.AsSpan(offset), offset);
+            if (read == 0) throw new IOException("Operator contract ended during read.");
+            offset += read;
+        }
+        Span<byte> excess = stackalloc byte[1];
+        if (RandomAccess.Read(file, excess, checked((long)expectedSize)) != 0)
+        {
+            throw new IOException("Operator contract grew during read.");
+        }
+        return raw;
+    }
+
+    private static uint GetEffectiveUserId() => NativeGetEffectiveUserId();
 
     private static bool OperatorAuthorityShapeValid(JsonElement root)
     {
@@ -2171,6 +2347,115 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         string ContractDigest,
         string ContractFileDigest,
         string ReceiptFileDigest);
+
+    private const int OpenCloseOnExec = 0x80000;
+    private const int OpenDirectory = 0x10000;
+    private const int OpenNoFollow = 0x20000;
+    private const int OpenPathOnly = 0x200000;
+    private const int DirectoryOpenFlags = OpenCloseOnExec | OpenDirectory | OpenNoFollow | OpenPathOnly;
+    private const int FileOpenFlags = OpenCloseOnExec | OpenNoFollow;
+    private const int AtSymlinkNoFollow = 0x100;
+    private const int AtEmptyPath = 0x1000;
+    private const uint StatxBasicStats = 0x7ff;
+    private const ushort LinuxFileTypeMask = 0xf000;
+    private const ushort LinuxDirectoryType = 0x4000;
+    private const ushort LinuxRegularFileType = 0x8000;
+    private const ushort LinuxPermissionMask = 0x01ff;
+
+    private sealed class OpenOperatorContractChain(
+        IReadOnlyList<SafeFileHandle> directoryHandles,
+        SafeFileHandle fileHandle) : IDisposable
+    {
+        private bool _disposed;
+
+        public IReadOnlyList<SafeFileHandle> DirectoryHandles { get; } = directoryHandles;
+        public SafeFileHandle FileHandle { get; } = fileHandle;
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            FileHandle.Dispose();
+            foreach (SafeFileHandle directory in Enumerable.Reverse(DirectoryHandles)) directory.Dispose();
+        }
+    }
+
+    private readonly record struct LinuxFileIdentity(
+        uint DeviceMajor,
+        uint DeviceMinor,
+        ulong Inode,
+        ulong Size,
+        long ModificationSeconds,
+        uint ModificationNanoseconds,
+        long ChangeSeconds,
+        uint ChangeNanoseconds,
+        ushort Mode,
+        uint UserId,
+        uint LinkCount)
+    {
+        public bool IsDirectory => (Mode & LinuxFileTypeMask) == LinuxDirectoryType;
+        public bool IsRegularFile => (Mode & LinuxFileTypeMask) == LinuxRegularFileType;
+        public ushort PermissionBits => (ushort)(Mode & LinuxPermissionMask);
+
+        public static LinuxFileIdentity From(LinuxStatx value)
+            => new(
+                value.DeviceMajor,
+                value.DeviceMinor,
+                value.Inode,
+                value.Size,
+                value.ModificationTime.Seconds,
+                value.ModificationTime.Nanoseconds,
+                value.ChangeTime.Seconds,
+                value.ChangeTime.Nanoseconds,
+                value.Mode,
+                value.UserId,
+                value.LinkCount);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LinuxStatxTimestamp
+    {
+        public long Seconds;
+        public uint Nanoseconds;
+        private int _reserved;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 256)]
+    private struct LinuxStatx
+    {
+        [FieldOffset(0)] public uint Mask;
+        [FieldOffset(16)] public uint LinkCount;
+        [FieldOffset(20)] public uint UserId;
+        [FieldOffset(28)] public ushort Mode;
+        [FieldOffset(32)] public ulong Inode;
+        [FieldOffset(40)] public ulong Size;
+        [FieldOffset(96)] public LinuxStatxTimestamp ChangeTime;
+        [FieldOffset(112)] public LinuxStatxTimestamp ModificationTime;
+        [FieldOffset(136)] public uint DeviceMajor;
+        [FieldOffset(140)] public uint DeviceMinor;
+    }
+
+    [DllImport("libc", EntryPoint = "open", SetLastError = true, ExactSpelling = true)]
+    private static extern int NativeOpen(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        int flags);
+
+    [DllImport("libc", EntryPoint = "openat", SetLastError = true, ExactSpelling = true)]
+    private static extern int NativeOpenAt(
+        int directoryDescriptor,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        int flags);
+
+    [DllImport("libc", EntryPoint = "statx", SetLastError = true, ExactSpelling = true)]
+    private static extern int NativeStatx(
+        int directoryDescriptor,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        int flags,
+        uint mask,
+        out LinuxStatx metadata);
+
+    [DllImport("libc", EntryPoint = "geteuid", ExactSpelling = true)]
+    private static extern uint NativeGetEffectiveUserId();
 
     private static BuildGhostToughTongueStockAvatarReadbackReceipt? ParseReceipt(
         string json,
@@ -2772,6 +3057,9 @@ public static class ToughTongueBuildGhostScenarioContract
             && Text(metadata, "avatar_provider_readback_source") == binding.ProviderReadbackSource
             && Text(metadata, "avatar_provider_readback_observed_at_utc") == binding.ProviderReadbackObservedAtUtc
             && Integer(metadata, "avatar_provider_readback_maximum_age_seconds") == binding.ProviderReadbackMaximumAgeSeconds
+            && Text(metadata, "avatar_operator_read_only_contract_digest") == binding.OperatorReadOnlyContractDigest
+            && Text(metadata, "avatar_operator_read_only_contract_file_digest") == binding.OperatorReadOnlyContractFileDigest
+            && Text(metadata, "avatar_provider_readback_receipt_file_digest") == binding.ProviderReadbackReceiptFileDigest
             && Text(metadata, "avatar_binding_digest") == binding.ContractDigest
             && Boolean(metadata, "avatar_provider_read_verified") == binding.ProviderReadVerified
             && Text(metadata, "model_provider") == binding.ModelProvider
