@@ -1,0 +1,181 @@
+{
+  "contract": "chummer-core.runtime-package-plane-lock/v1",
+  "dotnet_sdk": {
+    "version": "10.0.103",
+    "rid": "linux-x64",
+    "archive_url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.103/dotnet-sdk-10.0.103-linux-x64.tar.gz",
+    "archive_sha512": "bab94f13c57b2ac821d4924fe66084be9b44c41761ff7ff64522c8f7aba345659d31258401dcec31cc3cf6ccae1d012623075aca1c9b9165bcfe5ba9abda1c0c"
+  },
+  "package_version": "0.0.0-packageplane.candidate.shabc08228d3ce0",
+  "runtime_source": {
+    "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
+    "commit": "bc08228d3ce06410ca97ada63a5af41a2eaa91bf"
+  },
+  "allowed_recipe_delta": [
+    ".github/workflows/android-content-plane.yml",
+    ".github/workflows/package-plane.yml",
+    "Chummer.Application/Chummer.Application.csproj",
+    "Chummer.Contracts/Chummer.Contracts.csproj",
+    "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
+    "Chummer.Infrastructure/Chummer.Infrastructure.csproj",
+    "Chummer.Rulesets.Hosting/Chummer.Rulesets.Hosting.csproj",
+    "Chummer.Rulesets.Sr4/Chummer.Rulesets.Sr4.csproj",
+    "Chummer.Rulesets.Sr5/Chummer.Rulesets.Sr5.csproj",
+    "Chummer.Rulesets.Sr6/Chummer.Rulesets.Sr6.csproj",
+    "eng/android-content-plane.lock.json",
+    "eng/runtime-package-plane.lock.json",
+    "scripts/ai/android-content-plane.py",
+    "scripts/ai/runtime-package-plane.py",
+    "scripts/ai/verify-no-siblings-package-plane.sh",
+    "tests/test_android_content_plane.py",
+    "tests/test_package_plane.py",
+    "tests/test_runtime_package_plane_authority.py"
+  ],
+  "build_authority_files": [
+    {"path": ".github/workflows/package-plane.yml", "sha256": "a1f3c98af166b9d593fcf7cea9d6bc37f884b5d5202f6accdcf0856dd717b86a"},
+    {"path": "Chummer.CoreEngine.sln", "sha256": "a3fd0096e249453f68b9bb4b327722a1ce25d0faf81b74a11d048b24cc0a43c7"},
+    {"path": "Directory.Build.props", "sha256": "0607c419f70881157e30d4c571bc880f5e3cfc1cc64fe8a36850adf2b9c14a02"},
+    {"path": "Directory.Build.targets", "sha256": "fe701e982c753339dc9357e559d3824faf0d1f392abaa31d7f2cb5486baf2b65"},
+    {"path": "eng/package-plane.lock.json", "sha256": "ac731fe6e4ce7f9f2b7173fcec600769f0f76566734dc962f0ed61f68527e1fd"},
+    {"path": "global.json", "sha256": "d06216b65c9a7db2d45de7ddc9bbce1dd5a447b2112aba7a0855eec7c3dfce91"},
+    {"path": "scripts/ai/_env.sh", "sha256": "efd91711e2492039933b2b97a0e0cfe51f84127dc25987dc2d5034997dcb8c30"},
+    {"path": "scripts/ai/bootstrap-contracts-feed.sh", "sha256": "8b0c25566398f3b222ffbdd23a8244fb27d4f7ce8a65c15a9678a6a63d1a88e6"},
+    {"path": "scripts/ai/bootstrap-owner-contracts-feed.py", "sha256": "5beffe15d1708f4cf2c096f376822cd48b9502b5fb1acb69b95db3c86c474786"},
+    {"path": "scripts/ai/runtime-package-plane.py", "sha256": "52d67de28ca56bee29679915da5abf7b07fb15788fcda846ccdc85b2a8394e20"},
+    {"path": "scripts/ai/verify-no-siblings-package-plane.sh", "sha256": "dce5211365f6ecb67f59a2e12ef71c06743170f2e728ee2bd77f2d3b39869105"}
+  ],
+  "external_owner_packages": [
+    {
+      "id": "Chummer.Hub.Registry.Contracts",
+      "version": "0.0.0-packageplane.20260721.1",
+      "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
+      "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29"
+    },
+    {
+      "id": "Chummer.Play.Contracts",
+      "version": "0.0.0-packageplane.20260721.1",
+      "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
+      "commit": "7c1faef298fb9028e77069c2467686f92624566c"
+    },
+    {
+      "id": "Chummer.Run.Contracts",
+      "version": "0.0.0-packageplane.20260721.1",
+      "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
+      "commit": "7c1faef298fb9028e77069c2467686f92624566c"
+    }
+  ],
+  "third_party_packages": [
+    {"id": "Microsoft.Extensions.DependencyInjection", "version": "10.0.0"},
+    {"id": "SharpCompress", "version": "0.50.1"}
+  ],
+  "packages": [
+    {
+      "id": "Chummer.Engine.Contracts",
+      "project": "Chummer.Contracts/Chummer.Contracts.csproj",
+      "project_sha256": "1ae056091372ae0fb353b983023cea521ac848b899fd8d3ca3d45e546f57707e",
+      "assembly": "Chummer.Engine.Contracts.dll",
+      "target_framework": "net10.0",
+      "dependencies": []
+    },
+    {
+      "id": "Chummer.Application",
+      "project": "Chummer.Application/Chummer.Application.csproj",
+      "project_sha256": "cf5fc7f7f7d25c2ab20ba7719f3a60929cd78b205b9a43683b4a7048fcf0c19a",
+      "assembly": "Chummer.Application.dll",
+      "target_framework": "net10.0",
+      "dependencies": [
+        {"id": "Chummer.Engine.Contracts", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Hub.Registry.Contracts", "version": "0.0.0-packageplane.20260721.1"},
+        {"id": "Chummer.Run.Contracts", "version": "0.0.0-packageplane.20260721.1"}
+      ]
+    },
+    {
+      "id": "Chummer.Rulesets.Hosting",
+      "project": "Chummer.Rulesets.Hosting/Chummer.Rulesets.Hosting.csproj",
+      "project_sha256": "b3e1145840a1767a92e6e7c42fa5e510249753b36973e75050d6eac198e17521",
+      "assembly": "Chummer.Rulesets.Hosting.dll",
+      "target_framework": "net10.0",
+      "dependencies": [
+        {"id": "Chummer.Application", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Engine.Contracts", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Run.Contracts", "version": "0.0.0-packageplane.20260721.1"},
+        {"id": "Microsoft.Extensions.DependencyInjection", "version": "10.0.0"}
+      ]
+    },
+    {
+      "id": "Chummer.Rulesets.Sr5",
+      "project": "Chummer.Rulesets.Sr5/Chummer.Rulesets.Sr5.csproj",
+      "project_sha256": "2f7f91916c55035d42d7e5bddd52e76379ad2d0bb6d6eb4ff7ac5c7bbbea9826",
+      "assembly": "Chummer.Rulesets.Sr5.dll",
+      "target_framework": "net10.0",
+      "dependencies": [
+        {"id": "Chummer.Application", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Engine.Contracts", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Run.Contracts", "version": "0.0.0-packageplane.20260721.1"},
+        {"id": "Microsoft.Extensions.DependencyInjection", "version": "10.0.0"}
+      ]
+    },
+    {
+      "id": "Chummer.Rulesets.Sr6",
+      "project": "Chummer.Rulesets.Sr6/Chummer.Rulesets.Sr6.csproj",
+      "project_sha256": "23023db965dbfbf1795a5d660f5d3d3bc0d12f17b0a164882e6910e1a25a1f1f",
+      "assembly": "Chummer.Rulesets.Sr6.dll",
+      "target_framework": "net10.0",
+      "dependencies": [
+        {"id": "Chummer.Application", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Engine.Contracts", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Run.Contracts", "version": "0.0.0-packageplane.20260721.1"},
+        {"id": "Microsoft.Extensions.DependencyInjection", "version": "10.0.0"}
+      ]
+    },
+    {
+      "id": "Chummer.Infrastructure",
+      "project": "Chummer.Infrastructure/Chummer.Infrastructure.csproj",
+      "project_sha256": "e017c01931b664a99cf4d74d89f0e6ed07576c1de47dfa89b740eb972f877936",
+      "assembly": "Chummer.Infrastructure.dll",
+      "target_framework": "net10.0",
+      "dependencies": [
+        {"id": "Chummer.Application", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Engine.Contracts", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Hub.Registry.Contracts", "version": "0.0.0-packageplane.20260721.1"},
+        {"id": "Chummer.Rulesets.Hosting", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Rulesets.Sr5", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Rulesets.Sr6", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Run.Contracts", "version": "0.0.0-packageplane.20260721.1"},
+        {"id": "Microsoft.Extensions.DependencyInjection", "version": "10.0.0"},
+        {"id": "SharpCompress", "version": "0.50.1"}
+      ]
+    },
+    {
+      "id": "Chummer.Rulesets.Sr4",
+      "project": "Chummer.Rulesets.Sr4/Chummer.Rulesets.Sr4.csproj",
+      "project_sha256": "86eafdcdf1638c3651d5357acd7f99023ca97c5641d83432be2b3c12f3ba5fb5",
+      "assembly": "Chummer.Rulesets.Sr4.dll",
+      "target_framework": "net10.0",
+      "dependencies": [
+        {"id": "Chummer.Application", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Engine.Contracts", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Infrastructure", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Run.Contracts", "version": "0.0.0-packageplane.20260721.1"},
+        {"id": "Microsoft.Extensions.DependencyInjection", "version": "10.0.0"}
+      ]
+    },
+    {
+      "id": "Chummer.Engine.GmCharacterEdits",
+      "project": "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
+      "project_sha256": "7c2508ce3ee1c64338cc80df71e3a98487c5c8323db9bccb68e740f13f3db6a6",
+      "assembly": "Chummer.Engine.GmCharacterEdits.dll",
+      "target_framework": "net10.0",
+      "dependencies": [
+        {"id": "Chummer.Application", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Engine.Contracts", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Hub.Registry.Contracts", "version": "0.0.0-packageplane.20260721.1"},
+        {"id": "Chummer.Infrastructure", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Rulesets.Hosting", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Rulesets.Sr5", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Rulesets.Sr6", "version": "0.0.0-packageplane.candidate.shabc08228d3ce0"},
+        {"id": "Chummer.Run.Contracts", "version": "0.0.0-packageplane.20260721.1"}
+      ]
+    }
+  ]
+}

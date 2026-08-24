@@ -1,0 +1,144 @@
+name: Core main public runtime release consumer
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/core-main-runtime-artifact-consumer.yml
+      - eng/core-main-runtime-artifact-authority.json
+      - scripts/ai/consume-core-main-runtime-artifact.py
+      - scripts/ai/validate-core-package-artifact.py
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/core-main-runtime-artifact-consumer.yml
+      - eng/core-main-runtime-artifact-authority.json
+      - scripts/ai/consume-core-main-runtime-artifact.py
+      - scripts/ai/validate-core-package-artifact.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-main-public-runtime-release-375901074
+  cancel-in-progress: false
+
+jobs:
+  consume:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact Hub consumer
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate and consume exact anonymous Core public release once
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          umask 077
+          test "${GITHUB_REPOSITORY}" = "ArchonMegalon/chummer6-hub"
+
+          authority="eng/core-main-runtime-artifact-authority.json"
+          consumer="scripts/ai/consume-core-main-runtime-artifact.py"
+          validator="scripts/ai/validate-core-package-artifact.py"
+          snapshot_dir="$(mktemp -d "${RUNNER_TEMP}/core-main-runtime.XXXXXXXX")"
+          chmod 0700 "${snapshot_dir}"
+          export_root="${snapshot_dir}/artifact-root"
+          validator_authority="${snapshot_dir}/validator-authority.json"
+          validation="${snapshot_dir}/validation.json"
+          verdict="${RUNNER_TEMP}/core-main-runtime-artifact-verdict.json"
+          test ! -e "${verdict}"
+
+          cleanup_snapshot() {
+            python3 "${consumer}" cleanup \
+              --authority "${authority}" \
+              --runner-temp "${RUNNER_TEMP}" \
+              --workspace "${snapshot_dir}"
+          }
+          trap cleanup_snapshot EXIT
+
+          api_root="https://api.github.com/repos/ArchonMegalon/chummer6-core"
+          tag="core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277"
+          download_root="https://github.com/ArchonMegalon/chummer6-core/releases/download/${tag}"
+          receipt_name="chummer-core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277.public-handoff.json"
+          bundle_name="chummer-core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277.zip"
+          curl_common=(
+            --proto '=https'
+            --proto-redir '=https'
+            --tlsv1.2
+            --fail
+            --location
+            --max-redirs 3
+            --silent
+            --show-error
+            --retry 0
+            --connect-timeout 15
+            --max-time 120
+          )
+          (
+            ulimit -f 4096
+            curl "${curl_common[@]}" --max-filesize 2097152 \
+              --output "${snapshot_dir}/release.json" \
+              "${api_root}/releases/375901074"
+            curl "${curl_common[@]}" --max-filesize 2097152 \
+              --output "${snapshot_dir}/tag.json" \
+              "${api_root}/git/ref/tags/${tag}"
+            curl "${curl_common[@]}" --max-filesize 65536 \
+              --output "${snapshot_dir}/receipt.json" \
+              "${download_root}/${receipt_name}"
+          )
+          (
+            ulimit -f 32768
+            curl "${curl_common[@]}" --max-filesize 16777216 \
+              --output "${snapshot_dir}/bundle.zip" \
+              "${download_root}/${bundle_name}"
+          )
+          chmod 0600 \
+            "${snapshot_dir}/release.json" \
+            "${snapshot_dir}/tag.json" \
+            "${snapshot_dir}/receipt.json" \
+            "${snapshot_dir}/bundle.zip"
+
+          python3 "${consumer}" prepare \
+            --authority "${authority}" \
+            --release-metadata "${snapshot_dir}/release.json" \
+            --tag-metadata "${snapshot_dir}/tag.json" \
+            --receipt "${snapshot_dir}/receipt.json" \
+            --bundle "${snapshot_dir}/bundle.zip" \
+            --runner-temp "${RUNNER_TEMP}" \
+            --workspace "${snapshot_dir}" \
+            --export-root "${export_root}" \
+            --validator-authority "${validator_authority}"
+
+          test "$(stat --format='%a' "${snapshot_dir}")" = "700"
+          test ! -e "${validation}"
+          python3 "${validator}" \
+            --artifact-root "${export_root}" \
+            --authority "${validator_authority}" \
+            --output "${validation}"
+
+          python3 "${consumer}" finalize \
+            --authority "${authority}" \
+            --validation "${validation}" \
+            --runner-temp "${RUNNER_TEMP}" \
+            --workspace "${snapshot_dir}" \
+            --verdict "${verdict}"
+          test ! -e "${snapshot_dir}"
+          test -f "${verdict}"
+          trap - EXIT
+
+      - name: Record exact public-release verdict only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: core-main-public-runtime-release-verdict-c6138ff7ca27d66e85b223d0b29381cff4811277
+          path: ${{ runner.temp }}/core-main-runtime-artifact-verdict.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
