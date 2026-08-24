@@ -360,8 +360,16 @@ def test_workflow_is_anonymous_pinned_bounded_and_one_shot() -> None:
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     trigger = workflow.get("on", workflow.get(True))
     assert workflow["permissions"] == {"contents": "read"}
-    assert set(trigger) == {"workflow_dispatch", "push"}
+    assert set(trigger) == {"workflow_dispatch", "pull_request", "push"}
     assert trigger["push"]["branches"] == ["main"]
+    expected_paths = [
+        ".github/workflows/core-main-runtime-artifact-consumer.yml",
+        "eng/core-main-runtime-artifact-authority.json",
+        "scripts/ai/consume-core-main-runtime-artifact.py",
+        "scripts/ai/validate-core-package-artifact.py",
+    ]
+    assert trigger["pull_request"]["paths"] == expected_paths
+    assert trigger["push"]["paths"] == expected_paths
     steps = workflow["jobs"]["consume"]["steps"]
     uses = [step["uses"] for step in steps if "uses" in step]
     assert uses == [
