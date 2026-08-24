@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -18,17 +19,24 @@ import stat
 import sys
 import tempfile
 import unicodedata
+import xml.etree.ElementTree as ET
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
 
-AUTHORITY_CONTRACT = "chummer-hub.core-runtime-package-artifact-authority/v1"
-VALIDATION_CONTRACT = "chummer-hub.core-runtime-package-artifact-validation/v1"
+AUTHORITY_CONTRACT = "chummer-hub.core-runtime-package-artifact-authority/v2"
+VALIDATION_CONTRACT = "chummer-hub.core-runtime-package-artifact-validation/v2"
 INVENTORY_CONTRACT = "chummer-core.runtime-package-inventory/v1"
 RECEIPT_CONTRACT = "chummer-core.no-siblings-package-plane/v3"
+RUNTIME_LOCK_CONTRACT = "chummer-core.runtime-package-plane-lock/v1"
+OWNER_INVENTORY_CONTRACT = "chummer-core.owner-contract-package-inventory/v1"
 CORE_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-core.git"
+REGISTRY_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub-registry.git"
+HUB_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub.git"
+LICENSE_EXPRESSION = "GPL-3.0-only"
 
 INVENTORY_FILE_NAME = "chummer-core-runtime-packages.inventory.json"
 LOCK_FILE_NAME = "runtime-package-plane.lock.json"
@@ -44,6 +52,15 @@ EXPECTED_PACKAGE_IDS = (
     "Chummer.Infrastructure",
     "Chummer.Rulesets.Sr4",
     "Chummer.Engine.GmCharacterEdits",
+)
+EXPECTED_EXTERNAL_OWNER_PACKAGES = (
+    ("Chummer.Hub.Registry.Contracts", REGISTRY_REPOSITORY),
+    ("Chummer.Play.Contracts", HUB_REPOSITORY),
+    ("Chummer.Run.Contracts", HUB_REPOSITORY),
+)
+EXPECTED_THIRD_PARTY_PACKAGES = (
+    ("Microsoft.Extensions.DependencyInjection", "10.0.0"),
+    ("SharpCompress", "0.50.1"),
 )
 LOCKED_OWNER_PACKAGE_IDS = (
     "Chummer.Engine.Contracts",
@@ -75,10 +92,15 @@ PASS_RECEIPT_FIELDS = (
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+SHA512_PATTERN = re.compile(r"^[0-9a-f]{128}$")
 PACKAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*$")
 PACKAGE_FILE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.nupkg$")
 ASSEMBLY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.dll$")
 UTC_TIMESTAMP_PATTERN = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+DOTNET_VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+CORE_PROPERTIES_PATTERN = re.compile(
+    r"^package/services/metadata/core-properties/[0-9a-f]{64}\.psmdcp$"
+)
 
 MAX_AUTHORITY_BYTES = 128 * 1024
 MAX_INVENTORY_BYTES = 2 * 1024 * 1024
@@ -94,6 +116,7 @@ AUTHORITY_KEYS = {
     "receipt",
     "owner_package_plane_lock_sha256",
     "owner_package_inventory_sha256",
+    "owner_package_inventory",
     "candidate_engine_package_inventory_sha256",
     "candidate_runtime_package_inventory_sha256",
     "runtime_source_commit",
@@ -110,6 +133,37 @@ ARTIFACT_SELECTOR_KEYS = {
 }
 FILE_BINDING_KEYS = {"sha256"}
 LOCK_BINDING_KEYS = {"contract", "sha256"}
+OWNER_INVENTORY_BINDING_KEYS = {
+    "contract",
+    "sha256",
+    "package_version",
+    "packages",
+}
+OWNER_AUTHORITY_PACKAGE_KEYS = {"id", "version", "sha256", "size_bytes"}
+RUNTIME_LOCK_KEYS = {
+    "contract",
+    "dotnet_sdk",
+    "package_version",
+    "runtime_source",
+    "allowed_recipe_delta",
+    "build_authority_files",
+    "external_owner_packages",
+    "third_party_packages",
+    "packages",
+}
+DOTNET_SDK_KEYS = {"version", "rid", "archive_url", "archive_sha512"}
+RUNTIME_SOURCE_KEYS = {"repository", "commit"}
+BUILD_AUTHORITY_KEYS = {"path", "sha256"}
+EXTERNAL_OWNER_KEYS = {"id", "version", "repository", "commit"}
+THIRD_PARTY_KEYS = {"id", "version"}
+RUNTIME_LOCK_PACKAGE_KEYS = {
+    "id",
+    "project",
+    "project_sha256",
+    "assembly",
+    "target_framework",
+    "dependencies",
+}
 INVENTORY_KEYS = {
     "contract",
     "package_plane_lock_sha256",
@@ -178,12 +232,26 @@ class Authority:
     receipt_sha256: str
     owner_lock_sha256: str
     owner_inventory_sha256: str
+    owner_packages: tuple[Mapping[str, Any], ...]
     candidate_engine_inventory_sha256: str
     candidate_runtime_inventory_sha256: str
     runtime_source_commit: str
     package_recipe_commit: str
     owner_package_version: str
     runtime_package_version: str
+
+
+@dataclass(frozen=True)
+class RuntimeLock:
+    package_version: str
+    runtime_source_commit: str
+    packages: tuple[Mapping[str, Any], ...]
+
+
+@dataclass(frozen=True)
+class DirectorySnapshot:
+    descriptor: int
+    identity: tuple[int, int, int, int, int, int]
 
 
 def _reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
@@ -252,6 +320,13 @@ def _sha256_value(value: Any, *, label: str) -> str:
     return rendered
 
 
+def _sha512_value(value: Any, *, label: str) -> str:
+    rendered = _canonical_string(value, label=label)
+    if SHA512_PATTERN.fullmatch(rendered) is None:
+        raise ArtifactValidationError(f"{label} must be a lowercase SHA-512")
+    return rendered
+
+
 def _positive_integer(value: Any, *, label: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         raise ArtifactValidationError(f"{label} must be a positive integer")
@@ -289,6 +364,77 @@ def _safe_project_path(value: Any, *, label: str) -> str:
     ):
         raise ArtifactValidationError(f"{label} must be a contained POSIX relative path")
     return rendered
+
+
+def _directory_identity(metadata: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _open_directory(
+    path: Path | str,
+    *,
+    label: str,
+    directory_fd: int | None = None,
+) -> DirectorySnapshot:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, flags, dir_fd=directory_fd)
+        metadata = os.fstat(descriptor)
+    except OSError as exc:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise ArtifactValidationError(
+            f"{label} must be one non-symlink directory with stable identity"
+        ) from exc
+    if not stat.S_ISDIR(metadata.st_mode):
+        os.close(descriptor)
+        raise ArtifactValidationError(f"{label} must be one non-symlink directory")
+    return DirectorySnapshot(descriptor, _directory_identity(metadata))
+
+
+def _directory_names(snapshot: DirectorySnapshot, *, label: str) -> list[str]:
+    try:
+        before = os.fstat(snapshot.descriptor)
+        names = os.listdir(snapshot.descriptor)
+        after = os.fstat(snapshot.descriptor)
+    except OSError as exc:
+        raise ArtifactValidationError(f"unable to enumerate {label}") from exc
+    if (
+        _directory_identity(before) != snapshot.identity
+        or _directory_identity(after) != snapshot.identity
+    ):
+        raise ArtifactValidationError(f"{label} changed while it was validated")
+    if len(names) != len(set(names)):
+        raise ArtifactValidationError(f"{label} contains duplicate member names")
+    return names
+
+
+def _require_exact_directory_names(
+    snapshot: DirectorySnapshot,
+    expected_names: set[str],
+    *,
+    label: str,
+) -> None:
+    observed_names = set(_directory_names(snapshot, label=label))
+    if observed_names != expected_names:
+        missing = sorted(expected_names - observed_names)
+        foreign = sorted(observed_names - expected_names)
+        details = []
+        if missing:
+            details.append("missing=" + ",".join(missing))
+        if foreign:
+            details.append("foreign=" + ",".join(foreign))
+        raise ArtifactValidationError(
+            f"{label} must contain the exact layout (" + "; ".join(details) + ")"
+        )
 
 
 def _stable_file_bytes(path: Path, *, label: str, maximum: int) -> bytes:
@@ -343,8 +489,83 @@ def _stable_file_bytes(path: Path, *, label: str, maximum: int) -> bytes:
     return payload
 
 
+def _stable_file_bytes_at(
+    directory_fd: int,
+    name: str,
+    *,
+    label: str,
+    maximum: int,
+) -> bytes:
+    if PurePosixPath(name).name != name or "/" in name or "\\" in name:
+        raise ArtifactValidationError(f"{label} does not have one contained file name")
+    try:
+        before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise ArtifactValidationError(f"{label} is unavailable") from exc
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or stat.S_ISLNK(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_size > maximum
+    ):
+        raise ArtifactValidationError(
+            f"{label} must be one bounded, single-link regular file"
+        )
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(name, flags, dir_fd=directory_fd)
+        with os.fdopen(descriptor, "rb", closefd=True) as stream:
+            opened = os.fstat(stream.fileno())
+            if (
+                opened.st_dev != before.st_dev
+                or opened.st_ino != before.st_ino
+                or opened.st_size != before.st_size
+                or not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+            ):
+                raise ArtifactValidationError(f"{label} changed while it was opened")
+            payload = stream.read(maximum + 1)
+            if len(payload) > maximum or stream.read(1):
+                raise ArtifactValidationError(f"{label} exceeds its size bound")
+        after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except ArtifactValidationError:
+        raise
+    except OSError as exc:
+        raise ArtifactValidationError(f"unable to read {label}") from exc
+    identity_before = (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    identity_after = (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
+    if identity_after != identity_before or not stat.S_ISREG(after.st_mode) or after.st_nlink != 1:
+        raise ArtifactValidationError(f"{label} changed while it was read")
+    return payload
+
+
 def _load_json_file(path: Path, *, label: str, maximum: int) -> tuple[Any, bytes, str]:
     payload = _stable_file_bytes(path, label=label, maximum=maximum)
+    return _decode_json(payload, label=label), payload, hashlib.sha256(payload).hexdigest()
+
+
+def _load_json_file_at(
+    directory_fd: int,
+    name: str,
+    *,
+    label: str,
+    maximum: int,
+) -> tuple[Any, bytes, str]:
+    payload = _stable_file_bytes_at(
+        directory_fd, name, label=label, maximum=maximum
+    )
     return _decode_json(payload, label=label), payload, hashlib.sha256(payload).hexdigest()
 
 
@@ -392,6 +613,10 @@ def load_authority(path: Path) -> Authority:
         runtime_lock_binding.get("contract"),
         label="runtime package-plane lock contract",
     )
+    if runtime_lock_contract != RUNTIME_LOCK_CONTRACT:
+        raise ArtifactValidationError(
+            f"runtime package-plane lock contract must be {RUNTIME_LOCK_CONTRACT}"
+        )
     runtime_lock_sha256 = _sha256_value(
         runtime_lock_binding.get("sha256"),
         label="runtime package-plane lock sha256",
@@ -416,6 +641,67 @@ def load_authority(path: Path) -> Authority:
         root.get("owner_package_inventory_sha256"),
         label="owner package inventory sha256",
     )
+    owner_package_version = _canonical_string(
+        root.get("owner_package_version"),
+        label="authority owner_package_version",
+    )
+    owner_inventory_binding = _exact_object(
+        root.get("owner_package_inventory"),
+        OWNER_INVENTORY_BINDING_KEYS,
+        label="owner_package_inventory binding",
+    )
+    if owner_inventory_binding.get("contract") != OWNER_INVENTORY_CONTRACT:
+        raise ArtifactValidationError(
+            f"owner package inventory contract must be {OWNER_INVENTORY_CONTRACT}"
+        )
+    if owner_inventory_binding.get("sha256") != owner_inventory_sha256:
+        raise ArtifactValidationError(
+            "owner package inventory binding digest differs from scalar authority"
+        )
+    if owner_inventory_binding.get("package_version") != owner_package_version:
+        raise ArtifactValidationError(
+            "owner package inventory binding version differs from authority"
+        )
+    owner_values = owner_inventory_binding.get("packages")
+    if not isinstance(owner_values, list) or len(owner_values) != len(
+        LOCKED_OWNER_PACKAGE_IDS
+    ):
+        raise ArtifactValidationError(
+            "owner package inventory binding must contain exactly four package rows"
+        )
+    owner_packages: list[dict[str, Any]] = []
+    for index, (expected_id, value_row) in enumerate(
+        zip(LOCKED_OWNER_PACKAGE_IDS, owner_values, strict=True)
+    ):
+        row = _exact_object(
+            value_row,
+            OWNER_AUTHORITY_PACKAGE_KEYS,
+            label=f"owner package authority packages[{index}]",
+        )
+        package_id = _canonical_string(
+            row.get("id"), label=f"owner package authority packages[{index}].id"
+        )
+        if package_id != expected_id:
+            raise ArtifactValidationError(
+                "owner package authority IDs or order differ from policy"
+            )
+        if row.get("version") != owner_package_version:
+            raise ArtifactValidationError(
+                f"owner package authority version drift for {package_id}"
+            )
+        owner_packages.append(
+            {
+                "id": package_id,
+                "version": owner_package_version,
+                "sha256": _sha256_value(
+                    row.get("sha256"), label=f"owner package authority {package_id} sha256"
+                ),
+                "size_bytes": _positive_size(
+                    row.get("size_bytes"),
+                    label=f"owner package authority {package_id} size_bytes",
+                ),
+            }
+        )
     candidate_engine_inventory_sha256 = _sha256_value(
         root.get("candidate_engine_package_inventory_sha256"),
         label="candidate engine package inventory sha256",
@@ -423,10 +709,6 @@ def load_authority(path: Path) -> Authority:
     candidate_runtime_inventory_sha256 = _sha256_value(
         root.get("candidate_runtime_package_inventory_sha256"),
         label="candidate runtime package inventory sha256",
-    )
-    owner_package_version = _canonical_string(
-        root.get("owner_package_version"),
-        label="authority owner_package_version",
     )
     runtime_package_version = _canonical_string(
         root.get("runtime_package_version"),
@@ -446,6 +728,7 @@ def load_authority(path: Path) -> Authority:
         receipt_sha256=receipt_sha256,
         owner_lock_sha256=owner_lock_sha256,
         owner_inventory_sha256=owner_inventory_sha256,
+        owner_packages=tuple(owner_packages),
         candidate_engine_inventory_sha256=candidate_engine_inventory_sha256,
         candidate_runtime_inventory_sha256=candidate_runtime_inventory_sha256,
         runtime_source_commit=runtime_source_commit,
@@ -455,48 +738,160 @@ def load_authority(path: Path) -> Authority:
     )
 
 
-def _validate_artifact_root(root: Path) -> tuple[Path, Path, Path, Path]:
-    try:
-        metadata = root.lstat()
-    except OSError as exc:
-        raise ArtifactValidationError("artifact root is unavailable") from exc
-    if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
-        raise ArtifactValidationError("artifact root must be one non-symlink directory")
-
-    expected_root_names = {
-        PACKAGES_DIRECTORY_NAME,
-        INVENTORY_FILE_NAME,
-        LOCK_FILE_NAME,
-        RECEIPT_FILE_NAME,
-    }
-    try:
-        entries = list(root.iterdir())
-    except OSError as exc:
-        raise ArtifactValidationError("unable to enumerate artifact root") from exc
-    observed_names = {entry.name for entry in entries}
-    if len(entries) != len(observed_names):
-        raise ArtifactValidationError("artifact root contains duplicate member names")
-    if observed_names != expected_root_names:
-        missing = sorted(expected_root_names - observed_names)
-        foreign = sorted(observed_names - expected_root_names)
-        details = []
-        if missing:
-            details.append("missing=" + ",".join(missing))
-        if foreign:
-            details.append("foreign=" + ",".join(foreign))
+def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
+    root = _exact_object(value, RUNTIME_LOCK_KEYS, label="runtime package-plane lock")
+    if root.get("contract") != RUNTIME_LOCK_CONTRACT:
         raise ArtifactValidationError(
-            "artifact root must contain the exact layout (" + "; ".join(details) + ")"
+            f"runtime package-plane lock contract must be {RUNTIME_LOCK_CONTRACT}"
         )
 
-    packages = root / PACKAGES_DIRECTORY_NAME
-    packages_metadata = packages.lstat()
-    if not stat.S_ISDIR(packages_metadata.st_mode) or stat.S_ISLNK(packages_metadata.st_mode):
-        raise ArtifactValidationError("packages must be one non-symlink directory")
-    return (
-        packages,
-        root / INVENTORY_FILE_NAME,
-        root / LOCK_FILE_NAME,
-        root / RECEIPT_FILE_NAME,
+    sdk = _exact_object(root.get("dotnet_sdk"), DOTNET_SDK_KEYS, label="dotnet_sdk")
+    sdk_version = _canonical_string(sdk.get("version"), label="dotnet_sdk.version")
+    if DOTNET_VERSION_PATTERN.fullmatch(sdk_version) is None:
+        raise ArtifactValidationError("dotnet_sdk.version must be an exact three-part version")
+    sdk_rid = _canonical_string(sdk.get("rid"), label="dotnet_sdk.rid")
+    if sdk_rid != "linux-x64":
+        raise ArtifactValidationError("dotnet_sdk.rid must be linux-x64")
+    expected_archive_url = (
+        f"https://builds.dotnet.microsoft.com/dotnet/Sdk/{sdk_version}/"
+        f"dotnet-sdk-{sdk_version}-{sdk_rid}.tar.gz"
+    )
+    if sdk.get("archive_url") != expected_archive_url:
+        raise ArtifactValidationError("dotnet_sdk.archive_url is not exact for version and RID")
+    _sha512_value(sdk.get("archive_sha512"), label="dotnet_sdk.archive_sha512")
+
+    if root.get("package_version") != authority.runtime_package_version:
+        raise ArtifactValidationError("runtime lock package_version differs from authority")
+    runtime_source = _exact_object(
+        root.get("runtime_source"), RUNTIME_SOURCE_KEYS, label="runtime_source"
+    )
+    if runtime_source.get("repository") != CORE_REPOSITORY:
+        raise ArtifactValidationError("runtime lock source repository is not canonical Core")
+    if runtime_source.get("commit") != authority.runtime_source_commit:
+        raise ArtifactValidationError("runtime lock source commit differs from authority")
+
+    allowed_delta = root.get("allowed_recipe_delta")
+    if not isinstance(allowed_delta, list) or not allowed_delta:
+        raise ArtifactValidationError("allowed_recipe_delta must be one non-empty list")
+    normalized_delta = [
+        _safe_project_path(row, label=f"allowed_recipe_delta[{index}]")
+        for index, row in enumerate(allowed_delta)
+    ]
+    if len(normalized_delta) != len(set(value.casefold() for value in normalized_delta)):
+        raise ArtifactValidationError("allowed_recipe_delta paths must be case-insensitively unique")
+
+    build_authority = root.get("build_authority_files")
+    if not isinstance(build_authority, list) or not build_authority:
+        raise ArtifactValidationError("build_authority_files must be one non-empty list")
+    build_paths: list[str] = []
+    for index, value_row in enumerate(build_authority):
+        row = _exact_object(
+            value_row, BUILD_AUTHORITY_KEYS, label=f"build_authority_files[{index}]"
+        )
+        build_paths.append(
+            _safe_project_path(row.get("path"), label=f"build_authority_files[{index}].path")
+        )
+        _sha256_value(row.get("sha256"), label=f"build_authority_files[{index}].sha256")
+    if len(build_paths) != len(set(value.casefold() for value in build_paths)):
+        raise ArtifactValidationError("build authority paths must be case-insensitively unique")
+
+    external_values = root.get("external_owner_packages")
+    if not isinstance(external_values, list) or len(external_values) != len(
+        EXPECTED_EXTERNAL_OWNER_PACKAGES
+    ):
+        raise ArtifactValidationError("external_owner_packages must contain Registry/Play/Run")
+    external_ids: list[str] = []
+    for index, ((expected_id, expected_repository), value_row) in enumerate(
+        zip(EXPECTED_EXTERNAL_OWNER_PACKAGES, external_values, strict=True)
+    ):
+        row = _exact_object(
+            value_row, EXTERNAL_OWNER_KEYS, label=f"external_owner_packages[{index}]"
+        )
+        if row.get("id") != expected_id or row.get("repository") != expected_repository:
+            raise ArtifactValidationError("external owner package identity or repository drifted")
+        if row.get("version") != authority.owner_package_version:
+            raise ArtifactValidationError(f"external owner package version drift for {expected_id}")
+        _sha(row.get("commit"), label=f"external owner package {expected_id} commit")
+        external_ids.append(expected_id)
+
+    third_party_values = root.get("third_party_packages")
+    expected_third_party = [
+        {"id": package_id, "version": version}
+        for package_id, version in EXPECTED_THIRD_PARTY_PACKAGES
+    ]
+    if not isinstance(third_party_values, list):
+        raise ArtifactValidationError("third_party_packages must be one list")
+    normalized_third_party = [
+        _exact_object(row, THIRD_PARTY_KEYS, label=f"third_party_packages[{index}]")
+        for index, row in enumerate(third_party_values)
+    ]
+    if normalized_third_party != expected_third_party:
+        raise ArtifactValidationError("third-party package authority differs from current Core v1")
+
+    package_values = root.get("packages")
+    if not isinstance(package_values, list) or len(package_values) != len(EXPECTED_PACKAGE_IDS):
+        raise ArtifactValidationError("runtime lock must contain exactly eight package rows")
+    version_authority = {
+        **{package_id: authority.runtime_package_version for package_id in EXPECTED_PACKAGE_IDS},
+        **{package_id: authority.owner_package_version for package_id in external_ids},
+        **dict(EXPECTED_THIRD_PARTY_PACKAGES),
+    }
+    packages: list[dict[str, Any]] = []
+    observed_assemblies: set[str] = set()
+    seen_internal: set[str] = set()
+    for index, (expected_id, value_row) in enumerate(
+        zip(EXPECTED_PACKAGE_IDS, package_values, strict=True)
+    ):
+        row = _exact_object(
+            value_row, RUNTIME_LOCK_PACKAGE_KEYS, label=f"runtime lock packages[{index}]"
+        )
+        if row.get("id") != expected_id:
+            raise ArtifactValidationError("runtime lock package IDs or order differ from policy")
+        project = _safe_project_path(row.get("project"), label=f"runtime lock {expected_id} project")
+        project_sha256 = _sha256_value(
+            row.get("project_sha256"), label=f"runtime lock {expected_id} project_sha256"
+        )
+        assembly = _safe_file_name(
+            row.get("assembly"), label=f"runtime lock {expected_id} assembly", pattern=ASSEMBLY_PATTERN
+        )
+        if assembly.casefold() in observed_assemblies:
+            raise ArtifactValidationError("runtime lock assembly ownership is not unique")
+        observed_assemblies.add(assembly.casefold())
+        if row.get("target_framework") != "net10.0":
+            raise ArtifactValidationError(f"runtime lock target framework drift for {expected_id}")
+        dependencies_value = row.get("dependencies")
+        if not isinstance(dependencies_value, list):
+            raise ArtifactValidationError(f"runtime lock dependencies must be a list for {expected_id}")
+        dependencies = [
+            _validate_dependency(dependency, package_id=expected_id, index=dependency_index)
+            for dependency_index, dependency in enumerate(dependencies_value)
+        ]
+        dependency_ids = [dependency["id"] for dependency in dependencies]
+        if len(dependency_ids) != len(set(value.casefold() for value in dependency_ids)):
+            raise ArtifactValidationError(f"duplicate runtime lock dependency in {expected_id}")
+        for dependency in dependencies:
+            dependency_id = dependency["id"]
+            if dependency_id not in version_authority:
+                raise ArtifactValidationError(f"unknown runtime lock dependency in {expected_id}")
+            if dependency["version"] != version_authority[dependency_id]:
+                raise ArtifactValidationError(f"runtime lock dependency version drift in {expected_id}")
+            if dependency_id in EXPECTED_PACKAGE_IDS and dependency_id not in seen_internal:
+                raise ArtifactValidationError(f"runtime lock package order is not topological for {expected_id}")
+        packages.append(
+            {
+                "id": expected_id,
+                "project": project,
+                "project_sha256": project_sha256,
+                "assembly": assembly,
+                "target_framework": "net10.0",
+                "dependencies": dependencies,
+            }
+        )
+        seen_internal.add(expected_id)
+    return RuntimeLock(
+        package_version=authority.runtime_package_version,
+        runtime_source_commit=authority.runtime_source_commit,
+        packages=tuple(packages),
     )
 
 
@@ -519,6 +914,7 @@ def _validate_inventory(
     value: Any,
     *,
     authority: Authority,
+    runtime_lock: RuntimeLock,
     lock_sha256: str,
 ) -> list[dict[str, Any]]:
     root = _exact_object(value, INVENTORY_KEYS, label="runtime package inventory")
@@ -541,14 +937,14 @@ def _validate_inventory(
     packages: list[dict[str, Any]] = []
     observed_file_names: set[str] = set()
     observed_assemblies: set[str] = set()
-    for index, (expected_id, value_row) in enumerate(
-        zip(EXPECTED_PACKAGE_IDS, rows, strict=True)
+    for index, (lock_row, value_row) in enumerate(
+        zip(runtime_lock.packages, rows, strict=True)
     ):
         row = _exact_object(
             value_row, PACKAGE_KEYS, label=f"inventory packages[{index}]"
         )
         package_id = _canonical_string(row.get("id"), label=f"packages[{index}].id")
-        if package_id != expected_id:
+        if package_id != lock_row["id"]:
             raise ArtifactValidationError(
                 "inventory package IDs must match the exact ordered Core runtime plane"
             )
@@ -559,14 +955,20 @@ def _validate_inventory(
         if row.get("source_commit") != authority.runtime_source_commit:
             raise ArtifactValidationError(f"source commit drift for {package_id}")
         project = _safe_project_path(row.get("project"), label=f"{package_id} project")
+        if project != lock_row["project"]:
+            raise ArtifactValidationError(f"project differs from runtime lock for {package_id}")
         assembly = _safe_file_name(
             row.get("assembly"), label=f"{package_id} assembly", pattern=ASSEMBLY_PATTERN
         )
         if assembly.casefold() in observed_assemblies:
             raise ArtifactValidationError("Core runtime assembly ownership is not unique")
         observed_assemblies.add(assembly.casefold())
+        if assembly != lock_row["assembly"]:
+            raise ArtifactValidationError(f"assembly differs from runtime lock for {package_id}")
         if row.get("target_framework") != "net10.0":
             raise ArtifactValidationError(f"target framework drift for {package_id}")
+        if row.get("target_framework") != lock_row["target_framework"]:
+            raise ArtifactValidationError(f"target framework differs from runtime lock for {package_id}")
         file_name = _safe_file_name(
             row.get("file_name"),
             label=f"{package_id} file_name",
@@ -575,6 +977,9 @@ def _validate_inventory(
         if file_name.casefold() in observed_file_names:
             raise ArtifactValidationError("package filenames must be case-insensitively unique")
         observed_file_names.add(file_name.casefold())
+        expected_file_name = f"{package_id}.{authority.runtime_package_version}.nupkg"
+        if file_name != expected_file_name:
+            raise ArtifactValidationError(f"package filename differs from runtime lock for {package_id}")
         digest = _sha256_value(row.get("sha256"), label=f"{package_id} sha256")
         size = _positive_size(row.get("size_bytes"), label=f"{package_id} size_bytes")
         dependencies_value = row.get("dependencies")
@@ -589,6 +994,8 @@ def _validate_inventory(
             raise ArtifactValidationError(f"duplicate dependency id in {package_id}")
         if package_id.casefold() in dependency_ids:
             raise ArtifactValidationError(f"self dependency in {package_id}")
+        if dependencies != lock_row["dependencies"]:
+            raise ArtifactValidationError(f"dependency graph differs from runtime lock for {package_id}")
         packages.append(
             {
                 "id": package_id,
@@ -605,6 +1012,170 @@ def _validate_inventory(
             }
         )
     return packages
+
+
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _one_xml_text(root: ET.Element, name: str, *, package_id: str) -> str:
+    values = [
+        (element.text or "").strip()
+        for element in root.iter()
+        if _xml_local_name(element.tag) == name
+    ]
+    if len(values) != 1:
+        raise ArtifactValidationError(
+            f"package {package_id} nuspec must contain exactly one {name}"
+        )
+    return values[0]
+
+
+def _inspect_nupkg(payload: bytes, *, package: Mapping[str, Any]) -> None:
+    package_id = str(package["id"])
+    expected_assembly = f"lib/net10.0/{package['assembly']}"
+    expected_nuspec = f"{package_id}.nuspec"
+    try:
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            infos = archive.infolist()
+            names = [info.filename for info in infos]
+            if names != sorted(names, key=lambda value: (value.casefold(), value)):
+                raise ArtifactValidationError(f"package {package_id} archive is not canonical")
+            if len(names) != len(set(names)) or len(names) != len(
+                set(name.casefold() for name in names)
+            ):
+                raise ArtifactValidationError(
+                    f"package {package_id} archive members are not uniquely named"
+                )
+            for info in infos:
+                path = PurePosixPath(info.filename)
+                mode = (info.external_attr >> 16) & 0xFFFF
+                if (
+                    path.is_absolute()
+                    or "\\" in info.filename
+                    or any(part in {"", ".", ".."} for part in path.parts)
+                    or info.is_dir()
+                    or stat.S_ISLNK(mode)
+                    or info.flag_bits & 0x1
+                ):
+                    raise ArtifactValidationError(
+                        f"package {package_id} archive contains an unsafe member"
+                    )
+            if names.count(expected_nuspec) != 1:
+                raise ArtifactValidationError(
+                    f"package {package_id} must contain its one exact nuspec"
+                )
+            nuspec_info = archive.getinfo(expected_nuspec)
+            if nuspec_info.file_size > 2 * 1024 * 1024:
+                raise ArtifactValidationError(f"package {package_id} nuspec is oversized")
+            nuspec_bytes = archive.read(nuspec_info)
+    except ArtifactValidationError:
+        raise
+    except (OSError, RuntimeError, NotImplementedError, zipfile.BadZipFile) as exc:
+        raise ArtifactValidationError(f"package {package_id} is not a valid nupkg") from exc
+
+    lib_entries = [name for name in names if name.startswith("lib/")]
+    if lib_entries != [expected_assembly]:
+        raise ArtifactValidationError(
+            f"package {package_id} must own exactly {expected_assembly}"
+        )
+    allowed_entries = {
+        "_rels/.rels",
+        "[Content_Types].xml",
+        expected_nuspec,
+        expected_assembly,
+    }
+    if package_id == "Chummer.Engine.Contracts":
+        allowed_entries.add("README.md")
+    foreign_entries = {
+        name
+        for name in names
+        if name not in allowed_entries and CORE_PROPERTIES_PATTERN.fullmatch(name) is None
+    }
+    if foreign_entries:
+        raise ArtifactValidationError(
+            f"package {package_id} contains foreign payloads: "
+            + ", ".join(sorted(foreign_entries))
+        )
+
+    try:
+        nuspec = ET.fromstring(nuspec_bytes)
+    except ET.ParseError as exc:
+        raise ArtifactValidationError(f"package {package_id} nuspec is invalid XML") from exc
+    if (
+        _one_xml_text(nuspec, "id", package_id=package_id) != package_id
+        or _one_xml_text(nuspec, "version", package_id=package_id) != package["version"]
+    ):
+        raise ArtifactValidationError(f"package {package_id} nuspec identity drifted")
+    repositories = [
+        element for element in nuspec.iter() if _xml_local_name(element.tag) == "repository"
+    ]
+    if len(repositories) != 1 or (
+        (repositories[0].get("url") or "").strip(),
+        (repositories[0].get("commit") or "").strip(),
+    ) != (package["repository"], package["source_commit"]):
+        raise ArtifactValidationError(f"package {package_id} nuspec source authority drifted")
+    licenses = [
+        element for element in nuspec.iter() if _xml_local_name(element.tag) == "license"
+    ]
+    if len(licenses) != 1 or (
+        (licenses[0].get("type") or "").strip(),
+        (licenses[0].text or "").strip(),
+    ) != ("expression", LICENSE_EXPRESSION):
+        raise ArtifactValidationError(f"package {package_id} nuspec license drifted")
+
+    expected_dependencies = {
+        dependency["id"]: dependency["version"] for dependency in package["dependencies"]
+    }
+    dependency_containers = [
+        element for element in nuspec.iter() if _xml_local_name(element.tag) == "dependencies"
+    ]
+    if not expected_dependencies:
+        if dependency_containers:
+            raise ArtifactValidationError(
+                f"package {package_id} nuspec contains an unexpected dependency group"
+            )
+        return
+    if len(dependency_containers) != 1:
+        raise ArtifactValidationError(
+            f"package {package_id} nuspec must contain one dependency container"
+        )
+    groups = [
+        element
+        for element in dependency_containers[0]
+        if _xml_local_name(element.tag) == "group"
+    ]
+    if len(groups) != 1 or len(list(dependency_containers[0])) != 1:
+        raise ArtifactValidationError(
+            f"package {package_id} nuspec must contain one exact dependency group"
+        )
+    group = groups[0]
+    if set(group.attrib) != {"targetFramework"} or group.get("targetFramework") != "net10.0":
+        raise ArtifactValidationError(
+            f"package {package_id} nuspec dependency framework drifted"
+        )
+    observed_dependencies: dict[str, str] = {}
+    for element in group:
+        if _xml_local_name(element.tag) != "dependency" or set(element.attrib) != {
+            "id",
+            "version",
+            "exclude",
+        }:
+            raise ArtifactValidationError(
+                f"package {package_id} nuspec dependency metadata is not exact"
+            )
+        dependency_id = (element.get("id") or "").strip()
+        if dependency_id in observed_dependencies:
+            raise ArtifactValidationError(
+                f"package {package_id} nuspec repeats a dependency"
+            )
+        if (element.get("exclude") or "").strip() != "Build,Analyzers":
+            raise ArtifactValidationError(
+                f"package {package_id} nuspec dependency exclusions drifted"
+            )
+        observed_dependencies[dependency_id] = (element.get("version") or "").strip()
+    if observed_dependencies != expected_dependencies:
+        raise ArtifactValidationError(f"package {package_id} nuspec dependencies drifted")
 
 
 def _validate_owner_row(value: Any, *, label: str) -> dict[str, Any]:
@@ -691,10 +1262,20 @@ def _validate_receipt(
         _validate_owner_row(row, label=f"locked_packages[{index}]")
         for index, row in enumerate(locked_values)
     ]
+    expected_locked_packages = [
+        {**dict(owner_row), "role": role}
+        for owner_row, role in zip(
+            authority.owner_packages, LOCKED_OWNER_PACKAGE_ROLES, strict=True
+        )
+    ]
     if tuple(row["id"] for row in locked_packages) != LOCKED_OWNER_PACKAGE_IDS:
         raise ArtifactValidationError("receipt locked package IDs or order differ from policy")
     if tuple(row["role"] for row in locked_packages) != LOCKED_OWNER_PACKAGE_ROLES:
         raise ArtifactValidationError("receipt locked package roles differ from policy")
+    if locked_packages != expected_locked_packages:
+        raise ArtifactValidationError(
+            "receipt locked package rows differ from exact owner inventory authority"
+        )
 
     resolved = root.get("resolved_owner_contracts")
     if not isinstance(resolved, list) or len(resolved) != 11:
@@ -723,7 +1304,7 @@ def _validate_receipt(
         _validate_owner_row(row, label=f"resolved_owner_contracts[{index + 8}]")
         for index, row in enumerate(resolved[8:])
     ]
-    if resolved_owner_rows != locked_packages[1:]:
+    if resolved_owner_rows != expected_locked_packages[1:]:
         raise ArtifactValidationError(
             "resolved owner rows must be exact Registry/Play/Run locked dependencies"
         )
@@ -731,135 +1312,183 @@ def _validate_receipt(
 
 def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, Any]:
     authority = load_authority(authority_path.absolute())
-    root = artifact_root.absolute()
-    packages_root, inventory_path, lock_path, receipt_path = _validate_artifact_root(root)
-
-    lock_value, _lock_bytes, lock_sha256 = _load_json_file(
-        lock_path, label="runtime package-plane lock", maximum=MAX_LOCK_BYTES
+    root_snapshot = _open_directory(
+        artifact_root.absolute(), label="artifact root"
     )
-    if lock_sha256 != authority.runtime_lock_sha256:
-        raise ArtifactValidationError("runtime package-plane lock bytes differ from authority")
-    if not isinstance(lock_value, dict):
-        raise ArtifactValidationError("runtime package-plane lock must be a JSON object")
-    if lock_value.get("contract") != authority.runtime_lock_contract:
-        raise ArtifactValidationError("runtime package-plane lock contract differs from authority")
-
-    inventory_value, _inventory_bytes, inventory_sha256 = _load_json_file(
-        inventory_path, label="runtime package inventory", maximum=MAX_INVENTORY_BYTES
-    )
-    if inventory_sha256 != authority.inventory_sha256:
-        raise ArtifactValidationError("runtime package inventory bytes differ from authority")
-    inventory_packages = _validate_inventory(
-        inventory_value, authority=authority, lock_sha256=lock_sha256
-    )
-
-    try:
-        package_entries = list(packages_root.iterdir())
-    except OSError as exc:
-        raise ArtifactValidationError("unable to enumerate packages directory") from exc
-    expected_package_names = {row["file_name"] for row in inventory_packages}
-    observed_package_names = {entry.name for entry in package_entries}
-    if len(package_entries) != len(observed_package_names):
-        raise ArtifactValidationError("packages directory contains duplicate member names")
-    if observed_package_names != expected_package_names:
-        missing = sorted(expected_package_names - observed_package_names)
-        foreign = sorted(observed_package_names - expected_package_names)
-        details = []
-        if missing:
-            details.append("missing=" + ",".join(missing))
-        if foreign:
-            details.append("foreign=" + ",".join(foreign))
-        raise ArtifactValidationError(
-            "packages directory must contain the exact inventory set ("
-            + "; ".join(details)
-            + ")"
-        )
-
-    relative_names = [INVENTORY_FILE_NAME, LOCK_FILE_NAME, RECEIPT_FILE_NAME]
-    package_results: list[dict[str, Any]] = []
-    for row in inventory_packages:
-        path = packages_root / row["file_name"]
-        payload = _stable_file_bytes(
-            path, label=f"package {row['id']}", maximum=MAX_PACKAGE_BYTES
-        )
-        if len(payload) != row["size_bytes"]:
-            raise ArtifactValidationError(f"package size mismatch for {row['id']}")
-        digest = hashlib.sha256(payload).hexdigest()
-        if digest != row["sha256"]:
-            raise ArtifactValidationError(f"package digest mismatch for {row['id']}")
-        relative_names.append(f"{PACKAGES_DIRECTORY_NAME}/{row['file_name']}")
-        package_results.append(
-            {
-                "id": row["id"],
-                "version": row["version"],
-                "file_name": row["file_name"],
-                "sha256": digest,
-                "size_bytes": len(payload),
-            }
-        )
-    folded_names = [name.casefold() for name in relative_names]
-    if len(folded_names) != len(set(folded_names)):
-        raise ArtifactValidationError("artifact member paths must be case-insensitively unique")
-    if len(relative_names) != 11:
-        raise ArtifactValidationError("artifact must contain exactly eleven file members")
-
-    receipt_value, _receipt_bytes, receipt_sha256 = _load_json_file(
-        receipt_path, label="Core no-siblings v3 receipt", maximum=MAX_RECEIPT_BYTES
-    )
-    if receipt_sha256 != authority.receipt_sha256:
-        raise ArtifactValidationError("Core no-siblings receipt bytes differ from authority")
-    _validate_receipt(
-        receipt_value,
-        authority=authority,
-        runtime_lock_sha256=lock_sha256,
-        inventory_sha256=inventory_sha256,
-        inventory_packages=inventory_packages,
-    )
-
-    return {
-        "contract": VALIDATION_CONTRACT,
-        "status": "pass",
-        "outer_artifact_selector": dict(authority.artifact_selector),
-        "member_count": len(relative_names),
-        "package_count": len(package_results),
-        "runtime_package_plane_lock": {
-            "contract": authority.runtime_lock_contract,
-            "sha256": lock_sha256,
-        },
-        "inventory": {
-            "contract": INVENTORY_CONTRACT,
-            "file_name": INVENTORY_FILE_NAME,
-            "sha256": inventory_sha256,
-        },
-        "receipt": {
-            "contract": RECEIPT_CONTRACT,
-            "file_name": RECEIPT_FILE_NAME,
-            "sha256": receipt_sha256,
-        },
-        "runtime_source_commit": authority.runtime_source_commit,
-        "package_recipe_commit": authority.package_recipe_commit,
-        "owner_package_version": authority.owner_package_version,
-        "runtime_package_version": authority.runtime_package_version,
-        "owner_authority": {
-            "package_plane_lock_sha256": authority.owner_lock_sha256,
-            "package_inventory_sha256": authority.owner_inventory_sha256,
-            "candidate_engine_package_inventory_sha256": (
-                authority.candidate_engine_inventory_sha256
-            ),
-            "candidate_runtime_package_inventory_sha256": (
-                authority.candidate_runtime_inventory_sha256
-            ),
-        },
-        "ordered_package_ids": list(EXPECTED_PACKAGE_IDS),
-        "packages": package_results,
-        "checks": {
-            "exact_eleven_member_layout": "pass",
-            "strict_json_contracts": "pass",
-            "inventory_receipt_cross_links": "pass",
-            "package_byte_bindings": "pass",
-            "contained_regular_files": "pass",
-        },
+    packages_snapshot: DirectorySnapshot | None = None
+    expected_root_names = {
+        PACKAGES_DIRECTORY_NAME,
+        INVENTORY_FILE_NAME,
+        LOCK_FILE_NAME,
+        RECEIPT_FILE_NAME,
     }
+    try:
+        _require_exact_directory_names(
+            root_snapshot, expected_root_names, label="artifact root"
+        )
+        packages_snapshot = _open_directory(
+            PACKAGES_DIRECTORY_NAME,
+            label="packages directory",
+            directory_fd=root_snapshot.descriptor,
+        )
+        _directory_names(packages_snapshot, label="packages directory")
+
+        lock_value, _lock_bytes, lock_sha256 = _load_json_file_at(
+            root_snapshot.descriptor,
+            LOCK_FILE_NAME,
+            label="runtime package-plane lock",
+            maximum=MAX_LOCK_BYTES,
+        )
+        if lock_sha256 != authority.runtime_lock_sha256:
+            raise ArtifactValidationError(
+                "runtime package-plane lock bytes differ from authority"
+            )
+        runtime_lock = _validate_runtime_lock(lock_value, authority=authority)
+
+        inventory_value, _inventory_bytes, inventory_sha256 = _load_json_file_at(
+            root_snapshot.descriptor,
+            INVENTORY_FILE_NAME,
+            label="runtime package inventory",
+            maximum=MAX_INVENTORY_BYTES,
+        )
+        if inventory_sha256 != authority.inventory_sha256:
+            raise ArtifactValidationError(
+                "runtime package inventory bytes differ from authority"
+            )
+        inventory_packages = _validate_inventory(
+            inventory_value,
+            authority=authority,
+            runtime_lock=runtime_lock,
+            lock_sha256=lock_sha256,
+        )
+
+        expected_package_names = {row["file_name"] for row in inventory_packages}
+        _require_exact_directory_names(
+            packages_snapshot,
+            expected_package_names,
+            label="packages directory",
+        )
+
+        relative_names = [INVENTORY_FILE_NAME, LOCK_FILE_NAME, RECEIPT_FILE_NAME]
+        package_results: list[dict[str, Any]] = []
+        for row in inventory_packages:
+            payload = _stable_file_bytes_at(
+                packages_snapshot.descriptor,
+                row["file_name"],
+                label=f"package {row['id']}",
+                maximum=MAX_PACKAGE_BYTES,
+            )
+            if len(payload) != row["size_bytes"]:
+                raise ArtifactValidationError(f"package size mismatch for {row['id']}")
+            digest = hashlib.sha256(payload).hexdigest()
+            if digest != row["sha256"]:
+                raise ArtifactValidationError(f"package digest mismatch for {row['id']}")
+            _inspect_nupkg(payload, package=row)
+            relative_names.append(f"{PACKAGES_DIRECTORY_NAME}/{row['file_name']}")
+            package_results.append(
+                {
+                    "id": row["id"],
+                    "version": row["version"],
+                    "file_name": row["file_name"],
+                    "sha256": digest,
+                    "size_bytes": len(payload),
+                }
+            )
+        folded_names = [name.casefold() for name in relative_names]
+        if len(folded_names) != len(set(folded_names)):
+            raise ArtifactValidationError(
+                "artifact member paths must be case-insensitively unique"
+            )
+        if len(relative_names) != 11:
+            raise ArtifactValidationError(
+                "artifact must contain exactly eleven file members"
+            )
+
+        receipt_value, _receipt_bytes, receipt_sha256 = _load_json_file_at(
+            root_snapshot.descriptor,
+            RECEIPT_FILE_NAME,
+            label="Core no-siblings v3 receipt",
+            maximum=MAX_RECEIPT_BYTES,
+        )
+        if receipt_sha256 != authority.receipt_sha256:
+            raise ArtifactValidationError(
+                "Core no-siblings receipt bytes differ from authority"
+            )
+        _validate_receipt(
+            receipt_value,
+            authority=authority,
+            runtime_lock_sha256=lock_sha256,
+            inventory_sha256=inventory_sha256,
+            inventory_packages=inventory_packages,
+        )
+
+        # Exact final snapshots close the membership race between initial
+        # enumeration and all byte/receipt validation above.
+        _require_exact_directory_names(
+            packages_snapshot,
+            expected_package_names,
+            label="packages directory",
+        )
+        _require_exact_directory_names(
+            root_snapshot, expected_root_names, label="artifact root"
+        )
+
+        return {
+            "contract": VALIDATION_CONTRACT,
+            "status": "pass",
+            "outer_artifact_selector": dict(authority.artifact_selector),
+            "member_count": len(relative_names),
+            "package_count": len(package_results),
+            "runtime_package_plane_lock": {
+                "contract": RUNTIME_LOCK_CONTRACT,
+                "sha256": lock_sha256,
+            },
+            "inventory": {
+                "contract": INVENTORY_CONTRACT,
+                "file_name": INVENTORY_FILE_NAME,
+                "sha256": inventory_sha256,
+            },
+            "receipt": {
+                "contract": RECEIPT_CONTRACT,
+                "file_name": RECEIPT_FILE_NAME,
+                "sha256": receipt_sha256,
+            },
+            "runtime_source_commit": authority.runtime_source_commit,
+            "package_recipe_commit": authority.package_recipe_commit,
+            "owner_package_version": authority.owner_package_version,
+            "runtime_package_version": authority.runtime_package_version,
+            "owner_authority": {
+                "package_plane_lock_sha256": authority.owner_lock_sha256,
+                "package_inventory": {
+                    "contract": OWNER_INVENTORY_CONTRACT,
+                    "sha256": authority.owner_inventory_sha256,
+                    "packages": [dict(row) for row in authority.owner_packages],
+                },
+                "candidate_engine_package_inventory_sha256": (
+                    authority.candidate_engine_inventory_sha256
+                ),
+                "candidate_runtime_package_inventory_sha256": (
+                    authority.candidate_runtime_inventory_sha256
+                ),
+            },
+            "ordered_package_ids": list(EXPECTED_PACKAGE_IDS),
+            "packages": package_results,
+            "checks": {
+                "exact_eleven_member_layout": "pass",
+                "strict_json_contracts": "pass",
+                "runtime_lock_inventory_semantics": "pass",
+                "inventory_receipt_cross_links": "pass",
+                "owner_inventory_row_authority": "pass",
+                "package_byte_bindings": "pass",
+                "nupkg_payload_contracts": "pass",
+                "contained_regular_files": "pass",
+                "stable_directory_snapshots": "pass",
+            },
+        }
+    finally:
+        if packages_snapshot is not None:
+            os.close(packages_snapshot.descriptor)
+        os.close(root_snapshot.descriptor)
 
 
 def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
@@ -891,6 +1520,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.output is not None:
+        artifact_root = args.artifact_root.resolve(strict=True)
+        output = args.output.resolve(strict=False)
+        if output == artifact_root or artifact_root in output.parents:
+            raise ArtifactValidationError(
+                "validation output must remain outside the immutable artifact root"
+            )
     result = validate_artifact(args.artifact_root, args.authority)
     if args.output is not None:
         _atomic_json(args.output, result)
