@@ -1,0 +1,79 @@
+name: Hub package plane v5 byte authority
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe-owner-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install digest-locked .NET SDK
+        shell: bash
+        run: |
+          hub_v5_dotnet_script="${RUNNER_TEMP}/hub-v5-dotnet-install.sh"
+          hub_v5_dotnet_root="${RUNNER_TEMP}/hub-v5-dotnet"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            https://dot.net/v1/dotnet-install.sh --output "${hub_v5_dotnet_script}"
+          echo "082f7685e156738a1b2e2ed8381a621870d4ce8e8c59278034556f05c186eb2e  ${hub_v5_dotnet_script}" \
+            | sha256sum --check --strict
+          bash "${hub_v5_dotnet_script}" \
+            --version 10.0.103 \
+            --install-dir "${hub_v5_dotnet_root}" \
+            --no-path
+          echo "${hub_v5_dotnet_root}" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=${hub_v5_dotnet_root}" >> "${GITHUB_ENV}"
+
+      - name: Download exact public Core package bundle
+        shell: bash
+        run: |
+          hub_v5_core_bundle="${RUNNER_TEMP}/chummer-core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277.zip"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277/chummer-core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277.zip \
+            --output "${hub_v5_core_bundle}"
+          echo "76943cee5aa7761adf6f13cf8e641d03cf9892ea2ab795d2c9a4e0de6ccd9ce9  ${hub_v5_core_bundle}" \
+            | sha256sum --check --strict
+          hub_v5_core_receipt="${RUNNER_TEMP}/chummer-core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277.public-handoff.json"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277/chummer-core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277.public-handoff.json \
+            --output "${hub_v5_core_receipt}"
+          echo "f5fb506fde7f51c39ee982f3e8e935433f6dd7401e243a62643563a37a71dd0f  ${hub_v5_core_receipt}" \
+            | sha256sum --check --strict
+          echo "HUB_V5_CORE_BUNDLE=${hub_v5_core_bundle}" >> "${GITHUB_ENV}"
+          echo "HUB_V5_CORE_RECEIPT=${hub_v5_core_receipt}" >> "${GITHUB_ENV}"
+
+      - name: Observe exact Registry and Hub package bytes
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 scripts/ai/bootstrap-hub-package-feed.py \
+            --repo-root . \
+            --feed "${RUNNER_TEMP}/hub-v5-observed-feed" \
+            --core-public-bundle "${HUB_V5_CORE_BUNDLE}" \
+            --core-public-receipt "${HUB_V5_CORE_RECEIPT}" \
+            --observe-package-authority
+
+      - name: Upload exact candidate byte authority
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hub-package-plane-v5-byte-authority-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/hub-v5-observed-feed/chummer-hub-packages.observed-authority.json
+            ${{ runner.temp }}/hub-v5-observed-feed/Chummer.Hub.Registry.Contracts.0.0.0-packageplane.20260721.1.nupkg
+            ${{ runner.temp }}/hub-v5-observed-feed/Chummer.Run.Registry.0.0.0-packageplane.20260721.1.nupkg
+            ${{ runner.temp }}/hub-v5-observed-feed/Chummer.Play.Contracts.0.0.0-packageplane.20260721.1.nupkg
+            ${{ runner.temp }}/hub-v5-observed-feed/Chummer.Run.Contracts.0.0.0-packageplane.20260721.1.nupkg
+            ${{ runner.temp }}/hub-v5-observed-feed/Chummer.Campaign.Contracts.0.0.0-packageplane.20260721.1.nupkg
+            ${{ runner.temp }}/hub-v5-observed-feed/Chummer.Control.Contracts.0.0.0-packageplane.20260721.1.nupkg
+            ${{ runner.temp }}/hub-v5-observed-feed/Chummer.World.Contracts.0.0.0-packageplane.20260721.1.nupkg
+          if-no-files-found: error
+          retention-days: 30

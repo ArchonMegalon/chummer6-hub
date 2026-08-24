@@ -4,11 +4,11 @@
     <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == '' and '$(CHUMMER_WORKSPACE_ROOT)' != ''">$(CHUMMER_WORKSPACE_ROOT)</ChummerWorkspaceRoot>
     <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == ''">$(MSBuildThisFileDirectory)..</ChummerWorkspaceRoot>
     <ChummerUseLocalCompatibilityTree Condition="'$(ChummerUseLocalCompatibilityTree)' == ''">false</ChummerUseLocalCompatibilityTree>
-    <ChummerPackagePlaneVersion Condition="'$(ChummerPackagePlaneVersion)' == ''">0.1.0-preview</ChummerPackagePlaneVersion>
+    <ChummerPackagePlaneVersion Condition="'$(ChummerPackagePlaneVersion)' == ''">0.0.0-packageplane.20260721.1</ChummerPackagePlaneVersion>
     <ChummerEngineContractsPackageVersion Condition="'$(ChummerEngineContractsPackageVersion)' == ''">0.0.0-packageplane.candidate.shabc08228d3ce0</ChummerEngineContractsPackageVersion>
     <ChummerCoreGmCharacterEditsPackageVersion Condition="'$(ChummerCoreGmCharacterEditsPackageVersion)' == ''">0.0.0-packageplane.candidate.shabc08228d3ce0</ChummerCoreGmCharacterEditsPackageVersion>
-    <ChummerHubRegistryContractsPackageVersion Condition="'$(ChummerHubRegistryContractsPackageVersion)' == ''">0.1.0-preview</ChummerHubRegistryContractsPackageVersion>
-    <ChummerRunRegistryPackageVersion Condition="'$(ChummerRunRegistryPackageVersion)' == ''">0.1.0-preview</ChummerRunRegistryPackageVersion>
+    <ChummerHubRegistryContractsPackageVersion Condition="'$(ChummerHubRegistryContractsPackageVersion)' == ''">0.0.0-packageplane.20260721.1</ChummerHubRegistryContractsPackageVersion>
+    <ChummerRunRegistryPackageVersion Condition="'$(ChummerRunRegistryPackageVersion)' == ''">0.0.0-packageplane.20260721.1</ChummerRunRegistryPackageVersion>
     <ChummerPackageFeed Condition="'$(ChummerPackageFeed)' == '' and '$(CHUMMER_PACKAGE_FEED)' != ''">$(CHUMMER_PACKAGE_FEED)</ChummerPackageFeed>
     <RestoreAdditionalProjectSources Condition="'$(ChummerPackageFeed)' != ''">$(ChummerPackageFeed);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
     <ChummerCoreEngineRoot Condition="'$(ChummerCoreEngineRoot)' == ''">$(ChummerWorkspaceRoot)/chummer-core-engine</ChummerCoreEngineRoot>

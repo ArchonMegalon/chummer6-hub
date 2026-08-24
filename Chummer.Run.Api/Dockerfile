@@ -30,7 +30,7 @@ WORKDIR /proof
 COPY --from=run-services-source global.json global.json
 COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py
 COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json
-RUN ["/usr/local/bin/python3", "-I", "-S", "scripts/ai/bootstrap-hub-package-feed.py", "--repo-root", "/proof", "--feed", "/opt/chummer-package-feed"]
+RUN ["/usr/local/bin/python3", "-I", "-S", "scripts/ai/bootstrap-hub-package-feed.py", "--repo-root", "/proof", "--feed", "/opt/chummer-package-feed", "--download-core-public-authority-directory", "/tmp/chummer-core-public-authority"]
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a AS build
 COPY --from=public-pwa-proof /proof/public-pwa-proof-authority.receipt.json /tmp/public-pwa-proof-authority.receipt.json

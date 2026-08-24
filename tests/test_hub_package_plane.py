@@ -18,14 +18,24 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
-PACKAGE_VERSION = "0.1.0-preview"
+PACKAGE_VERSION = "0.0.0-packageplane.20260721.1"
+CORE_PACKAGE_VERSION = "0.0.0-packageplane.candidate.shabc08228d3ce0"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shabc08228d3ce0",
-    "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
-    "Chummer.Run.Registry": "0.1.0-preview",
-    "Chummer.Play.Contracts": "0.1.0-preview",
-    "Chummer.Run.Contracts": "0.1.0-preview",
-    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shabc08228d3ce0",
+    "Chummer.Engine.Contracts": CORE_PACKAGE_VERSION,
+    "Chummer.Application": CORE_PACKAGE_VERSION,
+    "Chummer.Rulesets.Hosting": CORE_PACKAGE_VERSION,
+    "Chummer.Rulesets.Sr5": CORE_PACKAGE_VERSION,
+    "Chummer.Rulesets.Sr6": CORE_PACKAGE_VERSION,
+    "Chummer.Infrastructure": CORE_PACKAGE_VERSION,
+    "Chummer.Rulesets.Sr4": CORE_PACKAGE_VERSION,
+    "Chummer.Engine.GmCharacterEdits": CORE_PACKAGE_VERSION,
+    "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Registry": PACKAGE_VERSION,
+    "Chummer.Play.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Contracts": PACKAGE_VERSION,
+    "Chummer.Campaign.Contracts": PACKAGE_VERSION,
+    "Chummer.Control.Contracts": PACKAGE_VERSION,
+    "Chummer.World.Contracts": PACKAGE_VERSION,
 }
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
@@ -89,15 +99,28 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
     assert lock.package_version == PACKAGE_VERSION
     assert [spec.package_id for spec in lock.packages] == [
         "Chummer.Engine.Contracts",
+        "Chummer.Application",
+        "Chummer.Rulesets.Hosting",
+        "Chummer.Rulesets.Sr5",
+        "Chummer.Rulesets.Sr6",
+        "Chummer.Infrastructure",
+        "Chummer.Rulesets.Sr4",
+        "Chummer.Engine.GmCharacterEdits",
         "Chummer.Hub.Registry.Contracts",
         "Chummer.Run.Registry",
         "Chummer.Play.Contracts",
         "Chummer.Run.Contracts",
-        "Chummer.Engine.GmCharacterEdits",
+        "Chummer.Campaign.Contracts",
+        "Chummer.Control.Contracts",
+        "Chummer.World.Contracts",
     ]
     assert all(len(spec.commit) == 40 for spec in lock.packages)
     assert {spec.package_id: spec.version for spec in lock.packages} == OWNER_PACKAGE_VERSIONS
-    assert all(spec.nupkg_sha256 and spec.nupkg_size_bytes > 0 for spec in lock.packages)
+    assert all(
+        spec.nupkg_sha256 and spec.nupkg_size_bytes and spec.nupkg_size_bytes > 0
+        for spec in lock.packages
+        if spec.byte_authority_status == "locked"
+    )
     assert lock.dotnet_install_url == "https://dot.net/v1/dotnet-install.sh"
     assert len(lock.dotnet_install_sha256) == 64
 
@@ -106,7 +129,7 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
     module = load_module()
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     payload["unbound"] = True
-    with pytest.raises(module.PackagePlaneError, match="exact v4 fields"):
+    with pytest.raises(module.PackagePlaneError, match="exact v5 fields"):
         module.validate_lock_payload(payload)
 
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
@@ -474,6 +497,9 @@ def test_build_feed_rejects_sdk_roll_forward(tmp_path: Path, monkeypatch) -> Non
             lock_sha256="0" * 64,
             feed=tmp_path / "feed",
             dotnet="dotnet",
+            core_public_bundle=tmp_path / "unused-core-bundle.zip",
+            core_public_receipt=tmp_path / "unused-core-receipt.json",
+            observe_package_authority=True,
         )
     assert calls == [("dotnet", "--version")]
 
@@ -549,7 +575,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert (
         "RUN [\"/usr/local/bin/python3\", \"-I\", \"-S\", "
         "\"scripts/ai/bootstrap-hub-package-feed.py\", \"--repo-root\", "
-        "\"/proof\", \"--feed\", \"/opt/chummer-package-feed\"]"
+        "\"/proof\", \"--feed\", \"/opt/chummer-package-feed\", "
+        "\"--download-core-public-authority-directory\", "
+        "\"/tmp/chummer-core-public-authority\"]"
     ) in dockerfile
     assert (
         "COPY --from=public-pwa-proof "

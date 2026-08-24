@@ -21,7 +21,7 @@ from typing import Iterable, Mapping
 
 
 INVENTORY_NAME = "chummer-hub-packages.inventory.json"
-RECEIPT_CONTRACT = "chummer-hub.no-siblings-package-plane/v2"
+RECEIPT_CONTRACT = "chummer-hub.no-siblings-package-plane/v3"
 HUB_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub.git"
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
@@ -41,10 +41,14 @@ LOCKED_PROJECTS = (
 )
 LOCAL_PROJECT_PACKAGE_IDS = frozenset(
     {
+        "Chummer.Campaign.Contracts",
+        "Chummer.Control.Contracts",
         "Chummer.Play.Contracts",
         "Chummer.Run.Contracts",
+        "Chummer.World.Contracts",
     }
 )
+PACKAGE_FEED_ONLY_IDS = frozenset({"Chummer.Rulesets.Sr4"})
 RELEASE_CONTROL_PYTHON_TESTS = (
     "tests/test_candidate_import_authority.py",
     "tests/test_verify_release_scope_decision.py",
@@ -197,6 +201,8 @@ def _audit_assets(
     for package_id, package_version in owner_versions.items():
         identity = f"{package_id}/{package_version}"
         metadata = observed_libraries.get(identity)
+        if package_id in PACKAGE_FEED_ONLY_IDS and metadata is None:
+            continue
         expected_type = (
             "project" if package_id in LOCAL_PROJECT_PACKAGE_IDS else "package"
         )
@@ -326,7 +332,13 @@ def _atomic_json(path: Path, payload: dict[str, object]) -> None:
             temporary_path.unlink()
 
 
-def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
+def verify(
+    repo_root: Path,
+    receipt_path: Path,
+    dotnet: str,
+    core_public_bundle: Path,
+    core_public_receipt: Path,
+) -> None:
     repo_root = repo_root.resolve()
     commit = _clean_commit(repo_root)
     bootstrap = _load_bootstrap(repo_root)
@@ -354,6 +366,8 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             lock_sha256=lock_sha,
             feed=feed,
             dotnet=dotnet,
+            core_public_bundle=core_public_bundle,
+            core_public_receipt=core_public_receipt,
         )
         inventory_path = feed / INVENTORY_NAME
         inventory_sha = bootstrap.validate_feed_inventory(feed, lock, lock_sha)
@@ -501,6 +515,16 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "package_plane_lock_sha256": lock_sha,
             "package_inventory_sha256": inventory_sha,
             "package_version": lock.package_version,
+            "core_public_bundle": {
+                "asset_url": lock.core_public_bundle.asset_url,
+                "receipt_asset_url": lock.core_public_bundle.receipt_asset_url,
+                "receipt_sha256": lock.core_public_bundle.receipt_sha256,
+                "release_tag": lock.core_public_bundle.release_tag,
+                "release_commit": lock.core_public_bundle.release_commit,
+                "source_commit": lock.core_public_bundle.source_commit,
+                "sha256": lock.core_public_bundle.sha256,
+                "size_bytes": lock.core_public_bundle.size_bytes,
+            },
             "dotnet_sdk": lock.dotnet_sdk,
             "dotnet_toolchain": toolchain,
             "source_authorities": [
@@ -509,6 +533,7 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
                     "version": spec.version,
                     "repository": spec.repository,
                     "commit": spec.commit,
+                    "source_kind": spec.source_kind,
                 }
                 for spec in lock.packages
             ],
@@ -550,12 +575,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--dotnet", default="dotnet")
+    parser.add_argument("--core-public-bundle", type=Path, required=True)
+    parser.add_argument("--core-public-receipt", type=Path, required=True)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    verify(args.repo_root, args.receipt, args.dotnet)
+    verify(
+        args.repo_root,
+        args.receipt,
+        args.dotnet,
+        args.core_public_bundle,
+        args.core_public_receipt,
+    )
     return 0
 
 
