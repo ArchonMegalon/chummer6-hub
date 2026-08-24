@@ -153,6 +153,8 @@ services:
         CHUMMER_RUN_SERVICES_REVISION: ${CHUMMER_RUN_SERVICES_REVISION:?set the exact clean Hub revision}
     restart: on-failure:5
     depends_on:
+      chummer-build-ghost-ai:
+        condition: service_healthy
       chummer-build-ghost-presentation:
         condition: service_healthy
     environment:
@@ -160,6 +162,7 @@ services:
       CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_HOST: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_HOST:-unconfigured.invalid}
       CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN:-unconfigured.cloudflareaccess.com}
       CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE:-}
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST: sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=16m

@@ -25,4 +25,16 @@ public static class AccessEdgeHttpTransport
             UseCookies = false,
             UseProxy = false,
         };
+
+    public static SocketsHttpHandler CreateAiHandler()
+        => new()
+        {
+            ActivityHeadersPropagator = null,
+            AllowAutoRedirect = false,
+            AutomaticDecompression = System.Net.DecompressionMethods.None,
+            ConnectTimeout = TimeSpan.FromSeconds(3),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            UseCookies = false,
+            UseProxy = false,
+        };
 }

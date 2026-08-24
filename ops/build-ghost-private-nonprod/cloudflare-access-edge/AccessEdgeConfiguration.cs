@@ -6,6 +6,7 @@ public sealed record AccessEdgeConfiguration(
     string PublicHost,
     string TeamDomain,
     string Audience,
+    string ToolContractDigest,
     Uri Issuer,
     Uri CertificatesEndpoint)
 {
@@ -15,6 +16,8 @@ public sealed record AccessEdgeConfiguration(
         "CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN";
     public const string AudienceEnvironmentVariable =
         "CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE";
+    public const string ToolContractDigestEnvironmentVariable =
+        "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST";
 
     private static readonly Regex AudiencePattern = new(
         "^[A-Za-z0-9_-]{16,128}$",
@@ -24,12 +27,14 @@ public sealed record AccessEdgeConfiguration(
         => Create(
             Environment.GetEnvironmentVariable(HostEnvironmentVariable),
             Environment.GetEnvironmentVariable(TeamDomainEnvironmentVariable),
-            Environment.GetEnvironmentVariable(AudienceEnvironmentVariable));
+            Environment.GetEnvironmentVariable(AudienceEnvironmentVariable),
+            Environment.GetEnvironmentVariable(ToolContractDigestEnvironmentVariable));
 
     public static AccessEdgeConfiguration Create(
         string? publicHost,
         string? teamDomain,
-        string? audience)
+        string? audience,
+        string? toolContractDigest)
     {
         string host = RequireCanonicalDnsName(publicHost, HostEnvironmentVariable);
         if (string.Equals(host, "unconfigured.invalid", StringComparison.Ordinal))
@@ -52,6 +57,16 @@ public sealed record AccessEdgeConfiguration(
             throw Invalid(AudienceEnvironmentVariable);
         }
 
+        string normalizedToolContractDigest = toolContractDigest?.Trim() ?? string.Empty;
+        if (normalizedToolContractDigest.Length != 71
+            || !normalizedToolContractDigest.StartsWith("sha256:", StringComparison.Ordinal)
+            || !normalizedToolContractDigest.AsSpan(7).ToString().All(
+                static character => character is >= '0' and <= '9' or >= 'a' and <= 'f')
+            || !string.Equals(normalizedToolContractDigest, toolContractDigest, StringComparison.Ordinal))
+        {
+            throw Invalid(ToolContractDigestEnvironmentVariable);
+        }
+
         Uri issuer = new($"https://{team}", UriKind.Absolute);
         Uri certificatesEndpoint = new(
             issuer,
@@ -60,6 +75,7 @@ public sealed record AccessEdgeConfiguration(
             host,
             team,
             normalizedAudience,
+            normalizedToolContractDigest,
             issuer,
             certificatesEndpoint);
     }

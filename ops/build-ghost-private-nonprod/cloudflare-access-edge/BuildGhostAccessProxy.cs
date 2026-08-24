@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Primitives;
@@ -12,6 +14,7 @@ public enum BuildGhostAccessRouteKind
     WorkspaceImport,
     WorkspaceLifecycle,
     ToolAccess,
+    ProviderToolV2,
 }
 
 public readonly record struct BuildGhostAccessRoute(
@@ -28,11 +31,16 @@ public sealed class BuildGhostAccessProxy
     public const string PortalOwnerTimestampHeader = "X-Chummer-Portal-Owner-Timestamp";
     public const string PortalOwnerSignatureHeader = "X-Chummer-Portal-Owner-Signature";
     public const string PortalModeratorSignatureHeader = "X-Chummer-Portal-Moderator-Signature";
+    public const string ToolContractHeader = "X-Chummer-Build-Ghost-Tool-Contract";
 
     private const long ImportBodyLimit = 64L * 1024 * 1024;
-    private const long ToolAccessBodyLimit = 1024 * 1024;
+    private const long ToolAccessBodyLimit = 4 * 1024;
+    private const int ToolAccessResponseBodyLimit = 16 * 1024;
     private static readonly Uri PresentationOrigin = new(
         "http://chummer-build-ghost-presentation:8080",
+        UriKind.Absolute);
+    private static readonly Uri AiOrigin = new(
+        "http://chummer-build-ghost-ai:8080",
         UriKind.Absolute);
     private static readonly Regex WorkspaceLifecyclePath = new(
         "^/api/workspaces/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
@@ -55,16 +63,35 @@ public sealed class BuildGhostAccessProxy
 
     private readonly AccessEdgeConfiguration _configuration;
     private readonly ICloudflareAccessTokenValidator _tokenValidator;
-    private readonly HttpClient _upstream;
+    private readonly HttpClient _presentationUpstream;
+    private readonly HttpClient _aiUpstream;
+    private readonly BuildGhostOwnerBoundGrantRegistry _grantRegistry;
 
     public BuildGhostAccessProxy(
         AccessEdgeConfiguration configuration,
         ICloudflareAccessTokenValidator tokenValidator,
         HttpClient upstream)
+        : this(
+            configuration,
+            tokenValidator,
+            upstream,
+            upstream,
+            new BuildGhostOwnerBoundGrantRegistry(TimeProvider.System))
     {
-        _configuration = configuration;
-        _tokenValidator = tokenValidator;
-        _upstream = upstream;
+    }
+
+    public BuildGhostAccessProxy(
+        AccessEdgeConfiguration configuration,
+        ICloudflareAccessTokenValidator tokenValidator,
+        HttpClient presentationUpstream,
+        HttpClient aiUpstream,
+        BuildGhostOwnerBoundGrantRegistry grantRegistry)
+    {
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _tokenValidator = tokenValidator ?? throw new ArgumentNullException(nameof(tokenValidator));
+        _presentationUpstream = presentationUpstream ?? throw new ArgumentNullException(nameof(presentationUpstream));
+        _aiUpstream = aiUpstream ?? throw new ArgumentNullException(nameof(aiUpstream));
+        _grantRegistry = grantRegistry ?? throw new ArgumentNullException(nameof(grantRegistry));
     }
 
     public async Task HandleAsync(HttpContext context)
@@ -111,6 +138,7 @@ public sealed class BuildGhostAccessProxy
 
         if (route.Kind is BuildGhostAccessRouteKind.WorkspaceImport
                 or BuildGhostAccessRouteKind.ToolAccess
+                or BuildGhostAccessRouteKind.ProviderToolV2
             && !HasJsonContentType(context.Request))
         {
             await WriteFixedErrorAsync(
@@ -123,11 +151,29 @@ public sealed class BuildGhostAccessProxy
 
         try
         {
+            if (route.Kind == BuildGhostAccessRouteKind.ToolAccess)
+            {
+                await IssueOwnerBoundGrantAsync(
+                    context,
+                    authenticatedEmail,
+                    route.MaximumBodyBytes).ConfigureAwait(false);
+                return;
+            }
+
+            if (route.Kind == BuildGhostAccessRouteKind.ProviderToolV2)
+            {
+                await DispatchOwnerBoundProviderToolAsync(
+                    context,
+                    authenticatedEmail,
+                    route.MaximumBodyBytes).ConfigureAwait(false);
+                return;
+            }
+
             using HttpRequestMessage upstreamRequest = CreateUpstreamRequest(
                 context.Request,
                 authenticatedEmail,
                 route);
-            using HttpResponseMessage upstreamResponse = await _upstream.SendAsync(
+            using HttpResponseMessage upstreamResponse = await _presentationUpstream.SendAsync(
                 upstreamRequest,
                 HttpCompletionOption.ResponseHeadersRead,
                 context.RequestAborted).ConfigureAwait(false);
@@ -144,6 +190,17 @@ public sealed class BuildGhostAccessProxy
                     context.Response,
                     StatusCodes.Status413PayloadTooLarge,
                     "request_body_too_large",
+                    context.RequestAborted).ConfigureAwait(false);
+            }
+        }
+        catch (UpstreamResponseLimitExceededException)
+        {
+            if (!context.Response.HasStarted)
+            {
+                await WriteFixedErrorAsync(
+                    context.Response,
+                    StatusCodes.Status502BadGateway,
+                    "private_tool_upstream_response_invalid",
                     context.RequestAborted).ConfigureAwait(false);
             }
         }
@@ -184,6 +241,15 @@ public sealed class BuildGhostAccessProxy
             route = new BuildGhostAccessRoute(
                 BuildGhostAccessRouteKind.ToolAccess,
                 ToolAccessBodyLimit);
+            return true;
+        }
+
+        if (string.Equals(method, "POST", StringComparison.Ordinal)
+            && string.Equals(path, BuildGhostProviderToolRequestContract.Path, StringComparison.Ordinal))
+        {
+            route = new BuildGhostAccessRoute(
+                BuildGhostAccessRouteKind.ProviderToolV2,
+                BuildGhostProviderToolRequestContract.MaximumBodyBytes);
             return true;
         }
 
@@ -249,6 +315,285 @@ public sealed class BuildGhostAccessProxy
         return outgoing;
     }
 
+    public static HttpRequestMessage CreateProviderToolUpstreamRequest(
+        HttpRequest request,
+        ReadOnlyMemory<byte> body,
+        string toolContractDigest)
+    {
+        Uri destination = new(AiOrigin, BuildGhostProviderToolRequestContract.Path);
+        HttpRequestMessage outgoing = new(HttpMethod.Post, destination);
+        outgoing.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
+        outgoing.Headers.TryAddWithoutValidation(ToolContractHeader, toolContractDigest);
+        CopySingleSafeHeader(request.Headers, outgoing.Headers, "Accept", 1024);
+        CopySingleSafeHeader(request.Headers, outgoing.Headers, "Accept-Language", 1024);
+        outgoing.Content = new ReadOnlyMemoryContent(body);
+        outgoing.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json")
+        {
+            CharSet = "utf-8",
+        };
+        return outgoing;
+    }
+
+    private async Task IssueOwnerBoundGrantAsync(
+        HttpContext context,
+        string authenticatedEmail,
+        long maximumBodyBytes)
+    {
+        byte[] requestBody = await ReadBoundedBodyAsync(
+            context.Request.Body,
+            maximumBodyBytes,
+            context.RequestAborted).ConfigureAwait(false);
+        byte[]? responseBody = null;
+        try
+        {
+            using HttpRequestMessage upstreamRequest = CreateBufferedPresentationRequest(
+                context.Request,
+                authenticatedEmail,
+                requestBody);
+            using HttpResponseMessage upstreamResponse = await _presentationUpstream.SendAsync(
+                upstreamRequest,
+                HttpCompletionOption.ResponseHeadersRead,
+                context.RequestAborted).ConfigureAwait(false);
+
+            responseBody = await ReadBoundedBodyAsync(
+                await upstreamResponse.Content.ReadAsStreamAsync(context.RequestAborted).ConfigureAwait(false),
+                ToolAccessResponseBodyLimit,
+                context.RequestAborted,
+                isUpstreamResponse: true).ConfigureAwait(false);
+            if (upstreamResponse.StatusCode != HttpStatusCode.OK)
+            {
+                await CopyBufferedResponseAsync(
+                    upstreamResponse,
+                    context.Response,
+                    responseBody,
+                    context.RequestAborted).ConfigureAwait(false);
+                return;
+            }
+
+            if (!HasJsonContentType(upstreamResponse.Content.Headers.ContentType)
+                || !BuildGhostProviderToolRequestContract.TryParseGrantResponse(
+                    responseBody,
+                    out BuildGhostToolAccessGrantResponse? grant)
+                || grant is null
+                || !_grantRegistry.TryRegister(
+                    grant.PacketAccessKey,
+                    authenticatedEmail,
+                    grant.PacketDigest,
+                    grant.ExpiresAtUtc))
+            {
+                await WriteFixedErrorAsync(
+                    context.Response,
+                    StatusCodes.Status502BadGateway,
+                    "private_tool_grant_binding_failed",
+                    context.RequestAborted).ConfigureAwait(false);
+                return;
+            }
+
+            await CopyBufferedResponseAsync(
+                upstreamResponse,
+                context.Response,
+                responseBody,
+                context.RequestAborted).ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(requestBody);
+            if (responseBody is not null)
+            {
+                CryptographicOperations.ZeroMemory(responseBody);
+            }
+        }
+    }
+
+    private async Task DispatchOwnerBoundProviderToolAsync(
+        HttpContext context,
+        string authenticatedEmail,
+        long maximumBodyBytes)
+    {
+        if (context.Request.Headers.ContainsKey("Authorization")
+            || context.Request.Headers.ContainsKey("Cookie")
+            || !TryReadExactlyOne(
+                context.Request.Headers,
+                ToolContractHeader,
+                out string suppliedContract)
+            || !FixedEquals(suppliedContract, _configuration.ToolContractDigest)
+            || !string.Equals(
+                context.Request.Headers.CacheControl.ToString().Trim(),
+                "no-store",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            await WriteFixedErrorAsync(
+                context.Response,
+                StatusCodes.Status401Unauthorized,
+                "private_tool_contract_required",
+                context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
+
+        byte[] requestBody = await ReadBoundedBodyAsync(
+            context.Request.Body,
+            maximumBodyBytes,
+            context.RequestAborted).ConfigureAwait(false);
+        byte[]? responseBody = null;
+        try
+        {
+            if (!BuildGhostProviderToolRequestContract.TryParse(
+                    requestBody,
+                    out BuildGhostProviderToolRequest? providerRequest,
+                    out IReadOnlyList<string> reasons)
+                || providerRequest is null)
+            {
+                await WriteProviderValidationErrorAsync(
+                    context.Response,
+                    reasons,
+                    context.RequestAborted).ConfigureAwait(false);
+                return;
+            }
+
+            if (!_grantRegistry.TryClaim(
+                    providerRequest.PacketAccessKey,
+                    authenticatedEmail,
+                    providerRequest.PacketDigest))
+            {
+                await WriteFixedErrorAsync(
+                    context.Response,
+                    StatusCodes.Status410Gone,
+                    "private-tool-authority-rejected",
+                    context.RequestAborted).ConfigureAwait(false);
+                return;
+            }
+
+            using HttpRequestMessage upstreamRequest = CreateProviderToolUpstreamRequest(
+                context.Request,
+                requestBody,
+                _configuration.ToolContractDigest);
+            using HttpResponseMessage upstreamResponse = await _aiUpstream.SendAsync(
+                upstreamRequest,
+                HttpCompletionOption.ResponseHeadersRead,
+                context.RequestAborted).ConfigureAwait(false);
+            responseBody = await ReadBoundedBodyAsync(
+                await upstreamResponse.Content.ReadAsStreamAsync(context.RequestAborted).ConfigureAwait(false),
+                BuildGhostProviderToolRequestContract.MaximumResponseBytes,
+                context.RequestAborted,
+                isUpstreamResponse: true).ConfigureAwait(false);
+            await CopyBufferedResponseAsync(
+                upstreamResponse,
+                context.Response,
+                responseBody,
+                context.RequestAborted).ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(requestBody);
+            if (responseBody is not null)
+            {
+                CryptographicOperations.ZeroMemory(responseBody);
+            }
+        }
+    }
+
+    private static HttpRequestMessage CreateBufferedPresentationRequest(
+        HttpRequest request,
+        string authenticatedEmail,
+        ReadOnlyMemory<byte> body)
+    {
+        Uri destination = new(PresentationOrigin, request.Path.Value);
+        HttpRequestMessage outgoing = new(HttpMethod.Post, destination);
+        outgoing.Headers.TryAddWithoutValidation(OwnerHeader, authenticatedEmail);
+        outgoing.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
+        CopySingleSafeHeader(request.Headers, outgoing.Headers, "Accept", 1024);
+        CopySingleSafeHeader(request.Headers, outgoing.Headers, "Accept-Language", 1024);
+        outgoing.Content = new ReadOnlyMemoryContent(body);
+        outgoing.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json")
+        {
+            CharSet = "utf-8",
+        };
+        return outgoing;
+    }
+
+    private static async Task<byte[]> ReadBoundedBodyAsync(
+        Stream stream,
+        long maximumBytes,
+        CancellationToken cancellationToken,
+        bool isUpstreamResponse = false)
+    {
+        if (maximumBytes < 0 || maximumBytes > int.MaxValue - 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumBytes));
+        }
+
+        byte[] buffer = new byte[checked((int)maximumBytes + 1)];
+        int total = 0;
+        try
+        {
+            while (total < buffer.Length)
+            {
+                int read = await stream.ReadAsync(
+                    buffer.AsMemory(total, buffer.Length - total),
+                    cancellationToken).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    break;
+                }
+                total += read;
+            }
+
+            if (total > maximumBytes)
+            {
+                if (isUpstreamResponse)
+                {
+                    throw new UpstreamResponseLimitExceededException();
+                }
+                throw new RequestBodyLimitExceededException();
+            }
+
+            return buffer.AsSpan(0, total).ToArray();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(buffer);
+        }
+    }
+
+    private static async Task WriteProviderValidationErrorAsync(
+        HttpResponse response,
+        IReadOnlyList<string> reasons,
+        CancellationToken cancellationToken)
+    {
+        response.StatusCode = StatusCodes.Status400BadRequest;
+        response.ContentType = "application/json; charset=utf-8";
+        ApplyNoStore(response);
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            error = "private_tool_provider_request_invalid",
+            reasons,
+        });
+        try
+        {
+            await response.Body.WriteAsync(body, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(body);
+        }
+    }
+
+    private static bool FixedEquals(string left, string right)
+    {
+        byte[] leftBytes = Encoding.ASCII.GetBytes(left);
+        byte[] rightBytes = Encoding.ASCII.GetBytes(right);
+        try
+        {
+            return leftBytes.Length == rightBytes.Length
+                && CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(leftBytes);
+            CryptographicOperations.ZeroMemory(rightBytes);
+        }
+    }
+
     public static bool IsForbiddenUpstreamHeader(string headerName)
         => ForbiddenOwnerHeaders.Contains(headerName)
             || string.Equals(headerName, AuthenticatedEmailHeader, StringComparison.OrdinalIgnoreCase)
@@ -279,8 +624,37 @@ public sealed class BuildGhostAccessProxy
     }
 
     private static bool HasJsonContentType(HttpRequest request)
-        => MediaTypeHeaderValue.TryParse(request.ContentType, out MediaTypeHeaderValue? mediaType)
-            && string.Equals(mediaType.MediaType, "application/json", StringComparison.OrdinalIgnoreCase);
+    {
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out MediaTypeHeaderValue? mediaType)
+            || !HasJsonContentType(mediaType))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool HasJsonContentType(MediaTypeHeaderValue? mediaType)
+    {
+        if (mediaType is null
+            || !string.Equals(mediaType.MediaType, "application/json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Parameters.Count > 1)
+        {
+            return false;
+        }
+
+        if (mediaType.Parameters.Count == 0)
+        {
+            return true;
+        }
+
+        NameValueHeaderValue parameter = mediaType.Parameters.Single();
+        return string.Equals(parameter.Name, "charset", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(
+                parameter.Value?.Trim('"'),
+                "utf-8",
+                StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool TryReadExactlyOne(
         IHeaderDictionary headers,
@@ -337,6 +711,26 @@ public sealed class BuildGhostAccessProxy
         await source.Content.CopyToAsync(destination.Body, cancellationToken).ConfigureAwait(false);
     }
 
+    private static async Task CopyBufferedResponseAsync(
+        HttpResponseMessage source,
+        HttpResponse destination,
+        ReadOnlyMemory<byte> body,
+        CancellationToken cancellationToken)
+    {
+        destination.StatusCode = (int)source.StatusCode;
+        ApplyNoStore(destination);
+        CopyResponseHeader(source, destination, "ETag");
+        CopyResponseHeader(source, destination, "Last-Modified");
+        CopyResponseHeader(source, destination, "Retry-After");
+        CopyResponseHeader(source, destination, "X-Chummer-Build-Ghost-Packet-Digest");
+        if (source.Content.Headers.ContentType is not null)
+        {
+            destination.ContentType = source.Content.Headers.ContentType.ToString();
+        }
+
+        await destination.Body.WriteAsync(body, cancellationToken).ConfigureAwait(false);
+    }
+
     private static void CopyResponseHeader(
         HttpResponseMessage source,
         HttpResponse destination,
@@ -375,7 +769,7 @@ public sealed class BuildGhostAccessProxy
         }
 
         response.StatusCode = statusCode;
-        response.ContentType = "application/json";
+        response.ContentType = "application/json; charset=utf-8";
         ApplyNoStore(response);
         string body = $"{{\"error\":\"{error}\"}}";
         await response.WriteAsync(body, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
@@ -435,4 +829,5 @@ public sealed class BuildGhostAccessProxy
     }
 
     private sealed class RequestBodyLimitExceededException : IOException;
+    private sealed class UpstreamResponseLimitExceededException : IOException;
 }

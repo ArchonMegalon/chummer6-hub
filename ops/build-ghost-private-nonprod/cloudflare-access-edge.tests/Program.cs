@@ -13,6 +13,8 @@ internal static class Program
 {
     private const string TestAudience =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    private const string TestToolContractDigest =
+        "sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104";
 
     public static async Task<int> Main()
     {
@@ -28,6 +30,11 @@ internal static class Program
             ("real outbound handlers suppress all activity propagation", TestActivityHeaderIsolationAsync),
             ("proxy rejects bypasses before upstream", TestProxyBypassesAsync),
             ("proxy forwards one admitted request without security header leakage", TestProxyForwardingAsync),
+            ("owner-bound registry caps lifetime cardinality and concurrent claims", TestOwnerBoundRegistryBoundsAsync),
+            ("owner-bound grant errors are bounded before status forwarding", TestOwnerBoundGrantResponseBoundsAsync),
+            ("owner-bound v2 broker issues dispatches once and returns deterministic packet", TestOwnerBoundProviderToolAsync),
+            ("owner-bound v2 broker fails closed across owner replay expiry restart and revocation", TestOwnerBoundProviderTerminalBehaviorAsync),
+            ("owner-bound v2 broker rejects hostile contract and body ambiguity before dispatch", TestOwnerBoundProviderHostileInputsAsync),
         ];
 
         int failures = 0;
@@ -55,6 +62,7 @@ static Task TestConfigurationAsync()
     Equal("ghost.chummer.run", configuration.PublicHost);
     Equal("example-team.cloudflareaccess.com", configuration.TeamDomain);
     Equal("https://example-team.cloudflareaccess.com/", configuration.Issuer.AbsoluteUri);
+    Equal(TestToolContractDigest, configuration.ToolContractDigest);
     Equal(
         "https://example-team.cloudflareaccess.com/cdn-cgi/access/certs",
         configuration.CertificatesEndpoint.AbsoluteUri);
@@ -62,19 +70,28 @@ static Task TestConfigurationAsync()
     Throws<InvalidOperationException>(() => AccessEdgeConfiguration.Create(
         "unconfigured.invalid",
         "example-team.cloudflareaccess.com",
-        TestAudience));
+        TestAudience,
+        TestToolContractDigest));
     Throws<InvalidOperationException>(() => AccessEdgeConfiguration.Create(
         "ghost.chummer.run",
         "evil.example.com",
-        TestAudience));
+        TestAudience,
+        TestToolContractDigest));
     Throws<InvalidOperationException>(() => AccessEdgeConfiguration.Create(
         "Ghost.chummer.run",
         "example-team.cloudflareaccess.com",
-        TestAudience));
+        TestAudience,
+        TestToolContractDigest));
     Throws<InvalidOperationException>(() => AccessEdgeConfiguration.Create(
         "ghost.chummer.run",
         "example-team.cloudflareaccess.com",
-        ""));
+        "",
+        TestToolContractDigest));
+    Throws<InvalidOperationException>(() => AccessEdgeConfiguration.Create(
+        "ghost.chummer.run",
+        "example-team.cloudflareaccess.com",
+        TestAudience,
+        "sha256:ABC"));
     return Task.CompletedTask;
 }
 
@@ -92,12 +109,16 @@ static Task TestRouteAllowlistAsync()
     True(BuildGhostAccessProxy.TryMatchRoute(
         "POST", "/api/workspaces/abc-123/build-ghost/tool-access", out BuildGhostAccessRoute grant));
     Equal(BuildGhostAccessRouteKind.ToolAccess, grant.Kind);
+    True(BuildGhostAccessProxy.TryMatchRoute(
+        "POST", BuildGhostProviderToolRequestContract.Path, out BuildGhostAccessRoute provider));
+    Equal(BuildGhostAccessRouteKind.ProviderToolV2, provider.Kind);
+    Equal((long)BuildGhostProviderToolRequestContract.MaximumBodyBytes, provider.MaximumBodyBytes);
 
     foreach ((string method, string path) in new[]
     {
         ("POST", "/api/internal/build-ghost/tool/resolve"),
         ("POST", "/api/v1/ai/build-ghost/tool"),
-        ("POST", "/api/v2/ai/build-ghost/tool"),
+        ("POST", "/api/v2/ai/build-ghost/explain"),
         ("POST", "/api/v1/ai/build-ghost/explain"),
         ("PUT", "/api/workspaces/abc-123"),
         ("GET", "/api/workspaces"),
@@ -614,6 +635,26 @@ static async Task TestActivityHeaderIsolationAsync()
             },
             "{\"ok\":true}");
         AssertTraceHeadersAbsent(presentationHeaders);
+
+        IReadOnlySet<string> aiHeaders = await CaptureLoopbackHeadersAsync(
+            async endpoint =>
+            {
+                using SocketsHttpHandler handler = AccessEdgeHttpTransport.CreateAiHandler();
+                True(handler.ActivityHeadersPropagator is null);
+                using HttpClient client = new(handler);
+                using HttpRequestMessage request = BuildGhostAccessProxy.CreateProviderToolUpstreamRequest(
+                    incoming.Request,
+                    "{}"u8.ToArray(),
+                    TestToolContractDigest);
+                request.RequestUri = endpoint;
+                await WithHostileActivityAsync(format, async () =>
+                {
+                    using HttpResponseMessage response = await client.SendAsync(request);
+                    Equal(HttpStatusCode.OK, response.StatusCode);
+                });
+            },
+            "{\"ok\":true}");
+        AssertTraceHeadersAbsent(aiHeaders);
     }
 
     using RSA rsa = RSA.Create(2048);
@@ -632,6 +673,7 @@ static async Task TestActivityHeaderIsolationAsync()
                     baseConfiguration.PublicHost,
                     baseConfiguration.TeamDomain,
                     baseConfiguration.Audience,
+                    baseConfiguration.ToolContractDigest,
                     baseConfiguration.Issuer,
                     endpoint);
                 using SocketsHttpHandler handler = AccessEdgeHttpTransport.CreateCertificateHandler();
@@ -662,7 +704,7 @@ static async Task TestProxyBypassesAsync()
     {
         ("wrong.chummer.run", "GET", "/api/workspaces/runner-1", (Action<DefaultHttpContext>?)null),
         (configuration.PublicHost, "POST", "/api/internal/build-ghost/tool/resolve", null),
-        (configuration.PublicHost, "POST", "/api/v2/ai/build-ghost/tool", null),
+        (configuration.PublicHost, "POST", "/api/v2/ai/build-ghost/explain", null),
         (configuration.PublicHost, "PUT", "/api/workspaces/runner-1", null),
         (configuration.PublicHost, "GET", "/api/workspaces/runner-1", context => context.Request.QueryString = new QueryString("?bypass=1")),
         (configuration.PublicHost, "GET", "/api/workspaces/runner-1", context => context.Request.Headers.Remove(BuildGhostAccessProxy.JwtAssertionHeader)),
@@ -717,6 +759,476 @@ static async Task TestProxyForwardingAsync()
     Equal("{\"ok\":true}", await reader.ReadToEndAsync());
 }
 
+static async Task TestOwnerBoundRegistryBoundsAsync()
+{
+    DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T11:00:00Z");
+    MutableTimeProvider clock = new(now);
+    string digest = $"sha256:{new string('9', 64)}";
+    const string owner = "runner@example.com";
+    BuildGhostOwnerBoundGrantRegistry registry = new(clock);
+
+    False(registry.TryRegister(
+        CanonicalPacketKey(0),
+        owner,
+        digest,
+        now));
+    False(registry.TryRegister(
+        CanonicalPacketKey(0),
+        owner,
+        digest,
+        now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime).AddTicks(1)));
+    True(registry.TryRegister(
+        CanonicalPacketKey(0),
+        owner,
+        digest,
+        now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)));
+    False(registry.TryRegister(
+        CanonicalPacketKey(0),
+        "other@example.com",
+        digest,
+        now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)));
+
+    for (int index = 1; index < BuildGhostOwnerBoundGrantRegistry.MaximumBindings; index++)
+    {
+        True(registry.TryRegister(
+            CanonicalPacketKey(index),
+            owner,
+            digest,
+            now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)),
+            $"binding {index} should fit exact registry capacity");
+    }
+    Equal(BuildGhostOwnerBoundGrantRegistry.MaximumBindings, registry.Count);
+    False(registry.TryRegister(
+        CanonicalPacketKey(BuildGhostOwnerBoundGrantRegistry.MaximumBindings),
+        owner,
+        digest,
+        now.Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)));
+
+    clock.Advance(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime);
+    True(registry.TryRegister(
+        CanonicalPacketKey(BuildGhostOwnerBoundGrantRegistry.MaximumBindings),
+        owner,
+        digest,
+        clock.GetUtcNow().Add(BuildGhostOwnerBoundGrantRegistry.MaximumGrantLifetime)));
+    Equal(1, registry.Count);
+    False(registry.TryClaim(CanonicalPacketKey(0), owner, digest));
+
+    BuildGhostOwnerBoundGrantRegistry claimRegistry = new(clock);
+    string claimKey = CanonicalPacketKey(BuildGhostOwnerBoundGrantRegistry.MaximumBindings + 1);
+    True(claimRegistry.TryRegister(
+        claimKey,
+        owner,
+        digest,
+        clock.GetUtcNow().AddMinutes(1)));
+    bool[] claimResults = await Task.WhenAll(
+        Enumerable.Range(0, 64)
+            .Select(_ => Task.Run(() => claimRegistry.TryClaim(claimKey, owner, digest))));
+    Equal(1, claimResults.Count(static claimed => claimed));
+    Equal(0, claimRegistry.Count);
+
+    BuildGhostOwnerBoundGrantRegistry dispatchRegistry = new(clock);
+    string dispatchKey = CanonicalPacketKey(BuildGhostOwnerBoundGrantRegistry.MaximumBindings + 2);
+    True(dispatchRegistry.TryRegister(
+        dispatchKey,
+        owner,
+        digest,
+        clock.GetUtcNow().AddMinutes(1)));
+    using HttpClient presentation = new(new CountingHandler());
+    ConcurrentProviderToolHandler aiHandler = new(digest);
+    using HttpClient ai = new(aiHandler);
+    BuildGhostAccessProxy proxy = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        presentation,
+        ai,
+        dispatchRegistry);
+    DefaultHttpContext[] contexts = Enumerable.Range(0, 64)
+        .Select(_ => ProviderRequestContext(dispatchKey, digest))
+        .ToArray();
+    Task[] dispatches = contexts.Select(proxy.HandleAsync).ToArray();
+    await aiHandler.WaitForCallAsync();
+    aiHandler.Release();
+    await Task.WhenAll(dispatches);
+    Equal(1, aiHandler.Calls);
+    Equal(1, contexts.Count(static context => context.Response.StatusCode == StatusCodes.Status200OK));
+    Equal(63, contexts.Count(static context => context.Response.StatusCode == StatusCodes.Status410Gone));
+    Equal(0, dispatchRegistry.Count);
+}
+
+static async Task TestOwnerBoundGrantResponseBoundsAsync()
+{
+    DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T11:30:00Z");
+    MutableTimeProvider clock = new(now);
+    const string leakedKey = "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHc";
+    byte[] hostileBody = Encoding.UTF8.GetBytes(
+        $"{{\"packetAccessKey\":\"{leakedKey}\",\"padding\":\"{new string('x', 17 * 1024)}\"}}");
+    bool responseHadNoDeclaredLength = false;
+    FixedResponseHandler presentationHandler = new(_ =>
+    {
+        StreamContent content = new(new NonSeekableReadStream(hostileBody));
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        responseHadNoDeclaredLength = content.Headers.ContentLength is null;
+        return new HttpResponseMessage(HttpStatusCode.Conflict)
+        {
+            Content = content,
+        };
+    });
+    using HttpClient presentation = new(presentationHandler);
+    using HttpClient ai = new(new CountingHandler());
+    BuildGhostOwnerBoundGrantRegistry registry = new(clock);
+    BuildGhostAccessProxy proxy = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        presentation,
+        ai,
+        registry);
+    DefaultHttpContext context = GrantRequestContext();
+
+    await proxy.HandleAsync(context);
+
+    True(responseHadNoDeclaredLength);
+    Equal(StatusCodes.Status502BadGateway, context.Response.StatusCode);
+    Equal(0, registry.Count);
+    Equal(
+        "{\"error\":\"private_tool_upstream_response_invalid\"}",
+        await ResponseBodyAsync(context));
+    False((await ResponseBodyAsync(context)).Contains(leakedKey, StringComparison.Ordinal));
+    Equal("no-store", context.Response.Headers.CacheControl.ToString());
+}
+
+static async Task TestOwnerBoundProviderToolAsync()
+{
+    DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T12:00:00Z");
+    MutableTimeProvider clock = new(now);
+    const string key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    string digest = $"sha256:{new string('a', 64)}";
+    GrantIssuanceHandler presentationHandler = new();
+    presentationHandler.Enqueue(new TestGrant(key, digest, now.AddMinutes(5)));
+    ProviderToolHandler aiHandler = new();
+    aiHandler.Enqueue(new TestProviderResponse(
+        HttpStatusCode.OK,
+        "{\"schema\":\"chummer.build_ghost_analysis.v1\",\"deterministicFallbackText\":\"grounded local answer\"}",
+        digest));
+    using HttpClient presentation = new(presentationHandler);
+    using HttpClient ai = new(aiHandler);
+    BuildGhostOwnerBoundGrantRegistry registry = new(clock);
+    BuildGhostAccessProxy proxy = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        presentation,
+        ai,
+        registry);
+
+    DefaultHttpContext issue = GrantRequestContext();
+    await proxy.HandleAsync(issue);
+    Equal(StatusCodes.Status200OK, issue.Response.StatusCode);
+    Equal(1, presentationHandler.Calls);
+    Equal("runner@example.com", presentationHandler.Owner);
+    False(presentationHandler.SawAccessAssertion);
+    False(presentationHandler.SawAuthorization);
+    Equal(1, registry.Count);
+    string issueBody = await ResponseBodyAsync(issue);
+    True(issueBody.Contains(key, StringComparison.Ordinal));
+    Equal("no-store", issue.Response.Headers.CacheControl.ToString());
+
+    DefaultHttpContext consume = ProviderRequestContext(key, digest);
+    consume.Request.Headers[BuildGhostAccessProxy.OwnerHeader] = "mallory@example.com";
+    consume.Request.Headers["traceparent"] =
+        "00-11111111111111111111111111111111-2222222222222222-01";
+    consume.Request.Headers["Cf-Connecting-Ip"] = "203.0.113.9";
+    await proxy.HandleAsync(consume);
+    Equal(StatusCodes.Status200OK, consume.Response.StatusCode);
+    Equal(1, aiHandler.Calls);
+    Equal(0, registry.Count);
+    False(aiHandler.SawOwner);
+    False(aiHandler.SawAccessAssertion);
+    False(aiHandler.SawAuthenticatedEmail);
+    False(aiHandler.SawAuthorization);
+    False(aiHandler.SawCookie);
+    False(aiHandler.SawTrace);
+    False(aiHandler.SawCloudflareHeaders);
+    True(aiHandler.SawCanonicalPacketKeyInBody);
+    Equal(TestToolContractDigest, aiHandler.ToolContracts.Single());
+    True(aiHandler.CacheControlNoStore);
+    Equal(BuildGhostProviderToolRequestContract.Path, aiHandler.Paths.Single());
+    Equal("no-store", consume.Response.Headers.CacheControl.ToString());
+    False(consume.Response.Headers.ContainsKey("Set-Cookie"));
+    Equal(digest, consume.Response.Headers["X-Chummer-Build-Ghost-Packet-Digest"].ToString());
+    True((await ResponseBodyAsync(consume)).Contains("grounded local answer", StringComparison.Ordinal));
+
+    DefaultHttpContext replay = ProviderRequestContext(key, digest);
+    await proxy.HandleAsync(replay);
+    Equal(StatusCodes.Status410Gone, replay.Response.StatusCode);
+    Equal("{\"error\":\"private-tool-authority-rejected\"}", await ResponseBodyAsync(replay));
+    Equal(1, aiHandler.Calls);
+}
+
+static async Task TestOwnerBoundProviderTerminalBehaviorAsync()
+{
+    DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T13:00:00Z");
+    MutableTimeProvider clock = new(now);
+    string digest = $"sha256:{new string('b', 64)}";
+    string ownerKey = $"{new string('B', 42)}E";
+    string restartKey = $"{new string('C', 42)}I";
+    string expiredKey = $"{new string('D', 42)}M";
+    string revokedKey = $"{new string('E', 42)}Q";
+    GrantIssuanceHandler presentationHandler = new();
+    presentationHandler.Enqueue(new TestGrant(ownerKey, digest, now.AddMinutes(5)));
+    presentationHandler.Enqueue(new TestGrant(restartKey, digest, now.AddMinutes(5)));
+    presentationHandler.Enqueue(new TestGrant(expiredKey, digest, now.AddMinutes(1)));
+    presentationHandler.Enqueue(new TestGrant(revokedKey, digest, now.AddMinutes(5)));
+    ProviderToolHandler aiHandler = new();
+    aiHandler.Enqueue(new TestProviderResponse(HttpStatusCode.OK, "{\"ok\":true}", digest));
+    const string terminalBody = "{\"error\":\"private-tool-authority-rejected\"}";
+    aiHandler.Enqueue(new TestProviderResponse(HttpStatusCode.Gone, terminalBody, null));
+    using HttpClient presentation = new(presentationHandler);
+    using HttpClient ai = new(aiHandler);
+    BuildGhostOwnerBoundGrantRegistry registry = new(clock);
+    BuildGhostAccessProxy proxy = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        presentation,
+        ai,
+        registry);
+
+    await proxy.HandleAsync(GrantRequestContext());
+    DefaultHttpContext crossOwner = ProviderRequestContext(ownerKey, digest, "attacker@example.com");
+    await proxy.HandleAsync(crossOwner);
+    Equal(StatusCodes.Status410Gone, crossOwner.Response.StatusCode);
+    Equal(0, aiHandler.Calls);
+    Equal(1, registry.Count);
+
+    DefaultHttpContext wrongDigest = ProviderRequestContext(
+        ownerKey,
+        $"sha256:{new string('f', 64)}");
+    await proxy.HandleAsync(wrongDigest);
+    Equal(StatusCodes.Status410Gone, wrongDigest.Response.StatusCode);
+    Equal(0, aiHandler.Calls);
+    Equal(1, registry.Count);
+
+    DefaultHttpContext rightfulOwner = ProviderRequestContext(ownerKey, digest);
+    await proxy.HandleAsync(rightfulOwner);
+    Equal(StatusCodes.Status200OK, rightfulOwner.Response.StatusCode);
+    Equal(1, aiHandler.Calls);
+
+    await proxy.HandleAsync(GrantRequestContext());
+    BuildGhostAccessProxy restarted = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        presentation,
+        ai,
+        new BuildGhostOwnerBoundGrantRegistry(clock));
+    DefaultHttpContext afterRestart = ProviderRequestContext(restartKey, digest);
+    await restarted.HandleAsync(afterRestart);
+    Equal(StatusCodes.Status410Gone, afterRestart.Response.StatusCode);
+    Equal(1, aiHandler.Calls);
+
+    await proxy.HandleAsync(GrantRequestContext());
+    clock.Advance(TimeSpan.FromMinutes(2));
+    DefaultHttpContext expired = ProviderRequestContext(expiredKey, digest);
+    await proxy.HandleAsync(expired);
+    Equal(StatusCodes.Status410Gone, expired.Response.StatusCode);
+    Equal(1, aiHandler.Calls);
+
+    await proxy.HandleAsync(GrantRequestContext());
+    DefaultHttpContext revoked = ProviderRequestContext(revokedKey, digest);
+    await proxy.HandleAsync(revoked);
+    Equal(StatusCodes.Status410Gone, revoked.Response.StatusCode);
+    Equal(terminalBody, await ResponseBodyAsync(revoked));
+    Equal("no-store", revoked.Response.Headers.CacheControl.ToString());
+    Equal(2, aiHandler.Calls);
+
+    DefaultHttpContext terminalReplay = ProviderRequestContext(revokedKey, digest);
+    await proxy.HandleAsync(terminalReplay);
+    Equal(revoked.Response.StatusCode, terminalReplay.Response.StatusCode);
+    Equal(await ResponseBodyAsync(revoked), await ResponseBodyAsync(terminalReplay));
+    Equal(revoked.Response.ContentType, terminalReplay.Response.ContentType);
+    Equal(revoked.Response.Headers.CacheControl.ToString(), terminalReplay.Response.Headers.CacheControl.ToString());
+    Equal(2, aiHandler.Calls);
+}
+
+static async Task TestOwnerBoundProviderHostileInputsAsync()
+{
+    DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T14:00:00Z");
+    MutableTimeProvider clock = new(now);
+    const string key = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFU";
+    string digest = $"sha256:{new string('c', 64)}";
+    GrantIssuanceHandler presentationHandler = new();
+    presentationHandler.Enqueue(new TestGrant(key, digest, now.AddMinutes(5)));
+    ProviderToolHandler aiHandler = new();
+    aiHandler.Enqueue(new TestProviderResponse(HttpStatusCode.OK, "{\"ok\":true}", digest));
+    using HttpClient presentation = new(presentationHandler);
+    using HttpClient ai = new(aiHandler);
+    BuildGhostOwnerBoundGrantRegistry registry = new(clock);
+    BuildGhostAccessProxy proxy = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        presentation,
+        ai,
+        registry);
+    await proxy.HandleAsync(GrantRequestContext());
+    Equal(1, registry.Count);
+
+    async Task AssertRejectedAsync(DefaultHttpContext context, int expectedStatus)
+    {
+        await proxy.HandleAsync(context);
+        Equal(expectedStatus, context.Response.StatusCode);
+        Equal("no-store", context.Response.Headers.CacheControl.ToString());
+        False((await ResponseBodyAsync(context)).Contains(key, StringComparison.Ordinal));
+        Equal(0, aiHandler.Calls);
+        Equal(1, registry.Count);
+    }
+
+    DefaultHttpContext missingCache = ProviderRequestContext(key, digest);
+    missingCache.Request.Headers.Remove("Cache-Control");
+    await AssertRejectedAsync(missingCache, StatusCodes.Status401Unauthorized);
+
+    DefaultHttpContext authorization = ProviderRequestContext(key, digest);
+    authorization.Request.Headers.Authorization = $"Bearer {key}";
+    await AssertRejectedAsync(authorization, StatusCodes.Status401Unauthorized);
+
+    DefaultHttpContext cookie = ProviderRequestContext(key, digest);
+    cookie.Request.Headers.Cookie = $"packet_access_key={key}";
+    await AssertRejectedAsync(cookie, StatusCodes.Status401Unauthorized);
+
+    DefaultHttpContext wrongContract = ProviderRequestContext(key, digest);
+    wrongContract.Request.Headers[BuildGhostAccessProxy.ToolContractHeader] = $"sha256:{new string('d', 64)}";
+    await AssertRejectedAsync(wrongContract, StatusCodes.Status401Unauthorized);
+
+    DefaultHttpContext duplicateContract = ProviderRequestContext(key, digest);
+    duplicateContract.Request.Headers[BuildGhostAccessProxy.ToolContractHeader] =
+        new StringValues([TestToolContractDigest, TestToolContractDigest]);
+    await AssertRejectedAsync(duplicateContract, StatusCodes.Status401Unauthorized);
+
+    DefaultHttpContext wrongMedia = ProviderRequestContext(key, digest);
+    wrongMedia.Request.ContentType = "application/json; charset=iso-8859-1";
+    await AssertRejectedAsync(wrongMedia, StatusCodes.Status415UnsupportedMediaType);
+
+    DefaultHttpContext tooLarge = ProviderRequestContext(key, digest);
+    tooLarge.Request.ContentLength = BuildGhostProviderToolRequestContract.MaximumBodyBytes + 1;
+    await AssertRejectedAsync(tooLarge, StatusCodes.Status413PayloadTooLarge);
+
+    string validBody = ProviderBody(key, digest);
+    DefaultHttpContext unknownField = ProviderRequestContext(
+        key,
+        digest,
+        bodyOverride: validBody[..^1] + ",\"authorization\":\"blocked\"}");
+    await AssertRejectedAsync(unknownField, StatusCodes.Status400BadRequest);
+
+    DefaultHttpContext duplicateKey = ProviderRequestContext(
+        key,
+        digest,
+        bodyOverride: validBody.Replace(
+            "\"packet_digest\"",
+            $"\"packet_access_key\":\"{key}\",\"packet_digest\"",
+            StringComparison.Ordinal));
+    await AssertRejectedAsync(duplicateKey, StatusCodes.Status400BadRequest);
+
+    DefaultHttpContext wrongSchema = ProviderRequestContext(
+        key,
+        digest,
+        bodyOverride: validBody.Replace(
+            BuildGhostProviderToolRequestContract.RequestSchema,
+            "chummer.build_ghost.private_tool_request.v1",
+            StringComparison.Ordinal));
+    await AssertRejectedAsync(wrongSchema, StatusCodes.Status400BadRequest);
+
+    DefaultHttpContext query = ProviderRequestContext(key, digest);
+    query.Request.QueryString = new QueryString("?packet_access_key=blocked");
+    query.Features.Get<IHttpRequestFeature>()!.RawTarget =
+        BuildGhostProviderToolRequestContract.Path + query.Request.QueryString;
+    await AssertRejectedAsync(query, StatusCodes.Status404NotFound);
+
+    DefaultHttpContext valid = ProviderRequestContext(key, digest);
+    valid.Request.Headers[BuildGhostAccessProxy.OwnerHeader] = "mallory@example.com";
+    await proxy.HandleAsync(valid);
+    Equal(StatusCodes.Status200OK, valid.Response.StatusCode);
+    Equal(1, aiHandler.Calls);
+    False(aiHandler.SawOwner);
+    False(aiHandler.SawAuthorization);
+    False(aiHandler.SawCookie);
+
+    const string malformedGrantKey = "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGY";
+    FixedResponseHandler malformedGrant = new(_ => new HttpResponseMessage(HttpStatusCode.OK)
+    {
+        Content = new StringContent(
+            $"{{\"packetAccessKey\":\"{malformedGrantKey}\",\"packetDigest\":\"{digest}\",\"expiresAtUtc\":\"{now.AddMinutes(5):O}\",\"unexpected\":true}}",
+            Encoding.UTF8,
+            "application/json"),
+    });
+    using HttpClient malformedPresentation = new(malformedGrant);
+    BuildGhostAccessProxy malformedProxy = new(
+        TestConfiguration(),
+        new FixedValidator(true),
+        malformedPresentation,
+        ai,
+        new BuildGhostOwnerBoundGrantRegistry(clock));
+    DefaultHttpContext malformedIssue = GrantRequestContext();
+    await malformedProxy.HandleAsync(malformedIssue);
+    Equal(StatusCodes.Status502BadGateway, malformedIssue.Response.StatusCode);
+    False((await ResponseBodyAsync(malformedIssue)).Contains(malformedGrantKey, StringComparison.Ordinal));
+}
+
+static DefaultHttpContext GrantRequestContext(string owner = "runner@example.com")
+{
+    DefaultHttpContext context = AdmittedContext(
+        "/api/workspaces/runner-1/build-ghost/tool-access",
+        "POST");
+    context.Request.Headers[BuildGhostAccessProxy.AuthenticatedEmailHeader] = owner;
+    context.Request.ContentType = "application/json; charset=utf-8";
+    byte[] body = "{\"locale\":\"en-US\",\"requestKind\":\"current-build\"}"u8.ToArray();
+    context.Request.Body = new MemoryStream(body);
+    context.Request.ContentLength = body.Length;
+    context.Response.Body = new MemoryStream();
+    return context;
+}
+
+static DefaultHttpContext ProviderRequestContext(
+    string key,
+    string digest,
+    string owner = "runner@example.com",
+    string? bodyOverride = null)
+{
+    DefaultHttpContext context = AdmittedContext(BuildGhostProviderToolRequestContract.Path, "POST");
+    context.Request.Headers[BuildGhostAccessProxy.AuthenticatedEmailHeader] = owner;
+    context.Request.Headers.CacheControl = "no-store";
+    context.Request.Headers[BuildGhostAccessProxy.ToolContractHeader] = TestToolContractDigest;
+    context.Request.ContentType = "application/json";
+    byte[] body = Encoding.UTF8.GetBytes(bodyOverride ?? ProviderBody(key, digest));
+    context.Request.Body = new MemoryStream(body);
+    context.Request.ContentLength = body.Length;
+    context.Response.Body = new MemoryStream();
+    return context;
+}
+
+static string ProviderBody(string key, string digest)
+    => JsonSerializer.Serialize(new Dictionary<string, object?>
+    {
+        ["schema"] = BuildGhostProviderToolRequestContract.RequestSchema,
+        ["packet_access_key"] = key,
+        ["packet_digest"] = digest,
+        ["locale"] = "en-US",
+        ["request_kind"] = "current-build",
+        ["question"] = "What should I improve?",
+    });
+
+static string CanonicalPacketKey(int value)
+{
+    byte[] material = new byte[32];
+    material[^4] = (byte)(value >> 24);
+    material[^3] = (byte)(value >> 16);
+    material[^2] = (byte)(value >> 8);
+    material[^1] = (byte)value;
+    return Base64Url(material);
+}
+
+static async Task<string> ResponseBodyAsync(DefaultHttpContext context)
+{
+    context.Response.Body.Position = 0;
+    using StreamReader reader = new(context.Response.Body, Encoding.UTF8, leaveOpen: true);
+    return await reader.ReadToEndAsync();
+}
+
 static DefaultHttpContext AdmittedContext(string path, string method)
 {
     DefaultHttpContext context = new();
@@ -733,7 +1245,8 @@ static AccessEdgeConfiguration TestConfiguration()
     => AccessEdgeConfiguration.Create(
         "ghost.chummer.run",
         "example-team.cloudflareaccess.com",
-        TestAudience);
+        TestAudience,
+        TestToolContractDigest);
 
 static string Token(
     RSA rsa,
@@ -1015,6 +1528,194 @@ sealed class CapturingHandler : HttpMessageHandler
         response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"rev-1\"");
         response.Headers.TryAddWithoutValidation("Set-Cookie", "should-not-cross=1");
         return response;
+    }
+}
+
+sealed record TestGrant(
+    string PacketAccessKey,
+    string PacketDigest,
+    DateTimeOffset ExpiresAtUtc);
+
+sealed class GrantIssuanceHandler : HttpMessageHandler
+{
+    private readonly Queue<TestGrant> _grants = new();
+
+    public int Calls { get; private set; }
+    public string? Owner { get; private set; }
+    public bool SawAccessAssertion { get; private set; }
+    public bool SawAuthorization { get; private set; }
+
+    public void Enqueue(TestGrant grant) => _grants.Enqueue(grant);
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        Calls++;
+        Equal(HttpMethod.Post, request.Method);
+        True(request.RequestUri?.AbsolutePath.EndsWith(
+            "/build-ghost/tool-access",
+            StringComparison.Ordinal) == true);
+        Owner = request.Headers.GetValues(BuildGhostAccessProxy.OwnerHeader).Single();
+        SawAccessAssertion |= request.Headers.Contains(BuildGhostAccessProxy.JwtAssertionHeader);
+        SawAuthorization |= request.Headers.Authorization is not null;
+        True(request.Headers.CacheControl?.NoStore is true);
+        string requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+        False(requestBody.Contains("packet_access_key", StringComparison.Ordinal));
+        TestGrant grant = _grants.Dequeue();
+        string body = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["packetAccessKey"] = grant.PacketAccessKey,
+            ["packetDigest"] = grant.PacketDigest,
+            ["expiresAtUtc"] = grant.ExpiresAtUtc,
+        });
+        HttpResponseMessage response = new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        response.Headers.TryAddWithoutValidation("Set-Cookie", "presentation-cookie=blocked");
+        return response;
+    }
+}
+
+sealed record TestProviderResponse(
+    HttpStatusCode StatusCode,
+    string Body,
+    string? PacketDigest);
+
+sealed class ProviderToolHandler : HttpMessageHandler
+{
+    private readonly Queue<TestProviderResponse> _responses = new();
+
+    public int Calls { get; private set; }
+    public bool SawOwner { get; private set; }
+    public bool SawAccessAssertion { get; private set; }
+    public bool SawAuthenticatedEmail { get; private set; }
+    public bool SawAuthorization { get; private set; }
+    public bool SawCookie { get; private set; }
+    public bool SawTrace { get; private set; }
+    public bool SawCloudflareHeaders { get; private set; }
+    public bool SawCanonicalPacketKeyInBody { get; private set; }
+    public bool CacheControlNoStore { get; private set; }
+    public List<string> ToolContracts { get; } = [];
+    public List<string> Paths { get; } = [];
+
+    public void Enqueue(TestProviderResponse response) => _responses.Enqueue(response);
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        Calls++;
+        Equal(HttpMethod.Post, request.Method);
+        Paths.Add(request.RequestUri?.AbsolutePath ?? string.Empty);
+        SawOwner |= request.Headers.Contains(BuildGhostAccessProxy.OwnerHeader);
+        SawAccessAssertion |= request.Headers.Contains(BuildGhostAccessProxy.JwtAssertionHeader);
+        SawAuthenticatedEmail |= request.Headers.Contains(BuildGhostAccessProxy.AuthenticatedEmailHeader);
+        SawAuthorization |= request.Headers.Authorization is not null;
+        SawCookie |= request.Headers.Contains("Cookie");
+        SawTrace |= request.Headers.Contains("traceparent")
+            || request.Headers.Contains("tracestate")
+            || request.Headers.Contains("baggage")
+            || request.Headers.Contains("Request-Id")
+            || request.Headers.Contains("Correlation-Context");
+        SawCloudflareHeaders |= request.Headers.Any(
+            static header => header.Key.StartsWith("Cf-", StringComparison.OrdinalIgnoreCase));
+        CacheControlNoStore |= request.Headers.CacheControl?.NoStore is true;
+        ToolContracts.Add(request.Headers.GetValues(BuildGhostAccessProxy.ToolContractHeader).Single());
+        byte[] body = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
+        try
+        {
+            SawCanonicalPacketKeyInBody |= BuildGhostProviderToolRequestContract.TryParse(
+                body,
+                out _,
+                out _);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(body);
+        }
+
+        TestProviderResponse configured = _responses.Dequeue();
+        HttpResponseMessage response = new(configured.StatusCode)
+        {
+            Content = new StringContent(configured.Body, Encoding.UTF8, "application/json"),
+        };
+        if (configured.PacketDigest is not null)
+        {
+            response.Headers.TryAddWithoutValidation(
+                "X-Chummer-Build-Ghost-Packet-Digest",
+                configured.PacketDigest);
+        }
+        response.Headers.TryAddWithoutValidation("Set-Cookie", "ai-cookie=blocked");
+        return response;
+    }
+}
+
+sealed class ConcurrentProviderToolHandler(string packetDigest) : HttpMessageHandler
+{
+    private readonly TaskCompletionSource _callEntered = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _callReleased = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _calls;
+
+    public int Calls => Volatile.Read(ref _calls);
+
+    public Task WaitForCallAsync() => _callEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+    public void Release() => _callReleased.TrySetResult();
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref _calls);
+        _callEntered.TrySetResult();
+        await _callReleased.Task.WaitAsync(cancellationToken);
+        HttpResponseMessage response = new(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"ok\":true}", Encoding.UTF8, "application/json"),
+        };
+        response.Headers.TryAddWithoutValidation(
+            "X-Chummer-Build-Ghost-Packet-Digest",
+            packetDigest);
+        return response;
+    }
+}
+
+sealed class NonSeekableReadStream(byte[] body) : Stream
+{
+    private readonly MemoryStream _inner = new(body, writable: false);
+
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
+
+    public override void Flush() => throw new NotSupportedException();
+    public override int Read(byte[] buffer, int offset, int count)
+        => _inner.Read(buffer, offset, count);
+    public override ValueTask<int> ReadAsync(
+        Memory<byte> buffer,
+        CancellationToken cancellationToken = default)
+        => _inner.ReadAsync(buffer, cancellationToken);
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _inner.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }
 
