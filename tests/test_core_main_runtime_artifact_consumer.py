@@ -53,6 +53,10 @@ def write_json(path: Path, payload: Any, mode: int = 0o600) -> None:
     path.chmod(mode)
 
 
+def open_descriptor_count() -> int:
+    return len(os.listdir("/proc/self/fd"))
+
+
 def api_metadata(authority: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     producer = authority["producer"]
     run = {
@@ -483,3 +487,249 @@ def test_finalize_deletes_artifact_root_before_recording_only_verdict(
     rendered = verdict_path.read_text(encoding="utf-8")
     assert "artifact-root" not in rendered
     assert "not_attested_after_snapshot_capture" in rendered
+
+
+def test_archive_leaf_swap_is_rejected_without_descriptor_leaks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        module,
+        _authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        run_path,
+        artifact_path,
+    ) = build_synthetic_lane(tmp_path)
+    archive_path = workspace / "artifact.zip"
+    original_archive = tmp_path / "original-artifact.zip"
+    hostile_archive = tmp_path / "hostile-artifact.zip"
+    hostile_archive.write_bytes(b"hostile replacement\n")
+    hostile_archive.chmod(0o600)
+    real_open = module.os.open
+    swapped = False
+
+    def swap_before_archive_open(
+        path: Any, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        nonlocal swapped
+        if path == "artifact.zip" and dir_fd is not None and not swapped:
+            swapped = True
+            os.rename(archive_path, original_archive)
+            os.rename(hostile_archive, archive_path)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    before = open_descriptor_count()
+    with monkeypatch.context() as patcher:
+        patcher.setattr(module.os, "open", swap_before_archive_open)
+        with pytest.raises(module.ConsumerError, match="downloaded archive"):
+            module.prepare(
+                authority_path,
+                run_path,
+                artifact_path,
+                archive_path,
+                runner_temp,
+                workspace,
+                workspace / "artifact-root",
+                workspace / "validator-authority.json",
+            )
+    assert swapped
+    assert open_descriptor_count() == before
+    archive_path.unlink()
+    original_archive.rename(archive_path)
+    module.cleanup(authority_path, runner_temp, workspace)
+    assert not workspace.exists()
+
+
+def test_extraction_directory_swap_never_writes_through_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        module,
+        _authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        run_path,
+        artifact_path,
+    ) = build_synthetic_lane(tmp_path)
+    export_root = workspace / "artifact-root"
+    packages_path = export_root / "packages"
+    held_packages_path = export_root / "packages-held"
+    outside = tmp_path / "outside-packages"
+    outside.mkdir()
+    sentinel = outside / "sentinel"
+    sentinel.write_text("do not touch\n", encoding="utf-8")
+    real_open = module.os.open
+    swapped = False
+
+    def swap_packages_before_member_create(
+        path: Any, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        nonlocal swapped
+        if (
+            isinstance(path, str)
+            and path.endswith(".nupkg")
+            and flags & os.O_CREAT
+            and dir_fd is not None
+            and not swapped
+        ):
+            swapped = True
+            os.rename(packages_path, held_packages_path)
+            os.symlink(outside, packages_path, target_is_directory=True)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    before = open_descriptor_count()
+    with monkeypatch.context() as patcher:
+        patcher.setattr(module.os, "open", swap_packages_before_member_create)
+        with pytest.raises(module.ConsumerError, match="packages directory path"):
+            module.prepare(
+                authority_path,
+                run_path,
+                artifact_path,
+                workspace / "artifact.zip",
+                runner_temp,
+                workspace,
+                export_root,
+                workspace / "validator-authority.json",
+            )
+    assert swapped
+    assert list(outside.iterdir()) == [sentinel]
+    assert open_descriptor_count() == before
+    packages_path.unlink()
+    held_packages_path.rename(packages_path)
+    module.cleanup(authority_path, runner_temp, workspace)
+    assert not workspace.exists()
+
+
+def test_finalize_cleanup_uses_held_root_and_fails_closed_on_root_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        module,
+        authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        run_path,
+        artifact_path,
+    ) = build_synthetic_lane(tmp_path)
+    export_root = workspace / "artifact-root"
+    held_export_root = workspace / "artifact-root-held"
+    outside = tmp_path / "outside-cleanup"
+    outside.mkdir()
+    sentinel = outside / "sentinel"
+    sentinel.write_text("do not touch\n", encoding="utf-8")
+    module.prepare(
+        authority_path,
+        run_path,
+        artifact_path,
+        workspace / "artifact.zip",
+        runner_temp,
+        workspace,
+        export_root,
+        workspace / "validator-authority.json",
+    )
+    write_json(
+        workspace / "validation.json",
+        validator_result(authority, module.VALIDATION_V3),
+    )
+    verdict_path = runner_temp / "core-main-runtime-artifact-verdict.json"
+    real_unlink = module.os.unlink
+    swapped = False
+
+    def swap_root_during_package_cleanup(
+        path: Any, *, dir_fd: int | None = None
+    ) -> None:
+        nonlocal swapped
+        if (
+            isinstance(path, str)
+            and path.endswith(".nupkg")
+            and dir_fd is not None
+            and not swapped
+        ):
+            swapped = True
+            os.rename(export_root, held_export_root)
+            os.symlink(outside, export_root, target_is_directory=True)
+        real_unlink(path, dir_fd=dir_fd)
+
+    before = open_descriptor_count()
+    with monkeypatch.context() as patcher:
+        patcher.setattr(module.os, "unlink", swap_root_during_package_cleanup)
+        with pytest.raises(module.ConsumerError, match="extraction root path"):
+            module.finalize(
+                authority_path,
+                workspace / "validation.json",
+                runner_temp,
+                workspace,
+                verdict_path,
+            )
+    assert swapped
+    assert not verdict_path.exists()
+    assert list(outside.iterdir()) == [sentinel]
+    assert open_descriptor_count() == before
+    export_root.unlink()
+    held_export_root.rename(export_root)
+    module.cleanup(authority_path, runner_temp, workspace)
+    assert not workspace.exists()
+
+
+def test_verdict_write_uses_held_runner_and_removes_output_after_runner_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        module,
+        authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        run_path,
+        artifact_path,
+    ) = build_synthetic_lane(tmp_path)
+    module.prepare(
+        authority_path,
+        run_path,
+        artifact_path,
+        workspace / "artifact.zip",
+        runner_temp,
+        workspace,
+        workspace / "artifact-root",
+        workspace / "validator-authority.json",
+    )
+    write_json(
+        workspace / "validation.json",
+        validator_result(authority, module.VALIDATION_V3),
+    )
+    verdict_path = runner_temp / "core-main-runtime-artifact-verdict.json"
+    held_runner = runner_temp.with_name(f"{runner_temp.name}-held")
+    real_open = module.os.open
+    swapped = False
+
+    def swap_runner_before_verdict_create(
+        path: Any, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        nonlocal swapped
+        if path == verdict_path.name and flags & os.O_CREAT and not swapped:
+            swapped = True
+            os.rename(runner_temp, held_runner)
+            os.mkdir(runner_temp, mode=0o700)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    before = open_descriptor_count()
+    with monkeypatch.context() as patcher:
+        patcher.setattr(module.os, "open", swap_runner_before_verdict_create)
+        with pytest.raises(module.ConsumerError, match="runner temp path"):
+            module.finalize(
+                authority_path,
+                workspace / "validation.json",
+                runner_temp,
+                workspace,
+                verdict_path,
+            )
+    assert swapped
+    assert open_descriptor_count() == before
+    assert not (held_runner / verdict_path.name).exists()
+    assert not verdict_path.exists()
+    runner_temp.rmdir()
+    held_runner.rename(runner_temp)
+    assert not workspace.exists()
