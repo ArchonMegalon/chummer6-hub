@@ -142,6 +142,35 @@ services:
       - caddy-data:/caddy-data:ro
       - caddy-trust:/caddy-trust
 
+  build-ghost-cloudflare-access-edge:
+    profiles:
+      - cloudflare-access-ingress
+    image: chummer-build-ghost-cloudflare-access-edge:private-nonprod
+    build:
+      context: .
+      dockerfile: ops/build-ghost-private-nonprod/Dockerfile.cloudflare-access-edge
+      args:
+        CHUMMER_RUN_SERVICES_REVISION: ${CHUMMER_RUN_SERVICES_REVISION:?set the exact clean Hub revision}
+    restart: on-failure:5
+    depends_on:
+      chummer-build-ghost-presentation:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_HOST: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_HOST:-unconfigured.invalid}
+      CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN:-unconfigured.cloudflareaccess.com}
+      CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE:-}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      build-ghost-private: {}
+      build-ghost-cloudflare-ingress: {}
+
 volumes:
   build-ghost-packet-access:
   caddy-data:
@@ -156,3 +185,6 @@ networks:
   build-ghost-private:
     internal: true
   build-ghost-loopback: {}
+  build-ghost-cloudflare-ingress:
+    external: true
+    name: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK:-chummer-build-ghost-cloudflare-ingress}
