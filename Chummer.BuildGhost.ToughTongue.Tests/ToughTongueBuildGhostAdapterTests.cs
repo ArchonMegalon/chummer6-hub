@@ -1841,7 +1841,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ScenarioSchemaReceipt(),
             CustomFunctionBinding());
 
-    private static BuildGhostToughTongueStockAvatarBinding StockAvatarBinding()
+    internal static BuildGhostToughTongueStockAvatarBinding StockAvatarBinding()
     {
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(
             StockAvatarConfiguration()).Build();

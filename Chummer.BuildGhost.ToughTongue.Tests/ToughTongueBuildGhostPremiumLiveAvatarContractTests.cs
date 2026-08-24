@@ -1,7 +1,6 @@
 using Chummer.Run.AI.Services.BuildGhost;
 using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -202,17 +201,10 @@ public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
                 ToughTongueBuildGhostLiveAvatarProviders.Anam,
                 "rook-anam-persona-v1");
 
-        BuildGhostToughTongueStockAvatarReadbackReceipt stockReceipt =
-            StockAvatarReadbackReceipt();
         ToughTongueBuildGhostScenarioCandidate candidate =
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookPremiumLiveAvatarCandidate(
                 deployment,
-                BuildGhostToughTongueStockAvatarBindingContract.CreateReadVerified(
-                    stockReceipt,
-                    $"sha256:{new string('a', 64)}",
-                    $"sha256:{new string('a', 64)}",
-                    BuildGhostToughTongueStockAvatarBindingContract.ComputeReadbackReceiptFileDigest(
-                        stockReceipt)),
+                ToughTongueBuildGhostAdapterTests.StockAvatarBinding(),
                 voiceBinding,
                 liveAvatarBinding,
                 receipt);
@@ -259,34 +251,4 @@ public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
             ProviderManagedLipSynchronizationAdvertised: true,
             DateTimeOffset.Parse("2026-08-22T05:35:00Z"));
 
-    private static BuildGhostToughTongueStockAvatarReadbackReceipt StockAvatarReadbackReceipt()
-    {
-        const string liveAvatarId = "11111111-2222-4333-8444-555555555555";
-        const string scenarioRef = "private-stock-scenario-ref";
-        BuildGhostToughTongueStockAvatarReadbackReceipt receipt = new(
-            ToughTongueBuildGhostContractVersions.StockAvatarReadbackReceiptV1,
-            200,
-            string.Empty,
-            ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace,
-            ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName,
-            ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath,
-            liveAvatarId,
-            ToughTongueBuildGhostStockAvatarSelections.RequiredModelProvider,
-            ToughTongueBuildGhostStockAvatarSelections.CurrentModelId,
-            false,
-            $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(scenarioRef))).ToLowerInvariant()}",
-            BuildGhostToughTongueStockAvatarBindingContract.RequiredReadbackSource,
-            DateTimeOffset.UtcNow.AddMinutes(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
-            BuildGhostToughTongueStockAvatarBindingContract.MaximumPermittedAgeSeconds,
-            string.Empty);
-        receipt = receipt with
-        {
-            CanonicalWhitelistedResponseDigest =
-                BuildGhostToughTongueStockAvatarBindingContract.ComputeCanonicalWhitelistedResponseDigest(receipt)
-        };
-        return receipt with
-        {
-            ReceiptDigest = BuildGhostToughTongueStockAvatarBindingContract.ComputeReadbackReceiptDigest(receipt)
-        };
-    }
 }
