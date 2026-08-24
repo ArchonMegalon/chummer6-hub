@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Strict offline validation for the hosted Core runtime-package artifact.
 
-The downloader is responsible for authenticating and digest-checking the outer
-GitHub Actions artifact.  This validator receives that exact selector and the
+The transport adapter is responsible for authenticating the producer selector
+and digest-checking every extracted byte, either directly or through the Core
+v2 public-handoff receipt. This validator receives that exact selector and the
 expected extracted-content bindings through a separately trusted authority
 file. It performs no network access and does not infer a "latest" artifact.
 The verdict attests one private immutable byte snapshot; mutable extraction
@@ -104,6 +105,21 @@ EXPECTED_BUILD_AUTHORITY_PATHS = (
     "scripts/ai/bootstrap-owner-contracts-feed.py",
     "scripts/ai/runtime-package-plane.py",
     "scripts/ai/verify-no-siblings-package-plane.sh",
+)
+PUBLIC_HANDOFF_RECIPE_COMMIT = "c6138ff7ca27d66e85b223d0b29381cff4811277"
+PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA = (
+    EXPECTED_ALLOWED_RECIPE_DELTA[:10]
+    + ("docs/runtime-package-public-handoff.md",)
+    + EXPECTED_ALLOWED_RECIPE_DELTA[10:13]
+    + ("scripts/ai/public-runtime-package-handoff.py",)
+    + EXPECTED_ALLOWED_RECIPE_DELTA[13:17]
+    + ("tests/test_public_runtime_package_handoff.py",)
+    + EXPECTED_ALLOWED_RECIPE_DELTA[17:]
+)
+PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS = (
+    EXPECTED_BUILD_AUTHORITY_PATHS[:9]
+    + ("scripts/ai/public-runtime-package-handoff.py",)
+    + EXPECTED_BUILD_AUTHORITY_PATHS[9:]
 )
 EXPECTED_EXTERNAL_OWNER_PACKAGES = (
     (
@@ -1123,7 +1139,12 @@ def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
     ]
     if len(normalized_delta) != len(set(value.casefold() for value in normalized_delta)):
         raise ArtifactValidationError("allowed_recipe_delta paths must be case-insensitively unique")
-    if normalized_delta != list(EXPECTED_ALLOWED_RECIPE_DELTA):
+    expected_allowed_delta = (
+        PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA
+        if authority.package_recipe_commit == PUBLIC_HANDOFF_RECIPE_COMMIT
+        else EXPECTED_ALLOWED_RECIPE_DELTA
+    )
+    if normalized_delta != list(expected_allowed_delta):
         raise ArtifactValidationError(
             "allowed_recipe_delta omission, addition, or order differs from current Core v1"
         )
@@ -1142,7 +1163,12 @@ def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
         _sha256_value(row.get("sha256"), label=f"build_authority_files[{index}].sha256")
     if len(build_paths) != len(set(value.casefold() for value in build_paths)):
         raise ArtifactValidationError("build authority paths must be case-insensitively unique")
-    if build_paths != list(EXPECTED_BUILD_AUTHORITY_PATHS):
+    expected_build_authority_paths = (
+        PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS
+        if authority.package_recipe_commit == PUBLIC_HANDOFF_RECIPE_COMMIT
+        else EXPECTED_BUILD_AUTHORITY_PATHS
+    )
+    if build_paths != list(expected_build_authority_paths):
         raise ArtifactValidationError(
             "build authority path omission, addition, or order differs from current Core v1"
         )

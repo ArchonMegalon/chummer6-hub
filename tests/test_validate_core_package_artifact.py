@@ -543,6 +543,23 @@ def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> N
     ] == "pass"
 
 
+def test_public_handoff_recipe_has_one_explicit_additive_policy_profile() -> None:
+    module = load_module()
+    assert module.PUBLIC_HANDOFF_RECIPE_COMMIT == (
+        "c6138ff7ca27d66e85b223d0b29381cff4811277"
+    )
+    assert set(module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA) - set(
+        module.EXPECTED_ALLOWED_RECIPE_DELTA
+    ) == {
+        "docs/runtime-package-public-handoff.md",
+        "scripts/ai/public-runtime-package-handoff.py",
+        "tests/test_public_runtime_package_handoff.py",
+    }
+    assert set(module.PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS) - set(
+        module.EXPECTED_BUILD_AUTHORITY_PATHS
+    ) == {"scripts/ai/public-runtime-package-handoff.py"}
+
+
 def test_cli_writes_a_deterministic_validation_receipt(tmp_path: Path) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)

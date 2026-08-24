@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consume one immutable Core main runtime artifact and retain only its verdict."""
+"""Consume one exact anonymous Core public release and retain only its verdict."""
 
 from __future__ import annotations
 
@@ -17,11 +17,13 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
 
-AUTHORITY_CONTRACT = "chummer-hub.core-main-runtime-artifact-consumer-authority/v1"
-VERDICT_CONTRACT = "chummer-hub.core-main-runtime-artifact-verdict/v1"
+AUTHORITY_CONTRACT = "chummer-hub.core-main-runtime-public-release-authority/v2"
+VERDICT_CONTRACT = "chummer-hub.core-main-runtime-public-release-verdict/v2"
 VALIDATION_V3 = "chummer-hub.core-runtime-package-artifact-validation/v3"
 BYTE_SNAPSHOT_CONTRACT = "chummer-hub.core-runtime-package-byte-snapshot/v1"
 SELECTOR_CONTRACT = "github-actions.immutable-artifact-selector/v1"
+HANDOFF_CONTRACT = "chummer-core.runtime-package-public-handoff/v2"
+HANDOFF_ZIP_CONTRACT = "chummer-core.runtime-package-public-handoff-zip/v1"
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_JSON_BYTES = 2 * 1024 * 1024
@@ -37,7 +39,13 @@ EXPECTED_PACKAGE_IDS = (
     "Chummer.Engine.GmCharacterEdits",
 )
 
-ENVELOPE_KEYS = {"contract", "producer", "archive", "validator_authority"}
+ENVELOPE_KEYS = {
+    "contract",
+    "producer",
+    "public_release",
+    "archive",
+    "validator_authority",
+}
 PRODUCER_KEYS = {
     "repository",
     "repository_id",
@@ -69,10 +77,83 @@ ARCHIVE_KEYS = {
     "members",
 }
 MEMBER_KEYS = {"path", "sha256", "size_bytes"}
+PUBLIC_RELEASE_KEYS = {
+    "release_id",
+    "tag_name",
+    "target_commit",
+    "name",
+    "body",
+    "draft",
+    "prerelease",
+    "immutable",
+    "created_at_utc",
+    "published_at_utc",
+    "updated_at_utc",
+    "release_api_url",
+    "release_html_url",
+    "tag_api_url",
+    "receipt_asset",
+    "bundle_asset",
+}
+RELEASE_ASSET_KEYS = {
+    "id",
+    "name",
+    "label",
+    "content_type",
+    "state",
+    "size_bytes",
+    "sha256",
+    "created_at_utc",
+    "updated_at_utc",
+    "api_url",
+    "download_url",
+}
+HANDOFF_KEYS = {
+    "contract",
+    "repository",
+    "ref",
+    "commit",
+    "release_tag",
+    "receipt_asset_name",
+    "source_actions_artifact",
+    "bundle",
+}
+HANDOFF_SOURCE_KEYS = {"id", "name", "sha256", "size_bytes", "workflow_run", "authenticated_metadata"}
+HANDOFF_WORKFLOW_KEYS = {
+    "id",
+    "attempt",
+    "event",
+    "head_branch",
+    "head_sha",
+    "head_tree",
+    "repository",
+    "workflow_id",
+    "workflow_ref",
+    "workflow_sha",
+    "attempt_api_url",
+}
+HANDOFF_METADATA_KEYS = {
+    "api_url",
+    "archive_download_url",
+    "created_at_utc",
+    "expires_at_utc",
+    "repository_id",
+    "head_repository_id",
+}
+HANDOFF_BUNDLE_KEYS = {
+    "contract",
+    "asset_name",
+    "sha256",
+    "size_bytes",
+    "member_count",
+    "uncompressed_size_bytes",
+    "members",
+}
 WORKSPACE_FILES = {
-    "run.json",
-    "artifact.json",
-    "artifact.zip",
+    "release.json",
+    "tag.json",
+    "receipt.json",
+    "bundle.zip",
     "validator-authority.json",
     "validation.json",
 }
@@ -199,14 +280,92 @@ def load_authority(path: Path) -> dict[str, Any]:
     if producer["event"] != "push" or producer["branch"] != "main":
         raise ConsumerError("producer must be one push run on main")
 
+    release = _exact_object(
+        authority["public_release"], PUBLIC_RELEASE_KEYS, label="public_release"
+    )
+    _positive_integer(release["release_id"], label="public_release.release_id")
+    for key in (
+        "tag_name",
+        "name",
+        "body",
+        "created_at_utc",
+        "published_at_utc",
+        "updated_at_utc",
+        "release_api_url",
+        "release_html_url",
+        "tag_api_url",
+    ):
+        _string(release[key], label=f"public_release.{key}")
+    _sha40(release["target_commit"], label="public_release.target_commit")
+    if release["target_commit"] != producer["head_commit"]:
+        raise ConsumerError("public release target differs from producer commit")
+    if release["draft"] is not False or release["prerelease"] is not False:
+        raise ConsumerError("public release must be published and non-prerelease")
+    # GitHub currently reports releases as mutable. The consumer never upgrades
+    # that into an immutability claim; exact IDs and asset digests fail closed.
+    if release["immutable"] is not False:
+        raise ConsumerError("reviewed public release mutability posture differs")
+    expected_tag = f"core-runtime-package-plane-{producer['head_commit']}"
+    if release["tag_name"] != expected_tag:
+        raise ConsumerError("public release tag does not bind the producer commit")
+    repository = producer["repository"]
+    expected_release_urls = {
+        "release_api_url": (
+            f"https://api.github.com/repos/{repository}/releases/{release['release_id']}"
+        ),
+        "release_html_url": (
+            f"https://github.com/{repository}/releases/tag/{release['tag_name']}"
+        ),
+        "tag_api_url": (
+            f"https://api.github.com/repos/{repository}/git/ref/tags/{release['tag_name']}"
+        ),
+    }
+    for key, expected in expected_release_urls.items():
+        if release[key] != expected:
+            raise ConsumerError(f"public_release.{key} differs from exact repository authority")
+    for asset_key, content_type in (
+        ("receipt_asset", "application/json"),
+        ("bundle_asset", "application/zip"),
+    ):
+        asset = _exact_object(
+            release[asset_key], RELEASE_ASSET_KEYS, label=f"public_release.{asset_key}"
+        )
+        _positive_integer(asset["id"], label=f"public_release.{asset_key}.id")
+        _positive_integer(
+            asset["size_bytes"], label=f"public_release.{asset_key}.size_bytes"
+        )
+        _sha256(asset["sha256"], label=f"public_release.{asset_key}.sha256")
+        for key in (
+            "name",
+            "label",
+            "content_type",
+            "state",
+            "created_at_utc",
+            "updated_at_utc",
+            "api_url",
+            "download_url",
+        ):
+            _string(asset[key], label=f"public_release.{asset_key}.{key}")
+        if asset["content_type"] != content_type or asset["state"] != "uploaded":
+            raise ConsumerError(f"public_release.{asset_key} upload metadata differs")
+        if asset["api_url"] != (
+            f"https://api.github.com/repos/{repository}/releases/assets/{asset['id']}"
+        ):
+            raise ConsumerError(f"public_release.{asset_key}.api_url differs")
+        expected_prefix = (
+            f"https://github.com/{repository}/releases/download/{release['tag_name']}/"
+        )
+        if asset["download_url"] != expected_prefix + asset["name"]:
+            raise ConsumerError(f"public_release.{asset_key}.download_url differs")
+
     if (
         archive["member_count"] != 11
         or archive["file_mode"] != 0o644
         or archive["directory_mode"] != 0o755
         or archive["zip_create_system"] != 3
-        or archive["zip_create_version"] != 45
+        or archive["zip_create_version"] != 20
         or archive["zip_extract_version"] != 20
-        or archive["zip_flag_bits"] != 8
+        or archive["zip_flag_bits"] != 0
         or archive["zip_compression_method"] != zipfile.ZIP_STORED
     ):
         raise ConsumerError("archive count, mode, or ZIP metadata authority differs")
@@ -233,6 +392,11 @@ def load_authority(path: Path) -> dict[str, Any]:
         raise ConsumerError("archive uncompressed byte authority differs")
     if len([path for path in paths if path.startswith("packages/")]) != 8:
         raise ConsumerError("archive must contain exactly eight package members")
+    bundle_asset = release["bundle_asset"]
+    if release["receipt_asset"]["size_bytes"] > MAX_JSON_BYTES:
+        raise ConsumerError("public handoff receipt exceeds governed JSON bound")
+    if bundle_asset["size_bytes"] > MAX_ARCHIVE_BYTES:
+        raise ConsumerError("public bundle exceeds governed download bound")
 
     validator = authority["validator_authority"]
     if not isinstance(validator, dict) or validator.get("contract") != (
@@ -268,91 +432,214 @@ def load_authority(path: Path) -> dict[str, Any]:
     return authority
 
 
-def validate_api_metadata(
-    authority: Mapping[str, Any], run: Any, artifact: Any
-) -> None:
-    producer = authority["producer"]
-    if not isinstance(run, dict) or {
-        "id": run.get("id"),
-        "run_attempt": run.get("run_attempt"),
-        "event": run.get("event"),
-        "status": run.get("status"),
-        "conclusion": run.get("conclusion"),
-        "head_branch": run.get("head_branch"),
-        "head_sha": run.get("head_sha"),
-        "name": run.get("name"),
-        "path": run.get("path"),
-        "workflow_id": run.get("workflow_id"),
-        "repository": (run.get("repository") or {}).get("full_name"),
-        "head_repository": (run.get("head_repository") or {}).get("full_name"),
-        "pull_requests": run.get("pull_requests"),
-        "head_commit_id": (run.get("head_commit") or {}).get("id"),
-        "head_tree_id": (run.get("head_commit") or {}).get("tree_id"),
-    } != {
-        "id": producer["run_id"],
-        "run_attempt": producer["run_attempt"],
-        "event": producer["event"],
-        "status": "completed",
-        "conclusion": "success",
-        "head_branch": producer["branch"],
-        "head_sha": producer["head_commit"],
-        "name": producer["workflow_name"],
-        "path": producer["workflow_path"],
-        "workflow_id": producer["workflow_id"],
-        "repository": producer["repository"],
-        "head_repository": producer["repository"],
-        "pull_requests": [],
-        "head_commit_id": producer["head_commit"],
-        "head_tree_id": producer["recipe_tree"],
-    }:
-        raise ConsumerError("workflow run metadata differs from immutable authority")
+def _github_bot_projection(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {key: value.get(key) for key in ("login", "id", "type", "site_admin")}
 
-    workflow_run = artifact.get("workflow_run") if isinstance(artifact, dict) else None
-    observed_artifact = {
-        "id": artifact.get("id") if isinstance(artifact, dict) else None,
-        "name": artifact.get("name") if isinstance(artifact, dict) else None,
-        "size_in_bytes": artifact.get("size_in_bytes") if isinstance(artifact, dict) else None,
-        "digest": artifact.get("digest") if isinstance(artifact, dict) else None,
-        "expired": artifact.get("expired") if isinstance(artifact, dict) else None,
-        "archive_download_url": (
-            artifact.get("archive_download_url") if isinstance(artifact, dict) else None
-        ),
-        "workflow_run_id": (
-            workflow_run.get("id") if isinstance(workflow_run, dict) else None
-        ),
-        "workflow_head_branch": (
-            workflow_run.get("head_branch") if isinstance(workflow_run, dict) else None
-        ),
-        "workflow_head_sha": (
-            workflow_run.get("head_sha") if isinstance(workflow_run, dict) else None
-        ),
-        "workflow_repository_id": (
-            workflow_run.get("repository_id") if isinstance(workflow_run, dict) else None
-        ),
-        "workflow_head_repository_id": (
-            workflow_run.get("head_repository_id")
-            if isinstance(workflow_run, dict)
-            else None
-        ),
+
+def _release_asset_projection(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "id": value.get("id"),
+        "name": value.get("name"),
+        "label": value.get("label"),
+        "content_type": value.get("content_type"),
+        "state": value.get("state"),
+        "size_bytes": value.get("size"),
+        "sha256": value.get("digest"),
+        "created_at_utc": value.get("created_at"),
+        "updated_at_utc": value.get("updated_at"),
+        "api_url": value.get("url"),
+        "download_url": value.get("browser_download_url"),
     }
-    expected_artifact = {
+
+
+def validate_public_release_metadata(
+    authority: Mapping[str, Any], release_metadata: Any, tag_metadata: Any, handoff: Any
+) -> None:
+    """Bind public transport metadata and the producer-signed byte receipt."""
+
+    producer = authority["producer"]
+    release = authority["public_release"]
+    if not isinstance(release_metadata, dict):
+        raise ConsumerError("public release metadata must be one object")
+    observed_release = {
+        "release_id": release_metadata.get("id"),
+        "tag_name": release_metadata.get("tag_name"),
+        "target_commit": release_metadata.get("target_commitish"),
+        "name": release_metadata.get("name"),
+        "body": release_metadata.get("body"),
+        "draft": release_metadata.get("draft"),
+        "prerelease": release_metadata.get("prerelease"),
+        "immutable": release_metadata.get("immutable"),
+        "created_at_utc": release_metadata.get("created_at"),
+        "published_at_utc": release_metadata.get("published_at"),
+        "updated_at_utc": release_metadata.get("updated_at"),
+        "release_api_url": release_metadata.get("url"),
+        "release_html_url": release_metadata.get("html_url"),
+        "tag_api_url": release["tag_api_url"],
+    }
+    expected_release = {
+        key: release[key]
+        for key in observed_release
+    }
+    if observed_release != expected_release:
+        raise ConsumerError("public release metadata differs from exact authority")
+    expected_bot = {
+        "login": "github-actions[bot]",
+        "id": 41898282,
+        "type": "Bot",
+        "site_admin": False,
+    }
+    if _github_bot_projection(release_metadata.get("author")) != expected_bot:
+        raise ConsumerError("public release author differs from GitHub Actions authority")
+
+    assets = release_metadata.get("assets")
+    if not isinstance(assets, list) or len(assets) != 2:
+        raise ConsumerError("public release must expose exactly the two governed assets")
+    observed_by_id: dict[int, Any] = {}
+    for value in assets:
+        if not isinstance(value, dict) or not isinstance(value.get("id"), int):
+            raise ConsumerError("public release contains malformed asset metadata")
+        if value["id"] in observed_by_id:
+            raise ConsumerError("public release contains a duplicate asset ID")
+        observed_by_id[value["id"]] = value
+    expected_ids = {
+        release["receipt_asset"]["id"],
+        release["bundle_asset"]["id"],
+    }
+    if set(observed_by_id) != expected_ids:
+        raise ConsumerError("public release asset IDs differ from exact authority")
+    for key in ("receipt_asset", "bundle_asset"):
+        expected_asset = release[key]
+        observed_asset = observed_by_id[expected_asset["id"]]
+        projection = _release_asset_projection(observed_asset)
+        if projection["sha256"] != f"sha256:{expected_asset['sha256']}":
+            raise ConsumerError(f"public release {key} digest metadata differs")
+        projection["sha256"] = expected_asset["sha256"]
+        if projection != expected_asset:
+            raise ConsumerError(f"public release {key} metadata differs from exact authority")
+        if _github_bot_projection(observed_asset.get("uploader")) != expected_bot:
+            raise ConsumerError(f"public release {key} uploader differs")
+
+    expected_tag = {
+        "ref": f"refs/tags/{release['tag_name']}",
+        "url": release["tag_api_url"].replace("/ref/tags/", "/refs/tags/"),
+        "object": {
+            "type": "commit",
+            "sha": release["target_commit"],
+            "url": (
+                f"https://api.github.com/repos/{producer['repository']}/git/commits/"
+                f"{release['target_commit']}"
+            ),
+        },
+    }
+    if not isinstance(tag_metadata, dict) or {
+        "ref": tag_metadata.get("ref"),
+        "url": tag_metadata.get("url"),
+        "object": tag_metadata.get("object"),
+    } != expected_tag:
+        raise ConsumerError("direct release tag does not resolve to the exact producer commit")
+
+    root = _exact_object(handoff, HANDOFF_KEYS, label="public handoff receipt")
+    if root["contract"] != HANDOFF_CONTRACT:
+        raise ConsumerError(f"public handoff receipt must use {HANDOFF_CONTRACT}")
+    if {
+        "repository": root["repository"],
+        "ref": root["ref"],
+        "commit": root["commit"],
+        "release_tag": root["release_tag"],
+        "receipt_asset_name": root["receipt_asset_name"],
+    } != {
+        "repository": producer["repository"],
+        "ref": "refs/heads/main",
+        "commit": producer["head_commit"],
+        "release_tag": release["tag_name"],
+        "receipt_asset_name": release["receipt_asset"]["name"],
+    }:
+        raise ConsumerError("public handoff repository, commit, or release binding differs")
+
+    source = _exact_object(
+        root["source_actions_artifact"], HANDOFF_SOURCE_KEYS, label="handoff source artifact"
+    )
+    if {key: source[key] for key in ("id", "name", "sha256", "size_bytes")} != {
         "id": producer["artifact_id"],
         "name": producer["artifact_name"],
-        "size_in_bytes": producer["artifact_size_bytes"],
-        "digest": f"sha256:{producer['artifact_sha256']}",
-        "expired": False,
-        "archive_download_url": (
-            f"https://api.github.com/repos/{producer['repository']}/actions/"
-            f"artifacts/{producer['artifact_id']}/zip"
+        "sha256": producer["artifact_sha256"],
+        "size_bytes": producer["artifact_size_bytes"],
+    }:
+        raise ConsumerError("public handoff source artifact differs from producer authority")
+    workflow = _exact_object(
+        source["workflow_run"], HANDOFF_WORKFLOW_KEYS, label="handoff workflow run"
+    )
+    expected_workflow = {
+        "id": producer["run_id"],
+        "attempt": producer["run_attempt"],
+        "event": producer["event"],
+        "head_branch": producer["branch"],
+        "head_sha": producer["head_commit"],
+        "head_tree": producer["recipe_tree"],
+        "repository": producer["repository"],
+        "workflow_id": producer["workflow_id"],
+        "workflow_ref": (
+            f"{producer['repository']}/{producer['workflow_path']}@refs/heads/{producer['branch']}"
         ),
-        "workflow_run_id": producer["run_id"],
-        "workflow_head_branch": producer["branch"],
-        "workflow_head_sha": producer["head_commit"],
-        "workflow_repository_id": producer["repository_id"],
-        "workflow_head_repository_id": producer["repository_id"],
+        "workflow_sha": producer["head_commit"],
+        "attempt_api_url": (
+            f"https://api.github.com/repos/{producer['repository']}/actions/runs/"
+            f"{producer['run_id']}/attempts/{producer['run_attempt']}"
+        ),
     }
-    if observed_artifact != expected_artifact:
-        raise ConsumerError("artifact API metadata differs from immutable authority")
+    if workflow != expected_workflow:
+        raise ConsumerError("public handoff workflow provenance differs from exact authority")
+    metadata = _exact_object(
+        source["authenticated_metadata"],
+        HANDOFF_METADATA_KEYS,
+        label="handoff authenticated artifact metadata",
+    )
+    if {
+        "api_url": metadata["api_url"],
+        "archive_download_url": metadata["archive_download_url"],
+        "repository_id": metadata["repository_id"],
+        "head_repository_id": metadata["head_repository_id"],
+    } != {
+        "api_url": (
+            f"https://api.github.com/repos/{producer['repository']}/actions/artifacts/"
+            f"{producer['artifact_id']}"
+        ),
+        "archive_download_url": (
+            f"https://api.github.com/repos/{producer['repository']}/actions/artifacts/"
+            f"{producer['artifact_id']}/zip"
+        ),
+        "repository_id": producer["repository_id"],
+        "head_repository_id": producer["repository_id"],
+    }:
+        raise ConsumerError("public handoff authenticated artifact metadata differs")
+    _string(metadata["created_at_utc"], label="handoff artifact created_at_utc")
+    _string(metadata["expires_at_utc"], label="handoff artifact expires_at_utc")
+
+    bundle = _exact_object(root["bundle"], HANDOFF_BUNDLE_KEYS, label="handoff bundle")
+    bundle_asset = release["bundle_asset"]
+    if {
+        "contract": bundle["contract"],
+        "asset_name": bundle["asset_name"],
+        "sha256": bundle["sha256"],
+        "size_bytes": bundle["size_bytes"],
+        "member_count": bundle["member_count"],
+        "uncompressed_size_bytes": bundle["uncompressed_size_bytes"],
+        "members": bundle["members"],
+    } != {
+        "contract": HANDOFF_ZIP_CONTRACT,
+        "asset_name": bundle_asset["name"],
+        "sha256": bundle_asset["sha256"],
+        "size_bytes": bundle_asset["size_bytes"],
+        "member_count": authority["archive"]["member_count"],
+        "uncompressed_size_bytes": authority["archive"]["uncompressed_size_bytes"],
+        "members": authority["archive"]["members"],
+    }:
+        raise ConsumerError("public handoff bundle member authority differs")
 
 
 def _require_private_paths(runner_temp: Path, workspace: Path) -> None:
@@ -568,12 +855,14 @@ def _read_json_at(
     *,
     label: str,
     maximum: int = MAX_JSON_BYTES,
+    required_mode: int | None = None,
 ) -> Any:
     payload = _read_regular_bytes_at(
         parent_descriptor,
         name,
         label=label,
         maximum=maximum,
+        required_mode=required_mode,
     )
     try:
         return json.loads(
@@ -658,9 +947,10 @@ def _write_json_exclusive_at(
 
 def prepare(
     authority_path: Path,
-    run_metadata_path: Path,
-    artifact_metadata_path: Path,
-    archive_path: Path,
+    release_metadata_path: Path,
+    tag_metadata_path: Path,
+    receipt_path: Path,
+    bundle_path: Path,
     runner_temp: Path,
     workspace: Path,
     export_root: Path,
@@ -669,9 +959,10 @@ def prepare(
     authority = load_authority(authority_path)
     _require_private_paths(runner_temp, workspace)
     expected_inputs = {
-        run_metadata_path: "run.json",
-        artifact_metadata_path: "artifact.json",
-        archive_path: "artifact.zip",
+        release_metadata_path: "release.json",
+        tag_metadata_path: "tag.json",
+        receipt_path: "receipt.json",
+        bundle_path: "bundle.zip",
     }
     if any(path.parent != workspace or path.name != name for path, name in expected_inputs.items()):
         raise ConsumerError("consumer inputs must use their fixed private-workspace names")
@@ -702,25 +993,53 @@ def prepare(
             validator_authority_path.name,
             label="validator authority output",
         )
-        run = _read_json_at(
-            workspace_descriptor, run_metadata_path.name, label="workflow run metadata"
-        )
-        artifact = _read_json_at(
-            workspace_descriptor, artifact_metadata_path.name, label="artifact metadata"
-        )
-        validate_api_metadata(authority, run, artifact)
-        producer = authority["producer"]
-        archive_authority = authority["archive"]
-        archive_bytes = _read_regular_bytes_at(
+        release_metadata = _read_json_at(
             workspace_descriptor,
-            archive_path.name,
-            label="downloaded archive",
-            maximum=MAX_ARCHIVE_BYTES,
-            expected_size=producer["artifact_size_bytes"],
+            release_metadata_path.name,
+            label="public release metadata",
             required_mode=0o600,
         )
-        if hashlib.sha256(archive_bytes).hexdigest() != producer["artifact_sha256"]:
-            raise ConsumerError("downloaded archive SHA-256 differs from authority")
+        tag_metadata = _read_json_at(
+            workspace_descriptor,
+            tag_metadata_path.name,
+            label="direct release tag metadata",
+            required_mode=0o600,
+        )
+        release = authority["public_release"]
+        receipt_asset = release["receipt_asset"]
+        receipt_bytes = _read_regular_bytes_at(
+            workspace_descriptor,
+            receipt_path.name,
+            label="public handoff receipt",
+            maximum=MAX_JSON_BYTES,
+            expected_size=receipt_asset["size_bytes"],
+            required_mode=0o600,
+        )
+        if hashlib.sha256(receipt_bytes).hexdigest() != receipt_asset["sha256"]:
+            raise ConsumerError("public handoff receipt SHA-256 differs from authority")
+        try:
+            handoff = json.loads(
+                receipt_bytes.decode("utf-8"),
+                object_pairs_hook=_reject_duplicate_keys,
+                parse_constant=_reject_constant,
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ConsumerError("invalid public handoff receipt JSON") from exc
+        validate_public_release_metadata(
+            authority, release_metadata, tag_metadata, handoff
+        )
+        archive_authority = authority["archive"]
+        bundle_asset = release["bundle_asset"]
+        archive_bytes = _read_regular_bytes_at(
+            workspace_descriptor,
+            bundle_path.name,
+            label="downloaded public bundle",
+            maximum=MAX_ARCHIVE_BYTES,
+            expected_size=bundle_asset["size_bytes"],
+            required_mode=0o600,
+        )
+        if hashlib.sha256(archive_bytes).hexdigest() != bundle_asset["sha256"]:
+            raise ConsumerError("downloaded public bundle SHA-256 differs from authority")
 
         rows = archive_authority["members"]
         expected_paths = [row["path"] for row in rows]
@@ -731,7 +1050,7 @@ def prepare(
             if (
                 archive.comment != b""
                 or archive.start_dir <= 0
-                or archive.start_dir >= producer["artifact_size_bytes"]
+                or archive.start_dir >= bundle_asset["size_bytes"]
             ):
                 raise ConsumerError("ZIP central-directory envelope differs")
             if observed_paths != expected_paths:
@@ -1189,6 +1508,7 @@ def finalize(
         )
         summary = validation_summary(authority, result)
         producer = authority["producer"]
+        release = authority["public_release"]
         verdict = {
             "contract": VERDICT_CONTRACT,
             "status": "pass",
@@ -1205,6 +1525,20 @@ def finalize(
                     "artifact_sha256",
                     "artifact_size_bytes",
                 )
+            },
+            "public_release_transport": {
+                "release_id": release["release_id"],
+                "tag_name": release["tag_name"],
+                "target_commit": release["target_commit"],
+                "mutable_at_source": not release["immutable"],
+                "receipt_asset": {
+                    key: release["receipt_asset"][key]
+                    for key in ("id", "name", "sha256", "size_bytes")
+                },
+                "bundle_asset": {
+                    key: release["bundle_asset"][key]
+                    for key in ("id", "name", "sha256", "size_bytes")
+                },
             },
             "archive": {
                 "member_count": authority["archive"]["member_count"],
@@ -1252,9 +1586,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", required=True)
     prepare_parser = subparsers.add_parser("prepare")
     prepare_parser.add_argument("--authority", type=Path, required=True)
-    prepare_parser.add_argument("--run-metadata", type=Path, required=True)
-    prepare_parser.add_argument("--artifact-metadata", type=Path, required=True)
-    prepare_parser.add_argument("--archive", type=Path, required=True)
+    prepare_parser.add_argument("--release-metadata", type=Path, required=True)
+    prepare_parser.add_argument("--tag-metadata", type=Path, required=True)
+    prepare_parser.add_argument("--receipt", type=Path, required=True)
+    prepare_parser.add_argument("--bundle", type=Path, required=True)
     prepare_parser.add_argument("--runner-temp", type=Path, required=True)
     prepare_parser.add_argument("--workspace", type=Path, required=True)
     prepare_parser.add_argument("--export-root", type=Path, required=True)
@@ -1278,9 +1613,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "prepare":
             prepare(
                 args.authority,
-                args.run_metadata,
-                args.artifact_metadata,
-                args.archive,
+                args.release_metadata,
+                args.tag_metadata,
+                args.receipt,
+                args.bundle,
                 args.runner_temp,
                 args.workspace,
                 args.export_root,
