@@ -11,6 +11,8 @@ compose_file="$repo_root/docker-compose.build-ghost-private-nonprod.yml"
 runtime_config_materializer="$repo_root/scripts/materialize_build_ghost_tough_tongue_runtime_config.py"
 operator_runtime_config_file="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE:-}"
 operator_runtime_evidence_root="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT:-}"
+quarantine_requested="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE:-0}"
+unconfigured_contract_file="$script_root/tough-tongue-read-only-binding-contract.unconfigured.json"
 project_name="chummer-build-ghost-private-nonprod"
 ai_service="chummer-build-ghost-ai"
 presentation_service="chummer-build-ghost-presentation"
@@ -124,6 +126,19 @@ validate_control_values() {
         fail "build-poll-must-be-one-to-fifteen-seconds"
     fi
     [[ "$workspace_revision" =~ ^[1-9][0-9]*$ ]] || fail "workspace-revision-invalid"
+}
+
+validate_quarantine_request() {
+    case "$quarantine_requested" in
+        0) ;;
+        1)
+            [ -z "$operator_runtime_config_file" ] \
+                || fail "tough-tongue-quarantine-conflicts-with-operator-config"
+            [ -z "$operator_runtime_evidence_root" ] \
+                || fail "tough-tongue-quarantine-conflicts-with-runtime-evidence"
+            ;;
+        *) fail "tough-tongue-quarantine-flag-invalid" ;;
+    esac
 }
 
 validate_source() {
@@ -349,6 +364,10 @@ verify_materialized_runtime_pair() {
 load_runtime_secrets_without_output() {
     load_existing_environment "$old_ai_id" CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN required
     load_existing_environment "$old_ai_id" CHUMMER_AI_INTERNAL_API_TOKEN required
+    if [ "$quarantine_requested" = "1" ]; then
+        quarantine_provider_runtime_without_output
+        return 0
+    fi
     if [ -n "$operator_runtime_config_file" ]; then
         return 0
     fi
@@ -363,6 +382,16 @@ load_runtime_secrets_without_output() {
     load_existing_environment_or_empty "$old_ai_id" EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
     [ -z "$EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST" ] \
         || fail "configured-readback-contract-requires-operator-config"
+}
+
+quarantine_provider_runtime_without_output() {
+    local variable_name
+    for variable_name in "${tough_tongue_runtime_variables[@]}"; do
+        printf -v "$variable_name" '%s' ""
+        export "${variable_name?}"
+    done
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE="$unconfigured_contract_file"
+    export CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE
 }
 
 securely_remove_temp() {
@@ -489,6 +518,21 @@ verify_rendered_compose() {
                  and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID != ""' \
                 "$rendered" >/dev/null || fail "compose-binding-candidates-drift"
         fi
+    elif [ "$quarantine_requested" = "1" ]; then
+        jq -e \
+            --arg service "$ai_service" \
+            --arg sentinel "$unconfigured_contract_file" \
+            '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID == ""
+             and .services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST == ""
+             and .secrets["build-ghost-tough-tongue-read-only-binding-contract"].file == $sentinel' \
+            "$rendered" >/dev/null || fail "compose-tough-tongue-quarantine-drift"
     fi
     if rg --fixed-strings '/api/v1/ai/build-ghost/explain' \
         "$script_root/Caddyfile" >/dev/null; then
@@ -536,6 +580,36 @@ assert_provider_gates_false() {
         [ "$(printf '%s\n' "$environment" | awk -v expected="$required_false=false" '$0 == expected { count++ } END { print count + 0 }')" -eq 1 ] \
             || fail "postcheck-provider-gate-$required_false"
     done
+}
+
+assert_provider_runtime_quarantined() {
+    local container_id="$1"
+    local environment line matches mount_source variable_name
+    local quarantined_variables=(
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID
+        EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
+    )
+    environment="$(docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}')"
+    for variable_name in "${quarantined_variables[@]}"; do
+        line="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { print }')"
+        matches="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { count++ } END { print count + 0 }')"
+        [ "$matches" -eq 1 ] && [ "$line" = "$variable_name=" ] \
+            || fail "postcheck-quarantine-$variable_name"
+    done
+    mount_source="$(docker inspect "$container_id" --format \
+        '{{range .Mounts}}{{if eq .Destination "/run/secrets/tough-tongue-read-only-binding-contract.json"}}{{println .Source}}{{end}}{{end}}')"
+    [ "$mount_source" = "$unconfigured_contract_file" ] \
+        || fail "postcheck-quarantine-contract-source"
+    if docker container inspect "$old_ai_id" >/dev/null 2>&1; then
+        fail "postcheck-quarantine-superseded-container-retained"
+    fi
 }
 
 wait_for_ai_health() {
@@ -684,6 +758,9 @@ run_postchecks() {
     verify_source_labels "$current_ai_image"
     wait_for_ai_health "$current_ai_id" || fail "postcheck-ai-health"
     assert_provider_gates_false "$current_ai_id"
+    if [ "$quarantine_requested" = "1" ]; then
+        assert_provider_runtime_quarantined "$current_ai_id"
+    fi
     [ "$(running_container_id "$presentation_service")" = "$presentation_id_before" ] \
         || fail "postcheck-presentation-container-changed"
     [ "$(running_container_id "$edge_service")" = "$edge_id_before" ] \
@@ -737,6 +814,10 @@ rollback_if_needed() {
         printf 'ai_deploy=rollback-failed stage=runtime-verification\n' >&2
         return 1
     fi
+    assert_provider_gates_false "$restored_ai_id"
+    if [ "$quarantine_requested" = "1" ]; then
+        assert_provider_runtime_quarantined "$restored_ai_id"
+    fi
     printf 'ai_deploy=rollback-restored rollback_ref=%s image=%s\n' "$rollback_ref" "$old_ai_image" >&2
     return 0
 }
@@ -769,6 +850,7 @@ main() {
         require_command "$required"
     done
     validate_control_values
+    validate_quarantine_request
     deploy_tmp="$(mktemp -d)"
     chmod 0700 "$deploy_tmp"
     prepare_operator_runtime_config
@@ -791,6 +873,9 @@ main() {
     deploy_succeeded="true"
     printf 'ai_deploy=passed rollback_ref=%s old_image=%s candidate_image=%s gates=false neighbors=unchanged public_explain=404 deterministic_fallback=true remote_attempted=false\n' \
         "$rollback_ref" "$old_ai_image" "$(image_id "$deployment_image")"
+    if [ "$quarantine_requested" = "1" ]; then
+        printf 'ai_deploy_quarantine=passed scope=local-container credentials_present=false provider_side_revocation=false contract=unconfigured gates=false\n'
+    fi
     if [ -n "$runtime_receipt_file" ]; then
         printf 'ai_deploy_runtime_contract=retained receipt=%s contract=%s credentials_retained=false\n' \
             "$runtime_receipt_file" "$runtime_contract_file"
