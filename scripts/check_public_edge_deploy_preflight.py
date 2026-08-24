@@ -783,7 +783,9 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN = (
     'RUN ["/usr/local/bin/python3", "-I", "-S", '
     '"scripts/ai/bootstrap-hub-package-feed.py", '
     '"--repo-root", "/proof", '
-    '"--feed", "/opt/chummer-package-feed"]'
+    '"--feed", "/opt/chummer-package-feed", '
+    '"--download-core-public-authority-directory", '
+    '"/tmp/chummer-core-public-authority"]'
 )
 PUBLIC_EDGE_DOCKER_PROOF_COPY_INPUTS = (
     "scripts/validate_public_pwa_proof_authority.py",
