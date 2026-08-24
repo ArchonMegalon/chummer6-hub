@@ -45,6 +45,33 @@ EXPECTED_PACKAGE_IDS = (
     "Chummer.Rulesets.Sr4",
     "Chummer.Engine.GmCharacterEdits",
 )
+LOCKED_OWNER_PACKAGE_IDS = (
+    "Chummer.Engine.Contracts",
+    "Chummer.Hub.Registry.Contracts",
+    "Chummer.Play.Contracts",
+    "Chummer.Run.Contracts",
+)
+LOCKED_OWNER_PACKAGE_ROLES = (
+    "locked_engine_baseline_not_selected",
+    "locked_owner_dependency",
+    "locked_owner_dependency",
+    "locked_owner_dependency",
+)
+RESOLVED_RUNTIME_ROLE = "current_core_runtime_candidate"
+EXPECTED_PACKAGE_SOURCE_MAPPING = {
+    "Chummer.*": "locked-owner-contracts",
+    "other": "https://api.nuget.org/v3/index.json",
+}
+PASS_RECEIPT_FIELDS = (
+    "normal_local_engine_dependency_graph",
+    "build",
+    "package_plane_runtime_test",
+    "local_owner_isolation_tests",
+    "candidate_engine_contract_pack",
+    "candidate_gm_edit_runtime_pack",
+    "candidate_gm_edit_runtime_consumer",
+    "eight_package_runtime_plane",
+)
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -62,12 +89,17 @@ MAX_PACKAGE_BYTES = 512 * 1024 * 1024
 AUTHORITY_KEYS = {
     "contract",
     "artifact_selector",
-    "package_plane_lock",
+    "runtime_package_plane_lock",
     "inventory",
     "receipt",
+    "owner_package_plane_lock_sha256",
+    "owner_package_inventory_sha256",
+    "candidate_engine_package_inventory_sha256",
+    "candidate_runtime_package_inventory_sha256",
     "runtime_source_commit",
     "package_recipe_commit",
-    "package_version",
+    "owner_package_version",
+    "runtime_package_version",
 }
 ARTIFACT_SELECTOR_KEYS = {
     "repository",
@@ -140,13 +172,18 @@ class ArtifactValidationError(RuntimeError):
 @dataclass(frozen=True)
 class Authority:
     artifact_selector: Mapping[str, Any]
-    lock_contract: str
-    lock_sha256: str
+    runtime_lock_contract: str
+    runtime_lock_sha256: str
     inventory_sha256: str
     receipt_sha256: str
+    owner_lock_sha256: str
+    owner_inventory_sha256: str
+    candidate_engine_inventory_sha256: str
+    candidate_runtime_inventory_sha256: str
     runtime_source_commit: str
     package_recipe_commit: str
-    package_version: str
+    owner_package_version: str
+    runtime_package_version: str
 
 
 def _reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
@@ -346,16 +383,18 @@ def load_authority(path: Path) -> Authority:
             "artifact name must bind the exact package recipe commit"
         )
 
-    lock_binding = _exact_object(
-        root.get("package_plane_lock"),
+    runtime_lock_binding = _exact_object(
+        root.get("runtime_package_plane_lock"),
         LOCK_BINDING_KEYS,
-        label="package_plane_lock binding",
+        label="runtime_package_plane_lock binding",
     )
-    lock_contract = _canonical_string(
-        lock_binding.get("contract"), label="package-plane lock contract"
+    runtime_lock_contract = _canonical_string(
+        runtime_lock_binding.get("contract"),
+        label="runtime package-plane lock contract",
     )
-    lock_sha256 = _sha256_value(
-        lock_binding.get("sha256"), label="package-plane lock sha256"
+    runtime_lock_sha256 = _sha256_value(
+        runtime_lock_binding.get("sha256"),
+        label="runtime package-plane lock sha256",
     )
     inventory_binding = _exact_object(
         root.get("inventory"), FILE_BINDING_KEYS, label="inventory binding"
@@ -369,8 +408,29 @@ def load_authority(path: Path) -> Authority:
     receipt_sha256 = _sha256_value(
         receipt_binding.get("sha256"), label="receipt sha256"
     )
-    package_version = _canonical_string(
-        root.get("package_version"), label="authority package_version"
+    owner_lock_sha256 = _sha256_value(
+        root.get("owner_package_plane_lock_sha256"),
+        label="owner package-plane lock sha256",
+    )
+    owner_inventory_sha256 = _sha256_value(
+        root.get("owner_package_inventory_sha256"),
+        label="owner package inventory sha256",
+    )
+    candidate_engine_inventory_sha256 = _sha256_value(
+        root.get("candidate_engine_package_inventory_sha256"),
+        label="candidate engine package inventory sha256",
+    )
+    candidate_runtime_inventory_sha256 = _sha256_value(
+        root.get("candidate_runtime_package_inventory_sha256"),
+        label="candidate runtime package inventory sha256",
+    )
+    owner_package_version = _canonical_string(
+        root.get("owner_package_version"),
+        label="authority owner_package_version",
+    )
+    runtime_package_version = _canonical_string(
+        root.get("runtime_package_version"),
+        label="authority runtime_package_version",
     )
     return Authority(
         artifact_selector={
@@ -380,13 +440,18 @@ def load_authority(path: Path) -> Authority:
             "name": artifact_name,
             "sha256": artifact_digest,
         },
-        lock_contract=lock_contract,
-        lock_sha256=lock_sha256,
+        runtime_lock_contract=runtime_lock_contract,
+        runtime_lock_sha256=runtime_lock_sha256,
         inventory_sha256=inventory_sha256,
         receipt_sha256=receipt_sha256,
+        owner_lock_sha256=owner_lock_sha256,
+        owner_inventory_sha256=owner_inventory_sha256,
+        candidate_engine_inventory_sha256=candidate_engine_inventory_sha256,
+        candidate_runtime_inventory_sha256=candidate_runtime_inventory_sha256,
         runtime_source_commit=runtime_source_commit,
         package_recipe_commit=package_recipe_commit,
-        package_version=package_version,
+        owner_package_version=owner_package_version,
+        runtime_package_version=runtime_package_version,
     )
 
 
@@ -463,7 +528,7 @@ def _validate_inventory(
         )
     if root.get("package_plane_lock_sha256") != lock_sha256:
         raise ArtifactValidationError("inventory does not bind the exact package-plane lock")
-    if root.get("package_version") != authority.package_version:
+    if root.get("package_version") != authority.runtime_package_version:
         raise ArtifactValidationError("inventory package_version differs from authority")
     if root.get("runtime_source_commit") != authority.runtime_source_commit:
         raise ArtifactValidationError("inventory runtime_source_commit differs from authority")
@@ -487,7 +552,7 @@ def _validate_inventory(
             raise ArtifactValidationError(
                 "inventory package IDs must match the exact ordered Core runtime plane"
             )
-        if row.get("version") != authority.package_version:
+        if row.get("version") != authority.runtime_package_version:
             raise ArtifactValidationError(f"package version drift for {package_id}")
         if row.get("repository") != CORE_REPOSITORY:
             raise ArtifactValidationError(f"repository drift for {package_id}")
@@ -527,7 +592,7 @@ def _validate_inventory(
         packages.append(
             {
                 "id": package_id,
-                "version": authority.package_version,
+                "version": authority.runtime_package_version,
                 "repository": CORE_REPOSITORY,
                 "source_commit": authority.runtime_source_commit,
                 "project": project,
@@ -571,7 +636,7 @@ def _validate_receipt(
     value: Any,
     *,
     authority: Authority,
-    lock_sha256: str,
+    runtime_lock_sha256: str,
     inventory_sha256: str,
     inventory_packages: Sequence[Mapping[str, Any]],
 ) -> None:
@@ -581,36 +646,43 @@ def _validate_receipt(
     _valid_utc_timestamp(root.get("generated_at_utc"))
     if root.get("status") != "pass":
         raise ArtifactValidationError("Core no-siblings receipt status must be pass")
-    if root.get("eight_package_runtime_plane") != "pass":
-        raise ArtifactValidationError("eight_package_runtime_plane must be pass")
+    for field in PASS_RECEIPT_FIELDS:
+        if root.get(field) != "pass":
+            raise ArtifactValidationError(f"receipt {field} must be pass")
     if root.get("no_sibling_directories") is not True:
         raise ArtifactValidationError("no_sibling_directories must be true")
     if root.get("isolated_package_cache") is not True:
         raise ArtifactValidationError("isolated_package_cache must be true")
-    if not isinstance(root.get("package_source_mapping"), dict):
-        raise ArtifactValidationError("package_source_mapping must be an object")
-    if root.get("core_commit") != authority.runtime_source_commit:
+    if root.get("package_source_mapping") != EXPECTED_PACKAGE_SOURCE_MAPPING:
+        raise ArtifactValidationError("receipt package_source_mapping differs from policy")
+    if root.get("core_commit") != authority.package_recipe_commit:
         raise ArtifactValidationError("receipt core_commit differs from authority")
     if root.get("runtime_source_commit") != authority.runtime_source_commit:
         raise ArtifactValidationError("receipt runtime_source_commit differs from authority")
     if root.get("package_recipe_commit") != authority.package_recipe_commit:
         raise ArtifactValidationError("receipt package_recipe_commit differs from authority")
-    if root.get("package_version") != authority.package_version:
-        raise ArtifactValidationError("receipt package_version differs from authority")
-    if root.get("candidate_package_version") != authority.package_version:
+    if root.get("package_version") != authority.owner_package_version:
+        raise ArtifactValidationError("receipt owner package_version differs from authority")
+    if root.get("candidate_package_version") != authority.runtime_package_version:
         raise ArtifactValidationError("receipt candidate_package_version differs from authority")
-    if root.get("package_plane_lock_sha256") != lock_sha256:
-        raise ArtifactValidationError("receipt package_plane_lock_sha256 cross-link mismatch")
-    if root.get("runtime_package_plane_lock_sha256") != lock_sha256:
+    if root.get("package_plane_lock_sha256") != authority.owner_lock_sha256:
+        raise ArtifactValidationError("receipt owner package-plane lock cross-link mismatch")
+    if root.get("runtime_package_plane_lock_sha256") != runtime_lock_sha256:
         raise ArtifactValidationError("receipt runtime package-plane lock cross-link mismatch")
+    if root.get("package_inventory_sha256") != authority.owner_inventory_sha256:
+        raise ArtifactValidationError("receipt owner package inventory cross-link mismatch")
+    if (
+        root.get("candidate_package_inventory_sha256")
+        != authority.candidate_engine_inventory_sha256
+    ):
+        raise ArtifactValidationError("receipt candidate engine inventory cross-link mismatch")
+    if (
+        root.get("candidate_runtime_package_inventory_sha256")
+        != authority.candidate_runtime_inventory_sha256
+    ):
+        raise ArtifactValidationError("receipt candidate runtime inventory cross-link mismatch")
     if root.get("runtime_package_inventory_sha256") != inventory_sha256:
         raise ArtifactValidationError("receipt runtime inventory cross-link mismatch")
-    for key in (
-        "package_inventory_sha256",
-        "candidate_package_inventory_sha256",
-        "candidate_runtime_package_inventory_sha256",
-    ):
-        _sha256_value(root.get(key), label=f"receipt {key}")
 
     locked_values = root.get("locked_packages")
     if not isinstance(locked_values, list) or len(locked_values) != 4:
@@ -619,9 +691,10 @@ def _validate_receipt(
         _validate_owner_row(row, label=f"locked_packages[{index}]")
         for index, row in enumerate(locked_values)
     ]
-    locked_ids = [row["id"].casefold() for row in locked_packages]
-    if len(locked_ids) != len(set(locked_ids)):
-        raise ArtifactValidationError("receipt locked package IDs must be unique")
+    if tuple(row["id"] for row in locked_packages) != LOCKED_OWNER_PACKAGE_IDS:
+        raise ArtifactValidationError("receipt locked package IDs or order differ from policy")
+    if tuple(row["role"] for row in locked_packages) != LOCKED_OWNER_PACKAGE_ROLES:
+        raise ArtifactValidationError("receipt locked package roles differ from policy")
 
     resolved = root.get("resolved_owner_contracts")
     if not isinstance(resolved, list) or len(resolved) != 11:
@@ -641,31 +714,19 @@ def _validate_receipt(
                 raise ArtifactValidationError(
                     f"resolved runtime row differs from inventory for {inventory_row['id']}"
                 )
-        _canonical_string(row.get("role"), label=f"resolved_owner_contracts[{index}].role")
+        if row.get("role") != RESOLVED_RUNTIME_ROLE:
+            raise ArtifactValidationError(
+                "resolved runtime package role must be current_core_runtime_candidate"
+            )
 
     resolved_owner_rows = [
         _validate_owner_row(row, label=f"resolved_owner_contracts[{index + 8}]")
         for index, row in enumerate(resolved[8:])
     ]
-    owner_ids = [row["id"].casefold() for row in resolved_owner_rows]
-    if len(owner_ids) != len(set(owner_ids)):
-        raise ArtifactValidationError("resolved owner package IDs must be unique")
-    locked_projection = {
-        (row["id"], row["version"], row["sha256"], row["size_bytes"], row["role"])
-        for row in locked_packages
-    }
-    for row in resolved_owner_rows:
-        projection = (
-            row["id"],
-            row["version"],
-            row["sha256"],
-            row["size_bytes"],
-            row["role"],
+    if resolved_owner_rows != locked_packages[1:]:
+        raise ArtifactValidationError(
+            "resolved owner rows must be exact Registry/Play/Run locked dependencies"
         )
-        if projection not in locked_projection:
-            raise ArtifactValidationError(
-                "resolved owner row is not present in locked package authority"
-            )
 
 
 def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, Any]:
@@ -676,11 +737,11 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
     lock_value, _lock_bytes, lock_sha256 = _load_json_file(
         lock_path, label="runtime package-plane lock", maximum=MAX_LOCK_BYTES
     )
-    if lock_sha256 != authority.lock_sha256:
+    if lock_sha256 != authority.runtime_lock_sha256:
         raise ArtifactValidationError("runtime package-plane lock bytes differ from authority")
     if not isinstance(lock_value, dict):
         raise ArtifactValidationError("runtime package-plane lock must be a JSON object")
-    if lock_value.get("contract") != authority.lock_contract:
+    if lock_value.get("contract") != authority.runtime_lock_contract:
         raise ArtifactValidationError("runtime package-plane lock contract differs from authority")
 
     inventory_value, _inventory_bytes, inventory_sha256 = _load_json_file(
@@ -750,7 +811,7 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
     _validate_receipt(
         receipt_value,
         authority=authority,
-        lock_sha256=lock_sha256,
+        runtime_lock_sha256=lock_sha256,
         inventory_sha256=inventory_sha256,
         inventory_packages=inventory_packages,
     )
@@ -761,8 +822,8 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
         "outer_artifact_selector": dict(authority.artifact_selector),
         "member_count": len(relative_names),
         "package_count": len(package_results),
-        "package_plane_lock": {
-            "contract": authority.lock_contract,
+        "runtime_package_plane_lock": {
+            "contract": authority.runtime_lock_contract,
             "sha256": lock_sha256,
         },
         "inventory": {
@@ -777,7 +838,18 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
         },
         "runtime_source_commit": authority.runtime_source_commit,
         "package_recipe_commit": authority.package_recipe_commit,
-        "package_version": authority.package_version,
+        "owner_package_version": authority.owner_package_version,
+        "runtime_package_version": authority.runtime_package_version,
+        "owner_authority": {
+            "package_plane_lock_sha256": authority.owner_lock_sha256,
+            "package_inventory_sha256": authority.owner_inventory_sha256,
+            "candidate_engine_package_inventory_sha256": (
+                authority.candidate_engine_inventory_sha256
+            ),
+            "candidate_runtime_package_inventory_sha256": (
+                authority.candidate_runtime_inventory_sha256
+            ),
+        },
         "ordered_package_ids": list(EXPECTED_PACKAGE_IDS),
         "packages": package_results,
         "checks": {

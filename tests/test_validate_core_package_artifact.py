@@ -18,7 +18,18 @@ SCRIPT_PATH = ROOT / "scripts" / "ai" / "validate-core-package-artifact.py"
 SOURCE_COMMIT = "1" * 40
 RECIPE_COMMIT = "2" * 40
 PACKAGE_VERSION = "0.0.0-packageplane.test.sha2222222"
+OWNER_PACKAGE_VERSION = "0.1.0-preview"
 LOCK_CONTRACT = "chummer-core.runtime-package-plane-lock/test-v1"
+OWNER_LOCK_SHA256 = "d" * 64
+OWNER_INVENTORY_SHA256 = "e" * 64
+CANDIDATE_ENGINE_INVENTORY_SHA256 = "f" * 64
+CANDIDATE_RUNTIME_INVENTORY_SHA256 = "0" * 64
+LOCKED_OWNER_IDS = (
+    "Chummer.Engine.Contracts",
+    "Chummer.Hub.Registry.Contracts",
+    "Chummer.Play.Contracts",
+    "Chummer.Run.Contracts",
+)
 
 
 def load_module():
@@ -62,11 +73,15 @@ class ArtifactFixture:
 
 def owner_row(index: int) -> dict[str, Any]:
     return {
-        "id": f"Chummer.Owner.Contract{index}",
+        "id": LOCKED_OWNER_IDS[index],
         "version": f"1.0.{index}",
         "sha256": f"{index + 3:x}" * 64,
         "size_bytes": 1000 + index,
-        "role": "owner_contract",
+        "role": (
+            "locked_engine_baseline_not_selected"
+            if index == 0
+            else "locked_owner_dependency"
+        ),
     }
 
 
@@ -132,25 +147,28 @@ def build_fixture(tmp_path: Path) -> ArtifactFixture:
         "contract": module.RECEIPT_CONTRACT,
         "generated_at_utc": "2026-08-24T12:34:56Z",
         "status": "pass",
-        "core_commit": SOURCE_COMMIT,
-        "package_plane_lock_sha256": lock_sha256,
-        "package_inventory_sha256": "a" * 64,
-        "candidate_package_inventory_sha256": "b" * 64,
-        "candidate_runtime_package_inventory_sha256": "c" * 64,
+        "core_commit": RECIPE_COMMIT,
+        "package_plane_lock_sha256": OWNER_LOCK_SHA256,
+        "package_inventory_sha256": OWNER_INVENTORY_SHA256,
+        "candidate_package_inventory_sha256": CANDIDATE_ENGINE_INVENTORY_SHA256,
+        "candidate_runtime_package_inventory_sha256": CANDIDATE_RUNTIME_INVENTORY_SHA256,
         "runtime_package_inventory_sha256": inventory_sha256,
         "runtime_package_plane_lock_sha256": lock_sha256,
         "runtime_source_commit": SOURCE_COMMIT,
         "package_recipe_commit": RECIPE_COMMIT,
-        "package_version": PACKAGE_VERSION,
+        "package_version": OWNER_PACKAGE_VERSION,
         "candidate_package_version": PACKAGE_VERSION,
         "locked_packages": locked_packages,
         "resolved_owner_contracts": [
-            {**row, "role": "runtime_package"} for row in package_rows
+            {**row, "role": "current_core_runtime_candidate"} for row in package_rows
         ]
-        + [dict(row) for row in locked_packages[:3]],
+        + [dict(row) for row in locked_packages[1:]],
         "no_sibling_directories": True,
         "isolated_package_cache": True,
-        "package_source_mapping": {"locked-core": "exact"},
+        "package_source_mapping": {
+            "Chummer.*": "locked-owner-contracts",
+            "other": "https://api.nuget.org/v3/index.json",
+        },
         "normal_local_engine_dependency_graph": "pass",
         "build": "pass",
         "package_plane_runtime_test": "pass",
@@ -172,15 +190,24 @@ def build_fixture(tmp_path: Path) -> ArtifactFixture:
             "name": f"chummer-core-runtime-package-plane-{RECIPE_COMMIT}",
             "sha256": "9" * 64,
         },
-        "package_plane_lock": {
+        "runtime_package_plane_lock": {
             "contract": LOCK_CONTRACT,
             "sha256": lock_sha256,
         },
         "inventory": {"sha256": inventory_sha256},
         "receipt": {"sha256": digest(receipt_bytes)},
+        "owner_package_plane_lock_sha256": OWNER_LOCK_SHA256,
+        "owner_package_inventory_sha256": OWNER_INVENTORY_SHA256,
+        "candidate_engine_package_inventory_sha256": (
+            CANDIDATE_ENGINE_INVENTORY_SHA256
+        ),
+        "candidate_runtime_package_inventory_sha256": (
+            CANDIDATE_RUNTIME_INVENTORY_SHA256
+        ),
         "runtime_source_commit": SOURCE_COMMIT,
         "package_recipe_commit": RECIPE_COMMIT,
-        "package_version": PACKAGE_VERSION,
+        "owner_package_version": OWNER_PACKAGE_VERSION,
+        "runtime_package_version": PACKAGE_VERSION,
     }
     write_json(authority_path, authority)
     return ArtifactFixture(
@@ -206,20 +233,21 @@ def rebind(
 ) -> None:
     lock_bytes = write_json(fixture.lock_path, fixture.lock)
     lock_sha256 = digest(lock_bytes)
-    fixture.authority["package_plane_lock"]["sha256"] = lock_sha256
-    fixture.authority["package_plane_lock"]["contract"] = fixture.lock["contract"]
+    fixture.authority["runtime_package_plane_lock"]["sha256"] = lock_sha256
+    fixture.authority["runtime_package_plane_lock"]["contract"] = fixture.lock[
+        "contract"
+    ]
     fixture.inventory["package_plane_lock_sha256"] = lock_sha256
     inventory_bytes = write_json(fixture.inventory_path, fixture.inventory)
     inventory_sha256 = digest(inventory_bytes)
     fixture.authority["inventory"]["sha256"] = inventory_sha256
     if sync_receipt_lock:
-        fixture.receipt["package_plane_lock_sha256"] = lock_sha256
         fixture.receipt["runtime_package_plane_lock_sha256"] = lock_sha256
     if sync_receipt_inventory:
         fixture.receipt["runtime_package_inventory_sha256"] = inventory_sha256
     if sync_resolved_runtime:
         fixture.receipt["resolved_owner_contracts"][:8] = [
-            {**row, "role": "runtime_package"}
+            {**row, "role": "current_core_runtime_candidate"}
             for row in fixture.inventory["packages"]
         ]
     receipt_bytes = write_json(fixture.receipt_path, fixture.receipt)
@@ -251,6 +279,40 @@ def test_validates_exact_eleven_member_artifact_and_outer_selector(tmp_path: Pat
         "package_byte_bindings": "pass",
         "contained_regular_files": "pass",
     }
+
+
+def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+
+    assert fixture.receipt["core_commit"] == RECIPE_COMMIT
+    assert fixture.receipt["core_commit"] != SOURCE_COMMIT
+    assert fixture.receipt["package_version"] == OWNER_PACKAGE_VERSION
+    assert fixture.receipt["candidate_package_version"] == PACKAGE_VERSION
+    assert fixture.receipt["package_plane_lock_sha256"] == OWNER_LOCK_SHA256
+    assert fixture.receipt["runtime_package_plane_lock_sha256"] == fixture.inventory[
+        "package_plane_lock_sha256"
+    ]
+    assert fixture.receipt["package_source_mapping"] == (
+        module.EXPECTED_PACKAGE_SOURCE_MAPPING
+    )
+    assert [row["id"] for row in fixture.receipt["locked_packages"]] == list(
+        module.LOCKED_OWNER_PACKAGE_IDS
+    )
+    assert [row["role"] for row in fixture.receipt["locked_packages"]] == list(
+        module.LOCKED_OWNER_PACKAGE_ROLES
+    )
+    assert all(
+        row["role"] == module.RESOLVED_RUNTIME_ROLE
+        for row in fixture.receipt["resolved_owner_contracts"][:8]
+    )
+    assert fixture.receipt["resolved_owner_contracts"][8:] == fixture.receipt[
+        "locked_packages"
+    ][1:]
+
+    assert module.validate_artifact(fixture.root, fixture.authority_path)[
+        "status"
+    ] == "pass"
 
 
 def test_cli_writes_a_deterministic_validation_receipt(tmp_path: Path) -> None:
@@ -448,11 +510,10 @@ def test_rejects_duplicate_lock_json_key_without_hard_coding_lock_shape(
     )
     fixture.lock_path.write_bytes(hostile)
     lock_sha256 = digest(hostile)
-    fixture.authority["package_plane_lock"]["sha256"] = lock_sha256
+    fixture.authority["runtime_package_plane_lock"]["sha256"] = lock_sha256
     fixture.inventory["package_plane_lock_sha256"] = lock_sha256
     inventory_bytes = write_json(fixture.inventory_path, fixture.inventory)
     fixture.authority["inventory"]["sha256"] = digest(inventory_bytes)
-    fixture.receipt["package_plane_lock_sha256"] = lock_sha256
     fixture.receipt["runtime_package_plane_lock_sha256"] = lock_sha256
     fixture.receipt["runtime_package_inventory_sha256"] = digest(inventory_bytes)
     rebind_receipt_only(fixture)
@@ -523,19 +584,105 @@ def test_rejects_runtime_inventory_receipt_cross_link_drift(tmp_path: Path) -> N
         module.validate_artifact(fixture.root, fixture.authority_path)
 
 
-@pytest.mark.parametrize(
-    "field",
-    ["package_plane_lock_sha256", "runtime_package_plane_lock_sha256"],
-)
-def test_rejects_runtime_lock_receipt_cross_link_drift(
-    tmp_path: Path, field: str
+def test_rejects_inventory_bound_to_owner_lock_instead_of_runtime_lock(
+    tmp_path: Path,
 ) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
-    fixture.receipt[field] = "e" * 64
+    fixture.inventory["package_plane_lock_sha256"] = OWNER_LOCK_SHA256
+    inventory_bytes = write_json(fixture.inventory_path, fixture.inventory)
+    fixture.authority["inventory"]["sha256"] = digest(inventory_bytes)
+    fixture.receipt["runtime_package_inventory_sha256"] = digest(inventory_bytes)
     rebind_receipt_only(fixture)
 
-    with pytest.raises(module.ArtifactValidationError, match="lock.*cross-link"):
+    with pytest.raises(
+        module.ArtifactValidationError, match="exact package-plane lock"
+    ):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+def test_rejects_owner_lock_receipt_cross_link_drift(tmp_path: Path) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt["package_plane_lock_sha256"] = "a" * 64
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(
+        module.ArtifactValidationError, match="owner package-plane lock cross-link"
+    ):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+def test_rejects_runtime_lock_receipt_cross_link_drift(tmp_path: Path) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt["runtime_package_plane_lock_sha256"] = "a" * 64
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(
+        module.ArtifactValidationError, match="runtime package-plane lock cross-link"
+    ):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "message"),
+    [
+        ("package_inventory_sha256", "owner package inventory cross-link"),
+        (
+            "candidate_package_inventory_sha256",
+            "candidate engine inventory cross-link",
+        ),
+        (
+            "candidate_runtime_package_inventory_sha256",
+            "candidate runtime inventory cross-link",
+        ),
+    ],
+)
+def test_rejects_owner_and_candidate_inventory_cross_link_drift(
+    tmp_path: Path, field: str, message: str
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt[field] = "a" * 64
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(module.ArtifactValidationError, match=message):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+def test_rejects_core_commit_bound_to_runtime_source_instead_of_recipe(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt["core_commit"] = SOURCE_COMMIT
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(module.ArtifactValidationError, match="core_commit differs"):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("package_version", PACKAGE_VERSION, "owner package_version differs"),
+        (
+            "candidate_package_version",
+            OWNER_PACKAGE_VERSION,
+            "candidate_package_version differs",
+        ),
+    ],
+)
+def test_rejects_owner_and_runtime_package_version_cross_link_drift(
+    tmp_path: Path, field: str, value: str, message: str
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt[field] = value
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(module.ArtifactValidationError, match=message):
         module.validate_artifact(fixture.root, fixture.authority_path)
 
 
@@ -546,6 +693,70 @@ def test_rejects_resolved_runtime_rows_that_differ_from_inventory(tmp_path: Path
     rebind_receipt_only(fixture)
 
     with pytest.raises(module.ArtifactValidationError, match="differs from inventory"):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+def test_rejects_resolved_runtime_candidate_role_drift(tmp_path: Path) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt["resolved_owner_contracts"][0]["role"] = "runtime_package"
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(
+        module.ArtifactValidationError, match="current_core_runtime_candidate"
+    ):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+def test_rejects_locked_owner_package_order_drift(tmp_path: Path) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt["locked_packages"][0], fixture.receipt["locked_packages"][1] = (
+        fixture.receipt["locked_packages"][1],
+        fixture.receipt["locked_packages"][0],
+    )
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(module.ArtifactValidationError, match="IDs or order"):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+@pytest.mark.parametrize(
+    ("index", "role"),
+    [
+        (0, "locked_owner_dependency"),
+        (1, "locked_engine_baseline_not_selected"),
+    ],
+)
+def test_rejects_locked_owner_package_role_drift(
+    tmp_path: Path, index: int, role: str
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt["locked_packages"][index]["role"] = role
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(module.ArtifactValidationError, match="roles differ"):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+@pytest.mark.parametrize("mutation", ["order", "role"])
+def test_rejects_resolved_registry_play_run_tail_drift(
+    tmp_path: Path, mutation: str
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    resolved = fixture.receipt["resolved_owner_contracts"]
+    if mutation == "order":
+        resolved[8], resolved[9] = resolved[9], resolved[8]
+    else:
+        resolved[8]["role"] = "locked_engine_baseline_not_selected"
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(
+        module.ArtifactValidationError,
+        match="exact Registry/Play/Run locked dependencies",
+    ):
         module.validate_artifact(fixture.root, fixture.authority_path)
 
 
@@ -560,6 +771,28 @@ def test_rejects_unknown_authority_fields(tmp_path: Path, field: str) -> None:
     write_json(fixture.authority_path, fixture.authority)
 
     with pytest.raises(module.ArtifactValidationError, match="unknown="):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "owner_package_plane_lock_sha256",
+        "owner_package_inventory_sha256",
+        "candidate_engine_package_inventory_sha256",
+        "candidate_runtime_package_inventory_sha256",
+        "owner_package_version",
+    ],
+)
+def test_requires_each_explicit_owner_authority_binding(
+    tmp_path: Path, field: str
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    del fixture.authority[field]
+    write_json(fixture.authority_path, fixture.authority)
+
+    with pytest.raises(module.ArtifactValidationError, match=f"missing={field}"):
         module.validate_artifact(fixture.root, fixture.authority_path)
 
 
@@ -585,7 +818,7 @@ def test_rejects_invalid_outer_artifact_selector(
         module.validate_artifact(fixture.root, fixture.authority_path)
 
 
-def test_rejects_receipt_contract_status_and_eight_package_gate(tmp_path: Path) -> None:
+def test_rejects_receipt_contract_and_status(tmp_path: Path) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
     fixture.receipt["contract"] = "chummer-core.no-siblings-package-plane/v2"
@@ -599,10 +832,55 @@ def test_rejects_receipt_contract_status_and_eight_package_gate(tmp_path: Path) 
     with pytest.raises(module.ArtifactValidationError, match="status must be pass"):
         module.validate_artifact(fixture.root, fixture.authority_path)
 
-    fixture.receipt["status"] = "pass"
-    fixture.receipt["eight_package_runtime_plane"] = "fail"
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "normal_local_engine_dependency_graph",
+        "build",
+        "package_plane_runtime_test",
+        "local_owner_isolation_tests",
+        "candidate_engine_contract_pack",
+        "candidate_gm_edit_runtime_pack",
+        "candidate_gm_edit_runtime_consumer",
+        "eight_package_runtime_plane",
+    ],
+)
+def test_rejects_non_pass_receipt_proof_fields(tmp_path: Path, field: str) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt[field] = "fail"
     rebind_receipt_only(fixture)
-    with pytest.raises(module.ArtifactValidationError, match="eight_package_runtime_plane"):
+
+    with pytest.raises(module.ArtifactValidationError, match=field):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {
+            "Chummer.*": "https://api.nuget.org/v3/index.json",
+            "other": "https://api.nuget.org/v3/index.json",
+        },
+        {"Chummer.*": "locked-owner-contracts", "other": "nuget.org"},
+        {"Chummer.*": "locked-owner-contracts"},
+        {
+            "Chummer.*": "locked-owner-contracts",
+            "other": "https://api.nuget.org/v3/index.json",
+            "Foreign.*": "foreign",
+        },
+    ],
+)
+def test_rejects_non_exact_package_source_mapping(
+    tmp_path: Path, mapping: dict[str, str]
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.receipt["package_source_mapping"] = mapping
+    rebind_receipt_only(fixture)
+
+    with pytest.raises(module.ArtifactValidationError, match="mapping differs from policy"):
         module.validate_artifact(fixture.root, fixture.authority_path)
 
 
