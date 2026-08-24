@@ -676,8 +676,12 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
     )
     if state == SEALED_LOCK_STATE and pending:
         raise PackagePlaneError("sealed v5 lock cannot contain pending package bytes")
-    if state == PENDING_LOCK_STATE and not pending:
-        raise PackagePlaneError("pending v5 lock must identify at least one CI byte authority")
+    expected_pending = EXPECTED_PACKAGE_IDS[8:]
+    if state == PENDING_LOCK_STATE and pending != expected_pending:
+        raise PackagePlaneError(
+            "pending v5 lock must leave the exact seven source-built packages "
+            "to pinned CI byte authority"
+        )
     versions = {spec.package_id: spec.version for spec in packages}
     expected_dependency_graph = {
         package_id: [
@@ -1956,8 +1960,9 @@ def build_feed(
                         staged_feed, spec.package_id, spec.version
                     ).stat().st_size,
                     "matches_candidate_byte_authority": (
-                        spec.byte_authority_status == "pending_pinned_ci"
-                        or (
+                        None
+                        if spec.byte_authority_status == "pending_pinned_ci"
+                        else (
                             spec.nupkg_sha256
                             == _sha256(
                                 _package_path(
@@ -1972,6 +1977,19 @@ def build_feed(
                     ),
                 }
                 for spec in lock.packages
+            ]
+            source_built_rows = [
+                row for row in observed_rows if row["source_kind"] == BUILD_SOURCE_KIND
+            ]
+            pending_source_built_ids = [
+                row["id"]
+                for row in source_built_rows
+                if row["candidate_byte_authority_status"] == "pending_pinned_ci"
+            ]
+            locked_source_built_rows = [
+                row
+                for row in source_built_rows
+                if row["candidate_byte_authority_status"] == "locked"
             ]
             observed = {
                 "contract": "chummer-hub.observed-package-authority/v2",
@@ -2000,12 +2018,20 @@ def build_feed(
                 "source_built_packages": [
                     row for row in observed_rows if row["source_kind"] == BUILD_SOURCE_KIND
                 ],
-                "prelocked_source_bytes_match": all(
-                    row["matches_candidate_byte_authority"]
-                    for row in observed_rows
-                    if row["source_kind"] == BUILD_SOURCE_KIND
-                    and row["candidate_byte_authority_status"] == "locked"
-                ),
+                "source_built_authority_summary": {
+                    "pending_ids": pending_source_built_ids,
+                    "pending_count": len(pending_source_built_ids),
+                    "locked_ids": [row["id"] for row in locked_source_built_rows],
+                    "locked_count": len(locked_source_built_rows),
+                    "all_locked_bytes_match": (
+                        None
+                        if not locked_source_built_rows
+                        else all(
+                            row["matches_candidate_byte_authority"] is True
+                            for row in locked_source_built_rows
+                        )
+                    ),
+                },
             }
             _write_json(staged_feed / OBSERVED_AUTHORITY_FILE_NAME, observed)
             observed_bytes = (staged_feed / OBSERVED_AUTHORITY_FILE_NAME).read_bytes()

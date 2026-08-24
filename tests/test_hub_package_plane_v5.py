@@ -160,6 +160,13 @@ def test_v5_rejects_preview_substitution_and_placeholder_digests() -> None:
     with pytest.raises(module.PackagePlaneError, match="must not carry placeholder bytes"):
         module.validate_lock_payload(payload)
 
+    payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    payload["packages"][8]["byte_authority_status"] = "locked"
+    payload["packages"][8]["nupkg_sha256"] = "1" * 64
+    payload["packages"][8]["nupkg_size_bytes"] = 1
+    with pytest.raises(module.PackagePlaneError, match="exact seven source-built packages"):
+        module.validate_lock_payload(payload)
+
 
 def test_core_public_bundle_provenance_is_fully_digest_bound() -> None:
     module = load_module()
@@ -190,6 +197,17 @@ def test_pinned_ci_lane_emits_receipt_and_all_seven_source_package_bytes() -> No
     assert "chummer-hub-packages.observed-authority.json" in workflow
     for package_id in (*REGISTRY_IDS, *HUB_IDS):
         assert f"{package_id}.{OWNER_VERSION}.nupkg" in workflow
+
+
+def test_pending_observation_receipt_cannot_claim_candidate_byte_matches() -> None:
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
+    assert 'None\n                        if spec.byte_authority_status == "pending_pinned_ci"' in source
+    assert '"prelocked_source_bytes_match"' not in source
+    assert '"source_built_authority_summary"' in source
+    assert '"pending_ids": pending_source_built_ids' in source
+    assert '"pending_count": len(pending_source_built_ids)' in source
+    assert '"locked_count": len(locked_source_built_rows)' in source
+    assert 'None\n                        if not locked_source_built_rows' in source
 
 
 @pytest.mark.skipif(
