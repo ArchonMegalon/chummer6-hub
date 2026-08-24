@@ -72,6 +72,7 @@ def test_default_unconfigured_contract_renders_every_service_fail_closed_without
         environment[name] = str(ROOT)
     environment["CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN"] = "test-tool-token-" + "a" * 32
     environment["CHUMMER_AI_INTERNAL_API_TOKEN"] = "test-ai-token-" + "b" * 32
+    environment["CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK"] = "test-build-ghost-cloudflare-ingress"
     for name in tuple(environment):
         if name.startswith("CHUMMER_BUILD_GHOST_TOUGH_TONGUE_") or name == "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST":
             environment.pop(name, None)

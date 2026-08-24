@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -20,8 +22,10 @@ internal static class Program
             ("route surface is an exact user-facing allowlist", TestRouteAllowlistAsync),
             ("Access headers require canonical single values", TestHeaderCardinalityAsync),
             ("upstream request overwrites identity and strips authority headers", TestUpstreamSanitizationAsync),
-            ("JWT binds signature issuer audience time and email", TestJwtValidationAsync),
+            ("JWT binds signature issuer audience type lifetime and email", TestJwtValidationAsync),
             ("signing-key retrieval is exact bounded and redirect closed", TestSigningKeyRetrievalAsync),
+            ("signing-key cache refresh rotation failure and concurrency are closed", TestSigningKeyCacheAsync),
+            ("real outbound handlers suppress all activity propagation", TestActivityHeaderIsolationAsync),
             ("proxy rejects bypasses before upstream", TestProxyBypassesAsync),
             ("proxy forwards one admitted request without security header leakage", TestProxyForwardingAsync),
         ];
@@ -211,6 +215,47 @@ static async Task TestJwtValidationAsync()
 
     string valid = Token(rsa, "key-1", configuration, "runner@example.com", 1_999_999_900, 2_000_000_300);
     True(await validator.ValidateAsync(valid, "runner@example.com", CancellationToken.None));
+    True(await validator.ValidateAsync(
+        Token(
+            rsa,
+            "key-1",
+            configuration,
+            "runner@example.com",
+            1_999_999_900,
+            1_999_999_900 + CloudflareAccessJwtValidator.MaximumTokenLifetimeSeconds),
+        "runner@example.com",
+        CancellationToken.None));
+    False(await validator.ValidateAsync(
+        Token(
+            rsa,
+            "key-1",
+            configuration,
+            "runner@example.com",
+            1_999_999_900,
+            1_999_999_901 + CloudflareAccessJwtValidator.MaximumTokenLifetimeSeconds),
+        "runner@example.com",
+        CancellationToken.None));
+    False(await validator.ValidateAsync(
+        Token(
+            rsa,
+            "key-1",
+            configuration,
+            "runner@example.com",
+            long.MinValue,
+            long.MaxValue),
+        "runner@example.com",
+        CancellationToken.None));
+    False(await validator.ValidateAsync(
+        Token(
+            rsa,
+            "key-1",
+            configuration,
+            "runner@example.com",
+            1_999_999_900,
+            2_000_000_300,
+            tokenType: "org"),
+        "runner@example.com",
+        CancellationToken.None));
     False(await validator.ValidateAsync(valid, "attacker@example.com", CancellationToken.None));
     False(await validator.ValidateAsync(
         Token(rsa, "key-1", configuration, "runner@example.com", 1_999_999_900, 2_000_000_300, audience: "other-audience-value"),
@@ -243,9 +288,16 @@ static async Task TestJwtValidationAsync()
         CancellationToken.None));
 
     string duplicatePayload =
-        $"{{\"iss\":\"{configuration.Issuer.AbsoluteUri.TrimEnd('/')}\",\"aud\":[\"{configuration.Audience}\"],\"email\":\"runner@example.com\",\"email\":\"attacker@example.com\",\"iat\":1999999900,\"exp\":2000000300}}";
+        $"{{\"iss\":\"{configuration.Issuer.AbsoluteUri.TrimEnd('/')}\",\"aud\":[\"{configuration.Audience}\"],\"type\":\"app\",\"email\":\"runner@example.com\",\"email\":\"attacker@example.com\",\"iat\":1999999900,\"exp\":2000000300}}";
     False(await validator.ValidateAsync(
         TokenFromRawPayload(rsa, "key-1", duplicatePayload),
+        "runner@example.com",
+        CancellationToken.None));
+
+    string serviceTokenPayload =
+        $"{{\"iss\":\"{configuration.Issuer.AbsoluteUri.TrimEnd('/')}\",\"aud\":[\"{configuration.Audience}\"],\"type\":\"app\",\"common_name\":\"service.access\",\"sub\":\"\",\"iat\":1999999900,\"exp\":2000000300}}";
+    False(await validator.ValidateAsync(
+        TokenFromRawPayload(rsa, "key-1", serviceTokenPayload),
         "runner@example.com",
         CancellationToken.None));
 }
@@ -317,6 +369,167 @@ static async Task TestSigningKeyRetrievalAsync()
     using HttpClient encryptionClient = new(encryptionHandler);
     CloudflareAccessSigningKeyProvider encryptionProvider = new(configuration, encryptionClient);
     True(await encryptionProvider.GetAsync("key-1", CancellationToken.None) is null);
+}
+
+static async Task TestSigningKeyCacheAsync()
+{
+    using RSA firstRsa = RSA.Create(2048);
+    using RSA secondRsa = RSA.Create(2048);
+    RSAParameters first = firstRsa.ExportParameters(false);
+    RSAParameters second = secondRsa.ExportParameters(false);
+    AccessEdgeConfiguration configuration = TestConfiguration();
+
+    FixedResponseHandler cachedHandler = new(_ => JwksResponse(Jwks("key-1", first)));
+    using HttpClient cachedClient = new(cachedHandler);
+    MutableTimeProvider cachedClock = new(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000));
+    CloudflareAccessSigningKeyProvider cachedProvider = new(
+        configuration,
+        cachedClient,
+        cachedClock);
+    CloudflareAccessSigningKey? cachedFirst = await cachedProvider.GetAsync(
+        "key-1",
+        CancellationToken.None);
+    CloudflareAccessSigningKey? cachedSecond = await cachedProvider.GetAsync(
+        "key-1",
+        CancellationToken.None);
+    True(cachedFirst is not null && cachedSecond is not null);
+    Equal(1, cachedHandler.RequestedUris.Count);
+
+    int unknownRefreshCall = 0;
+    FixedResponseHandler unknownRefreshHandler = new(_ =>
+        JwksResponse(Interlocked.Increment(ref unknownRefreshCall) == 1
+            ? Jwks("key-1", first)
+            : Jwks("key-2", second)));
+    using HttpClient unknownRefreshClient = new(unknownRefreshHandler);
+    CloudflareAccessSigningKeyProvider unknownRefreshProvider = new(
+        configuration,
+        unknownRefreshClient,
+        new MutableTimeProvider(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000)));
+    True(await unknownRefreshProvider.GetAsync("key-1", CancellationToken.None) is not null);
+    True(await unknownRefreshProvider.GetAsync("key-2", CancellationToken.None) is not null);
+    Equal(2, unknownRefreshHandler.RequestedUris.Count);
+
+    int rotationCall = 0;
+    FixedResponseHandler rotationHandler = new(_ =>
+        JwksResponse(Interlocked.Increment(ref rotationCall) == 1
+            ? Jwks("key-1", first)
+            : Jwks("key-1", second)));
+    using HttpClient rotationClient = new(rotationHandler);
+    MutableTimeProvider rotationClock = new(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000));
+    CloudflareAccessSigningKeyProvider rotationProvider = new(
+        configuration,
+        rotationClient,
+        rotationClock);
+    CloudflareAccessSigningKey? beforeRotation = await rotationProvider.GetAsync(
+        "key-1",
+        CancellationToken.None);
+    rotationClock.Advance(TimeSpan.FromMinutes(11));
+    CloudflareAccessSigningKey? afterRotation = await rotationProvider.GetAsync(
+        "key-1",
+        CancellationToken.None);
+    True(beforeRotation is not null && afterRotation is not null);
+    True(beforeRotation!.Modulus.SequenceEqual(first.Modulus!));
+    True(afterRotation!.Modulus.SequenceEqual(second.Modulus!));
+    Equal(2, rotationHandler.RequestedUris.Count);
+
+    int failedRefreshCall = 0;
+    FixedResponseHandler failedRefreshHandler = new(_ =>
+        Interlocked.Increment(ref failedRefreshCall) == 1
+            ? JwksResponse(Jwks("key-1", first))
+            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+    using HttpClient failedRefreshClient = new(failedRefreshHandler);
+    MutableTimeProvider failedRefreshClock = new(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000));
+    CloudflareAccessSigningKeyProvider failedRefreshProvider = new(
+        configuration,
+        failedRefreshClient,
+        failedRefreshClock);
+    True(await failedRefreshProvider.GetAsync("key-1", CancellationToken.None) is not null);
+    failedRefreshClock.Advance(TimeSpan.FromMinutes(11));
+    True(await failedRefreshProvider.GetAsync("key-1", CancellationToken.None) is null);
+    Equal(2, failedRefreshHandler.RequestedUris.Count);
+
+    FixedResponseHandler concurrentHandler = new(_ => JwksResponse(Jwks("key-1", first)));
+    using HttpClient concurrentClient = new(concurrentHandler);
+    CloudflareAccessSigningKeyProvider concurrentProvider = new(
+        configuration,
+        concurrentClient,
+        new MutableTimeProvider(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000)));
+    CloudflareAccessSigningKey?[] concurrent = await Task.WhenAll(
+        Enumerable.Range(0, 32).Select(_ =>
+            concurrentProvider.GetAsync("key-1", CancellationToken.None).AsTask()));
+    True(concurrent.All(static key => key is not null));
+    Equal(1, concurrentHandler.RequestedUris.Count);
+}
+
+static async Task TestActivityHeaderIsolationAsync()
+{
+    DefaultHttpContext incoming = AdmittedContext("/api/workspaces/import", "POST");
+    incoming.Request.ContentType = "application/json";
+    incoming.Request.Body = new MemoryStream("{}"u8.ToArray());
+    incoming.Request.Headers["traceparent"] =
+        "00-11111111111111111111111111111111-2222222222222222-01";
+    incoming.Request.Headers["tracestate"] = "vendor=hostile";
+    incoming.Request.Headers["baggage"] = "owner=hostile";
+    incoming.Request.Headers["Request-Id"] = "|hostile.request.";
+    incoming.Request.Headers["Correlation-Context"] = "owner=hostile";
+    True(BuildGhostAccessProxy.TryMatchRoute(
+        incoming.Request.Method,
+        incoming.Request.Path,
+        out BuildGhostAccessRoute route));
+
+    IReadOnlySet<string> presentationHeaders = await CaptureLoopbackHeadersAsync(
+        async endpoint =>
+        {
+            using SocketsHttpHandler handler = AccessEdgeHttpTransport.CreatePresentationHandler();
+            True(handler.ActivityHeadersPropagator is null);
+            using HttpClient client = new(handler);
+            using HttpRequestMessage request = BuildGhostAccessProxy.CreateUpstreamRequest(
+                incoming.Request,
+                "runner@example.com",
+                route);
+            request.RequestUri = endpoint;
+            await WithHostileActivityAsync(ActivityIdFormat.W3C, async () =>
+            {
+                using HttpResponseMessage response = await client.SendAsync(request);
+                Equal(HttpStatusCode.OK, response.StatusCode);
+            });
+        },
+        "{\"ok\":true}");
+    AssertTraceHeadersAbsent(presentationHeaders);
+
+    using RSA rsa = RSA.Create(2048);
+    RSAParameters key = rsa.ExportParameters(false);
+    foreach (ActivityIdFormat format in new[]
+    {
+        ActivityIdFormat.W3C,
+        ActivityIdFormat.Hierarchical,
+    })
+    {
+        IReadOnlySet<string> certificateHeaders = await CaptureLoopbackHeadersAsync(
+            async endpoint =>
+            {
+                AccessEdgeConfiguration baseConfiguration = TestConfiguration();
+                AccessEdgeConfiguration loopbackConfiguration = new(
+                    baseConfiguration.PublicHost,
+                    baseConfiguration.TeamDomain,
+                    baseConfiguration.Audience,
+                    baseConfiguration.Issuer,
+                    endpoint);
+                using SocketsHttpHandler handler = AccessEdgeHttpTransport.CreateCertificateHandler();
+                True(handler.ActivityHeadersPropagator is null);
+                using HttpClient client = new(handler);
+                CloudflareAccessSigningKeyProvider provider = new(
+                    loopbackConfiguration,
+                    client,
+                    new MutableTimeProvider(DateTimeOffset.FromUnixTimeSeconds(2_000_000_000)));
+                await WithHostileActivityAsync(format, async () =>
+                {
+                    True(await provider.GetAsync("key-1", CancellationToken.None) is not null);
+                });
+            },
+            Jwks("key-1", key));
+        AssertTraceHeadersAbsent(certificateHeaders);
+    }
 }
 
 static async Task TestProxyBypassesAsync()
@@ -412,12 +625,14 @@ static string Token(
     long expiresAt,
     string? issuer = null,
     string? audience = null,
-    long? notBefore = null)
+    long? notBefore = null,
+    string tokenType = "app")
 {
     Dictionary<string, object> payload = new(StringComparer.Ordinal)
     {
         ["iss"] = issuer ?? configuration.Issuer.AbsoluteUri.TrimEnd('/'),
         ["aud"] = new[] { audience ?? configuration.Audience },
+        ["type"] = tokenType,
         ["email"] = email,
         ["iat"] = issuedAt,
         ["exp"] = expiresAt,
@@ -449,6 +664,134 @@ static string TokenFromRawPayload(RSA rsa, string keyId, string payload)
 
 static string Base64Url(byte[] bytes)
     => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+static string Jwks(string keyId, RSAParameters parameters)
+    => JsonSerializer.Serialize(new
+    {
+        keys = new[]
+        {
+            new
+            {
+                kty = "RSA",
+                kid = keyId,
+                use = "sig",
+                alg = "RS256",
+                n = Base64Url(parameters.Modulus!),
+                e = Base64Url(parameters.Exponent!),
+            },
+        },
+    });
+
+static HttpResponseMessage JwksResponse(string json)
+    => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent(json, Encoding.UTF8, "application/json"),
+    };
+
+static async Task<IReadOnlySet<string>> CaptureLoopbackHeadersAsync(
+    Func<Uri, Task> send,
+    string responseBody)
+{
+    TcpListener listener = new(IPAddress.Loopback, 0);
+    listener.Start(1);
+    try
+    {
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        Uri endpoint = new($"http://127.0.0.1:{port}/capture", UriKind.Absolute);
+        Task<IReadOnlySet<string>> capture = CaptureOneRequestAsync(listener, responseBody);
+        await send(endpoint);
+        return await capture;
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static async Task<IReadOnlySet<string>> CaptureOneRequestAsync(
+    TcpListener listener,
+    string responseBody)
+{
+    using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+    using TcpClient connection = await listener.AcceptTcpClientAsync(timeout.Token);
+    await using NetworkStream stream = connection.GetStream();
+    byte[] buffer = new byte[64 * 1024];
+    int total = 0;
+    int headerEnd = -1;
+    while (total < buffer.Length)
+    {
+        int read = await stream.ReadAsync(
+            buffer.AsMemory(total, buffer.Length - total),
+            timeout.Token);
+        if (read == 0)
+        {
+            break;
+        }
+        total += read;
+        headerEnd = Encoding.ASCII.GetString(buffer, 0, total)
+            .IndexOf("\r\n\r\n", StringComparison.Ordinal);
+        if (headerEnd >= 0)
+        {
+            break;
+        }
+    }
+    True(headerEnd >= 0, "loopback request headers were incomplete");
+    string headerBlock = Encoding.ASCII.GetString(buffer, 0, headerEnd);
+    HashSet<string> names = headerBlock.Split("\r\n", StringSplitOptions.None)
+        .Skip(1)
+        .Select(static line => line.Split(':', 2)[0])
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    byte[] body = Encoding.UTF8.GetBytes(responseBody);
+    string responseHeaders =
+        $"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n";
+    await stream.WriteAsync(Encoding.ASCII.GetBytes(responseHeaders), timeout.Token);
+    await stream.WriteAsync(body, timeout.Token);
+    await stream.FlushAsync(timeout.Token);
+    return names;
+}
+
+static async Task WithHostileActivityAsync(
+    ActivityIdFormat format,
+    Func<Task> action)
+{
+    using Activity activity = new Activity("hostile-edge-context").SetIdFormat(format);
+    if (format == ActivityIdFormat.W3C)
+    {
+        activity.SetParentId(
+            "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01");
+        activity.TraceStateString = "vendor=hostile";
+    }
+    else
+    {
+        activity.SetParentId("|hostile.root.");
+    }
+    activity.AddBaggage("owner", "hostile");
+    activity.Start();
+    try
+    {
+        await action();
+    }
+    finally
+    {
+        activity.Stop();
+    }
+}
+
+static void AssertTraceHeadersAbsent(IReadOnlySet<string> headerNames)
+{
+    foreach (string forbidden in new[]
+    {
+        "traceparent",
+        "tracestate",
+        "baggage",
+        "Request-Id",
+        "Correlation-Context",
+    })
+    {
+        False(headerNames.Contains(forbidden), $"activity header crossed boundary: {forbidden}");
+    }
+}
 
 static void True(bool condition, string? message = null)
 {
@@ -493,6 +836,15 @@ sealed class StaticKeyProvider(CloudflareAccessSigningKey key) : ICloudflareAcce
 sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
 {
     public override DateTimeOffset GetUtcNow() => now;
+}
+
+sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
+{
+    private DateTimeOffset _now = now;
+
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    public void Advance(TimeSpan duration) => _now = _now.Add(duration);
 }
 
 sealed class FixedValidator(bool result) : ICloudflareAccessTokenValidator

@@ -11,6 +11,7 @@ EDGE_ROOT = ROOT / "ops/build-ghost-private-nonprod/cloudflare-access-edge"
 PROXY = (EDGE_ROOT / "BuildGhostAccessProxy.cs").read_text(encoding="utf-8")
 JWT = (EDGE_ROOT / "CloudflareAccessJwtValidator.cs").read_text(encoding="utf-8")
 PROGRAM = (EDGE_ROOT / "Program.cs").read_text(encoding="utf-8")
+TRANSPORT = (EDGE_ROOT / "AccessEdgeHttpTransport.cs").read_text(encoding="utf-8")
 DOCKERFILE = (
     ROOT / "ops/build-ghost-private-nonprod/Dockerfile.cloudflare-access-edge"
 ).read_text(encoding="utf-8")
@@ -19,7 +20,11 @@ HANDOFF = (
 ).read_text(encoding="utf-8")
 
 
-def compose_environment(*, configured_access: bool) -> dict[str, str]:
+def compose_environment(
+    *,
+    configured_access: bool,
+    ingress_network: str | None = "test-build-ghost-cloudflare-ingress",
+) -> dict[str, str]:
     environment = os.environ.copy()
     for index, name in enumerate(
         (
@@ -53,6 +58,10 @@ def compose_environment(*, configured_access: bool) -> dict[str, str]:
         "CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK",
     ):
         environment.pop(name, None)
+    if ingress_network is not None:
+        environment["CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK"] = (
+            ingress_network
+        )
     if configured_access:
         environment.update(
             {
@@ -61,9 +70,6 @@ def compose_environment(*, configured_access: bool) -> dict[str, str]:
                     "example-team.cloudflareaccess.com"
                 ),
                 "CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE": "a" * 64,
-                "CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK": (
-                    "test-build-ghost-cloudflare-ingress"
-                ),
             }
         )
     return environment
@@ -119,6 +125,44 @@ def test_profiled_edge_has_no_host_port_and_only_two_bounded_networks():
     ingress = rendered["networks"]["build-ghost-cloudflare-ingress"]
     assert ingress["external"] is True
     assert ingress["name"] == "test-build-ghost-cloudflare-ingress"
+
+
+def test_external_ingress_network_name_is_strictly_required_and_blank_closed():
+    for ingress_network in (None, ""):
+        command = [
+            "docker",
+            "compose",
+            "--project-directory",
+            str(ROOT),
+            "--profile",
+            "cloudflare-access-ingress",
+            "--file",
+            str(COMPOSE_PATH),
+            "config",
+            "--format",
+            "json",
+        ]
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=compose_environment(
+                configured_access=True,
+                ingress_network=ingress_network,
+            ),
+        )
+        assert result.returncode != 0
+        assert "CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK" in result.stderr
+
+    rendered = render_compose(profile=True, configured_access=True)
+    assert rendered["networks"]["build-ghost-cloudflare-ingress"]["name"] == (
+        "test-build-ghost-cloudflare-ingress"
+    )
+    assert (
+        "${CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK:?"
+        in COMPOSE
+    )
 
 
 def test_profile_defaults_are_blocked_public_sentinels_and_never_credentials():
@@ -182,9 +226,15 @@ def test_edge_validates_both_access_headers_and_cryptographic_identity_binding()
     assert "HasExactAudience(payload, _configuration.Audience)" in JWT
     assert 'TryReadExactString(payload, "email"' in JWT
     assert "rsa.VerifyData" in JWT
-    assert "AllowAutoRedirect = false" in PROGRAM
-    assert "UseCookies = false" in PROGRAM
-    assert "UseProxy = false" in PROGRAM
+    assert TRANSPORT.count("ActivityHeadersPropagator = null") == 2
+    assert TRANSPORT.count("AllowAutoRedirect = false") == 2
+    assert TRANSPORT.count("UseCookies = false") == 2
+    assert TRANSPORT.count("UseProxy = false") == 2
+    assert "CreateCertificateHandler" in PROGRAM
+    assert "CreatePresentationHandler" in PROGRAM
+    assert 'TryReadExactString(payload, "type"' in JWT
+    assert 'string.Equals(accessTokenType, "app"' in JWT
+    assert "MaximumTokenLifetimeSeconds = 24 * 60 * 60" in JWT
 
 
 def test_upstream_is_reconstructed_and_access_assertion_is_not_logged_or_forwarded():

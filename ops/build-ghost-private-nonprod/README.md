@@ -35,6 +35,12 @@ through the existing isolated `X-Chummer-Owner` dev seam. The Access assertion,
 client owner/portal assertions, cookies, authorization, and forwarding headers
 never cross to Presentation.
 
+Admission requires Cloudflare application-token type `app` and limits the
+signed `exp - iat` interval to exactly 24 hours. Both outbound handlers disable
+.NET activity-header propagation, so ambient trace and baggage state cannot
+cross either the Presentation or signing-key boundary. The dedicated external
+network name has no fallback and must be supplied explicitly.
+
 The edge routes only workspace import, exact workspace read/close, and
 ephemeral Build Ghost tool-access issuance. It cannot route either AI provider
 tool endpoint or `/api/internal/build-ghost/tool/resolve`. Its checked-in

@@ -12,29 +12,13 @@ builder.WebHost.ConfigureKestrel(options =>
 
 AccessEdgeConfiguration configuration = AccessEdgeConfiguration.FromEnvironment();
 
-SocketsHttpHandler certificateHandler = new()
-{
-    AllowAutoRedirect = false,
-    AutomaticDecompression = System.Net.DecompressionMethods.None,
-    ConnectTimeout = TimeSpan.FromSeconds(5),
-    PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-    UseCookies = false,
-    UseProxy = false,
-};
+SocketsHttpHandler certificateHandler = AccessEdgeHttpTransport.CreateCertificateHandler();
 HttpClient certificateClient = new(certificateHandler)
 {
     Timeout = TimeSpan.FromSeconds(10),
 };
 
-SocketsHttpHandler upstreamHandler = new()
-{
-    AllowAutoRedirect = false,
-    AutomaticDecompression = System.Net.DecompressionMethods.None,
-    ConnectTimeout = TimeSpan.FromSeconds(3),
-    PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-    UseCookies = false,
-    UseProxy = false,
-};
+SocketsHttpHandler upstreamHandler = AccessEdgeHttpTransport.CreatePresentationHandler();
 HttpClient upstreamClient = new(upstreamHandler)
 {
     Timeout = TimeSpan.FromSeconds(30),

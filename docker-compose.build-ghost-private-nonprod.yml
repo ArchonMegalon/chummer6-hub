@@ -187,4 +187,4 @@ networks:
   build-ghost-loopback: {}
   build-ghost-cloudflare-ingress:
     external: true
-    name: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK:-chummer-build-ghost-cloudflare-ingress}
+    name: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK:?set the exact pre-created dedicated Cloudflare ingress network}
