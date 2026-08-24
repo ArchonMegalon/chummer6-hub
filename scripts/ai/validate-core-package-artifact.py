@@ -67,6 +67,7 @@ EXPECTED_PACKAGE_IDS = (
     "Chummer.Engine.GmCharacterEdits",
 )
 EXPECTED_ALLOWED_RECIPE_DELTA = (
+    ".github/workflows/android-content-plane.yml",
     ".github/workflows/package-plane.yml",
     "Chummer.Application/Chummer.Application.csproj",
     "Chummer.Contracts/Chummer.Contracts.csproj",
@@ -76,9 +77,12 @@ EXPECTED_ALLOWED_RECIPE_DELTA = (
     "Chummer.Rulesets.Sr4/Chummer.Rulesets.Sr4.csproj",
     "Chummer.Rulesets.Sr5/Chummer.Rulesets.Sr5.csproj",
     "Chummer.Rulesets.Sr6/Chummer.Rulesets.Sr6.csproj",
+    "eng/android-content-plane.lock.json",
     "eng/runtime-package-plane.lock.json",
+    "scripts/ai/android-content-plane.py",
     "scripts/ai/runtime-package-plane.py",
     "scripts/ai/verify-no-siblings-package-plane.sh",
+    "tests/test_android_content_plane.py",
     "tests/test_package_plane.py",
     "tests/test_runtime_package_plane_authority.py",
 )
@@ -413,6 +417,18 @@ class DirectorySnapshot:
     identity: tuple[int, int, int, int, int, int]
 
 
+@dataclass(frozen=True)
+class HeldFileSnapshot:
+    descriptor: int
+    directory_fd: int
+    name: str
+    label: str
+    maximum: int
+    expected_size: int
+    expected_sha256: str
+    identity: tuple[int, int, int, int, int, int, int]
+
+
 def _reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -534,6 +550,36 @@ def _directory_identity(metadata: os.stat_result) -> tuple[int, int, int, int, i
         metadata.st_mtime_ns,
         metadata.st_ctime_ns,
     )
+
+
+def _file_identity(metadata: os.stat_result) -> tuple[int, int, int, int, int, int, int]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _require_regular_file_metadata(
+    metadata: os.stat_result,
+    *,
+    label: str,
+    maximum: int,
+    expected_size: int,
+) -> None:
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_size > maximum
+        or metadata.st_size != expected_size
+    ):
+        raise ArtifactValidationError(
+            f"{label} must remain one exact-size bounded, single-link regular file"
+        )
 
 
 def _open_directory(
@@ -728,7 +774,7 @@ def _load_json_file_at(
     return _decode_json(payload, label=label), payload, hashlib.sha256(payload).hexdigest()
 
 
-def _require_final_file_binding(
+def _open_held_file(
     directory_fd: int,
     name: str,
     *,
@@ -736,15 +782,133 @@ def _require_final_file_binding(
     maximum: int,
     expected_size: int,
     expected_sha256: str,
-) -> None:
-    payload = _stable_file_bytes_at(
-        directory_fd, name, label=f"final {label}", maximum=maximum
+) -> HeldFileSnapshot:
+    if PurePosixPath(name).name != name or "/" in name or "\\" in name:
+        raise ArtifactValidationError(f"held {label} does not have one contained file name")
+    descriptor = -1
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        _require_regular_file_metadata(
+            before,
+            label=f"held {label}",
+            maximum=maximum,
+            expected_size=expected_size,
+        )
+        descriptor = os.open(name, flags, dir_fd=directory_fd)
+        opened = os.fstat(descriptor)
+        _require_regular_file_metadata(
+            opened,
+            label=f"held {label}",
+            maximum=maximum,
+            expected_size=expected_size,
+        )
+    except ArtifactValidationError:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise
+    except OSError as exc:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise ArtifactValidationError(f"unable to hold {label} for final validation") from exc
+    if _file_identity(before) != _file_identity(opened):
+        os.close(descriptor)
+        raise ArtifactValidationError(f"held {label} changed while it was opened")
+    return HeldFileSnapshot(
+        descriptor=descriptor,
+        directory_fd=directory_fd,
+        name=name,
+        label=label,
+        maximum=maximum,
+        expected_size=expected_size,
+        expected_sha256=expected_sha256,
+        identity=_file_identity(opened),
+    )
+
+
+def _require_final_file_binding(snapshot: HeldFileSnapshot) -> None:
+    try:
+        before = os.fstat(snapshot.descriptor)
+        _require_regular_file_metadata(
+            before,
+            label=f"final {snapshot.label}",
+            maximum=snapshot.maximum,
+            expected_size=snapshot.expected_size,
+        )
+        if _file_identity(before) != snapshot.identity:
+            raise ArtifactValidationError(
+                f"final identity differs before byte reread for {snapshot.label}"
+            )
+        if os.lseek(snapshot.descriptor, 0, os.SEEK_SET) != 0:
+            raise ArtifactValidationError(
+                f"final descriptor cannot be rewound for {snapshot.label}"
+            )
+        digest = hashlib.sha256()
+        remaining = snapshot.expected_size
+        while remaining:
+            chunk = os.read(snapshot.descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                raise ArtifactValidationError(
+                    f"final byte binding ended early for {snapshot.label}"
+                )
+            digest.update(chunk)
+            remaining -= len(chunk)
+        if os.read(snapshot.descriptor, 1):
+            raise ArtifactValidationError(
+                f"final byte binding exceeds exact size for {snapshot.label}"
+            )
+        after = os.fstat(snapshot.descriptor)
+        _require_regular_file_metadata(
+            after,
+            label=f"final {snapshot.label}",
+            maximum=snapshot.maximum,
+            expected_size=snapshot.expected_size,
+        )
+    except ArtifactValidationError:
+        raise
+    except OSError as exc:
+        raise ArtifactValidationError(
+            f"unable to reread final held descriptor for {snapshot.label}"
+        ) from exc
+    if _file_identity(before) != _file_identity(after):
+        raise ArtifactValidationError(
+            f"final identity changed during byte reread for {snapshot.label}"
+        )
+    if digest.hexdigest() != snapshot.expected_sha256:
+        raise ArtifactValidationError(f"final byte binding differs for {snapshot.label}")
+
+
+def _require_terminal_file_identity(snapshot: HeldFileSnapshot) -> None:
+    try:
+        descriptor_metadata = os.fstat(snapshot.descriptor)
+        entry_metadata = os.stat(
+            snapshot.name,
+            dir_fd=snapshot.directory_fd,
+            follow_symlinks=False,
+        )
+    except OSError as exc:
+        raise ArtifactValidationError(
+            f"unable to resweep final identity for {snapshot.label}"
+        ) from exc
+    _require_regular_file_metadata(
+        descriptor_metadata,
+        label=f"terminal {snapshot.label}",
+        maximum=snapshot.maximum,
+        expected_size=snapshot.expected_size,
+    )
+    _require_regular_file_metadata(
+        entry_metadata,
+        label=f"terminal entry {snapshot.label}",
+        maximum=snapshot.maximum,
+        expected_size=snapshot.expected_size,
     )
     if (
-        len(payload) != expected_size
-        or hashlib.sha256(payload).hexdigest() != expected_sha256
+        _file_identity(descriptor_metadata) != snapshot.identity
+        or _file_identity(entry_metadata) != snapshot.identity
     ):
-        raise ArtifactValidationError(f"final byte binding differs for {label}")
+        raise ArtifactValidationError(
+            f"terminal file identity or entry differs for {snapshot.label}"
+        )
 
 
 def load_authority(path: Path) -> Authority:
@@ -1532,6 +1696,7 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
         artifact_root.absolute(), label="artifact root"
     )
     packages_snapshot: DirectorySnapshot | None = None
+    held_files: list[HeldFileSnapshot] = []
     expected_root_names = {
         PACKAGES_DIRECTORY_NAME,
         INVENTORY_FILE_NAME,
@@ -1638,9 +1803,8 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
             inventory_packages=inventory_packages,
         )
 
-        # Re-read every member only after every semantic and receipt check.
-        # Directory identity alone cannot detect an in-place mutation between
-        # two otherwise stable reads.
+        # Hold every exact member entry before the final directory and byte
+        # phases so the terminal reread cannot be redirected to another inode.
         for name, label, maximum, initial_bytes, initial_sha256 in (
             (
                 LOCK_FILE_NAME,
@@ -1664,26 +1828,30 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
                 receipt_sha256,
             ),
         ):
-            _require_final_file_binding(
-                root_snapshot.descriptor,
-                name,
-                label=label,
-                maximum=maximum,
-                expected_size=len(initial_bytes),
-                expected_sha256=initial_sha256,
+            held_files.append(
+                _open_held_file(
+                    root_snapshot.descriptor,
+                    name,
+                    label=label,
+                    maximum=maximum,
+                    expected_size=len(initial_bytes),
+                    expected_sha256=initial_sha256,
+                )
             )
         for row in inventory_packages:
-            _require_final_file_binding(
-                packages_snapshot.descriptor,
-                row["file_name"],
-                label=f"package {row['id']}",
-                maximum=MAX_PACKAGE_BYTES,
-                expected_size=row["size_bytes"],
-                expected_sha256=row["sha256"],
+            held_files.append(
+                _open_held_file(
+                    packages_snapshot.descriptor,
+                    row["file_name"],
+                    label=f"package {row['id']}",
+                    maximum=MAX_PACKAGE_BYTES,
+                    expected_size=row["size_bytes"],
+                    expected_sha256=row["sha256"],
+                )
             )
 
-        # Exact final membership snapshots close addition/removal and
-        # directory replacement races after the complete eleven-file reread.
+        # All directory-dependent validation happens before the terminal byte
+        # pass. In-place mutations do not change directory membership.
         _require_exact_directory_names(
             packages_snapshot,
             expected_package_names,
@@ -1692,6 +1860,17 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
         _require_exact_directory_names(
             root_snapshot, expected_root_names, label="artifact root"
         )
+
+        # Re-read all eleven held descriptors only after every semantic,
+        # receipt, and directory check.
+        for held_file in held_files:
+            _require_final_file_binding(held_file)
+
+        # This is deliberately the final filesystem-dependent phase. It binds
+        # every still-open descriptor back to its exact directory entry and
+        # catches mutations that race the terminal byte sweep.
+        for held_file in held_files:
+            _require_terminal_file_identity(held_file)
 
         return {
             "contract": VALIDATION_CONTRACT,
@@ -1747,6 +1926,8 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
             },
         }
     finally:
+        for held_file in held_files:
+            os.close(held_file.descriptor)
         if packages_snapshot is not None:
             os.close(packages_snapshot.descriptor)
         os.close(root_snapshot.descriptor)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import io
 import importlib.util
@@ -18,11 +19,22 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "validate-core-package-artifact.py"
-SOURCE_COMMIT = "bc08228d3ce06410ca97ada63a5af41a2eaa91bf"
+SELECTED_CORE_COMMIT = "6bc30bc886cbfe77585b7a7933524f282eb5e9a0"
+SELECTED_CORE_LOCK_PATH = (
+    ROOT / "tests" / "fixtures" / f"core-runtime-package-plane.{SELECTED_CORE_COMMIT[:12]}.lock.json"
+)
+SELECTED_CORE_LOCK_SHA256 = (
+    "8f417ff62fa24373c85cbf98e53580acef109434b656359b455a12eecf967cbf"
+)
+SELECTED_CORE_LOCK_BYTES = SELECTED_CORE_LOCK_PATH.read_bytes()
+if hashlib.sha256(SELECTED_CORE_LOCK_BYTES).hexdigest() != SELECTED_CORE_LOCK_SHA256:
+    raise RuntimeError("selected Core runtime lock fixture digest differs")
+SELECTED_CORE_LOCK = json.loads(SELECTED_CORE_LOCK_BYTES.decode("utf-8"))
+SOURCE_COMMIT = SELECTED_CORE_LOCK["runtime_source"]["commit"]
 RECIPE_COMMIT = "2" * 40
-PACKAGE_VERSION = "0.0.0-packageplane.candidate.shabc08228d3ce0"
-OWNER_PACKAGE_VERSION = "0.0.0-packageplane.20260721.1"
-LOCK_CONTRACT = "chummer-core.runtime-package-plane-lock/v1"
+PACKAGE_VERSION = SELECTED_CORE_LOCK["package_version"]
+OWNER_PACKAGE_VERSION = SELECTED_CORE_LOCK["external_owner_packages"][0]["version"]
+LOCK_CONTRACT = SELECTED_CORE_LOCK["contract"]
 OWNER_LOCK_SHA256 = "d" * 64
 OWNER_INVENTORY_SHA256 = "e" * 64
 CANDIDATE_ENGINE_INVENTORY_SHA256 = "f" * 64
@@ -33,143 +45,23 @@ LOCKED_OWNER_IDS = (
     "Chummer.Play.Contracts",
     "Chummer.Run.Contracts",
 )
-CORE_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-core.git"
-REGISTRY_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub-registry.git"
-HUB_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub.git"
-SDK_ARCHIVE_SHA512 = (
-    "bab94f13c57b2ac821d4924fe66084be9b44c41761ff7ff64522c8f7aba345659"
-    "d31258401dcec31cc3cf6ccae1d012623075aca1c9b9165bcfe5ba9abda1c0c"
+CORE_REPOSITORY = SELECTED_CORE_LOCK["runtime_source"]["repository"]
+REGISTRY_REPOSITORY = SELECTED_CORE_LOCK["external_owner_packages"][0]["repository"]
+HUB_REPOSITORY = SELECTED_CORE_LOCK["external_owner_packages"][1]["repository"]
+SDK_ARCHIVE_SHA512 = SELECTED_CORE_LOCK["dotnet_sdk"]["archive_sha512"]
+ALLOWED_RECIPE_DELTA = tuple(SELECTED_CORE_LOCK["allowed_recipe_delta"])
+BUILD_AUTHORITY_PATHS = tuple(
+    row["path"] for row in SELECTED_CORE_LOCK["build_authority_files"]
 )
-ALLOWED_RECIPE_DELTA = (
-    ".github/workflows/package-plane.yml",
-    "Chummer.Application/Chummer.Application.csproj",
-    "Chummer.Contracts/Chummer.Contracts.csproj",
-    "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
-    "Chummer.Infrastructure/Chummer.Infrastructure.csproj",
-    "Chummer.Rulesets.Hosting/Chummer.Rulesets.Hosting.csproj",
-    "Chummer.Rulesets.Sr4/Chummer.Rulesets.Sr4.csproj",
-    "Chummer.Rulesets.Sr5/Chummer.Rulesets.Sr5.csproj",
-    "Chummer.Rulesets.Sr6/Chummer.Rulesets.Sr6.csproj",
-    "eng/runtime-package-plane.lock.json",
-    "scripts/ai/runtime-package-plane.py",
-    "scripts/ai/verify-no-siblings-package-plane.sh",
-    "tests/test_package_plane.py",
-    "tests/test_runtime_package_plane_authority.py",
-)
-BUILD_AUTHORITY_PATHS = (
-    ".github/workflows/package-plane.yml",
-    "Chummer.CoreEngine.sln",
-    "Directory.Build.props",
-    "Directory.Build.targets",
-    "eng/package-plane.lock.json",
-    "global.json",
-    "scripts/ai/_env.sh",
-    "scripts/ai/bootstrap-contracts-feed.sh",
-    "scripts/ai/bootstrap-owner-contracts-feed.py",
-    "scripts/ai/runtime-package-plane.py",
-    "scripts/ai/verify-no-siblings-package-plane.sh",
-)
-RUNTIME_SPECS = (
+RUNTIME_SPECS = tuple(
     (
-        "Chummer.Engine.Contracts",
-        "Chummer.Contracts/Chummer.Contracts.csproj",
-        "1ae056091372ae0fb353b983023cea521ac848b899fd8d3ca3d45e546f57707e",
-        "Chummer.Engine.Contracts.dll",
-        (),
-    ),
-    (
-        "Chummer.Application",
-        "Chummer.Application/Chummer.Application.csproj",
-        "cf5fc7f7f7d25c2ab20ba7719f3a60929cd78b205b9a43683b4a7048fcf0c19a",
-        "Chummer.Application.dll",
-        (
-            "Chummer.Engine.Contracts",
-            "Chummer.Hub.Registry.Contracts",
-            "Chummer.Run.Contracts",
-        ),
-    ),
-    (
-        "Chummer.Rulesets.Hosting",
-        "Chummer.Rulesets.Hosting/Chummer.Rulesets.Hosting.csproj",
-        "b3e1145840a1767a92e6e7c42fa5e510249753b36973e75050d6eac198e17521",
-        "Chummer.Rulesets.Hosting.dll",
-        (
-            "Chummer.Application",
-            "Chummer.Engine.Contracts",
-            "Chummer.Run.Contracts",
-            "Microsoft.Extensions.DependencyInjection",
-        ),
-    ),
-    (
-        "Chummer.Rulesets.Sr5",
-        "Chummer.Rulesets.Sr5/Chummer.Rulesets.Sr5.csproj",
-        "2f7f91916c55035d42d7e5bddd52e76379ad2d0bb6d6eb4ff7ac5c7bbbea9826",
-        "Chummer.Rulesets.Sr5.dll",
-        (
-            "Chummer.Application",
-            "Chummer.Engine.Contracts",
-            "Chummer.Run.Contracts",
-            "Microsoft.Extensions.DependencyInjection",
-        ),
-    ),
-    (
-        "Chummer.Rulesets.Sr6",
-        "Chummer.Rulesets.Sr6/Chummer.Rulesets.Sr6.csproj",
-        "23023db965dbfbf1795a5d660f5d3d3bc0d12f17b0a164882e6910e1a25a1f1f",
-        "Chummer.Rulesets.Sr6.dll",
-        (
-            "Chummer.Application",
-            "Chummer.Engine.Contracts",
-            "Chummer.Run.Contracts",
-            "Microsoft.Extensions.DependencyInjection",
-        ),
-    ),
-    (
-        "Chummer.Infrastructure",
-        "Chummer.Infrastructure/Chummer.Infrastructure.csproj",
-        "e017c01931b664a99cf4d74d89f0e6ed07576c1de47dfa89b740eb972f877936",
-        "Chummer.Infrastructure.dll",
-        (
-            "Chummer.Application",
-            "Chummer.Engine.Contracts",
-            "Chummer.Hub.Registry.Contracts",
-            "Chummer.Rulesets.Hosting",
-            "Chummer.Rulesets.Sr5",
-            "Chummer.Rulesets.Sr6",
-            "Chummer.Run.Contracts",
-            "Microsoft.Extensions.DependencyInjection",
-            "SharpCompress",
-        ),
-    ),
-    (
-        "Chummer.Rulesets.Sr4",
-        "Chummer.Rulesets.Sr4/Chummer.Rulesets.Sr4.csproj",
-        "86eafdcdf1638c3651d5357acd7f99023ca97c5641d83432be2b3c12f3ba5fb5",
-        "Chummer.Rulesets.Sr4.dll",
-        (
-            "Chummer.Application",
-            "Chummer.Engine.Contracts",
-            "Chummer.Infrastructure",
-            "Chummer.Run.Contracts",
-            "Microsoft.Extensions.DependencyInjection",
-        ),
-    ),
-    (
-        "Chummer.Engine.GmCharacterEdits",
-        "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
-        "7c2508ce3ee1c64338cc80df71e3a98487c5c8323db9bccb68e740f13f3db6a6",
-        "Chummer.Engine.GmCharacterEdits.dll",
-        (
-            "Chummer.Application",
-            "Chummer.Engine.Contracts",
-            "Chummer.Hub.Registry.Contracts",
-            "Chummer.Infrastructure",
-            "Chummer.Rulesets.Hosting",
-            "Chummer.Rulesets.Sr5",
-            "Chummer.Rulesets.Sr6",
-            "Chummer.Run.Contracts",
-        ),
-    ),
+        row["id"],
+        row["project"],
+        row["project_sha256"],
+        row["assembly"],
+        tuple(dependency["id"] for dependency in row["dependencies"]),
+    )
+    for row in SELECTED_CORE_LOCK["packages"]
 )
 
 
@@ -298,68 +190,8 @@ def build_fixture(tmp_path: Path) -> ArtifactFixture:
     packages_root.mkdir(parents=True)
 
     lock_path = root / module.LOCK_FILE_NAME
-    runtime_lock_rows = []
-    for package_id, project, project_sha256, assembly, dependency_ids in RUNTIME_SPECS:
-        runtime_lock_rows.append(
-            {
-                "id": package_id,
-                "project": project,
-                "project_sha256": project_sha256,
-                "assembly": assembly,
-                "target_framework": "net10.0",
-                "dependencies": [
-                    {"id": dependency_id, "version": dependency_version(dependency_id)}
-                    for dependency_id in dependency_ids
-                ],
-            }
-        )
-    lock = {
-        "contract": LOCK_CONTRACT,
-        "dotnet_sdk": {
-            "version": "10.0.103",
-            "rid": "linux-x64",
-            "archive_url": (
-                "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.103/"
-                "dotnet-sdk-10.0.103-linux-x64.tar.gz"
-            ),
-            "archive_sha512": SDK_ARCHIVE_SHA512,
-        },
-        "package_version": PACKAGE_VERSION,
-        "runtime_source": {
-            "repository": CORE_REPOSITORY,
-            "commit": SOURCE_COMMIT,
-        },
-        "allowed_recipe_delta": list(ALLOWED_RECIPE_DELTA),
-        "build_authority_files": [
-            {"path": path, "sha256": hashlib.sha256(path.encode()).hexdigest()}
-            for path in BUILD_AUTHORITY_PATHS
-        ],
-        "external_owner_packages": [
-            {
-                "id": "Chummer.Hub.Registry.Contracts",
-                "version": OWNER_PACKAGE_VERSION,
-                "repository": REGISTRY_REPOSITORY,
-                "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29",
-            },
-            {
-                "id": "Chummer.Play.Contracts",
-                "version": OWNER_PACKAGE_VERSION,
-                "repository": HUB_REPOSITORY,
-                "commit": "7c1faef298fb9028e77069c2467686f92624566c",
-            },
-            {
-                "id": "Chummer.Run.Contracts",
-                "version": OWNER_PACKAGE_VERSION,
-                "repository": HUB_REPOSITORY,
-                "commit": "7c1faef298fb9028e77069c2467686f92624566c",
-            },
-        ],
-        "third_party_packages": [
-            {"id": "Microsoft.Extensions.DependencyInjection", "version": "10.0.0"},
-            {"id": "SharpCompress", "version": "0.50.1"},
-        ],
-        "packages": runtime_lock_rows,
-    }
+    lock = copy.deepcopy(SELECTED_CORE_LOCK)
+    runtime_lock_rows = lock["packages"]
     lock_bytes = write_json(lock_path, lock)
     lock_sha256 = digest(lock_bytes)
 
@@ -577,6 +409,11 @@ def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> N
     module = load_module()
     fixture = build_fixture(tmp_path)
 
+    assert fixture.lock == SELECTED_CORE_LOCK
+    assert SELECTED_CORE_LOCK_SHA256 == digest(SELECTED_CORE_LOCK_BYTES)
+    assert tuple(SELECTED_CORE_LOCK["allowed_recipe_delta"]) == (
+        module.EXPECTED_ALLOWED_RECIPE_DELTA
+    )
     assert set(fixture.lock) == module.RUNTIME_LOCK_KEYS
     assert fixture.lock["contract"] == module.RUNTIME_LOCK_CONTRACT
     assert fixture.lock["dotnet_sdk"] == {
@@ -1492,15 +1329,14 @@ def test_final_gate_rereads_all_eleven_members(
 ) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
-    original = module._stable_file_bytes_at
+    original = module._require_final_file_binding
     final_labels: list[str] = []
 
-    def recording_read(directory_fd: int, name: str, *, label: str, maximum: int) -> bytes:
-        if label.startswith("final "):
-            final_labels.append(label)
-        return original(directory_fd, name, label=label, maximum=maximum)
+    def recording_read(snapshot: Any) -> None:
+        original(snapshot)
+        final_labels.append(f"final {snapshot.label}")
 
-    monkeypatch.setattr(module, "_stable_file_bytes_at", recording_read)
+    monkeypatch.setattr(module, "_require_final_file_binding", recording_read)
     assert module.validate_artifact(fixture.root, fixture.authority_path)["status"] == "pass"
     assert final_labels == [
         "final runtime package-plane lock",
@@ -1508,6 +1344,38 @@ def test_final_gate_rereads_all_eleven_members(
         "final Core no-siblings v3 receipt",
         *[f"final package {package_id}" for package_id in module.EXPECTED_PACKAGE_IDS],
     ]
+
+
+def test_terminal_phase_orders_directory_checks_before_bytes_and_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    original_directory = module._require_exact_directory_names
+    original_reread = module._require_final_file_binding
+    original_identity = module._require_terminal_file_identity
+    events: list[str] = []
+
+    def recording_directory(*args: Any, **kwargs: Any) -> None:
+        original_directory(*args, **kwargs)
+        events.append("directory")
+
+    def recording_reread(snapshot: Any) -> None:
+        original_reread(snapshot)
+        events.append("reread")
+
+    def recording_identity(snapshot: Any) -> None:
+        original_identity(snapshot)
+        events.append("identity")
+
+    monkeypatch.setattr(module, "_require_exact_directory_names", recording_directory)
+    monkeypatch.setattr(module, "_require_final_file_binding", recording_reread)
+    monkeypatch.setattr(module, "_require_terminal_file_identity", recording_identity)
+
+    assert module.validate_artifact(fixture.root, fixture.authority_path)["status"] == "pass"
+    first_reread = events.index("reread")
+    assert "directory" not in events[first_reread:]
+    assert events[first_reread:] == ["reread"] * 11 + ["identity"] * 11
 
 
 @pytest.mark.parametrize("target", ["package", "lock", "inventory", "receipt"])
@@ -1549,6 +1417,41 @@ def test_final_gate_rejects_post_validation_member_byte_mutation(
         return payload
 
     monkeypatch.setattr(module, "_stable_file_bytes_at", mutate_after_receipt_read)
-    with pytest.raises(module.ArtifactValidationError, match="final byte binding differs"):
+    with pytest.raises(
+        module.ArtifactValidationError,
+        match="exact-size bounded|final byte binding differs",
+    ):
         module.validate_artifact(fixture.root, fixture.authority_path)
     assert changed is True
+
+
+def test_terminal_identity_resweep_rejects_mutation_after_eleventh_reread(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    target = fixture.packages_root / fixture.inventory["packages"][0]["file_name"]
+    original = module._require_final_file_binding
+    reread_count = 0
+
+    def mutate_after_eleventh_reread(snapshot: Any) -> None:
+        nonlocal reread_count
+        original(snapshot)
+        reread_count += 1
+        if reread_count == 11:
+            with target.open("r+b", buffering=0) as stream:
+                first = stream.read(1)
+                assert first
+                stream.seek(0)
+                stream.write(bytes([first[0] ^ 1]))
+                os.fsync(stream.fileno())
+
+    monkeypatch.setattr(
+        module, "_require_final_file_binding", mutate_after_eleventh_reread
+    )
+    with pytest.raises(
+        module.ArtifactValidationError,
+        match="terminal file identity or entry differs",
+    ):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+    assert reread_count == 11
