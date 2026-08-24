@@ -23,6 +23,7 @@ internal static class Program
             ("configuration is explicit and sentinel-blocked", TestConfigurationAsync),
             ("route surface is an exact user-facing allowlist", TestRouteAllowlistAsync),
             ("Access headers require canonical single values", TestHeaderCardinalityAsync),
+            ("browser Access cookie is assertion-bound and hostile forms fail closed", TestAccessCookieCompatibilityAsync),
             ("upstream request overwrites identity and strips authority headers", TestUpstreamSanitizationAsync),
             ("JWT binds signature issuer audience type lifetime and email", TestJwtValidationAsync),
             ("signing-key retrieval is exact bounded and redirect closed", TestSigningKeyRetrievalAsync),
@@ -143,6 +144,10 @@ static Task TestHeaderCardinalityAsync()
     Equal("runner@example.com", email);
     Equal("signed.assertion.value", assertion);
 
+    context.Request.Headers.Cookie =
+        $"{BuildGhostAccessProxy.AccessAuthorizationCookieName}={assertion}";
+    True(BuildGhostAccessProxy.TryReadAccessHeaders(context.Request, out _, out _));
+
     context.Request.Headers[BuildGhostAccessProxy.AuthenticatedEmailHeader] =
         new StringValues(["runner@example.com", "attacker@example.com"]);
     False(BuildGhostAccessProxy.TryReadAccessHeaders(context.Request, out _, out _));
@@ -171,6 +176,54 @@ static Task TestHeaderCardinalityAsync()
     context.Request.Headers.Cookie = "CF_Authorization=cookie-only";
     False(BuildGhostAccessProxy.TryReadAccessHeaders(context.Request, out _, out _));
     return Task.CompletedTask;
+}
+
+static async Task TestAccessCookieCompatibilityAsync()
+{
+    const string assertion = "signed.assertion.value";
+    AccessEdgeConfiguration configuration = TestConfiguration();
+    CountingHandler handler = new();
+    using HttpClient upstream = new(handler);
+    BuildGhostAccessProxy proxy = new(configuration, new FixedValidator(true), upstream);
+
+    foreach (string hostileCookie in new[]
+    {
+        "CF_Authorization=forged.assertion.value",
+        $"cf_authorization={assertion}",
+        $"CF-Authorization={assertion}",
+        $"CF_Authorization=\"{assertion}\"",
+        $"CF_Authorization={assertion};",
+        $"CF_Authorization={assertion}; CF_Binding=unexpected",
+        $"session=unexpected; CF_Authorization={assertion}",
+        $"CF_Authorization={assertion}; CF_Authorization={assertion}",
+        $"CF_Authorization={assertion},session=unexpected",
+        $" CF_Authorization={assertion}",
+        $"CF_Authorization ={assertion}",
+        $"CF_Authorization={assertion} ",
+        $"CF_Authorization={assertion}\t",
+        $"CF_Authorization={assertion}\r\nX-Smuggled: yes",
+        $"CF_Authorization={assertion}\0",
+        $"CF_Authorization={new string('a', CloudflareAccessJwtValidator.MaximumAssertionBytes + 1)}",
+    })
+    {
+        DefaultHttpContext rejected = AdmittedContext("/api/workspaces/runner-1", "GET");
+        rejected.Request.Headers.Cookie = hostileCookie;
+        rejected.Response.Body = new MemoryStream();
+        await proxy.HandleAsync(rejected);
+        Equal(StatusCodes.Status401Unauthorized, rejected.Response.StatusCode);
+        Equal("{\"error\":\"cloudflare_access_required\"}", await ResponseBodyAsync(rejected));
+    }
+
+    DefaultHttpContext duplicateHeader = AdmittedContext("/api/workspaces/runner-1", "GET");
+    duplicateHeader.Request.Headers.Cookie = new StringValues([
+        $"CF_Authorization={assertion}",
+        $"CF_Authorization={assertion}",
+    ]);
+    duplicateHeader.Response.Body = new MemoryStream();
+    await proxy.HandleAsync(duplicateHeader);
+    Equal(StatusCodes.Status401Unauthorized, duplicateHeader.Response.StatusCode);
+    Equal("{\"error\":\"cloudflare_access_required\"}", await ResponseBodyAsync(duplicateHeader));
+    Equal(0, handler.Calls);
 }
 
 static Task TestUpstreamSanitizationAsync()
@@ -740,6 +793,8 @@ static async Task TestProxyForwardingAsync()
     context.Request.ContentLength = body.Length;
     context.Request.Headers[BuildGhostAccessProxy.OwnerHeader] = "attacker@example.com";
     context.Request.Headers[BuildGhostAccessProxy.PortalOwnerSignatureHeader] = "forged";
+    context.Request.Headers.Cookie =
+        $"{BuildGhostAccessProxy.AccessAuthorizationCookieName}=signed.assertion.value";
     context.Response.Body = new MemoryStream();
 
     await proxy.HandleAsync(context);
@@ -751,6 +806,7 @@ static async Task TestProxyForwardingAsync()
     False(handler.SawAuthenticatedEmail);
     False(handler.SawPortalOwner);
     False(handler.SawAuthorization);
+    False(handler.SawCookie);
     Equal("no-store", context.Response.Headers.CacheControl.ToString());
     False(context.Response.Headers.ContainsKey("Set-Cookie"));
     Equal("\"rev-1\"", context.Response.Headers.ETag.ToString());
@@ -932,6 +988,8 @@ static async Task TestOwnerBoundProviderToolAsync()
     Equal("no-store", issue.Response.Headers.CacheControl.ToString());
 
     DefaultHttpContext consume = ProviderRequestContext(key, digest);
+    consume.Request.Headers.Cookie =
+        $"{BuildGhostAccessProxy.AccessAuthorizationCookieName}=signed.assertion.value";
     consume.Request.Headers[BuildGhostAccessProxy.OwnerHeader] = "mallory@example.com";
     consume.Request.Headers["traceparent"] =
         "00-11111111111111111111111111111111-2222222222222222-01";
@@ -1509,6 +1567,7 @@ sealed class CapturingHandler : HttpMessageHandler
     public bool SawAuthenticatedEmail { get; private set; }
     public bool SawPortalOwner { get; private set; }
     public bool SawAuthorization { get; private set; }
+    public bool SawCookie { get; private set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
@@ -1520,6 +1579,7 @@ sealed class CapturingHandler : HttpMessageHandler
         SawAuthenticatedEmail = request.Headers.Contains(BuildGhostAccessProxy.AuthenticatedEmailHeader);
         SawPortalOwner = request.Headers.Contains(BuildGhostAccessProxy.PortalOwnerHeader);
         SawAuthorization = request.Headers.Authorization is not null;
+        SawCookie = request.Headers.Contains("Cookie");
         Equal("{\"payload\":true}", await request.Content!.ReadAsStringAsync(cancellationToken));
         HttpResponseMessage response = new(HttpStatusCode.OK)
         {

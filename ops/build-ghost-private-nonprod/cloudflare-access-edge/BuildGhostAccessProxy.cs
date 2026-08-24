@@ -26,6 +26,7 @@ public sealed class BuildGhostAccessProxy
     public const string AuthenticatedEmailHeader =
         "Cf-Access-Authenticated-User-Email";
     public const string JwtAssertionHeader = "Cf-Access-Jwt-Assertion";
+    public const string AccessAuthorizationCookieName = "CF_Authorization";
     public const string OwnerHeader = "X-Chummer-Owner";
     public const string PortalOwnerHeader = "X-Chummer-Portal-Owner";
     public const string PortalOwnerTimestampHeader = "X-Chummer-Portal-Owner-Timestamp";
@@ -279,7 +280,8 @@ public sealed class BuildGhostAccessProxy
             || !string.Equals(rawEmail, rawEmail.Trim(), StringComparison.Ordinal)
             || !string.Equals(rawEmail, rawEmail.ToLowerInvariant(), StringComparison.Ordinal)
             || !NormalizedEmailPattern.IsMatch(rawEmail)
-            || assertion.Length > CloudflareAccessJwtValidator.MaximumAssertionBytes)
+            || assertion.Length > CloudflareAccessJwtValidator.MaximumAssertionBytes
+            || !HasCompatibleAccessCookie(request.Headers, assertion))
         {
             return false;
         }
@@ -411,7 +413,6 @@ public sealed class BuildGhostAccessProxy
         long maximumBodyBytes)
     {
         if (context.Request.Headers.ContainsKey("Authorization")
-            || context.Request.Headers.ContainsKey("Cookie")
             || !TryReadExactlyOne(
                 context.Request.Headers,
                 ToolContractHeader,
@@ -592,6 +593,27 @@ public sealed class BuildGhostAccessProxy
             CryptographicOperations.ZeroMemory(leftBytes);
             CryptographicOperations.ZeroMemory(rightBytes);
         }
+    }
+
+    private static bool HasCompatibleAccessCookie(
+        IHeaderDictionary headers,
+        string assertion)
+    {
+        if (!headers.ContainsKey("Cookie"))
+        {
+            return true;
+        }
+
+        const string prefix = AccessAuthorizationCookieName + "=";
+        if (!TryReadExactlyOne(headers, "Cookie", out string rawCookie)
+            || rawCookie.Length > prefix.Length + CloudflareAccessJwtValidator.MaximumAssertionBytes
+            || rawCookie.Length != prefix.Length + assertion.Length
+            || !rawCookie.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return FixedEquals(rawCookie[prefix.Length..], assertion);
     }
 
     public static bool IsForbiddenUpstreamHeader(string headerName)
