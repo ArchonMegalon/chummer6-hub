@@ -122,6 +122,8 @@ def test_pinned_ci_lane_emits_receipt_and_all_seven_source_package_bytes() -> No
     workflow = (
         ROOT / ".github/workflows/package-plane-v5-byte-authority.yml"
     ).read_text(encoding="utf-8")
+    assert "push:" in workflow
+    assert "codex/hub-package-plane-v5-20260824" in workflow
     assert "workflow_dispatch:" in workflow
     assert "--observe-package-authority" in workflow
     assert "--core-public-bundle" in workflow

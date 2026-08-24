@@ -1,6 +1,9 @@
 name: Hub package plane v5 byte authority
 
 on:
+  push:
+    branches:
+      - codex/hub-package-plane-v5-20260824
   workflow_dispatch:
 
 permissions:

@@ -4,10 +4,13 @@ The reviewed lock is deliberately in `awaiting-pinned-ci-byte-authority` state.
 That state is not deployable: normal feed materialization fails before network
 access, and only the observation mode may build the remaining owner packages.
 
-The `Hub package plane v5 byte authority` workflow imports the eight Core
-packages byte-for-byte from the digest-bound public Core handoff. It then builds
-exactly these seven packages from clean detached owner commits with the pinned
-.NET SDK and toolchain:
+The `Hub package plane v5 byte authority` workflow is bootstrapped by the exact
+`codex/hub-package-plane-v5-20260824` branch push (and remains manually
+dispatchable after the workflow reaches the default branch). This avoids
+merging an unsealed lock merely to make `workflow_dispatch` visible. It imports
+the eight Core packages byte-for-byte from the digest-bound public Core
+handoff, then builds exactly these seven packages from clean detached owner
+commits with the pinned .NET SDK and toolchain:
 
 - `Chummer.Hub.Registry.Contracts`
 - `Chummer.Run.Registry`
