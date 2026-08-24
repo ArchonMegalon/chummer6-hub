@@ -11,7 +11,7 @@
   },
   "package_version": "0.0.0-packageplane.20260721.1",
   "approved_remote_source": "https://api.nuget.org/v3/index.json",
-  "build_recipe": {"path": "scripts/ai/bootstrap-hub-package-feed.py", "sha256": "f19aa64eabb47668e404fcab342508646d8067819f36e599248a1a7a56c49b1e"},
+  "build_recipe": {"path": "scripts/ai/bootstrap-hub-package-feed.py", "sha256": "8cb2ba87ca7ae505d76d957aff798fdb0ece64a5a10eb83a3c8011bbd2d01aef"},
   "core_public_bundle": {
     "asset_url": "https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277/chummer-core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277.zip",
     "asset_name": "chummer-core-runtime-package-plane-c6138ff7ca27d66e85b223d0b29381cff4811277.zip",

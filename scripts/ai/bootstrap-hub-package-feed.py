@@ -877,6 +877,41 @@ def acquire_source(
     return checkout
 
 
+def restore_with_ephemeral_package_locks(
+    checkout: Path,
+    command: Iterable[str],
+    *,
+    env: Mapping[str, str],
+) -> str:
+    """Restore against this feed without trusting stale same-version hashes.
+
+    Owner commits retain their reviewed lock bytes. They are temporarily absent
+    only while NuGet resolves the exact authority feed, then restored byte for
+    byte before the checkout is validated and the package is accepted.
+    """
+
+    checkout = checkout.resolve()
+    source_lock_bytes: dict[Path, bytes] = {}
+    for path in checkout.rglob("packages.lock.json"):
+        if path.is_symlink() or not path.is_file():
+            raise PackagePlaneError("source package locks must be regular files")
+        resolved = path.resolve()
+        resolved.relative_to(checkout)
+        source_lock_bytes[resolved] = path.read_bytes()
+    for path in source_lock_bytes:
+        path.unlink()
+    try:
+        return _run(command, cwd=checkout, env=env)
+    finally:
+        for path in checkout.rglob("packages.lock.json"):
+            if path.is_symlink() or path.is_file():
+                path.unlink()
+            else:
+                raise PackagePlaneError("generated package lock is not a regular file")
+        for path, content in source_lock_bytes.items():
+            path.write_bytes(content)
+
+
 def package_build_properties(
     lock: PackagePlaneLock,
     spec: PackageSpec,
@@ -1855,12 +1890,8 @@ def build_feed(
                 checkout,
                 package_root,
             )
-            source_lock_bytes = {
-                path.resolve(): path.read_bytes()
-                for path in checkout.rglob("packages.lock.json")
-                if path.is_file() and not path.is_symlink()
-            }
-            _run(
+            restore_with_ephemeral_package_locks(
+                checkout,
                 (
                     dotnet,
                     "restore",
@@ -1874,18 +1905,8 @@ def build_feed(
                     "-m:1",
                     *common_properties,
                 ),
-                cwd=checkout,
                 env=env,
             )
-            current_source_locks = {
-                path.resolve()
-                for path in checkout.rglob("packages.lock.json")
-                if path.is_file() and not path.is_symlink()
-            }
-            for path in current_source_locks - set(source_lock_bytes):
-                path.unlink()
-            for path, content in source_lock_bytes.items():
-                path.write_bytes(content)
             pack_command = [
                 dotnet,
                 "pack",
@@ -1960,6 +1981,7 @@ def build_feed(
                 "dotnet_sdk": lock.dotnet_sdk,
                 "dotnet_toolchain_sha256": observed_toolchain,
                 "source_checkout_mode": "fresh-detached-exact-commit",
+                "source_package_lock_mode": "ephemeral-authority-feed-regeneration",
                 "isolated_package_cache": True,
                 "ambient_package_reuse": False,
                 "dependency_graph": {

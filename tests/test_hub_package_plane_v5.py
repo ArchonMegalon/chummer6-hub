@@ -90,6 +90,64 @@ def test_pending_v5_authority_fails_closed_for_normal_materialization(tmp_path: 
         )
 
 
+def test_source_locks_are_ephemeral_during_authority_feed_restore(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = load_module()
+    checkout = tmp_path / "checkout"
+    project = checkout / "Project"
+    project.mkdir(parents=True)
+    original = b'{"version": 1, "dependencies": {}}\n'
+    source_lock = project / "packages.lock.json"
+    source_lock.write_bytes(original)
+
+    def fake_run(command, *, cwd, env):
+        assert tuple(command) == ("dotnet", "restore")
+        assert cwd == checkout.resolve()
+        assert env == {"AUTHORITY": "exact"}
+        assert not source_lock.exists()
+        source_lock.write_bytes(b"new authority-feed lock\n")
+        (checkout / "generated" / "nested").mkdir(parents=True)
+        (checkout / "generated" / "nested" / "packages.lock.json").write_bytes(
+            b"generated\n"
+        )
+        return "restored"
+
+    monkeypatch.setattr(module, "_run", fake_run)
+    assert module.restore_with_ephemeral_package_locks(
+        checkout,
+        ("dotnet", "restore"),
+        env={"AUTHORITY": "exact"},
+    ) == "restored"
+    assert source_lock.read_bytes() == original
+    assert not (checkout / "generated" / "nested" / "packages.lock.json").exists()
+
+
+def test_source_locks_are_restored_when_authority_restore_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = load_module()
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    source_lock = checkout / "packages.lock.json"
+    original = b"reviewed source lock\n"
+    source_lock.write_bytes(original)
+
+    def fake_run(*_args, **_kwargs):
+        assert not source_lock.exists()
+        source_lock.write_bytes(b"partial restore\n")
+        raise module.PackagePlaneError("restore failed")
+
+    monkeypatch.setattr(module, "_run", fake_run)
+    with pytest.raises(module.PackagePlaneError, match="restore failed"):
+        module.restore_with_ephemeral_package_locks(
+            checkout,
+            ("dotnet", "restore"),
+            env={},
+        )
+    assert source_lock.read_bytes() == original
+
+
 def test_v5_rejects_preview_substitution_and_placeholder_digests() -> None:
     module = load_module()
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
