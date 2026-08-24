@@ -44,6 +44,9 @@ REPO_DIGEST = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,511}@sha256:[0-9a-f]{6
 SAFE_REASON = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,159}$")
 UTC_TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 PROVIDER_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,511}$")
+UUID = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 MAX_COMMAND_BYTES = 2 * 1024 * 1024
 MAX_RECEIPT_BYTES = 512 * 1024
@@ -75,6 +78,31 @@ TOUGH_TONGUE_CANDIDATE_ENV = {
     "scenario": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID",
     "live_avatar": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID",
 }
+TOUGH_TONGUE_STOCK_AVATAR_ENV = {
+    "provider": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER",
+    "name": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME",
+    "asset_path": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH",
+    "readback_digest": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST",
+    "model_provider": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER",
+    "model_id": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID",
+    "allow_legacy_cascade": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE",
+}
+TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_JSON_ENV = (
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON"
+)
+TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_SCHEMA = (
+    "chummer.tough_tongue.stock_avatar_readback_receipt.v1"
+)
+TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_SOURCE = (
+    "tough_tongue_api_public_scenario_get"
+)
+TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_FIELDS = {
+    "Schema", "HttpStatus", "CanonicalWhitelistedResponseDigest",
+    "ObservedProvider", "ObservedAvatarName", "ObservedAvatarAssetPath",
+    "ObservedLiveAvatarId", "ObservedModelProvider", "ObservedModelId",
+    "LegacyCascadePolicyOptIn", "ScenarioRefDigest", "Source",
+    "ObservedAtUtc", "MaximumAgeSeconds", "ReceiptDigest",
+}
 TOUGH_TONGUE_CONTRACT_DIGEST_ENV = "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST"
 TOUGH_TONGUE_CONTRACT_TARGET = "/run/secrets/tough-tongue-read-only-binding-contract.json"
 TOUGH_TONGUE_RUNTIME_RECEIPT_SCHEMA = (
@@ -86,6 +114,10 @@ TOUGH_TONGUE_RUNTIME_RECEIPT_FIELDS = {
     "accountRefsDigest", "organizationContextCount", "organizationRefsDigest",
     "preferredAccountRef", "candidateRefDigests", "candidateRefCount",
     "bindingCandidatesConfigured", "stockAvatarMigrationConfigured",
+    "stockAvatarReadbackReceiptFileDigest", "stockAvatarReadbackReceiptDigest",
+    "stockAvatarCanonicalResponseDigest", "stockAvatarReadbackObservedAtUtc",
+    "stockAvatarReadbackScenarioRefDigest",
+    "stockAvatarLegacyCascadePolicyOptIn",
     "expectationDigest", "readOnlyContractDigest",
     "accountSelectionPolicyDigest", "accountSelectionPolicyEvidenceDigest",
     "accountSelectionPolicySource", "premiumBasis", "premiumThresholdMinutes",
@@ -428,9 +460,96 @@ def _single_environment_value(
     return values[0]
 
 
+def _validated_deployed_stock_avatar_receipt(
+    receipt_json: str,
+    environment_values: Mapping[str, str],
+    scenario_ref: str,
+    live_avatar_ref: str,
+    clock: Callable[[], dt.datetime],
+) -> dict[str, Any] | None:
+    try:
+        receipt = _json_object(
+            receipt_json.encode("utf-8"), "deployed stock avatar readback receipt"
+        )
+    except AttestationError:
+        return None
+    if (
+        set(receipt) != TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_FIELDS
+        or receipt.get("Schema") != TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_SCHEMA
+        or receipt.get("HttpStatus") != 200
+        or receipt.get("ObservedProvider") != "avatario"
+        or receipt.get("ObservedAvatarName") != "Amelia"
+        or receipt.get("ObservedAvatarAssetPath")
+        != "/live-avatars/avatars/Amelia.jpg"
+        or receipt.get("ObservedLiveAvatarId") != live_avatar_ref
+        or not isinstance(receipt.get("ObservedLiveAvatarId"), str)
+        or UUID.fullmatch(str(receipt.get("ObservedLiveAvatarId"))) is None
+        or receipt.get("ObservedModelProvider") != "Landmass"
+        or receipt.get("ScenarioRefDigest") != _candidate_ref_digest(scenario_ref)
+        or receipt.get("Source") != TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_SOURCE
+    ):
+        return None
+    legacy_opt_in = receipt.get("LegacyCascadePolicyOptIn")
+    model_id = receipt.get("ObservedModelId")
+    if type(legacy_opt_in) is not bool or not (
+        (model_id == "gemini" and legacy_opt_in is False)
+        or (model_id == "cascade" and legacy_opt_in is True)
+    ):
+        return None
+    maximum_age = receipt.get("MaximumAgeSeconds")
+    observed_at = _parse_timestamp(receipt.get("ObservedAtUtc"))
+    now = clock().astimezone(dt.timezone.utc)
+    if (
+        type(maximum_age) is not int
+        or not 60 <= maximum_age <= 900
+        or observed_at is None
+        or observed_at > now
+        or now - observed_at > dt.timedelta(seconds=maximum_age)
+    ):
+        return None
+    response_authority = {
+        "ObservedAvatarAssetPath": receipt["ObservedAvatarAssetPath"],
+        "ObservedAvatarName": receipt["ObservedAvatarName"],
+        "ObservedLiveAvatarId": receipt["ObservedLiveAvatarId"],
+        "ObservedModelId": receipt["ObservedModelId"],
+        "ObservedModelProvider": receipt["ObservedModelProvider"],
+        "ObservedProvider": receipt["ObservedProvider"],
+        "ScenarioRefDigest": receipt["ScenarioRefDigest"],
+    }
+    if receipt.get("CanonicalWhitelistedResponseDigest") != _upstream_digest(
+        response_authority
+    ):
+        return None
+    receipt_authority = {
+        key: value for key, value in receipt.items() if key != "ReceiptDigest"
+    }
+    if receipt.get("ReceiptDigest") != _upstream_digest(receipt_authority):
+        return None
+    exact_environment = {
+        "provider": receipt["ObservedProvider"],
+        "name": receipt["ObservedAvatarName"],
+        "asset_path": receipt["ObservedAvatarAssetPath"],
+        "readback_digest": receipt["ReceiptDigest"],
+        "model_provider": receipt["ObservedModelProvider"],
+        "model_id": receipt["ObservedModelId"],
+        "allow_legacy_cascade": str(legacy_opt_in).lower(),
+    }
+    if dict(environment_values) != exact_environment:
+        return None
+    return {
+        "file_digest": _digest(_canonical(receipt)),
+        "receipt_digest": receipt["ReceiptDigest"],
+        "response_digest": receipt["CanonicalWhitelistedResponseDigest"],
+        "observed_at": receipt["ObservedAtUtc"],
+        "scenario_ref_digest": receipt["ScenarioRefDigest"],
+        "legacy_opt_in": legacy_opt_in,
+    }
+
+
 def _deployed_tough_tongue_binding(
     inspect: Mapping[str, Any],
     blockers: list[str],
+    clock: Callable[[], dt.datetime],
 ) -> dict[str, Any]:
     account_raw = _single_environment_value(
         inspect,
@@ -506,6 +625,45 @@ def _deployed_tough_tongue_binding(
         configured_candidate_count == len(TOUGH_TONGUE_CANDIDATE_ENV)
     )
 
+    stock_avatar_environment: dict[str, str] = {}
+    for key, name in TOUGH_TONGUE_STOCK_AVATAR_ENV.items():
+        stock_avatar_environment[key] = _single_environment_value(
+            inspect,
+            name,
+            blockers,
+            "deployed-tough-tongue-stock-avatar-readback-invalid",
+        )
+    stock_avatar_receipt_json = _single_environment_value(
+        inspect,
+        TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_JSON_ENV,
+        blockers,
+        "deployed-tough-tongue-stock-avatar-readback-invalid",
+    )
+    stock_avatar_receipt: dict[str, Any] | None = None
+    if candidate_values["live_avatar"]:
+        stock_avatar_receipt = _validated_deployed_stock_avatar_receipt(
+            stock_avatar_receipt_json,
+            stock_avatar_environment,
+            candidate_values["scenario"],
+            candidate_values["live_avatar"],
+            clock,
+        )
+        if stock_avatar_receipt is None:
+            _add(blockers, "deployed-tough-tongue-stock-avatar-readback-invalid")
+    elif (
+        stock_avatar_receipt_json != ""
+        or stock_avatar_environment != {
+            "provider": "",
+            "name": "",
+            "asset_path": "",
+            "readback_digest": "",
+            "model_provider": "",
+            "model_id": "",
+            "allow_legacy_cascade": "false",
+        }
+    ):
+        _add(blockers, "deployed-tough-tongue-stock-avatar-readback-unexpected")
+
     contract_digest = _single_environment_value(
         inspect,
         TOUGH_TONGUE_CONTRACT_DIGEST_ENV,
@@ -520,7 +678,13 @@ def _deployed_tough_tongue_binding(
         "preferred_account_ref": preferred,
         "candidate_refs": dict(sorted(candidate_digests.items())),
     }
-    configured = bool(account_refs and credential_slots and preferred and contract_digest)
+    configured = bool(
+        account_refs
+        and credential_slots
+        and preferred
+        and contract_digest
+        and (not candidate_values["live_avatar"] or stock_avatar_receipt is not None)
+    )
     return {
         "configured": configured,
         "bindingCandidatesConfigured": binding_candidates_configured,
@@ -534,6 +698,30 @@ def _deployed_tough_tongue_binding(
         "candidateRefDigests": candidate_digests,
         "expectationDigest": _upstream_digest(expectation_payload),
         "readOnlyContractDigest": contract_digest,
+        "stockAvatarReadbackReceiptFileDigest": (
+            stock_avatar_receipt["file_digest"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarReadbackReceiptDigest": (
+            stock_avatar_receipt["receipt_digest"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarCanonicalResponseDigest": (
+            stock_avatar_receipt["response_digest"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarReadbackObservedAtUtc": (
+            stock_avatar_receipt["observed_at"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarReadbackScenarioRefDigest": (
+            stock_avatar_receipt["scenario_ref_digest"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarLegacyCascadePolicyOptIn": (
+            stock_avatar_receipt["legacy_opt_in"]
+            if stock_avatar_receipt is not None else False
+        ),
         "rawCandidateRefsPersisted": False,
         "rawCredentialsPersisted": False,
     }
@@ -1080,6 +1268,7 @@ def _collect_runtime(
         runtime["toughTongueOpaqueBinding"] = _deployed_tough_tongue_binding(
             ai_inspect,
             blockers,
+            clock,
         )
         if runtime["toughTongueOpaqueBinding"]["stockAvatarMigrationConfigured"]:
             _add(blockers, "tough-tongue-stock-avatar-migration-grounding-incomplete")
@@ -1115,6 +1304,12 @@ def _collect_runtime(
             "candidateRefDigests": {kind: "" for kind in TOUGH_TONGUE_CANDIDATE_ENV},
             "expectationDigest": "",
             "readOnlyContractDigest": "",
+            "stockAvatarReadbackReceiptFileDigest": "",
+            "stockAvatarReadbackReceiptDigest": "",
+            "stockAvatarCanonicalResponseDigest": "",
+            "stockAvatarReadbackObservedAtUtc": "",
+            "stockAvatarReadbackScenarioRefDigest": "",
+            "stockAvatarLegacyCascadePolicyOptIn": False,
             "rawCandidateRefsPersisted": False,
             "rawCredentialsPersisted": False,
         }

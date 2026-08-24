@@ -87,7 +87,11 @@ account ref present exactly once in those slots, either raw provider refs for
 all of `agent`, `voice`, `function`, `scenario`, and `live_avatar` or empty
 strings for all five, and the absolute
 mode-0600 path plus canonical SHA-256 digest of an operator-verified
-`chummer.build_ghost.tough_tongue.read_only_binding_contract.v2` contract. The materializer
+`chummer.build_ghost.tough_tongue.read_only_binding_contract.v3` contract. When a
+live-avatar candidate is present, the operator config must additionally name the
+absolute mode-0600 path and canonical JSON digest of one
+`chummer.tough_tongue.stock_avatar_readback_receipt.v1`; the read-only contract
+must pin that same full-file digest. The materializer
 accepts only the documented `balance`, `subscriptions`, `v2/organizations`,
 and `scenarios/{resource_ref}` GET allowlist used by EA live ops,
 allows the optional organization context only when it is present on all six
@@ -375,13 +379,23 @@ retaining the semantic packet alias
 `/live-avatars/avatars/Amelia.jpg`; its opaque provider identifier is supplied
 only through the existing materialized live-avatar environment input and is
 represented by a SHA-256 digest in the binding contract. It is never committed
-or serialized in receipts. Missing identifiers, provider misspellings, name or
+or serialized in Chummer binding/deployment receipts; the caller-owned
+mode-0600 provider-readback input necessarily carries it so the materializer can
+prove the exact observed value. Missing identifiers, provider misspellings, name or
 path drift, and a missing exact
-`CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST` all fail closed.
+`CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST` all fail closed. That
+digest is no longer a free-form assertion: it is the internal seal of the typed
+receipt, whose exact HTTP 200 status, canonical whitelisted response digest,
+Amelia/provider/path/live-avatar/model observations, scenario-ref digest,
+source, timestamp, and bounded freshness are revalidated independently. The
+receipt JSON and all seven derived avatar/model environment values are emitted
+only by the materializer, checked in rendered Compose and attestation, and
+removed from ambient shell authority before rendering.
 
 The exact current model pair is `Landmass` / `gemini`. The historical
 `Landmass` / `cascade` path remains available only behind the explicit
-`CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE=true` migration flag;
+`CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE=true` migration flag and
+the matching exact receipt policy opt-in;
 arbitrary providers or model names are rejected. Neither this source binding
 nor the compatibility flag authorizes provider reads or mutations. The Rook
 persona, packet/rules authority, and synthetic voice identity remain unchanged.
@@ -461,6 +475,10 @@ candidate refs, binds the resulting expectation digest and account count/set to
 the live receipt, verifies that receipt's canonical evidence and receipt
 digests, and requires the read-only contract digest to equal the deployed
 opaque value. Missing or mismatched inputs cannot mint a deployment claim.
+When a live-avatar ref exists, the attester also requires the sealed typed
+stock-avatar receipt JSON and exact derived provider/name/path/readback/model/
+legacy values; all must be empty with legacy `false` when no live-avatar ref is
+configured.
 Candidate resource inputs are raw provider IDs, not opaque account refs: each
 exact raw value is always hashed, and a pre-shaped `sha256:` candidate value is
 rejected instead of being accepted as the digest of a different raw resource.

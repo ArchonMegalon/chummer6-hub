@@ -30,9 +30,9 @@ def canonical(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode()
 
 
-def contract_payload() -> dict[str, object]:
+def contract_payload(stock_avatar_receipt_digest: str = "") -> dict[str, object]:
     return {
-        "schema": "chummer.build_ghost.tough_tongue.read_only_binding_contract.v2",
+        "schema": "chummer.build_ghost.tough_tongue.read_only_binding_contract.v3",
         "provider_key": "tough_tongue",
         "base_url": "https://api.toughtongueai.com/api/public",
         "source_type": "provider_documentation",
@@ -59,10 +59,64 @@ def contract_payload() -> dict[str, object]:
             "resource_ownership": "organization_scoped_scenario_readback",
         },
         "unsupported_direct_resources": ["agent", "voice", "function", "avatar"],
+        "stock_avatar_readback_receipt_digest": stock_avatar_receipt_digest,
     }
 
 
-def operator_payload(contract_path: Path, contract: dict[str, object]) -> dict[str, object]:
+def stock_avatar_readback_receipt(
+    scenario_ref: str = "operator-scenario-ref",
+    live_avatar_ref: str = "11111111-2222-4333-8444-555555555555",
+    model_id: str = "gemini",
+    allow_legacy_cascade: bool = False,
+) -> dict[str, object]:
+    observed_at = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=60)).replace(
+        microsecond=0
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload: dict[str, object] = {
+        "Schema": "chummer.tough_tongue.stock_avatar_readback_receipt.v1",
+        "HttpStatus": 200,
+        "CanonicalWhitelistedResponseDigest": "",
+        "ObservedProvider": "avatario",
+        "ObservedAvatarName": "Amelia",
+        "ObservedAvatarAssetPath": "/live-avatars/avatars/Amelia.jpg",
+        "ObservedLiveAvatarId": live_avatar_ref,
+        "ObservedModelProvider": "Landmass",
+        "ObservedModelId": model_id,
+        "LegacyCascadePolicyOptIn": allow_legacy_cascade,
+        "ScenarioRefDigest": digest(scenario_ref.encode()),
+        "Source": "tough_tongue_api_public_scenario_get",
+        "ObservedAtUtc": observed_at,
+        "MaximumAgeSeconds": 900,
+        "ReceiptDigest": "",
+    }
+    return seal_stock_avatar_readback_receipt(payload)
+
+
+def seal_stock_avatar_readback_receipt(
+    payload: dict[str, object],
+) -> dict[str, object]:
+    payload = dict(payload)
+    payload["CanonicalWhitelistedResponseDigest"] = digest(canonical({
+        "ObservedAvatarAssetPath": payload["ObservedAvatarAssetPath"],
+        "ObservedAvatarName": payload["ObservedAvatarName"],
+        "ObservedLiveAvatarId": payload["ObservedLiveAvatarId"],
+        "ObservedModelId": payload["ObservedModelId"],
+        "ObservedModelProvider": payload["ObservedModelProvider"],
+        "ObservedProvider": payload["ObservedProvider"],
+        "ScenarioRefDigest": payload["ScenarioRefDigest"],
+    }))
+    payload["ReceiptDigest"] = digest(canonical({
+        key: value for key, value in payload.items() if key != "ReceiptDigest"
+    }))
+    return payload
+
+
+def operator_payload(
+    contract_path: Path,
+    contract: dict[str, object],
+    stock_receipt_path: Path,
+    stock_receipt: dict[str, object],
+) -> dict[str, object]:
     refs = ["sha256:" + character * 64 for character in "123456"]
     return {
         "schema": "chummer.build_ghost.tough_tongue.runtime_config.v1",
@@ -76,11 +130,15 @@ def operator_payload(contract_path: Path, contract: dict[str, object]) -> dict[s
             "voice": "operator-voice-ref",
             "function": "operator-function-ref",
             "scenario": "operator-scenario-ref",
-            "live_avatar": "operator-live-avatar-ref",
+            "live_avatar": "11111111-2222-4333-8444-555555555555",
         },
         "read_only_contract": {
             "path": str(contract_path),
             "digest": digest(canonical(contract)),
+        },
+        "stock_avatar_readback_receipt": {
+            "path": str(stock_receipt_path),
+            "digest": digest(canonical(stock_receipt)),
         },
     }
 
@@ -138,13 +196,51 @@ def write_private_json(path: Path, payload: object) -> None:
     path.chmod(0o600)
 
 
+def attach_stock_avatar_receipt(
+    payload: dict[str, object],
+    source_contract: Path,
+) -> dict[str, object]:
+    candidates = payload["candidate_refs"]
+    assert isinstance(candidates, dict)
+    receipt = stock_avatar_readback_receipt(
+        scenario_ref=str(candidates["scenario"]),
+        live_avatar_ref=str(candidates["live_avatar"]),
+    )
+    bind_stock_avatar_receipt(payload, source_contract, receipt)
+    return receipt
+
+
+def bind_stock_avatar_receipt(
+    payload: dict[str, object],
+    source_contract: Path,
+    receipt: dict[str, object],
+) -> None:
+    receipt_path = source_contract.parent / "stock-avatar-readback-receipt.json"
+    write_private_json(receipt_path, receipt)
+    contract = contract_payload(digest(canonical(receipt)))
+    write_private_json(source_contract, contract)
+    payload["read_only_contract"] = {
+        "path": str(source_contract),
+        "digest": digest(canonical(contract)),
+    }
+    payload["stock_avatar_readback_receipt"] = {
+        "path": str(receipt_path),
+        "digest": digest(canonical(receipt)),
+    }
+
+
 def inputs(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path, dict[str, object]]:
     tmp_path.chmod(0o700)
-    contract = contract_payload()
+    stock_receipt = stock_avatar_readback_receipt()
+    stock_receipt_path = tmp_path / "stock-avatar-readback-receipt.json"
+    write_private_json(stock_receipt_path, stock_receipt)
+    contract = contract_payload(digest(canonical(stock_receipt)))
     source_contract = tmp_path / "operator-contract.json"
     write_private_json(source_contract, contract)
     config = tmp_path / "operator-config.json"
-    payload = operator_payload(source_contract, contract)
+    payload = operator_payload(
+        source_contract, contract, stock_receipt_path, stock_receipt
+    )
     write_private_json(config, payload)
     environment = tmp_path / "runtime.env"
     snapshot = tmp_path / "runtime-contract.json"
@@ -162,6 +258,10 @@ def audit_only_inputs(
     write_private_json(policy_path, policy)
     payload["preferred_account_ref"] = refs[3]
     payload["candidate_refs"] = {kind: "" for kind in MODULE.CANDIDATE_KINDS}
+    payload.pop("stock_avatar_readback_receipt", None)
+    contract = contract_payload()
+    write_private_json(source_contract, contract)
+    payload["read_only_contract"]["digest"] = digest(canonical(contract))  # type: ignore[index]
     payload["account_selection_policy"] = {
         "path": str(policy_path),
         "digest": digest(canonical(policy)),
@@ -188,7 +288,7 @@ def usable(path: Path, mode: int) -> bool:
 
 
 def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path: Path):
-    config, environment, snapshot, receipt_path, _, payload = inputs(tmp_path)
+    config, environment, snapshot, receipt_path, source_contract, payload = inputs(tmp_path)
 
     receipt = MODULE.materialize(config, environment, snapshot, receipt_path)
 
@@ -203,6 +303,8 @@ def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path
     assert receipt["organizationRefsDigest"].startswith("sha256:")
     assert receipt["providerReadbackVerified"] is False
     assert receipt["stockAvatarMigrationConfigured"] is False
+    assert receipt["stockAvatarReadbackReceiptDigest"].startswith("sha256:")
+    assert receipt["stockAvatarCanonicalResponseDigest"].startswith("sha256:")
     assert receipt["providerActivationAuthorized"] is False
     assert receipt["providerMutationPerformed"] is False
     assert receipt["environmentFileDigest"] == digest(environment_raw)
@@ -213,10 +315,16 @@ def test_materializes_digest_bound_pair_with_environment_published_last(tmp_path
     assert receipt["evidenceDigest"] == digest(
         canonical({key: value for key, value in receipt.items() if key != "evidenceDigest"})
     )
-    assert json.loads(contract_raw) == contract_payload()
+    assert json.loads(contract_raw) == json.loads(source_contract.read_text(encoding="utf-8"))
     environment_text = environment_raw.decode()
     assert f"CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE={snapshot}" in environment_text
     assert "TOUGH_TONGUE_ORGANIZATION_IDS=org-1;org-2;org-3;org-4;org-5;org-6" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER=avatario\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME=Amelia\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER=Landmass\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID=gemini\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE=false\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON={" in environment_text
     rendered_receipt = receipt_path.read_text(encoding="utf-8")
     for slot in payload["account_slots"]:  # type: ignore[index]
         assert slot["api_key"] not in rendered_receipt
@@ -250,6 +358,10 @@ def test_materializes_account_audit_only_policy_without_resource_candidates(tmp_
     environment_text = environment.read_text(encoding="utf-8")
     for name in MODULE.ENVIRONMENT_NAMES.values():
         assert f"{name}=\n" in environment_text
+    for name in MODULE.STOCK_AVATAR_ENVIRONMENT_NAMES.values():
+        expected = "false" if name.endswith("ALLOW_LEGACY_CASCADE") else ""
+        assert f"{name}={expected}\n" in environment_text
+    assert f"{MODULE.STOCK_AVATAR_READBACK_JSON_ENV}=\n" in environment_text
     assert policy["providerPlanLabelBasis"] == "unproven_by_documented_api"
     assert policy["laterBalanceDropRevokesBeforeExpiry"] is False
     assert policy["readyForResourceBinding"] is False
@@ -318,7 +430,7 @@ def test_account_audit_only_rejects_partial_resource_candidates(tmp_path: Path):
 
 
 def test_stock_avatar_migration_accepts_only_voice_scenario_and_avatar_and_stays_unready(tmp_path: Path):
-    config, environment, snapshot, receipt_path, _, _, payload, _ = audit_only_inputs(tmp_path)
+    config, environment, snapshot, receipt_path, source_contract, _, payload, _ = audit_only_inputs(tmp_path)
     payload["candidate_refs"].update(  # type: ignore[union-attr]
         {
             "voice": "Aoede",
@@ -326,6 +438,7 @@ def test_stock_avatar_migration_accepts_only_voice_scenario_and_avatar_and_stays
             "live_avatar": "11111111-2222-4333-8444-555555555555",
         }
     )
+    stock_receipt = attach_stock_avatar_receipt(payload, source_contract)
     write_private_json(config, payload)
 
     receipt = MODULE.materialize(config, environment, snapshot, receipt_path)
@@ -338,6 +451,7 @@ def test_stock_avatar_migration_accepts_only_voice_scenario_and_avatar_and_stays
     assert receipt["providerReadbackVerified"] is False
     assert receipt["providerActivationAuthorized"] is False
     assert receipt["providerMutationPerformed"] is False
+    assert receipt["stockAvatarReadbackReceiptDigest"] == stock_receipt["ReceiptDigest"]
     assert receipt["nextAction"] == (
         "attach-read-verified-grounded-custom-function-before-any-remote-execution"
     )
@@ -347,6 +461,90 @@ def test_stock_avatar_migration_accepts_only_voice_scenario_and_avatar_and_stays
     assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID=Aoede\n" in environment_text
     assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID=private-stock-scenario-ref\n" in environment_text
     assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID=11111111-2222-4333-8444-555555555555\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER=avatario\n" in environment_text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID=gemini\n" in environment_text
+
+
+def test_stock_avatar_candidate_requires_digest_bound_external_readback_receipt(
+    tmp_path: Path,
+):
+    config, environment, snapshot, receipt_path, source_contract, payload = inputs(tmp_path)
+    payload.pop("stock_avatar_readback_receipt")
+    contract = contract_payload()
+    write_private_json(source_contract, contract)
+    payload["read_only_contract"]["digest"] = digest(canonical(contract))  # type: ignore[index]
+    write_private_json(config, payload)
+
+    with pytest.raises(
+        MODULE.ConfigError,
+        match="stock-avatar-readback-receipt-required-or-unexpected",
+    ):
+        MODULE.materialize(config, environment, snapshot, receipt_path)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    [
+        (lambda receipt: receipt.update({"HttpStatus": 500}), "authority-invalid"),
+        (
+            lambda receipt: receipt.update(
+                {"ObservedAtUtc": "2026-01-01T00:00:00Z"}
+            ),
+            "stale",
+        ),
+        (
+            lambda receipt: receipt.update(
+                {"ScenarioRefDigest": "sha256:" + "0" * 64}
+            ),
+            "scenario-invalid",
+        ),
+        (
+            lambda receipt: receipt.update(
+                {"ObservedLiveAvatarId": "attacker-live-avatar"}
+            ),
+            "live-avatar-invalid",
+        ),
+    ],
+)
+def test_stock_avatar_receipt_rejects_hostile_readback_even_when_all_digests_are_resealed(
+    tmp_path: Path,
+    mutation,
+    expected: str,
+):
+    config, environment, snapshot, receipt_path, source_contract, payload = inputs(tmp_path)
+    receipt_config = payload["stock_avatar_readback_receipt"]
+    assert isinstance(receipt_config, dict)
+    receipt = json.loads(Path(str(receipt_config["path"])).read_text(encoding="utf-8"))
+    mutation(receipt)
+    receipt = seal_stock_avatar_readback_receipt(receipt)
+    bind_stock_avatar_receipt(payload, source_contract, receipt)
+    write_private_json(config, payload)
+
+    with pytest.raises(MODULE.ConfigError, match=expected):
+        MODULE.materialize(config, environment, snapshot, receipt_path)
+
+
+def test_stock_avatar_legacy_cascade_requires_exact_receipt_policy_opt_in(
+    tmp_path: Path,
+):
+    config, environment, snapshot, receipt_path, source_contract, payload = inputs(tmp_path)
+    candidates = payload["candidate_refs"]
+    assert isinstance(candidates, dict)
+    receipt = stock_avatar_readback_receipt(
+        scenario_ref=str(candidates["scenario"]),
+        live_avatar_ref=str(candidates["live_avatar"]),
+        model_id="cascade",
+        allow_legacy_cascade=True,
+    )
+    bind_stock_avatar_receipt(payload, source_contract, receipt)
+    write_private_json(config, payload)
+
+    materialized = MODULE.materialize(config, environment, snapshot, receipt_path)
+
+    assert materialized["stockAvatarLegacyCascadePolicyOptIn"] is True
+    text = environment.read_text(encoding="utf-8")
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID=cascade\n" in text
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE=true\n" in text
 
 
 @pytest.mark.parametrize("provider", ["avatari0", "unknown-avatar-provider"])

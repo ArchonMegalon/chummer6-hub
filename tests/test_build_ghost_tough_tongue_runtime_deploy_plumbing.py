@@ -23,6 +23,14 @@ RUNTIME_VARIABLES = (
     "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID",
     "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID",
     "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID",
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER",
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME",
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH",
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST",
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON",
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER",
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID",
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE",
     "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE",
     "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST",
 )
@@ -83,7 +91,11 @@ def test_all_three_compose_paths_use_one_complete_operator_config_or_stay_blocke
     assert 'compose_environment_args=(--env-file "$runtime_environment_file")' in script
     assert 'docker compose "${compose_environment_args[@]}"' in script
     assert 'prepare_operator_runtime_config\n    validate_sources_and_labels' in script
-    assert 'configured-readback-contract-requires-operator-config' in script
+    assert (
+        'configured-readback-contract-requires-operator-config' in script
+        or 'quarantine_provider_runtime_without_output' in script
+    )
+    assert 'compose-stock-avatar-readback-drift' in script
     assert '.providerReadbackVerified == false' in script
     assert '.providerActivationAuthorized == false' in script
     assert '.providerMutationPerformed == false' in script
@@ -111,6 +123,7 @@ def test_every_bounded_deployer_accepts_only_complete_binding_or_exact_account_a
     assert '.premiumGrantCount > 0' in script
     assert "compose-audit-only-candidates-drift" in script
     assert "compose-binding-candidates-drift" in script
+    assert "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON" in script
     for variable in RUNTIME_VARIABLES[3:8]:
         assert f".services[$service].environment.{variable} == \"\"" in script
         assert f".services[$service].environment.{variable} != \"\"" in script

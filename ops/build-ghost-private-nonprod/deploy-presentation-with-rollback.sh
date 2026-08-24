@@ -65,6 +65,14 @@ tough_tongue_runtime_variables=(
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE
     EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
 )
@@ -213,6 +221,9 @@ read_existing_environment_or_empty() {
 
 prepare_operator_runtime_config() {
     local materializer_log owner resolved_root variable_name
+    for variable_name in "${tough_tongue_runtime_variables[@]}"; do
+        unset "$variable_name"
+    done
     if [ -z "$operator_runtime_config_file" ]; then
         [ -z "$operator_runtime_evidence_root" ] \
             || fail "operator-tough-tongue-evidence-without-config"
@@ -266,6 +277,22 @@ prepare_operator_runtime_config() {
          and .providerMutationPerformed == false
          and .readyForResourceBinding == false
          and .providerPlanLabelReadbackVerified == false
+         and (
+           ((.candidateRefDigests.live_avatar // "") != ""
+             and (.stockAvatarReadbackReceiptFileDigest | test("^sha256:[0-9a-f]{64}$"))
+             and (.stockAvatarReadbackReceiptDigest | test("^sha256:[0-9a-f]{64}$"))
+             and (.stockAvatarCanonicalResponseDigest | test("^sha256:[0-9a-f]{64}$"))
+             and (.stockAvatarReadbackScenarioRefDigest | test("^sha256:[0-9a-f]{64}$"))
+             and (.stockAvatarReadbackObservedAtUtc | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")))
+           or
+           ((.candidateRefDigests.live_avatar // "") == ""
+             and .stockAvatarReadbackReceiptFileDigest == ""
+             and .stockAvatarReadbackReceiptDigest == ""
+             and .stockAvatarCanonicalResponseDigest == ""
+             and .stockAvatarReadbackScenarioRefDigest == ""
+             and .stockAvatarReadbackObservedAtUtc == ""
+             and .stockAvatarLegacyCascadePolicyOptIn == false)
+         )
          and (
            .bindingCandidatesConfigured == true
            or (
@@ -676,6 +703,40 @@ verify_rendered_compose() {
              and (.services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
                   | test("^sha256:[0-9a-f]{64}$"))' \
             "$rendered" >/dev/null || fail "compose-operator-runtime-drift"
+        if jq -e '(.candidateRefDigests.live_avatar // "") != ""' \
+            "$runtime_receipt_file" >/dev/null; then
+            jq -e --arg service "$ai_service" \
+                --slurpfile runtime "$runtime_receipt_file" \
+                '($runtime[0]) as $runtimeReceipt
+                 | (.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON | fromjson) as $avatarReceipt
+                 | .services[$service].environment as $environment
+                 | $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER == $avatarReceipt.ObservedProvider
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME == $avatarReceipt.ObservedAvatarName
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH == $avatarReceipt.ObservedAvatarAssetPath
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID == $avatarReceipt.ObservedLiveAvatarId
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST == $avatarReceipt.ReceiptDigest
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER == $avatarReceipt.ObservedModelProvider
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID == $avatarReceipt.ObservedModelId
+                 and ($environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE | fromjson) == $avatarReceipt.LegacyCascadePolicyOptIn
+                 and $avatarReceipt.ReceiptDigest == $runtimeReceipt.stockAvatarReadbackReceiptDigest
+                 and $avatarReceipt.CanonicalWhitelistedResponseDigest == $runtimeReceipt.stockAvatarCanonicalResponseDigest
+                 and $avatarReceipt.ScenarioRefDigest == $runtimeReceipt.stockAvatarReadbackScenarioRefDigest
+                 and $avatarReceipt.ObservedAtUtc == $runtimeReceipt.stockAvatarReadbackObservedAtUtc
+                 and $avatarReceipt.LegacyCascadePolicyOptIn == $runtimeReceipt.stockAvatarLegacyCascadePolicyOptIn' \
+                "$rendered" >/dev/null || fail "compose-stock-avatar-readback-drift"
+        else
+            jq -e --arg service "$ai_service" \
+                '.services[$service].environment as $environment
+                 | $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE == "false"' \
+                "$rendered" >/dev/null || fail "compose-stock-avatar-empty-posture-drift"
+        fi
         if jq -e '.stockAvatarMigrationConfigured == true' \
             "$runtime_receipt_file" >/dev/null; then
             jq -e --arg service "$ai_service" \
@@ -703,6 +764,18 @@ verify_rendered_compose() {
                  and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID != ""' \
                 "$rendered" >/dev/null || fail "compose-binding-candidates-drift"
         fi
+    else
+        jq -e --arg service "$ai_service" \
+            '.services[$service].environment as $environment
+             | $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER == "avatario"
+             and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME == "Amelia"
+             and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH == "/live-avatars/avatars/Amelia.jpg"
+             and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST == ""
+             and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON == ""
+             and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER == "Landmass"
+             and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID == "gemini"
+             and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE == "false"' \
+            "$rendered" >/dev/null || fail "compose-stock-avatar-unconfigured-posture-drift"
     fi
     if rg --fixed-strings '/api/v1/ai/build-ghost/explain' "$script_root/Caddyfile" >/dev/null; then
         fail "public-explain-route-present"

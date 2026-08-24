@@ -11,6 +11,7 @@ public static class ToughTongueBuildGhostContractVersions
     public const string ReceiptV1 = "chummer.tough_tongue.build_ghost_receipt.v1";
     public const string PersonaReleaseV1 = "chummer.build_ghost_persona_release.v1";
     public const string StockAvatarBindingV1 = "chummer.tough_tongue.stock_avatar_binding.v1";
+    public const string StockAvatarReadbackReceiptV1 = "chummer.tough_tongue.stock_avatar_readback_receipt.v1";
     public const string ScenarioContractV1 = "chummer.tough_tongue.build_ghost_scenario.v1";
     public const string ScenarioContractV2 = "chummer.tough_tongue.build_ghost_scenario.v2";
     public const string ToolContractV1 = "chummer.tough_tongue.build_ghost_tool.v1";
@@ -427,8 +428,30 @@ public sealed record BuildGhostToughTongueStockAvatarBinding(
     string ModelId,
     bool LegacyModelCompatibilityEnabled,
     string ProviderReadbackDigest,
+    string ProviderCanonicalResponseDigest,
+    string ProviderReadbackScenarioRefDigest,
+    string ProviderReadbackSource,
+    string ProviderReadbackObservedAtUtc,
+    int ProviderReadbackMaximumAgeSeconds,
     bool ProviderReadVerified,
     string ContractDigest);
+
+public sealed record BuildGhostToughTongueStockAvatarReadbackReceipt(
+    string Schema,
+    int HttpStatus,
+    string CanonicalWhitelistedResponseDigest,
+    string ObservedProvider,
+    string ObservedAvatarName,
+    string ObservedAvatarAssetPath,
+    string ObservedLiveAvatarId,
+    string ObservedModelProvider,
+    string ObservedModelId,
+    bool LegacyCascadePolicyOptIn,
+    string ScenarioRefDigest,
+    string Source,
+    string ObservedAtUtc,
+    int MaximumAgeSeconds,
+    string ReceiptDigest);
 
 public sealed record BuildGhostToughTongueStockAvatarBindingValidation(
     bool Accepted,

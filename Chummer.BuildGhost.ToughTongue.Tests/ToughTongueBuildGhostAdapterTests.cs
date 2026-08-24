@@ -22,7 +22,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private const string CustomFunctionId = "custom-function-rook-private-v1";
     private const string CustomFunctionAccountRef = "sha256:689642aa853d240436dd28773f760a289be65a9ecf36783aae1ffe1934b74b15";
     private const string StockAvatarId = "11111111-2222-4333-8444-555555555555";
-    private const string StockAvatarReadbackDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private const string StockScenarioRef = "private-stock-scenario-ref";
 
     [TestMethod]
     public async Task Remote_execution_is_disabled_by_default_and_returns_audited_deterministic_fallback()
@@ -813,6 +813,35 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public void Scenario_serialization_rejects_recomputed_digest_stock_avatar_and_model_drift()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        foreach (Action<JsonObject> mutate in new Action<JsonObject>[]
+        {
+            payload => payload["appearance"]!["avatar_url"] = "https://attacker.invalid/amelia.png",
+            payload => payload["appearance"]!["live_avatar_id"] = "22222222-3333-4444-8555-666666666666",
+            payload => payload["appearance"]!["live_avatar_provider"] = "attacker",
+            payload => payload["ai_model_config"]!["provider"] = "attacker",
+            payload => payload["ai_model_config"]!["model"] = "future-model",
+            payload => payload["user_metadata"]!["avatar_provider_response_digest"] = $"sha256:{new string('0', 64)}"
+        })
+        {
+            JsonObject payload = (JsonObject)candidate.Payload.DeepClone();
+            mutate(payload);
+            string recomputed = ScenarioPayloadDigest(payload);
+            payload["user_metadata"]!["scenario_contract_digest"] = recomputed;
+            ToughTongueBuildGhostScenarioCandidate drifted = candidate with
+            {
+                Payload = payload,
+                ContractDigest = recomputed
+            };
+
+            Assert.ThrowsExactly<InvalidDataException>(
+                () => ToughTongueBuildGhostScenarioContract.SerializeCreatePayload(drifted));
+        }
+    }
+
+    [TestMethod]
     public async Task Scenario_creation_rejects_bundle_deployment_digest_url_size_and_field_drift_before_transport()
     {
         BuildGhostToughTongueCartesiaScenarioSchemaReceipt receipt = ScenarioSchemaReceipt();
@@ -1472,11 +1501,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         CollectionAssert.Contains(blocked.RejectionReasons.ToArray(), "stock-avatar-provider-readback-digest-missing-or-invalid");
 
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?>
-            {
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest
-            }).Build();
+            StockAvatarConfiguration()).Build();
 
         BuildGhostToughTongueStockAvatarBindingValidation validation =
             BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(configuration);
@@ -1490,6 +1515,9 @@ public sealed class ToughTongueBuildGhostAdapterTests
         Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.CurrentModelId, validation.Binding.ModelId);
         Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, validation.Binding.AvatarAlias);
         Assert.IsTrue(validation.Binding.ProviderReadVerified);
+        Assert.AreEqual(
+            BuildGhostToughTongueStockAvatarBindingContract.RequiredReadbackSource,
+            validation.Binding.ProviderReadbackSource);
         Assert.IsTrue(validation.Binding.ContractDigest.StartsWith("sha256:", StringComparison.Ordinal));
         Assert.IsEmpty(BuildGhostToughTongueStockAvatarBindingContract.Validate(validation.Binding));
         Assert.IsFalse(JsonSerializer.Serialize(validation.Binding).Contains(StockAvatarId, StringComparison.Ordinal));
@@ -1499,22 +1527,16 @@ public sealed class ToughTongueBuildGhostAdapterTests
     public void Stock_avatar_configuration_rejects_provider_misspellings_and_arbitrary_models_and_gates_legacy_Cascade_explicitly()
     {
         IConfiguration current = new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?>
-            {
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest
-            }).Build();
+            StockAvatarConfiguration()).Build();
         BuildGhostToughTongueStockAvatarBindingValidation accepted =
             BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(current);
         Assert.IsTrue(accepted.Accepted);
 
         IConfiguration misspelledProvider = new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?>
+            StockAvatarConfiguration(new Dictionary<string, string?>
             {
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest,
                 [BuildGhostToughTongueStockAvatarBindingContract.ProviderConfigurationKey] = "avatari0"
-            }).Build();
+            })).Build();
         BuildGhostToughTongueStockAvatarBindingValidation rejected =
             BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(misspelledProvider);
         Assert.IsFalse(rejected.Accepted);
@@ -1522,26 +1544,65 @@ public sealed class ToughTongueBuildGhostAdapterTests
         CollectionAssert.Contains(rejected.RejectionReasons.ToArray(), "stock-avatar-provider-invalid");
 
         IConfiguration arbitraryModel = new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?>
+            StockAvatarConfiguration(new Dictionary<string, string?>
             {
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest,
                 [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = "future-model"
-            }).Build();
+            })).Build();
         Assert.IsFalse(BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(arbitraryModel).Accepted);
 
-        IConfiguration explicitLegacy = new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?>
+        IConfiguration currentWithLegacyFlag = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration(new Dictionary<string, string?>
             {
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = StockAvatarId,
-                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = StockAvatarReadbackDigest,
-                [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = "cascade",
                 [BuildGhostToughTongueStockAvatarBindingContract.AllowLegacyCascadeConfigurationKey] = "true"
-            }).Build();
+            })).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation invalidCurrent =
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(currentWithLegacyFlag);
+        Assert.IsFalse(invalidCurrent.Accepted);
+        CollectionAssert.Contains(invalidCurrent.RejectionReasons.ToArray(), "stock-avatar-legacy-model-flag-invalid");
+
+        BuildGhostToughTongueStockAvatarReadbackReceipt legacyReceipt = StockAvatarReadbackReceipt(
+            modelId: ToughTongueBuildGhostStockAvatarSelections.LegacyModelId,
+            allowLegacyCascade: true);
+        IConfiguration explicitLegacy = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration(new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = "cascade",
+                [BuildGhostToughTongueStockAvatarBindingContract.AllowLegacyCascadeConfigurationKey] = "true",
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = legacyReceipt.ReceiptDigest,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] = JsonSerializer.Serialize(legacyReceipt)
+            })).Build();
         BuildGhostToughTongueStockAvatarBindingValidation legacy =
             BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(explicitLegacy);
         Assert.IsTrue(legacy.Accepted);
         Assert.IsTrue(legacy.Binding!.LegacyModelCompatibilityEnabled);
+    }
+
+    [TestMethod]
+    public void Stock_avatar_receipt_rejects_fabricated_digest_wrong_status_stale_readback_and_scenario_drift()
+    {
+        BuildGhostToughTongueStockAvatarReadbackReceipt valid = StockAvatarReadbackReceipt();
+        BuildGhostToughTongueStockAvatarReadbackReceipt[] hostile =
+        [
+            valid with { HttpStatus = 500 },
+            valid with { CanonicalWhitelistedResponseDigest = $"sha256:{new string('0', 64)}" },
+            valid with { ObservedAtUtc = DateTimeOffset.UtcNow.AddHours(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'") },
+            valid with { ScenarioRefDigest = $"sha256:{new string('1', 64)}" }
+        ];
+        foreach (BuildGhostToughTongueStockAvatarReadbackReceipt drifted in hostile)
+        {
+            bool preserveInvalidResponseDigest = drifted.CanonicalWhitelistedResponseDigest
+                == $"sha256:{new string('0', 64)}";
+            BuildGhostToughTongueStockAvatarReadbackReceipt sealedDrifted = SealStockAvatarReadbackReceipt(
+                drifted,
+                preserveInvalidResponseDigest);
+            Dictionary<string, string?> values = StockAvatarConfiguration(new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = sealedDrifted.ReceiptDigest,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] = JsonSerializer.Serialize(sealedDrifted)
+            });
+            Assert.IsFalse(BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(
+                new ConfigurationBuilder().AddInMemoryCollection(values).Build()).Accepted);
+        }
     }
 
     [TestMethod]
@@ -1732,8 +1793,82 @@ public sealed class ToughTongueBuildGhostAdapterTests
 
     private static BuildGhostToughTongueStockAvatarBinding StockAvatarBinding()
         => BuildGhostToughTongueStockAvatarBindingContract.CreateReadVerified(
+            StockAvatarReadbackReceipt());
+
+    private static BuildGhostToughTongueStockAvatarReadbackReceipt StockAvatarReadbackReceipt(
+        string modelId = ToughTongueBuildGhostStockAvatarSelections.CurrentModelId,
+        bool allowLegacyCascade = false)
+    {
+        BuildGhostToughTongueStockAvatarReadbackReceipt receipt = new(
+            ToughTongueBuildGhostContractVersions.StockAvatarReadbackReceiptV1,
+            200,
+            string.Empty,
+            ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace,
+            ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName,
+            ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath,
             StockAvatarId,
-            StockAvatarReadbackDigest);
+            ToughTongueBuildGhostStockAvatarSelections.RequiredModelProvider,
+            modelId,
+            allowLegacyCascade,
+            TextDigest(StockScenarioRef),
+            BuildGhostToughTongueStockAvatarBindingContract.RequiredReadbackSource,
+            DateTimeOffset.UtcNow.AddMinutes(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+            BuildGhostToughTongueStockAvatarBindingContract.MaximumPermittedAgeSeconds,
+            string.Empty);
+        return SealStockAvatarReadbackReceipt(receipt);
+    }
+
+    private static BuildGhostToughTongueStockAvatarReadbackReceipt SealStockAvatarReadbackReceipt(
+        BuildGhostToughTongueStockAvatarReadbackReceipt receipt,
+        bool preserveResponseDigest = false)
+    {
+        if (!preserveResponseDigest)
+        {
+            receipt = receipt with
+            {
+                CanonicalWhitelistedResponseDigest =
+                    BuildGhostToughTongueStockAvatarBindingContract.ComputeCanonicalWhitelistedResponseDigest(receipt)
+            };
+        }
+        return receipt with
+        {
+            ReceiptDigest = BuildGhostToughTongueStockAvatarBindingContract.ComputeReadbackReceiptDigest(receipt)
+        };
+    }
+
+    private static Dictionary<string, string?> StockAvatarConfiguration(
+        IReadOnlyDictionary<string, string?>? overrides = null)
+    {
+        BuildGhostToughTongueStockAvatarReadbackReceipt receipt = StockAvatarReadbackReceipt();
+        Dictionary<string, string?> values = new(StringComparer.Ordinal)
+        {
+            [BuildGhostToughTongueStockAvatarBindingContract.ProviderConfigurationKey] = receipt.ObservedProvider,
+            [BuildGhostToughTongueStockAvatarBindingContract.NameConfigurationKey] = receipt.ObservedAvatarName,
+            [BuildGhostToughTongueStockAvatarBindingContract.AssetPathConfigurationKey] = receipt.ObservedAvatarAssetPath,
+            [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = receipt.ObservedLiveAvatarId,
+            [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = receipt.ReceiptDigest,
+            [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] = JsonSerializer.Serialize(receipt),
+            [BuildGhostToughTongueStockAvatarBindingContract.ModelProviderConfigurationKey] = receipt.ObservedModelProvider,
+            [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = receipt.ObservedModelId,
+            [BuildGhostToughTongueStockAvatarBindingContract.AllowLegacyCascadeConfigurationKey] = receipt.LegacyCascadePolicyOptIn.ToString(),
+            [BuildGhostToughTongueStockAvatarBindingContract.ScenarioIdConfigurationKey] = StockScenarioRef
+        };
+        if (overrides is not null)
+        {
+            foreach ((string key, string? value) in overrides) values[key] = value;
+        }
+        return values;
+    }
+
+    private static string ScenarioPayloadDigest(JsonObject payload)
+    {
+        JsonObject authority = (JsonObject)payload.DeepClone();
+        authority["user_metadata"]!.AsObject().Remove("scenario_contract_digest");
+        return $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(authority))).ToLowerInvariant()}";
+    }
+
+    private static string TextDigest(string value)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
 
     private static JsonObject ProviderScenario(ToughTongueBuildGhostScenarioCandidate candidate)
     {

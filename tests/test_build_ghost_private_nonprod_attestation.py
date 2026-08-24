@@ -39,7 +39,7 @@ CANDIDATE_REFS = {
     "voice": "voice-review-1",
     "function": "function-review-1",
     "scenario": "scenario-review-1",
-    "live_avatar": "live-avatar-review-1",
+    "live_avatar": "11111111-2222-4333-8444-555555555555",
 }
 CANDIDATE_DIGESTS = {
     kind: MODULE._candidate_ref_digest(value) for kind, value in CANDIDATE_REFS.items()
@@ -47,6 +47,39 @@ CANDIDATE_DIGESTS = {
 CONTRACT_DIGEST = "sha256:" + "7" * 64
 PRIVATE_NETWORK = MODULE.PROJECT + "_build-ghost-private"
 LOOPBACK_NETWORK = MODULE.PROJECT + "_build-ghost-loopback"
+
+
+def stock_avatar_receipt() -> dict[str, object]:
+    payload: dict[str, object] = {
+        "Schema": MODULE.TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_SCHEMA,
+        "HttpStatus": 200,
+        "CanonicalWhitelistedResponseDigest": "",
+        "ObservedProvider": "avatario",
+        "ObservedAvatarName": "Amelia",
+        "ObservedAvatarAssetPath": "/live-avatars/avatars/Amelia.jpg",
+        "ObservedLiveAvatarId": CANDIDATE_REFS["live_avatar"],
+        "ObservedModelProvider": "Landmass",
+        "ObservedModelId": "gemini",
+        "LegacyCascadePolicyOptIn": False,
+        "ScenarioRefDigest": CANDIDATE_DIGESTS["scenario"],
+        "Source": MODULE.TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_SOURCE,
+        "ObservedAtUtc": "2026-08-23T05:29:00Z",
+        "MaximumAgeSeconds": 900,
+        "ReceiptDigest": "",
+    }
+    payload["CanonicalWhitelistedResponseDigest"] = MODULE._upstream_digest({
+        "ObservedAvatarAssetPath": payload["ObservedAvatarAssetPath"],
+        "ObservedAvatarName": payload["ObservedAvatarName"],
+        "ObservedLiveAvatarId": payload["ObservedLiveAvatarId"],
+        "ObservedModelId": payload["ObservedModelId"],
+        "ObservedModelProvider": payload["ObservedModelProvider"],
+        "ObservedProvider": payload["ObservedProvider"],
+        "ScenarioRefDigest": payload["ScenarioRefDigest"],
+    })
+    payload["ReceiptDigest"] = MODULE._upstream_digest({
+        key: value for key, value in payload.items() if key != "ReceiptDigest"
+    })
+    return payload
 
 
 def labels(role: str, compose: Path) -> dict[str, str]:
@@ -100,6 +133,20 @@ def environment(role: str) -> list[str]:
         rows.extend(
             f"{MODULE.TOUGH_TONGUE_CANDIDATE_ENV[kind]}={value}"
             for kind, value in CANDIDATE_REFS.items()
+        )
+        receipt = stock_avatar_receipt()
+        rows.extend(
+            [
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV['provider']}={receipt['ObservedProvider']}",
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV['name']}={receipt['ObservedAvatarName']}",
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV['asset_path']}={receipt['ObservedAvatarAssetPath']}",
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV['readback_digest']}={receipt['ReceiptDigest']}",
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV['model_provider']}={receipt['ObservedModelProvider']}",
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV['model_id']}={receipt['ObservedModelId']}",
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV['allow_legacy_cascade']}=false",
+                f"{MODULE.TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_JSON_ENV}="
+                + json.dumps(receipt, sort_keys=True, separators=(",", ":")),
+            ]
         )
         return rows
     if role == "presentation":
@@ -243,6 +290,12 @@ def account_audit_receipt(evidence_dir: Path, contract: Path) -> dict[str, objec
         "candidateRefCount": 0,
         "bindingCandidatesConfigured": False,
         "stockAvatarMigrationConfigured": False,
+        "stockAvatarReadbackReceiptFileDigest": "",
+        "stockAvatarReadbackReceiptDigest": "",
+        "stockAvatarCanonicalResponseDigest": "",
+        "stockAvatarReadbackObservedAtUtc": "",
+        "stockAvatarReadbackScenarioRefDigest": "",
+        "stockAvatarLegacyCascadePolicyOptIn": False,
         "expectationDigest": MODULE._upstream_digest(
             {
                 "preferred_account_ref": PREFERRED_ACCOUNT_REF,
@@ -339,8 +392,17 @@ class FakeRunner:
         env = environment(role)
         if role == "ai" and self.account_audit_contract is not None:
             candidate_names = set(MODULE.TOUGH_TONGUE_CANDIDATE_ENV.values())
+            stock_names = set(MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV.values())
+            empty_names = candidate_names | stock_names | {
+                MODULE.TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_JSON_ENV
+            }
             env = [
-                f"{name}=" if (name := row.partition("=")[0]) in candidate_names else row
+                (
+                    f"{name}=false"
+                    if name == MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV["allow_legacy_cascade"]
+                    else f"{name}="
+                )
+                if (name := row.partition("=")[0]) in empty_names else row
                 for row in env
             ]
         if role == "ai" and self.candidate_overrides:
