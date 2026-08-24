@@ -37,6 +37,19 @@ CORE_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-core.git"
 REGISTRY_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub-registry.git"
 HUB_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub.git"
 LICENSE_EXPRESSION = "GPL-3.0-only"
+SDK_VERSION = "10.0.103"
+SDK_RID = "linux-x64"
+SDK_ARCHIVE_URL = (
+    "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.103/"
+    "dotnet-sdk-10.0.103-linux-x64.tar.gz"
+)
+SDK_ARCHIVE_SHA512 = (
+    "bab94f13c57b2ac821d4924fe66084be9b44c41761ff7ff64522c8f7aba345659"
+    "d31258401dcec31cc3cf6ccae1d012623075aca1c9b9165bcfe5ba9abda1c0c"
+)
+RUNTIME_PACKAGE_VERSION = "0.0.0-packageplane.candidate.shabc08228d3ce0"
+RUNTIME_SOURCE_COMMIT = "bc08228d3ce06410ca97ada63a5af41a2eaa91bf"
+OWNER_PACKAGE_VERSION = "0.0.0-packageplane.20260721.1"
 
 INVENTORY_FILE_NAME = "chummer-core-runtime-packages.inventory.json"
 LOCK_FILE_NAME = "runtime-package-plane.lock.json"
@@ -53,14 +66,160 @@ EXPECTED_PACKAGE_IDS = (
     "Chummer.Rulesets.Sr4",
     "Chummer.Engine.GmCharacterEdits",
 )
+EXPECTED_ALLOWED_RECIPE_DELTA = (
+    ".github/workflows/package-plane.yml",
+    "Chummer.Application/Chummer.Application.csproj",
+    "Chummer.Contracts/Chummer.Contracts.csproj",
+    "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
+    "Chummer.Infrastructure/Chummer.Infrastructure.csproj",
+    "Chummer.Rulesets.Hosting/Chummer.Rulesets.Hosting.csproj",
+    "Chummer.Rulesets.Sr4/Chummer.Rulesets.Sr4.csproj",
+    "Chummer.Rulesets.Sr5/Chummer.Rulesets.Sr5.csproj",
+    "Chummer.Rulesets.Sr6/Chummer.Rulesets.Sr6.csproj",
+    "eng/runtime-package-plane.lock.json",
+    "scripts/ai/runtime-package-plane.py",
+    "scripts/ai/verify-no-siblings-package-plane.sh",
+    "tests/test_package_plane.py",
+    "tests/test_runtime_package_plane_authority.py",
+)
+EXPECTED_BUILD_AUTHORITY_PATHS = (
+    ".github/workflows/package-plane.yml",
+    "Chummer.CoreEngine.sln",
+    "Directory.Build.props",
+    "Directory.Build.targets",
+    "eng/package-plane.lock.json",
+    "global.json",
+    "scripts/ai/_env.sh",
+    "scripts/ai/bootstrap-contracts-feed.sh",
+    "scripts/ai/bootstrap-owner-contracts-feed.py",
+    "scripts/ai/runtime-package-plane.py",
+    "scripts/ai/verify-no-siblings-package-plane.sh",
+)
 EXPECTED_EXTERNAL_OWNER_PACKAGES = (
-    ("Chummer.Hub.Registry.Contracts", REGISTRY_REPOSITORY),
-    ("Chummer.Play.Contracts", HUB_REPOSITORY),
-    ("Chummer.Run.Contracts", HUB_REPOSITORY),
+    (
+        "Chummer.Hub.Registry.Contracts",
+        OWNER_PACKAGE_VERSION,
+        REGISTRY_REPOSITORY,
+        "af9a7e19c3bf331e96411dfb8f9e7820a98cab29",
+    ),
+    (
+        "Chummer.Play.Contracts",
+        OWNER_PACKAGE_VERSION,
+        HUB_REPOSITORY,
+        "7c1faef298fb9028e77069c2467686f92624566c",
+    ),
+    (
+        "Chummer.Run.Contracts",
+        OWNER_PACKAGE_VERSION,
+        HUB_REPOSITORY,
+        "7c1faef298fb9028e77069c2467686f92624566c",
+    ),
 )
 EXPECTED_THIRD_PARTY_PACKAGES = (
     ("Microsoft.Extensions.DependencyInjection", "10.0.0"),
     ("SharpCompress", "0.50.1"),
+)
+EXPECTED_RUNTIME_PACKAGE_SPECS = (
+    (
+        "Chummer.Engine.Contracts",
+        "Chummer.Contracts/Chummer.Contracts.csproj",
+        "1ae056091372ae0fb353b983023cea521ac848b899fd8d3ca3d45e546f57707e",
+        "Chummer.Engine.Contracts.dll",
+        (),
+    ),
+    (
+        "Chummer.Application",
+        "Chummer.Application/Chummer.Application.csproj",
+        "cf5fc7f7f7d25c2ab20ba7719f3a60929cd78b205b9a43683b4a7048fcf0c19a",
+        "Chummer.Application.dll",
+        (
+            ("Chummer.Engine.Contracts", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Hub.Registry.Contracts", OWNER_PACKAGE_VERSION),
+            ("Chummer.Run.Contracts", OWNER_PACKAGE_VERSION),
+        ),
+    ),
+    (
+        "Chummer.Rulesets.Hosting",
+        "Chummer.Rulesets.Hosting/Chummer.Rulesets.Hosting.csproj",
+        "b3e1145840a1767a92e6e7c42fa5e510249753b36973e75050d6eac198e17521",
+        "Chummer.Rulesets.Hosting.dll",
+        (
+            ("Chummer.Application", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Engine.Contracts", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Run.Contracts", OWNER_PACKAGE_VERSION),
+            ("Microsoft.Extensions.DependencyInjection", "10.0.0"),
+        ),
+    ),
+    (
+        "Chummer.Rulesets.Sr5",
+        "Chummer.Rulesets.Sr5/Chummer.Rulesets.Sr5.csproj",
+        "2f7f91916c55035d42d7e5bddd52e76379ad2d0bb6d6eb4ff7ac5c7bbbea9826",
+        "Chummer.Rulesets.Sr5.dll",
+        (
+            ("Chummer.Application", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Engine.Contracts", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Run.Contracts", OWNER_PACKAGE_VERSION),
+            ("Microsoft.Extensions.DependencyInjection", "10.0.0"),
+        ),
+    ),
+    (
+        "Chummer.Rulesets.Sr6",
+        "Chummer.Rulesets.Sr6/Chummer.Rulesets.Sr6.csproj",
+        "23023db965dbfbf1795a5d660f5d3d3bc0d12f17b0a164882e6910e1a25a1f1f",
+        "Chummer.Rulesets.Sr6.dll",
+        (
+            ("Chummer.Application", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Engine.Contracts", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Run.Contracts", OWNER_PACKAGE_VERSION),
+            ("Microsoft.Extensions.DependencyInjection", "10.0.0"),
+        ),
+    ),
+    (
+        "Chummer.Infrastructure",
+        "Chummer.Infrastructure/Chummer.Infrastructure.csproj",
+        "e017c01931b664a99cf4d74d89f0e6ed07576c1de47dfa89b740eb972f877936",
+        "Chummer.Infrastructure.dll",
+        (
+            ("Chummer.Application", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Engine.Contracts", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Hub.Registry.Contracts", OWNER_PACKAGE_VERSION),
+            ("Chummer.Rulesets.Hosting", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Rulesets.Sr5", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Rulesets.Sr6", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Run.Contracts", OWNER_PACKAGE_VERSION),
+            ("Microsoft.Extensions.DependencyInjection", "10.0.0"),
+            ("SharpCompress", "0.50.1"),
+        ),
+    ),
+    (
+        "Chummer.Rulesets.Sr4",
+        "Chummer.Rulesets.Sr4/Chummer.Rulesets.Sr4.csproj",
+        "86eafdcdf1638c3651d5357acd7f99023ca97c5641d83432be2b3c12f3ba5fb5",
+        "Chummer.Rulesets.Sr4.dll",
+        (
+            ("Chummer.Application", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Engine.Contracts", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Infrastructure", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Run.Contracts", OWNER_PACKAGE_VERSION),
+            ("Microsoft.Extensions.DependencyInjection", "10.0.0"),
+        ),
+    ),
+    (
+        "Chummer.Engine.GmCharacterEdits",
+        "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
+        "7c2508ce3ee1c64338cc80df71e3a98487c5c8323db9bccb68e740f13f3db6a6",
+        "Chummer.Engine.GmCharacterEdits.dll",
+        (
+            ("Chummer.Application", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Engine.Contracts", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Hub.Registry.Contracts", OWNER_PACKAGE_VERSION),
+            ("Chummer.Infrastructure", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Rulesets.Hosting", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Rulesets.Sr5", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Rulesets.Sr6", RUNTIME_PACKAGE_VERSION),
+            ("Chummer.Run.Contracts", OWNER_PACKAGE_VERSION),
+        ),
+    ),
 )
 LOCKED_OWNER_PACKAGE_IDS = (
     "Chummer.Engine.Contracts",
@@ -569,6 +728,25 @@ def _load_json_file_at(
     return _decode_json(payload, label=label), payload, hashlib.sha256(payload).hexdigest()
 
 
+def _require_final_file_binding(
+    directory_fd: int,
+    name: str,
+    *,
+    label: str,
+    maximum: int,
+    expected_size: int,
+    expected_sha256: str,
+) -> None:
+    payload = _stable_file_bytes_at(
+        directory_fd, name, label=f"final {label}", maximum=maximum
+    )
+    if (
+        len(payload) != expected_size
+        or hashlib.sha256(payload).hexdigest() != expected_sha256
+    ):
+        raise ArtifactValidationError(f"final byte binding differs for {label}")
+
+
 def load_authority(path: Path) -> Authority:
     payload, _raw, _digest = _load_json_file(
         path, label="Core artifact authority", maximum=MAX_AUTHORITY_BYTES
@@ -594,6 +772,8 @@ def load_authority(path: Path) -> Authority:
     runtime_source_commit = _sha(
         root.get("runtime_source_commit"), label="authority runtime_source_commit"
     )
+    if runtime_source_commit != RUNTIME_SOURCE_COMMIT:
+        raise ArtifactValidationError("authority runtime_source_commit differs from current Core v1")
     package_recipe_commit = _sha(
         root.get("package_recipe_commit"), label="authority package_recipe_commit"
     )
@@ -645,6 +825,8 @@ def load_authority(path: Path) -> Authority:
         root.get("owner_package_version"),
         label="authority owner_package_version",
     )
+    if owner_package_version != OWNER_PACKAGE_VERSION:
+        raise ArtifactValidationError("authority owner_package_version differs from current Core v1")
     owner_inventory_binding = _exact_object(
         root.get("owner_package_inventory"),
         OWNER_INVENTORY_BINDING_KEYS,
@@ -714,6 +896,8 @@ def load_authority(path: Path) -> Authority:
         root.get("runtime_package_version"),
         label="authority runtime_package_version",
     )
+    if runtime_package_version != RUNTIME_PACKAGE_VERSION:
+        raise ArtifactValidationError("authority runtime_package_version differs from current Core v1")
     return Authority(
         artifact_selector={
             "repository": repository,
@@ -750,25 +934,27 @@ def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
     if DOTNET_VERSION_PATTERN.fullmatch(sdk_version) is None:
         raise ArtifactValidationError("dotnet_sdk.version must be an exact three-part version")
     sdk_rid = _canonical_string(sdk.get("rid"), label="dotnet_sdk.rid")
-    if sdk_rid != "linux-x64":
-        raise ArtifactValidationError("dotnet_sdk.rid must be linux-x64")
-    expected_archive_url = (
-        f"https://builds.dotnet.microsoft.com/dotnet/Sdk/{sdk_version}/"
-        f"dotnet-sdk-{sdk_version}-{sdk_rid}.tar.gz"
+    archive_url = _canonical_string(sdk.get("archive_url"), label="dotnet_sdk.archive_url")
+    archive_sha512 = _sha512_value(
+        sdk.get("archive_sha512"), label="dotnet_sdk.archive_sha512"
     )
-    if sdk.get("archive_url") != expected_archive_url:
-        raise ArtifactValidationError("dotnet_sdk.archive_url is not exact for version and RID")
-    _sha512_value(sdk.get("archive_sha512"), label="dotnet_sdk.archive_sha512")
+    if (sdk_version, sdk_rid, archive_url, archive_sha512) != (
+        SDK_VERSION,
+        SDK_RID,
+        SDK_ARCHIVE_URL,
+        SDK_ARCHIVE_SHA512,
+    ):
+        raise ArtifactValidationError("dotnet SDK archive authority differs from current Core v1")
 
-    if root.get("package_version") != authority.runtime_package_version:
-        raise ArtifactValidationError("runtime lock package_version differs from authority")
+    if root.get("package_version") != RUNTIME_PACKAGE_VERSION:
+        raise ArtifactValidationError("runtime lock package_version differs from current Core v1")
     runtime_source = _exact_object(
         root.get("runtime_source"), RUNTIME_SOURCE_KEYS, label="runtime_source"
     )
     if runtime_source.get("repository") != CORE_REPOSITORY:
         raise ArtifactValidationError("runtime lock source repository is not canonical Core")
-    if runtime_source.get("commit") != authority.runtime_source_commit:
-        raise ArtifactValidationError("runtime lock source commit differs from authority")
+    if runtime_source.get("commit") != RUNTIME_SOURCE_COMMIT:
+        raise ArtifactValidationError("runtime lock source commit differs from current Core v1")
 
     allowed_delta = root.get("allowed_recipe_delta")
     if not isinstance(allowed_delta, list) or not allowed_delta:
@@ -779,6 +965,10 @@ def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
     ]
     if len(normalized_delta) != len(set(value.casefold() for value in normalized_delta)):
         raise ArtifactValidationError("allowed_recipe_delta paths must be case-insensitively unique")
+    if normalized_delta != list(EXPECTED_ALLOWED_RECIPE_DELTA):
+        raise ArtifactValidationError(
+            "allowed_recipe_delta omission, addition, or order differs from current Core v1"
+        )
 
     build_authority = root.get("build_authority_files")
     if not isinstance(build_authority, list) or not build_authority:
@@ -794,6 +984,10 @@ def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
         _sha256_value(row.get("sha256"), label=f"build_authority_files[{index}].sha256")
     if len(build_paths) != len(set(value.casefold() for value in build_paths)):
         raise ArtifactValidationError("build authority paths must be case-insensitively unique")
+    if build_paths != list(EXPECTED_BUILD_AUTHORITY_PATHS):
+        raise ArtifactValidationError(
+            "build authority path omission, addition, or order differs from current Core v1"
+        )
 
     external_values = root.get("external_owner_packages")
     if not isinstance(external_values, list) or len(external_values) != len(
@@ -801,17 +995,25 @@ def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
     ):
         raise ArtifactValidationError("external_owner_packages must contain Registry/Play/Run")
     external_ids: list[str] = []
-    for index, ((expected_id, expected_repository), value_row) in enumerate(
+    for index, (
+        (expected_id, expected_version, expected_repository, expected_commit),
+        value_row,
+    ) in enumerate(
         zip(EXPECTED_EXTERNAL_OWNER_PACKAGES, external_values, strict=True)
     ):
         row = _exact_object(
             value_row, EXTERNAL_OWNER_KEYS, label=f"external_owner_packages[{index}]"
         )
-        if row.get("id") != expected_id or row.get("repository") != expected_repository:
-            raise ArtifactValidationError("external owner package identity or repository drifted")
-        if row.get("version") != authority.owner_package_version:
-            raise ArtifactValidationError(f"external owner package version drift for {expected_id}")
-        _sha(row.get("commit"), label=f"external owner package {expected_id} commit")
+        commit = _sha(row.get("commit"), label=f"external owner package {expected_id} commit")
+        if (
+            row.get("id"),
+            row.get("version"),
+            row.get("repository"),
+            commit,
+        ) != (expected_id, expected_version, expected_repository, expected_commit):
+            raise ArtifactValidationError(
+                "external owner package omission, addition, order, or authority differs from current Core v1"
+            )
         external_ids.append(expected_id)
 
     third_party_values = root.get("third_party_packages")
@@ -832,8 +1034,8 @@ def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
     if not isinstance(package_values, list) or len(package_values) != len(EXPECTED_PACKAGE_IDS):
         raise ArtifactValidationError("runtime lock must contain exactly eight package rows")
     version_authority = {
-        **{package_id: authority.runtime_package_version for package_id in EXPECTED_PACKAGE_IDS},
-        **{package_id: authority.owner_package_version for package_id in external_ids},
+        **{package_id: RUNTIME_PACKAGE_VERSION for package_id in EXPECTED_PACKAGE_IDS},
+        **{package_id: OWNER_PACKAGE_VERSION for package_id in external_ids},
         **dict(EXPECTED_THIRD_PARTY_PACKAGES),
     }
     packages: list[dict[str, Any]] = []
@@ -888,6 +1090,26 @@ def _validate_runtime_lock(value: Any, *, authority: Authority) -> RuntimeLock:
             }
         )
         seen_internal.add(expected_id)
+    expected_packages = [
+        {
+            "id": package_id,
+            "project": project,
+            "project_sha256": project_sha256,
+            "assembly": assembly,
+            "target_framework": "net10.0",
+            "dependencies": [
+                {"id": dependency_id, "version": version}
+                for dependency_id, version in dependencies
+            ],
+        }
+        for package_id, project, project_sha256, assembly, dependencies in (
+            EXPECTED_RUNTIME_PACKAGE_SPECS
+        )
+    ]
+    if packages != expected_packages:
+        raise ArtifactValidationError(
+            "runtime package omission, addition, order, project, digest, assembly, or dependency authority differs from current Core v1"
+        )
     return RuntimeLock(
         package_version=authority.runtime_package_version,
         runtime_source_commit=authority.runtime_source_commit,
@@ -1130,12 +1352,6 @@ def _inspect_nupkg(payload: bytes, *, package: Mapping[str, Any]) -> None:
     dependency_containers = [
         element for element in nuspec.iter() if _xml_local_name(element.tag) == "dependencies"
     ]
-    if not expected_dependencies:
-        if dependency_containers:
-            raise ArtifactValidationError(
-                f"package {package_id} nuspec contains an unexpected dependency group"
-            )
-        return
     if len(dependency_containers) != 1:
         raise ArtifactValidationError(
             f"package {package_id} nuspec must contain one dependency container"
@@ -1333,7 +1549,7 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
         )
         _directory_names(packages_snapshot, label="packages directory")
 
-        lock_value, _lock_bytes, lock_sha256 = _load_json_file_at(
+        lock_value, lock_bytes, lock_sha256 = _load_json_file_at(
             root_snapshot.descriptor,
             LOCK_FILE_NAME,
             label="runtime package-plane lock",
@@ -1345,7 +1561,7 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
             )
         runtime_lock = _validate_runtime_lock(lock_value, authority=authority)
 
-        inventory_value, _inventory_bytes, inventory_sha256 = _load_json_file_at(
+        inventory_value, inventory_bytes, inventory_sha256 = _load_json_file_at(
             root_snapshot.descriptor,
             INVENTORY_FILE_NAME,
             label="runtime package inventory",
@@ -1404,7 +1620,7 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
                 "artifact must contain exactly eleven file members"
             )
 
-        receipt_value, _receipt_bytes, receipt_sha256 = _load_json_file_at(
+        receipt_value, receipt_bytes, receipt_sha256 = _load_json_file_at(
             root_snapshot.descriptor,
             RECEIPT_FILE_NAME,
             label="Core no-siblings v3 receipt",
@@ -1422,8 +1638,52 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
             inventory_packages=inventory_packages,
         )
 
-        # Exact final snapshots close the membership race between initial
-        # enumeration and all byte/receipt validation above.
+        # Re-read every member only after every semantic and receipt check.
+        # Directory identity alone cannot detect an in-place mutation between
+        # two otherwise stable reads.
+        for name, label, maximum, initial_bytes, initial_sha256 in (
+            (
+                LOCK_FILE_NAME,
+                "runtime package-plane lock",
+                MAX_LOCK_BYTES,
+                lock_bytes,
+                lock_sha256,
+            ),
+            (
+                INVENTORY_FILE_NAME,
+                "runtime package inventory",
+                MAX_INVENTORY_BYTES,
+                inventory_bytes,
+                inventory_sha256,
+            ),
+            (
+                RECEIPT_FILE_NAME,
+                "Core no-siblings v3 receipt",
+                MAX_RECEIPT_BYTES,
+                receipt_bytes,
+                receipt_sha256,
+            ),
+        ):
+            _require_final_file_binding(
+                root_snapshot.descriptor,
+                name,
+                label=label,
+                maximum=maximum,
+                expected_size=len(initial_bytes),
+                expected_sha256=initial_sha256,
+            )
+        for row in inventory_packages:
+            _require_final_file_binding(
+                packages_snapshot.descriptor,
+                row["file_name"],
+                label=f"package {row['id']}",
+                maximum=MAX_PACKAGE_BYTES,
+                expected_size=row["size_bytes"],
+                expected_sha256=row["sha256"],
+            )
+
+        # Exact final membership snapshots close addition/removal and
+        # directory replacement races after the complete eleven-file reread.
         _require_exact_directory_names(
             packages_snapshot,
             expected_package_names,
@@ -1480,6 +1740,7 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
                 "inventory_receipt_cross_links": "pass",
                 "owner_inventory_row_authority": "pass",
                 "package_byte_bindings": "pass",
+                "final_eleven_member_byte_reread": "pass",
                 "nupkg_payload_contracts": "pass",
                 "contained_regular_files": "pass",
                 "stable_directory_snapshots": "pass",
