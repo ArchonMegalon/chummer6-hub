@@ -153,8 +153,7 @@
       "id": "Chummer.Hub.Registry.Contracts", "version": "0.0.0-packageplane.20260721.1",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git", "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29", "checkout_directory": "chummer-hub-registry",
       "project": "Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj", "license_type": "file", "license_value": "LICENSE", "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "source_kind": "source_build", "bundle_member": null, "byte_authority_status": "locked",
-      "nupkg_sha256": "542844e6c7a349b5c0ec563e1911cf28831eb9736cad77e672996c8263239905", "nupkg_size_bytes": 161221
+      "source_kind": "source_build", "bundle_member": null, "byte_authority_status": "pending_pinned_ci", "nupkg_sha256": null, "nupkg_size_bytes": null
     },
     {
       "id": "Chummer.Run.Registry", "version": "0.0.0-packageplane.20260721.1",

@@ -60,10 +60,10 @@ def test_v5_authority_is_exact_about_graph_versions_and_pending_bytes() -> None:
     assert all(spec.version == OWNER_VERSION for spec in lock.packages[8:])
     assert all(spec.source_kind == module.CORE_SOURCE_KIND for spec in lock.packages[:8])
     assert all(spec.source_kind == module.BUILD_SOURCE_KIND for spec in lock.packages[8:])
-    assert all(spec.byte_authority_status == "locked" for spec in lock.packages[:9])
-    pending = lock.packages[9:]
+    assert all(spec.byte_authority_status == "locked" for spec in lock.packages[:8])
+    pending = lock.packages[8:]
     assert tuple(spec.package_id for spec in pending) == (
-        "Chummer.Run.Registry",
+        *REGISTRY_IDS,
         *HUB_IDS,
     )
     assert all(spec.byte_authority_status == "pending_pinned_ci" for spec in pending)

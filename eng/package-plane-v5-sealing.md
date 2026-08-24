@@ -32,8 +32,8 @@ commit must:
 1. verify the Actions run belongs to the observation workflow at the reviewed
    candidate commit;
 2. replay the observation and require identical seven-package bytes;
-3. verify the prelocked Registry contract row still matches;
-4. replace only the six `pending_pinned_ci` rows with the reviewed hashes and
+3. require all seven source-built packages to reproduce byte-for-byte;
+4. replace only the seven `pending_pinned_ci` rows with the reviewed hashes and
    sizes, then set the lock state to `sealed`;
 5. regenerate NuGet lock files from only that sealed feed; and
 6. pass the full no-siblings package-plane workflow and container preflight.
