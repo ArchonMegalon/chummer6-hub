@@ -84,6 +84,31 @@ def digest(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def expected_snapshot_members(module: Any, fixture: "ArtifactFixture") -> tuple[Any, ...]:
+    rows = [
+        (module.LOCK_FILE_NAME, "runtime package-plane lock", fixture.lock_path),
+        (module.INVENTORY_FILE_NAME, "runtime package inventory", fixture.inventory_path),
+        (module.RECEIPT_FILE_NAME, "Core no-siblings v3 receipt", fixture.receipt_path),
+    ]
+    rows.extend(
+        (
+            f"{module.PACKAGES_DIRECTORY_NAME}/{row['file_name']}",
+            f"package {row['id']}",
+            fixture.packages_root / row["file_name"],
+        )
+        for row in fixture.inventory["packages"]
+    )
+    return tuple(
+        module.ImmutableMemberSnapshot(
+            member_path=member_path,
+            label=label,
+            payload=path.read_bytes(),
+            sha256=digest(path.read_bytes()),
+        )
+        for member_path, label, path in rows
+    )
+
+
 def write_json(path: Path, payload: Any) -> bytes:
     rendered = json_bytes(payload)
     path.write_bytes(rendered)
@@ -391,6 +416,17 @@ def test_validates_exact_eleven_member_artifact_and_outer_selector(tmp_path: Pat
     assert result["package_count"] == 8
     assert result["ordered_package_ids"] == list(module.EXPECTED_PACKAGE_IDS)
     assert result["outer_artifact_selector"] == fixture.authority["artifact_selector"]
+    assert result["post_validation_consumption_authority"] == {
+        "contract": "github-actions.immutable-artifact-selector/v1",
+        "artifact_id": fixture.authority["artifact_selector"]["artifact_id"],
+        "sha256": fixture.authority["artifact_selector"]["sha256"],
+    }
+    assert result["artifact_byte_snapshot"] == {
+        "contract": module.BYTE_SNAPSHOT_CONTRACT,
+        "sha256": module._snapshot_sha256(expected_snapshot_members(module, fixture)),
+        "member_count": 11,
+        "source_path_posture": "not_attested_after_snapshot_capture",
+    }
     assert result["checks"] == {
         "exact_eleven_member_layout": "pass",
         "strict_json_contracts": "pass",
@@ -398,10 +434,11 @@ def test_validates_exact_eleven_member_artifact_and_outer_selector(tmp_path: Pat
         "inventory_receipt_cross_links": "pass",
         "owner_inventory_row_authority": "pass",
         "package_byte_bindings": "pass",
-        "final_eleven_member_byte_reread": "pass",
+        "immutable_eleven_member_byte_snapshot": "pass",
+        "snapshot_only_semantic_validation": "pass",
         "nupkg_payload_contracts": "pass",
         "contained_regular_files": "pass",
-        "stable_directory_snapshots": "pass",
+        "capture_time_directory_snapshots": "pass",
     }
 
 
@@ -1138,7 +1175,7 @@ def test_rejects_invalid_runtime_lock_project_sha_even_when_rebound(tmp_path: Pa
         ("assembly", "assembly differs from runtime lock"),
         ("framework", "target framework drift"),
         ("dependencies", "dependency graph differs from runtime lock"),
-        ("file_name", "package filename differs from runtime lock"),
+        ("file_name", "packages directory must contain the exact layout"),
     ],
 )
 def test_rejects_runtime_inventory_semantic_substitution_even_when_rebound(
@@ -1227,29 +1264,36 @@ def test_rejects_owner_inventory_binding_digest_disagreement(tmp_path: Path) -> 
 
 
 @pytest.mark.parametrize("target", ["root", "packages"])
-def test_rejects_directory_membership_change_after_initial_enumeration(
+def test_post_capture_directory_change_does_not_change_declared_snapshot(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str
 ) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
-    original = module._stable_file_bytes_at
+    initial_members = expected_snapshot_members(module, fixture)
+    original = module._capture_immutable_member
     changed = False
 
-    def racing_read(directory_fd: int, name: str, *, label: str, maximum: int) -> bytes:
+    def racing_capture(snapshot: Any) -> Any:
         nonlocal changed
-        payload = original(directory_fd, name, label=label, maximum=maximum)
-        if label.startswith("package ") and not changed:
+        captured = original(snapshot)
+        if not changed:
             changed = True
             destination = fixture.root if target == "root" else fixture.packages_root
             (destination / "foreign-after-enumeration.txt").write_text(
                 "foreign\n", encoding="utf-8"
             )
-        return payload
+        return captured
 
-    monkeypatch.setattr(module, "_stable_file_bytes_at", racing_read)
-    with pytest.raises(module.ArtifactValidationError, match="changed while it was validated"):
-        module.validate_artifact(fixture.root, fixture.authority_path)
+    monkeypatch.setattr(module, "_capture_immutable_member", racing_capture)
+    result = module.validate_artifact(fixture.root, fixture.authority_path)
     assert changed is True
+    assert result["status"] == "pass"
+    assert result["artifact_byte_snapshot"] == {
+        "contract": module.BYTE_SNAPSHOT_CONTRACT,
+        "sha256": module._snapshot_sha256(initial_members),
+        "member_count": 11,
+        "source_path_posture": "not_attested_after_snapshot_capture",
+    }
 
 
 @pytest.mark.parametrize("field", ["version", "rid", "archive_url", "archive_sha512"])
@@ -1324,134 +1368,185 @@ def test_engine_contracts_requires_one_empty_net10_dependency_group(
         module.validate_artifact(fixture.root, fixture.authority_path)
 
 
-def test_final_gate_rereads_all_eleven_members(
+def test_captures_all_eleven_members_once_in_canonical_order(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
-    original = module._require_final_file_binding
-    final_labels: list[str] = []
+    original = module._capture_immutable_member
+    captured_paths: list[str] = []
 
-    def recording_read(snapshot: Any) -> None:
-        original(snapshot)
-        final_labels.append(f"final {snapshot.label}")
+    def recording_capture(snapshot: Any) -> Any:
+        member = original(snapshot)
+        captured_paths.append(member.member_path)
+        return member
 
-    monkeypatch.setattr(module, "_require_final_file_binding", recording_read)
+    monkeypatch.setattr(module, "_capture_immutable_member", recording_capture)
     assert module.validate_artifact(fixture.root, fixture.authority_path)["status"] == "pass"
-    assert final_labels == [
-        "final runtime package-plane lock",
-        "final runtime package inventory",
-        "final Core no-siblings v3 receipt",
-        *[f"final package {package_id}" for package_id in module.EXPECTED_PACKAGE_IDS],
+    assert captured_paths == [
+        module.LOCK_FILE_NAME,
+        module.INVENTORY_FILE_NAME,
+        module.RECEIPT_FILE_NAME,
+        *[
+            f"{module.PACKAGES_DIRECTORY_NAME}/{package_id}.{module.RUNTIME_PACKAGE_VERSION}.nupkg"
+            for package_id in module.EXPECTED_PACKAGE_IDS
+        ],
     ]
 
 
-def test_terminal_phase_orders_directory_checks_before_bytes_and_identity(
+def test_source_filesystem_phase_ends_after_single_snapshot_capture(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
     original_directory = module._require_exact_directory_names
-    original_reread = module._require_final_file_binding
-    original_identity = module._require_terminal_file_identity
+    original_capture = module._capture_immutable_member
+    original_decode = module._decode_json
     events: list[str] = []
 
     def recording_directory(*args: Any, **kwargs: Any) -> None:
         original_directory(*args, **kwargs)
         events.append("directory")
 
-    def recording_reread(snapshot: Any) -> None:
-        original_reread(snapshot)
-        events.append("reread")
+    def recording_capture(snapshot: Any) -> Any:
+        member = original_capture(snapshot)
+        events.append("capture")
+        return member
 
-    def recording_identity(snapshot: Any) -> None:
-        original_identity(snapshot)
-        events.append("identity")
+    def recording_decode(payload: bytes, *, label: str) -> Any:
+        events.append("semantic")
+        return original_decode(payload, label=label)
 
     monkeypatch.setattr(module, "_require_exact_directory_names", recording_directory)
-    monkeypatch.setattr(module, "_require_final_file_binding", recording_reread)
-    monkeypatch.setattr(module, "_require_terminal_file_identity", recording_identity)
+    monkeypatch.setattr(module, "_capture_immutable_member", recording_capture)
+    monkeypatch.setattr(module, "_decode_json", recording_decode)
 
     assert module.validate_artifact(fixture.root, fixture.authority_path)["status"] == "pass"
-    first_reread = events.index("reread")
-    assert "directory" not in events[first_reread:]
-    assert events[first_reread:] == ["reread"] * 11 + ["identity"] * 11
+    first_capture = events.index("capture")
+    first_semantic = events.index("semantic", first_capture)
+    assert events[first_capture:first_semantic] == ["capture"] * 11
+    assert "directory" not in events[first_capture:]
+    assert "capture" not in events[first_semantic:]
 
 
-@pytest.mark.parametrize("target", ["package", "lock", "inventory", "receipt"])
-@pytest.mark.parametrize("mutation", ["same_size", "changed_size"])
-def test_final_gate_rejects_post_validation_member_byte_mutation(
+def mutate_same_size(path: Path) -> None:
+    with path.open("r+b", buffering=0) as stream:
+        first = stream.read(1)
+        assert first
+        stream.seek(0)
+        stream.write(bytes([first[0] ^ 1]))
+        os.fsync(stream.fileno())
+
+
+@pytest.mark.parametrize("capture_number", [1, 11])
+def test_source_mutation_after_snapshot_keeps_verdict_bound_to_initial_bytes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    target: str,
-    mutation: str,
+    capture_number: int,
 ) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
-    paths = {
-        "package": (
-            fixture.packages_root / fixture.inventory["packages"][0]["file_name"]
-        ),
-        "lock": fixture.lock_path,
-        "inventory": fixture.inventory_path,
-        "receipt": fixture.receipt_path,
-    }
-    target_path = paths[target]
-    original = module._stable_file_bytes_at
+    initial_members = expected_snapshot_members(module, fixture)
+    expected_snapshot_sha256 = module._snapshot_sha256(initial_members)
+    initial_lock_sha256 = digest(fixture.lock_path.read_bytes())
+    original = module._capture_immutable_member
+    captures = 0
+
+    def mutate_after_capture(snapshot: Any) -> Any:
+        nonlocal captures
+        member = original(snapshot)
+        captures += 1
+        if captures == capture_number:
+            mutate_same_size(fixture.lock_path)
+        return member
+
+    monkeypatch.setattr(module, "_capture_immutable_member", mutate_after_capture)
+    result = module.validate_artifact(fixture.root, fixture.authority_path)
+
+    assert captures == 11
+    assert digest(fixture.lock_path.read_bytes()) != initial_lock_sha256
+    assert result["status"] == "pass"
+    assert result["artifact_byte_snapshot"]["sha256"] == expected_snapshot_sha256
+    assert result["artifact_byte_snapshot"]["source_path_posture"] == (
+        "not_attested_after_snapshot_capture"
+    )
+
+
+@pytest.mark.parametrize("phase", ["semantic", "result"])
+def test_late_source_mutation_cannot_change_immutable_snapshot_verdict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase: str,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    expected_snapshot_sha256 = module._snapshot_sha256(
+        expected_snapshot_members(module, fixture)
+    )
+    initial_lock_sha256 = digest(fixture.lock_path.read_bytes())
     changed = False
 
-    def mutate_after_receipt_read(
-        directory_fd: int, name: str, *, label: str, maximum: int
-    ) -> bytes:
-        nonlocal changed
-        payload = original(directory_fd, name, label=label, maximum=maximum)
-        if label == "Core no-siblings v3 receipt" and not changed:
+    if phase == "semantic":
+        original = module._validate_receipt
+
+        def mutate_during_semantics(*args: Any, **kwargs: Any) -> None:
+            nonlocal changed
+            original(*args, **kwargs)
+            mutate_same_size(fixture.lock_path)
             changed = True
-            current = target_path.read_bytes()
-            if mutation == "same_size":
-                replacement = bytearray(current)
-                replacement[0] ^= 1
-                target_path.write_bytes(bytes(replacement))
-            else:
-                target_path.write_bytes(current + b"post-validation-mutation")
-        return payload
 
-    monkeypatch.setattr(module, "_stable_file_bytes_at", mutate_after_receipt_read)
-    with pytest.raises(
-        module.ArtifactValidationError,
-        match="exact-size bounded|final byte binding differs",
-    ):
-        module.validate_artifact(fixture.root, fixture.authority_path)
+        monkeypatch.setattr(module, "_validate_receipt", mutate_during_semantics)
+    else:
+        original_result = module._snapshot_result
+
+        def mutate_during_result(members: Any) -> dict[str, Any]:
+            nonlocal changed
+            summary = original_result(members)
+            mutate_same_size(fixture.lock_path)
+            changed = True
+            return summary
+
+        monkeypatch.setattr(module, "_snapshot_result", mutate_during_result)
+
+    result = module.validate_artifact(fixture.root, fixture.authority_path)
+
     assert changed is True
+    assert digest(fixture.lock_path.read_bytes()) != initial_lock_sha256
+    assert result["status"] == "pass"
+    assert result["artifact_byte_snapshot"]["sha256"] == expected_snapshot_sha256
 
 
-def test_terminal_identity_resweep_rejects_mutation_after_eleventh_reread(
+def test_cli_output_consumes_only_immutable_authority_after_verdict(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
-    target = fixture.packages_root / fixture.inventory["packages"][0]["file_name"]
-    original = module._require_final_file_binding
-    reread_count = 0
+    output = tmp_path / "validation.json"
+    moved_root = tmp_path / "artifact-moved-after-verdict"
+    original = module.validate_artifact
 
-    def mutate_after_eleventh_reread(snapshot: Any) -> None:
-        nonlocal reread_count
-        original(snapshot)
-        reread_count += 1
-        if reread_count == 11:
-            with target.open("r+b", buffering=0) as stream:
-                first = stream.read(1)
-                assert first
-                stream.seek(0)
-                stream.write(bytes([first[0] ^ 1]))
-                os.fsync(stream.fileno())
+    def move_source_after_verdict(artifact_root: Path, authority_path: Path) -> dict[str, Any]:
+        result = original(artifact_root, authority_path)
+        artifact_root.rename(moved_root)
+        return result
 
-    monkeypatch.setattr(
-        module, "_require_final_file_binding", mutate_after_eleventh_reread
-    )
-    with pytest.raises(
-        module.ArtifactValidationError,
-        match="terminal file identity or entry differs",
-    ):
-        module.validate_artifact(fixture.root, fixture.authority_path)
-    assert reread_count == 11
+    monkeypatch.setattr(module, "validate_artifact", move_source_after_verdict)
+    assert module.main(
+        [
+            "--artifact-root",
+            str(fixture.root),
+            "--authority",
+            str(fixture.authority_path),
+            "--output",
+            str(output),
+        ]
+    ) == 0
+
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+    assert result["post_validation_consumption_authority"] == {
+        "contract": "github-actions.immutable-artifact-selector/v1",
+        "artifact_id": fixture.authority["artifact_selector"]["artifact_id"],
+        "sha256": fixture.authority["artifact_selector"]["sha256"],
+    }
+    assert str(fixture.root) not in json.dumps(result, sort_keys=True)
