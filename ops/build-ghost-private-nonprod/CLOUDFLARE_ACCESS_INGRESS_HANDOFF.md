@@ -41,8 +41,20 @@ The edge requires exactly one canonical lowercase
 configured canonical `<team>.cloudflareaccess.com/cdn-cgi/access/certs`
 endpoint with redirects, cookies, and proxy inheritance disabled. It verifies
 RS256, issuer, exact configured audience membership, `iat`, `exp`, optional
-`nbf`, signature, and exact equality between the JWT email and authenticated
-email header.
+`nbf`, signature, exact token type `app`, and exact equality between the JWT
+email and authenticated email header. Cloudflare documents `app` as the
+application-token type for both identity and service-token authentication;
+this human ingress additionally requires the identity-only verified `email`
+claim, so a service-token assertion cannot satisfy it. See Cloudflare's
+[application-token contract](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/application-token/).
+
+The edge applies a stricter local token policy than Cloudflare's full
+configuration range: `exp - iat` may be at most exactly 86,400 seconds (24
+hours). Cloudflare permits application or policy session durations up to one
+month and defaults them to 24 hours; this edge deliberately accepts no token
+longer than that default. Configure both the Access application and every
+matching policy at 24 hours or less. See Cloudflare's
+[session-duration contract](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/session-management/).
 
 The upstream request is rebuilt from an allowlist. Client-supplied
 `X-Chummer-Owner`, every `X-Chummer-Portal-*` owner/signature header,
@@ -67,6 +79,12 @@ CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN=<team>.cloudflareaccess.com
 CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE=<exact-Access-application-audience-tag>
 CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK=<dedicated-existing-network-name>
 ```
+
+The ingress-network variable uses Compose's strict `:?` interpolation. An
+absent or explicitly blank value prevents even model rendering; there is no
+implicit Docker network name and no chance of attaching to a similarly named
+default network. Supply the exact already-created network name for every
+Compose `config` or later profiled operation.
 
 The application audience tag and team domain are identifiers, not bearer
 credentials. Do not place the tunnel token, an Access service token, a user
@@ -119,7 +137,7 @@ following in one change-controlled window:
 6. a valid Access session can import, read, issue one ephemeral grant, and close
    only its own workspace;
 7. upstream logs and request capture contain no Access JWT, Access email header,
-   client owner assertion, cookie, or authorization header; and
+client owner assertion, cookie, or authorization header; and
 8. AI stays internal, deterministic fallback remains available, provider
    fields remain empty or their separately attested blocked values, and every
    provider/canary gate remains exactly `false`.
@@ -127,3 +145,10 @@ following in one change-controlled window:
 Stop before activation if any value is missing, any network member is
 unexpected, any negative request reaches an upstream, JWT key retrieval is
 redirected/unavailable, or any provider gate differs from `false`.
+
+Both outbound HTTP transports explicitly set .NET's
+`ActivityHeadersPropagator` to `null`. Ambient or inbound `traceparent`,
+`tracestate`, `baggage`, `Request-Id`, and `Correlation-Context` values must be
+absent at both Presentation and the Cloudflare signing-key endpoint; the
+offline loopback tests exercise the real `SocketsHttpHandler` instances for
+both boundaries.

@@ -29,6 +29,7 @@ public sealed record CloudflareAccessSigningKey(
 public sealed class CloudflareAccessJwtValidator : ICloudflareAccessTokenValidator
 {
     public const int MaximumAssertionBytes = 16 * 1024;
+    public const long MaximumTokenLifetimeSeconds = 24 * 60 * 60;
 
     private readonly AccessEdgeConfiguration _configuration;
     private readonly ICloudflareAccessSigningKeyProvider _keys;
@@ -89,6 +90,8 @@ public sealed class CloudflareAccessJwtValidator : ICloudflareAccessTokenValidat
                 || !TryReadExactString(payload, "iss", out string issuer)
                 || !string.Equals(issuer, _configuration.Issuer.AbsoluteUri.TrimEnd('/'), StringComparison.Ordinal)
                 || !HasExactAudience(payload, _configuration.Audience)
+                || !TryReadExactString(payload, "type", out string accessTokenType)
+                || !string.Equals(accessTokenType, "app", StringComparison.Ordinal)
                 || !TryReadExactString(payload, "email", out string tokenEmail)
                 || !string.Equals(tokenEmail, authenticatedEmail, StringComparison.Ordinal)
                 || !TryReadUnixTime(payload, "iat", out long issuedAt)
@@ -99,9 +102,12 @@ public sealed class CloudflareAccessJwtValidator : ICloudflareAccessTokenValidat
 
             long now = _timeProvider.GetUtcNow().ToUnixTimeSeconds();
             const long clockSkewSeconds = 30;
-            if (issuedAt > now + clockSkewSeconds
+            if (issuedAt < 0
+                || expiresAt < 0
+                || issuedAt > now + clockSkewSeconds
                 || expiresAt <= now - clockSkewSeconds
-                || expiresAt <= issuedAt)
+                || expiresAt <= issuedAt
+                || expiresAt - issuedAt > MaximumTokenLifetimeSeconds)
             {
                 return false;
             }
