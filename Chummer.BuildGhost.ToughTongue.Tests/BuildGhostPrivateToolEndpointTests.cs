@@ -503,7 +503,7 @@ public sealed class BuildGhostPrivateToolEndpointTests
     private sealed class StaticReleaseRegistry : IBuildGhostPersonaReleaseRegistry
     {
         public BuildGhostPersonaReleaseProjection ResolveRook()
-            => new(ToughTongueBuildGhostPersonaIds.Rook, ToughTongueBuildGhostPersonaIds.RookAvatar,
+            => new(ToughTongueBuildGhostPersonaIds.Rook, ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
                 ToughTongueBuildGhostPersonaIds.RookVoice, "approved", "disabled", true, false,
                 "localized-deterministic-text-only", []);
     }

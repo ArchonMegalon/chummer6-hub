@@ -10,6 +10,9 @@ public static class ToughTongueBuildGhostContractVersions
     public const string RequestV1 = "chummer.tough_tongue.build_ghost_request.v1";
     public const string ReceiptV1 = "chummer.tough_tongue.build_ghost_receipt.v1";
     public const string PersonaReleaseV1 = "chummer.build_ghost_persona_release.v1";
+    public const string StockAvatarBindingV1 = "chummer.tough_tongue.stock_avatar_binding.v1";
+    public const string StockAvatarReadbackReceiptV1 = "chummer.tough_tongue.stock_avatar_readback_receipt.v1";
+    public const string ReadOnlyBindingContractV3 = "chummer.build_ghost.tough_tongue.read_only_binding_contract.v3";
     public const string ScenarioContractV1 = "chummer.tough_tongue.build_ghost_scenario.v1";
     public const string ScenarioContractV2 = "chummer.tough_tongue.build_ghost_scenario.v2";
     public const string ToolContractV1 = "chummer.tough_tongue.build_ghost_tool.v1";
@@ -41,8 +44,19 @@ public static class ToughTongueBuildGhostContractVersions
 public static class ToughTongueBuildGhostPersonaIds
 {
     public const string Rook = "build-ghost-rook-v1";
-    public const string RookAvatar = "build-ghost-rook-avatar-v1";
+    public const string StockDefaultAvatar = "build-ghost-tough-tongue-stock-avatar-v1";
     public const string RookVoice = "build-ghost-rook-voice-v1";
+}
+
+public static class ToughTongueBuildGhostStockAvatarSelections
+{
+    public const string ProviderNamespace = "avatario";
+    public const string ProviderStock = "provider-stock";
+    public const string SelectedAvatarName = "Amelia";
+    public const string SelectedAvatarAssetPath = "/live-avatars/avatars/Amelia.jpg";
+    public const string RequiredModelProvider = "Landmass";
+    public const string CurrentModelId = "gemini";
+    public const string LegacyModelId = "cascade";
 }
 
 public static class ToughTongueBuildGhostVoiceProviders
@@ -55,6 +69,7 @@ public static class ToughTongueBuildGhostVoiceProviders
 public static class ToughTongueBuildGhostLiveAvatarProviders
 {
     public const string Anam = "anam";
+    public const string Avatario = "avatario";
     public const string HeyGen = "liveavatar";
     public const string RequiredModelProvider = "Landmass";
     public const decimal PremiumMinutesMultiplier = 2m;
@@ -401,6 +416,52 @@ public sealed record BuildGhostCascadePrivateVoiceBinding(
     IReadOnlyList<string> SupportedLocales,
     string ContractDigest);
 
+public sealed record BuildGhostToughTongueStockAvatarBinding(
+    string Schema,
+    string ProviderNamespace,
+    string AvatarAlias,
+    string SelectionMode,
+    string AvatarName,
+    string AvatarAssetPath,
+    [property: JsonIgnore] string ProviderAvatarId,
+    string ProviderAvatarIdDigest,
+    string ModelProvider,
+    string ModelId,
+    bool LegacyModelCompatibilityEnabled,
+    string ProviderReadbackDigest,
+    string ProviderCanonicalResponseDigest,
+    string ProviderReadbackScenarioRefDigest,
+    string ProviderReadbackSource,
+    string ProviderReadbackObservedAtUtc,
+    int ProviderReadbackMaximumAgeSeconds,
+    bool ProviderReadVerified,
+    string OperatorReadOnlyContractDigest,
+    string OperatorReadOnlyContractFileDigest,
+    string ProviderReadbackReceiptFileDigest,
+    string ContractDigest);
+
+public sealed record BuildGhostToughTongueStockAvatarReadbackReceipt(
+    string Schema,
+    int HttpStatus,
+    string CanonicalWhitelistedResponseDigest,
+    string ObservedProvider,
+    string ObservedAvatarName,
+    string ObservedAvatarAssetPath,
+    string ObservedLiveAvatarId,
+    string ObservedModelProvider,
+    string ObservedModelId,
+    bool LegacyCascadePolicyOptIn,
+    string ScenarioRefDigest,
+    string Source,
+    string ObservedAtUtc,
+    int MaximumAgeSeconds,
+    string ReceiptDigest);
+
+public sealed record BuildGhostToughTongueStockAvatarBindingValidation(
+    bool Accepted,
+    BuildGhostToughTongueStockAvatarBinding? Binding,
+    IReadOnlyList<string> RejectionReasons);
+
 public sealed record ToughTongueBuildGhostScenarioCandidate(
     string Schema,
     JsonObject Payload,
@@ -418,7 +479,8 @@ public sealed record ToughTongueBuildGhostScenarioCandidate(
     string LiveAvatarBindingDigest = "",
     bool LiveAvatarSchemaVerified = false,
     string? LiveAvatarIdFieldPath = null,
-    string? LiveAvatarProviderFieldPath = null);
+    string? LiveAvatarProviderFieldPath = null,
+    BuildGhostToughTongueStockAvatarBinding? StockAvatarBinding = null);
 
 public sealed record ToughTongueBuildGhostScenarioValidation(
     bool Accepted,
