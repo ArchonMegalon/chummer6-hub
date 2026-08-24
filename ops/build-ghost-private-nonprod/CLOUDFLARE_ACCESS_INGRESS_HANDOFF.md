@@ -14,7 +14,7 @@ make the process exit before listening.
 
 The edge has no host port. It may join only:
 
-1. `build-ghost-private`, to reach the Presentation service; and
+1. `build-ghost-private`, to reach the Presentation and AI services; and
 2. one dedicated externally managed tunnel-ingress network, to receive traffic
    from a separately operated `cloudflared` container.
 
@@ -29,9 +29,13 @@ The edge admits only these exact route and method families:
 * `GET /api/workspaces/{workspace-id}`
 * `DELETE /api/workspaces/{workspace-id}`
 * `POST /api/workspaces/{workspace-id}/build-ghost/tool-access`
+* `POST /api/v2/ai/build-ghost/tool`
 
-It does not route either private AI tool endpoint, the internal packet resolver,
-workspace mutation APIs, or neighboring Presentation APIs.
+The v2 path is not a direct proxy. It accepts only the existing
+`chummer.build_ghost.private_tool_request.v2` body and exact tool-contract
+header after an owner-bound grant has been observed at the issuance route in
+this same edge process. It does not route v1, `/explain`, the internal packet
+resolver, workspace mutation APIs, or neighboring Presentation/AI APIs.
 
 ## Security boundary
 
@@ -59,9 +63,30 @@ matching policy at 24 hours or less. See Cloudflare's
 The upstream request is rebuilt from an allowlist. Client-supplied
 `X-Chummer-Owner`, every `X-Chummer-Portal-*` owner/signature header,
 `Authorization`, `Cookie`, `X-Forwarded-*`, and every `Cf-*` header are omitted.
-Only the JWT-validated normalized email is injected as `X-Chummer-Owner` at
-this isolated boundary. Request logs are disabled, the Access assertion is not
+Only the JWT-validated normalized email is injected as `X-Chummer-Owner` on
+Presentation workspace/issuance requests. No owner header is sent to AI. The
+v2 body is rebuilt with a fixed AI origin, fixed configured contract digest,
+and no client owner, Access, authorization, cookie, forwarding, Cloudflare, or
+trace headers. Request logs are disabled, the Access assertion is not
 forwarded, and every response is `Cache-Control: no-store`.
+
+The edge buffers only the 4 KiB grant request/16 KiB grant response and the
+exact 16 KiB v2 request/64 KiB v2 response ceilings. After a successful grant
+response, it retains only `SHA-256(packet_access_key)`, a domain-separated
+SHA-256 reference for the validated owner, packet digest, and expiry in a
+4,096-entry process-local registry. The raw key
+exists only in the bounded request/response buffers, which are zeroed after
+use. A matching owner/digest claim is removed before the one permitted AI
+dispatch. Cross-owner attempts do not consume the binding. Restart, expiry,
+replay, malformed/unknown keys, and absent bindings fail closed. A restart or
+upstream failure after the Access claim can require issuing a fresh grant, an
+intentional availability tradeoff that prevents Access-side key reuse.
+
+The fixed local `410` is byte/content-type/cache equivalent to the current AI
+terminal response. Presentation remains the final packet one-use, expiry,
+workspace-revocation, revision, digest, locale, and request-kind authority.
+Neither the edge registry nor the AI request receives an owner selected by the
+client body.
 
 Signing keys are cached for ten minutes. A missing `kid`, an expired cache, or
 a failed refresh admits no key from the old generation. Concurrent callers
@@ -77,7 +102,9 @@ just-rotated key after an earlier negative lookup; that is an intentional
 availability tradeoff at this authentication boundary.
 
 This grants an owner identity to the existing dev-header seam only for the
-allowlisted workspace routes. It never authorizes provider execution. The four
+allowlisted Presentation routes. The exact v2 path consumes the existing
+provider-neutral packet tool contract and returns the grounded deterministic
+analysis/fallback packet; it never authorizes provider execution. The four
 Tough Tongue gates remain literal `false`, and neither this edge nor its
 configuration contains a provider account, key, token, or candidate resource.
 
@@ -104,8 +131,9 @@ credentials. Do not place the tunnel token, an Access service token, a user
 JWT, a session cookie, or provider material in Compose environment or source.
 
 Configure one Cloudflare Access self-hosted application for the exact private
-hostname, with the intended human email/identity policy. The tunnel ingress
-must target:
+hostname, with one explicitly intended human identity provider/policy. Do not
+reuse a broader/root application, an `Everyone` bypass, or a service-token
+policy for this human ingress. The tunnel ingress must target:
 
 ```yaml
 service: http://build-ghost-cloudflare-access-edge:8080
@@ -150,10 +178,12 @@ following in one change-controlled window:
    network;
 4. the edge alone also joins `build-ghost-private`, with no host port;
 5. missing, blank, duplicate, forged-signature, wrong-audience, wrong-email,
-   wrong-host, wrong-method, neighboring-path, provider-route, and internal
-   resolver requests all fail before Presentation or AI receives them;
-6. a valid Access session can import, read, issue one ephemeral grant, and close
-   only its own workspace;
+   wrong-host, wrong-method, v1, `/explain`, neighboring-path, internal-resolver,
+   malformed-v2, header/body-ambiguity, oversized, replay, expired, restart,
+   and cross-owner requests all fail before an unauthorized upstream dispatch;
+6. a valid Access session can import, read, issue and consume one ephemeral v2
+   packet grant, receive its deterministic fallback authority, and close only
+   its own workspace;
 7. upstream logs and request capture contain no Access JWT, Access email header,
 client owner assertion, cookie, or authorization header; and
 8. AI stays internal, deterministic fallback remains available, provider
@@ -164,9 +194,9 @@ Stop before activation if any value is missing, any network member is
 unexpected, any negative request reaches an upstream, JWT key retrieval is
 redirected/unavailable, or any provider gate differs from `false`.
 
-Both outbound HTTP transports explicitly set .NET's
+All three outbound HTTP transports explicitly set .NET's
 `ActivityHeadersPropagator` to `null`. Ambient or inbound `traceparent`,
 `tracestate`, `baggage`, `Request-Id`, and `Correlation-Context` values must be
-absent at both Presentation and the Cloudflare signing-key endpoint; the
+absent at Presentation, AI, and the Cloudflare signing-key endpoint; the
 offline loopback tests exercise the real `SocketsHttpHandler` instances for
-both boundaries.
+all three boundaries.

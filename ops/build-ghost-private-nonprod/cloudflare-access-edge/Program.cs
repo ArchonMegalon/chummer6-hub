@@ -24,6 +24,12 @@ HttpClient upstreamClient = new(upstreamHandler)
     Timeout = TimeSpan.FromSeconds(30),
 };
 
+SocketsHttpHandler aiHandler = AccessEdgeHttpTransport.CreateAiHandler();
+HttpClient aiClient = new(aiHandler)
+{
+    Timeout = TimeSpan.FromSeconds(30),
+};
+
 CloudflareAccessSigningKeyProvider signingKeys = new(
     configuration,
     certificateClient);
@@ -33,10 +39,13 @@ CloudflareAccessJwtValidator tokenValidator = new(
 BuildGhostAccessProxy proxy = new(
     configuration,
     tokenValidator,
-    upstreamClient);
+    upstreamClient,
+    aiClient,
+    new BuildGhostOwnerBoundGrantRegistry(TimeProvider.System));
 
 WebApplication app = builder.Build();
 app.Lifetime.ApplicationStopping.Register(certificateClient.Dispose);
 app.Lifetime.ApplicationStopping.Register(upstreamClient.Dispose);
+app.Lifetime.ApplicationStopping.Register(aiClient.Dispose);
 app.Run(proxy.HandleAsync);
 await app.RunAsync().ConfigureAwait(false);

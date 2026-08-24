@@ -9,6 +9,12 @@ COMPOSE_PATH = ROOT / "docker-compose.build-ghost-private-nonprod.yml"
 COMPOSE = COMPOSE_PATH.read_text(encoding="utf-8")
 EDGE_ROOT = ROOT / "ops/build-ghost-private-nonprod/cloudflare-access-edge"
 PROXY = (EDGE_ROOT / "BuildGhostAccessProxy.cs").read_text(encoding="utf-8")
+GRANT_REGISTRY = (EDGE_ROOT / "BuildGhostOwnerBoundGrantRegistry.cs").read_text(
+    encoding="utf-8"
+)
+PROVIDER_CONTRACT = (EDGE_ROOT / "BuildGhostProviderToolRequestContract.cs").read_text(
+    encoding="utf-8"
+)
 JWT = (EDGE_ROOT / "CloudflareAccessJwtValidator.cs").read_text(encoding="utf-8")
 PROGRAM = (EDGE_ROOT / "Program.cs").read_text(encoding="utf-8")
 TRANSPORT = (EDGE_ROOT / "AccessEdgeHttpTransport.cs").read_text(encoding="utf-8")
@@ -131,6 +137,10 @@ def test_profiled_edge_has_no_host_port_and_only_two_bounded_networks():
     assert edge["restart"] == "on-failure:5"
     assert edge["cap_drop"] == ["ALL"]
     assert edge["security_opt"] == ["no-new-privileges:true"]
+    assert set(edge["depends_on"]) == {
+        "chummer-build-ghost-ai",
+        "chummer-build-ghost-presentation",
+    }
     ingress = rendered["networks"]["build-ghost-cloudflare-ingress"]
     assert ingress["external"] is True
     assert ingress["name"] == "test-build-ghost-cloudflare-ingress"
@@ -186,6 +196,10 @@ def test_profile_defaults_are_blocked_public_sentinels_and_never_credentials():
         "CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN": (
             "unconfigured.cloudflareaccess.com"
         ),
+        "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST": (
+            "sha256:af7b643855bbc2220be40bfadc8cb1e89"
+            "ecdc324a787c771a353d74e85f01104"
+        ),
     }
     edge_block = COMPOSE.split(
         "\n  build-ghost-cloudflare-access-edge:\n", 1
@@ -206,7 +220,7 @@ def test_existing_local_operator_edge_remains_loopback_and_unprofiled():
     assert "ops/build-ghost-private-nonprod/Caddyfile" in local_edge
 
 
-def test_edge_allowlists_only_workspace_import_lifecycle_and_ephemeral_grant():
+def test_edge_allowlists_only_workspace_and_exact_owner_bound_v2_packet_tool():
     assert '"/api/workspaces/import"' in PROXY
     assert "WorkspaceLifecyclePath" in PROXY
     assert "ToolAccessPath" in PROXY
@@ -216,12 +230,19 @@ def test_edge_allowlists_only_workspace_import_lifecycle_and_ephemeral_grant():
     for forbidden_route in (
         "/api/internal/build-ghost/tool/resolve",
         "/api/v1/ai/build-ghost/tool",
-        "/api/v2/ai/build-ghost/tool",
         "/api/v1/ai/build-ghost/explain",
     ):
         assert forbidden_route not in PROXY
+        assert forbidden_route not in PROVIDER_CONTRACT
+    assert '"/api/v2/ai/build-ghost/tool"' in PROVIDER_CONTRACT
+    assert "ProviderToolV2" in PROXY
     assert "PresentationOrigin" in PROXY
-    assert "chummer-build-ghost-ai" not in PROXY
+    assert "AiOrigin" in PROXY
+    assert "chummer-build-ghost-ai" in PROXY
+    assert "private_tool_provider_request_invalid" in PROXY
+    assert "private-tool-authority-rejected" in PROXY
+    assert "MaximumBodyBytes = 16 * 1024" in PROVIDER_CONTRACT
+    assert "MaximumResponseBytes = 64 * 1024" in PROVIDER_CONTRACT
 
 
 def test_edge_validates_both_access_headers_and_cryptographic_identity_binding():
@@ -235,12 +256,13 @@ def test_edge_validates_both_access_headers_and_cryptographic_identity_binding()
     assert "HasExactAudience(payload, _configuration.Audience)" in JWT
     assert 'TryReadExactString(payload, "email"' in JWT
     assert "rsa.VerifyData" in JWT
-    assert TRANSPORT.count("ActivityHeadersPropagator = null") == 2
-    assert TRANSPORT.count("AllowAutoRedirect = false") == 2
-    assert TRANSPORT.count("UseCookies = false") == 2
-    assert TRANSPORT.count("UseProxy = false") == 2
+    assert TRANSPORT.count("ActivityHeadersPropagator = null") == 3
+    assert TRANSPORT.count("AllowAutoRedirect = false") == 3
+    assert TRANSPORT.count("UseCookies = false") == 3
+    assert TRANSPORT.count("UseProxy = false") == 3
     assert "CreateCertificateHandler" in PROGRAM
     assert "CreatePresentationHandler" in PROGRAM
+    assert "CreateAiHandler" in PROGRAM
     assert 'TryReadExactString(payload, "type"' in JWT
     assert 'string.Equals(accessTokenType, "app"' in JWT
     assert "MaximumTokenLifetimeSeconds = 24 * 60 * 60" in JWT
@@ -253,12 +275,55 @@ def test_upstream_is_reconstructed_and_access_assertion_is_not_logged_or_forward
     assert "CopySingleSafeHeader" in PROXY
     assert "request.Headers" not in PROXY.split(
         "public static HttpRequestMessage CreateUpstreamRequest", 1
-    )[1].split("public static bool IsForbiddenUpstreamHeader", 1)[0].replace(
+    )[1].split("public static HttpRequestMessage CreateProviderToolUpstreamRequest", 1)[0].replace(
         "request.Headers, outgoing.Headers", ""
     )
+    provider_rebuild = PROXY.split(
+        "public static HttpRequestMessage CreateProviderToolUpstreamRequest", 1
+    )[1].split("private async Task IssueOwnerBoundGrantAsync", 1)[0]
+    assert "OwnerHeader" not in provider_rebuild
+    assert "Authorization" not in provider_rebuild
+    assert "Cookie" not in provider_rebuild
+    assert "ToolContractHeader" in provider_rebuild
     assert "CacheControl = new CacheControlHeaderValue { NoStore = true }" in PROXY
     assert 'response.Headers.CacheControl = "no-store"' in PROXY
     assert "Set-Cookie" not in PROXY
+
+
+def test_owner_binding_retains_no_raw_key_and_claims_before_single_dispatch():
+    assert "SHA256.HashData(material)" in GRANT_REGISTRY
+    assert "CryptographicOperations.ZeroMemory(material)" in GRANT_REGISTRY
+    assert "Dictionary<string, OwnerBoundGrant>" in GRANT_REGISTRY
+    assert "PacketAccessKey" not in GRANT_REGISTRY.split(
+        "private sealed record OwnerBoundGrant", 1
+    )[1]
+    assert "MaximumBindings = 4096" in GRANT_REGISTRY
+    assert "MaximumGrantLifetime = TimeSpan.FromMinutes(5)" in GRANT_REGISTRY
+    claim = GRANT_REGISTRY.split("public bool TryClaim", 1)[1]
+    assert claim.index("_bindings.Remove(keyRef)") < claim.index("return true")
+    dispatch = PROXY.split("private async Task DispatchOwnerBoundProviderToolAsync", 1)[1]
+    assert dispatch.index("_grantRegistry.TryClaim") < dispatch.index("_aiUpstream.SendAsync")
+    assert "CryptographicOperations.ZeroMemory(requestBody)" in dispatch
+    assert "builder.Logging.ClearProviders()" in PROGRAM
+
+
+def test_provider_contract_rejects_unknown_duplicate_and_header_credentials():
+    assert "HasExactUniqueProperties" in PROVIDER_CONTRACT
+    assert "!seen.Add(property.Name)" in PROVIDER_CONTRACT
+    assert "JsonUnmappedMemberHandling.Disallow" in PROVIDER_CONTRACT
+    assert "IsCanonicalPacketAccessKey" in PROVIDER_CONTRACT
+    assert "IsCanonicalPacketDigest" in PROVIDER_CONTRACT
+    dispatch = PROXY.split("private async Task DispatchOwnerBoundProviderToolAsync", 1)[1]
+    assert 'ContainsKey("Authorization")' in dispatch
+    assert 'ContainsKey("Cookie")' in dispatch
+    assert '"no-store"' in dispatch
+    assert "FixedEquals(suppliedContract" in dispatch
+    for hostile_receipt in (
+        "owner-bound v2 broker issues dispatches once",
+        "owner-bound v2 broker fails closed across owner replay expiry restart and revocation",
+        "owner-bound v2 broker rejects hostile contract and body ambiguity",
+    ):
+        assert hostile_receipt in MANAGED_TESTS
 
 
 def test_edge_image_is_digest_pinned_nonroot_and_has_no_tunnel_or_provider_binary():
@@ -277,6 +342,8 @@ def test_operator_handoff_stops_before_live_mutation_and_preserves_provider_gate
     assert "CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE" in HANDOFF
     assert "httpHostHeader" in HANDOFF
     assert "never authorizes provider execution" in HANDOFF
+    assert "`Everyone` bypass" in HANDOFF
+    assert "service-token" in HANDOFF
     assert "false" in HANDOFF
 
 

@@ -33,12 +33,12 @@ issuer, application audience, lifetime, and exact authenticated-email claim;
 then it rebuilds the upstream request and injects only that normalized email
 through the existing isolated `X-Chummer-Owner` dev seam. The Access assertion,
 client owner/portal assertions, cookies, authorization, and forwarding headers
-never cross to Presentation.
+never cross either upstream boundary.
 
 Admission requires Cloudflare application-token type `app` and limits the
-signed `exp - iat` interval to exactly 24 hours. Both outbound handlers disable
+signed `exp - iat` interval to exactly 24 hours. All three outbound handlers disable
 .NET activity-header propagation, so ambient trace and baggage state cannot
-cross either the Presentation or signing-key boundary. The dedicated external
+cross the Presentation, AI, or signing-key boundary. The dedicated external
 network name has no fallback and must be supplied explicitly.
 
 JWKS refresh is generation-coalesced and fail closed: negative or failed
@@ -47,11 +47,23 @@ stale and expired keys are never returned. The canonical verifier requires the
 repo-locked exact .NET SDK `10.0.103`; the path-scoped pull-request job is the
 merge authority when that SDK is unavailable locally.
 
-The edge routes only workspace import, exact workspace read/close, and
-ephemeral Build Ghost tool-access issuance. It cannot route either AI provider
-tool endpoint or `/api/internal/build-ghost/tool/resolve`. Its checked-in
-configuration is deliberately invalid, selecting no profile keeps it absent,
-and no provider gate is changed.
+The edge routes only workspace import, exact workspace read/close, ephemeral
+Build Ghost tool-access issuance, and the exact provider-neutral v2 packet tool
+POST. A v2 dispatch is admitted only for a grant this same process observed at
+issuance and bound to the JWT-validated owner; the registry retains SHA-256
+references for the key and owner, never either raw value, and removes the binding before its sole AI
+dispatch. Restart, expiry, replay, owner mismatch, and an unknown key fail
+closed with the same no-store terminal response. It cannot route v1, `/explain`,
+`/api/internal/build-ghost/tool/resolve`, or neighboring AI/Presentation APIs.
+The four provider gates stay literal `false`; this path returns Chummer's
+deterministic packet/fallback authority and does not invoke a provider.
+
+The Access binding is deliberately process-local and capped at 4,096 entries
+for the five-minute grant window. Restart or an upstream failure after the
+atomic Access claim may sacrifice that grant's availability, but cannot reuse
+or dispatch it twice. Its checked-in host/team/audience configuration remains
+deliberately invalid, selecting no profile keeps it absent, and no provider
+gate is changed.
 
 See
 [`CLOUDFLARE_ACCESS_INGRESS_HANDOFF.md`](CLOUDFLARE_ACCESS_INGRESS_HANDOFF.md)
