@@ -1,0 +1,135 @@
+name: Core main runtime artifact consumer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/core-main-runtime-artifact-consumer.yml
+      - eng/core-main-runtime-artifact-authority.json
+      - scripts/ai/consume-core-main-runtime-artifact.py
+      - scripts/ai/validate-core-package-artifact.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-main-runtime-artifact-9528212865
+  cancel-in-progress: false
+
+jobs:
+  consume:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact Hub consumer
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate and consume exact Core main artifact once
+        shell: bash
+        env:
+          CORE_ARTIFACT_READ_TOKEN: ${{ secrets.CHUMMER_CORE_ARTIFACT_READ_TOKEN }}
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "${CORE_ARTIFACT_READ_TOKEN}"
+          test "${GITHUB_REPOSITORY}" = "ArchonMegalon/chummer6-hub"
+
+          authority="eng/core-main-runtime-artifact-authority.json"
+          consumer="scripts/ai/consume-core-main-runtime-artifact.py"
+          validator="scripts/ai/validate-core-package-artifact.py"
+          snapshot_dir="$(mktemp -d "${RUNNER_TEMP}/core-main-runtime.XXXXXXXX")"
+          chmod 0700 "${snapshot_dir}"
+          export_root="${snapshot_dir}/artifact-root"
+          validator_authority="${snapshot_dir}/validator-authority.json"
+          validation="${snapshot_dir}/validation.json"
+          verdict="${RUNNER_TEMP}/core-main-runtime-artifact-verdict.json"
+          test ! -e "${verdict}"
+
+          cleanup_snapshot() {
+            python3 "${consumer}" cleanup \
+              --authority "${authority}" \
+              --runner-temp "${RUNNER_TEMP}" \
+              --workspace "${snapshot_dir}"
+          }
+          trap cleanup_snapshot EXIT
+
+          api_root="https://api.github.com/repos/ArchonMegalon/chummer6-core"
+          auth_header="Authorization:"' Bearer '"${CORE_ARTIFACT_READ_TOKEN}"
+          curl_common=(
+            --proto '=https'
+            --proto-redir '=https'
+            --tlsv1.2
+            --fail
+            --location
+            --max-redirs 3
+            --silent
+            --show-error
+            --retry 0
+            --connect-timeout 15
+            --max-time 120
+            --header "${auth_header}"
+            --header 'Accept:'' application/vnd.github+json'
+            --header 'X-GitHub-Api-Version:'' 2022-11-28'
+          )
+          (
+            ulimit -f 4096
+            curl "${curl_common[@]}" --max-filesize 2097152 \
+              --output "${snapshot_dir}/run.json" \
+              "${api_root}/actions/runs/32748122851"
+            curl "${curl_common[@]}" --max-filesize 2097152 \
+              --output "${snapshot_dir}/artifact.json" \
+              "${api_root}/actions/artifacts/9528212865"
+          )
+          (
+            ulimit -f 32768
+            curl "${curl_common[@]}" --max-filesize 16777216 \
+              --output "${snapshot_dir}/artifact.zip" \
+              "${api_root}/actions/artifacts/9528212865/zip"
+          )
+          chmod 0600 \
+            "${snapshot_dir}/run.json" \
+            "${snapshot_dir}/artifact.json" \
+            "${snapshot_dir}/artifact.zip"
+
+          python3 "${consumer}" prepare \
+            --authority "${authority}" \
+            --run-metadata "${snapshot_dir}/run.json" \
+            --artifact-metadata "${snapshot_dir}/artifact.json" \
+            --archive "${snapshot_dir}/artifact.zip" \
+            --runner-temp "${RUNNER_TEMP}" \
+            --workspace "${snapshot_dir}" \
+            --export-root "${export_root}" \
+            --validator-authority "${validator_authority}"
+
+          test "$(stat --format='%a' "${snapshot_dir}")" = "700"
+          test ! -e "${validation}"
+          python3 "${validator}" \
+            --artifact-root "${export_root}" \
+            --authority "${validator_authority}" \
+            --output "${validation}"
+
+          python3 "${consumer}" finalize \
+            --authority "${authority}" \
+            --validation "${validation}" \
+            --runner-temp "${RUNNER_TEMP}" \
+            --workspace "${snapshot_dir}" \
+            --verdict "${verdict}"
+          test ! -e "${snapshot_dir}"
+          test -f "${verdict}"
+          trap - EXIT
+
+      - name: Record immutable Core artifact verdict only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: core-main-runtime-artifact-verdict-a8e191ea49f2cac8a3f695c56812254d34cbd669
+          path: ${{ runner.temp }}/core-main-runtime-artifact-verdict.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
