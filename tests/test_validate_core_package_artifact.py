@@ -560,6 +560,40 @@ def test_public_handoff_recipe_has_one_explicit_additive_policy_profile() -> Non
     ) == {"scripts/ai/public-runtime-package-handoff.py"}
 
 
+@pytest.mark.parametrize(
+    ("policy_field", "expected_error"),
+    [
+        ("allowed_recipe_delta", "allowed_recipe_delta omission, addition, or order"),
+        ("build_authority_files", "build authority path omission, addition, or order"),
+    ],
+)
+def test_public_handoff_additive_policy_is_rejected_for_foreign_recipe_commit(
+    tmp_path: Path,
+    policy_field: str,
+    expected_error: str,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    assert fixture.authority["package_recipe_commit"] != (
+        module.PUBLIC_HANDOFF_RECIPE_COMMIT
+    )
+
+    if policy_field == "allowed_recipe_delta":
+        fixture.lock[policy_field] = list(module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA)
+    else:
+        existing_by_path = {
+            row["path"]: row for row in fixture.lock["build_authority_files"]
+        }
+        fixture.lock[policy_field] = [
+            existing_by_path.get(path, {"path": path, "sha256": "a" * 64})
+            for path in module.PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS
+        ]
+    rebind(fixture)
+
+    with pytest.raises(module.ArtifactValidationError, match=expected_error):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+
+
 def test_cli_writes_a_deterministic_validation_receipt(tmp_path: Path) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
