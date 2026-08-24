@@ -105,6 +105,30 @@ TOUGH_TONGUE_STOCK_AVATAR_RECEIPT_FIELDS = {
 }
 TOUGH_TONGUE_CONTRACT_DIGEST_ENV = "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST"
 TOUGH_TONGUE_CONTRACT_TARGET = "/run/secrets/tough-tongue-read-only-binding-contract.json"
+TOUGH_TONGUE_OPERATOR_CONTRACT_SCHEMA = (
+    "chummer.build_ghost.tough_tongue.read_only_binding_contract.v3"
+)
+TOUGH_TONGUE_OPERATOR_CONTRACT_FIELDS = {
+    "schema", "provider_key", "base_url", "source_type", "verified_at",
+    "authority", "slot_cardinality", "maximum_snapshot_age_seconds",
+    "premium_plan_values", "live_avatar_providers", "documented_get_allowlist",
+    "normalization", "unsupported_direct_resources",
+    "stock_avatar_readback_receipt_digest",
+}
+TOUGH_TONGUE_OPERATOR_ROUTES = {
+    "balance": "balance",
+    "subscriptions": "subscriptions",
+    "organizations": "v2/organizations",
+    "scenario": "scenarios/{resource_ref}",
+}
+TOUGH_TONGUE_OPERATOR_NORMALIZATION = {
+    "plan": "subscriptions.active.product_name",
+    "remaining_minutes": "balance.available_minutes",
+    "refresh_at": "balance.last_updated",
+    "organization": "organizations.id",
+    "resource_ownership": "organization_scoped_scenario_readback",
+}
+MAX_TOUGH_TONGUE_OPERATOR_CONTRACT_BYTES = 64 * 1024
 TOUGH_TONGUE_RUNTIME_RECEIPT_SCHEMA = (
     "chummer.build_ghost.tough_tongue.runtime_config_receipt.v1"
 )
@@ -546,6 +570,152 @@ def _validated_deployed_stock_avatar_receipt(
     }
 
 
+def _mounted_tough_tongue_operator_contract(
+    inspect: Mapping[str, Any],
+    deployed_contract_digest: str,
+    receipt_file_digest: str,
+    blockers: list[str],
+) -> dict[str, Any]:
+    blocked = {
+        "verified": False,
+        "fileDigest": "",
+        "canonicalDigest": "",
+        "stockAvatarReadbackReceiptFileDigest": "",
+    }
+    mounts = inspect.get("Mounts")
+    matches = [
+        row for row in mounts
+        if isinstance(row, dict)
+        and row.get("Destination") == TOUGH_TONGUE_CONTRACT_TARGET
+    ] if isinstance(mounts, list) else []
+    if len(matches) != 1:
+        _add(blockers, "tough-tongue-runtime-contract-mount-invalid")
+        return blocked
+    mount = matches[0]
+    source = mount.get("Source")
+    if (
+        mount.get("Type") != "bind"
+        or mount.get("RW") is not False
+        or not isinstance(source, str)
+        or not source.startswith("/")
+        or str(Path(os.path.normpath(source))) != source
+    ):
+        _add(blockers, "tough-tongue-runtime-contract-mount-invalid")
+        return blocked
+
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            source,
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        opened = os.fstat(descriptor)
+        linked = os.stat(source, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or stat.S_ISLNK(linked.st_mode)
+            or opened.st_uid != os.geteuid()
+            or opened.st_nlink != 1
+            or stat.S_IMODE(opened.st_mode) != 0o400
+            or not 1 <= opened.st_size <= MAX_TOUGH_TONGUE_OPERATOR_CONTRACT_BYTES
+            or (opened.st_dev, opened.st_ino) != (linked.st_dev, linked.st_ino)
+        ):
+            raise AttestationError("mounted operator contract authority invalid")
+        chunks: list[bytes] = []
+        remaining = opened.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(64 * 1024, remaining))
+            if not chunk:
+                raise AttestationError("mounted operator contract short read")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise AttestationError("mounted operator contract grew while read")
+        raw = b"".join(chunks)
+        rebound = os.fstat(descriptor)
+        relinked = os.stat(source, follow_symlinks=False)
+        if (
+            (opened.st_dev, opened.st_ino, opened.st_size)
+            != (rebound.st_dev, rebound.st_ino, rebound.st_size)
+            or (opened.st_dev, opened.st_ino)
+            != (relinked.st_dev, relinked.st_ino)
+        ):
+            raise AttestationError("mounted operator contract changed while read")
+        payload = _json_object(raw, "mounted Tough Tongue operator contract")
+    except (OSError, AttestationError):
+        _add(blockers, "tough-tongue-runtime-contract-unverifiable")
+        return blocked
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+    file_digest = _digest(raw)
+    canonical_digest = _digest(_canonical(payload))
+    authority = payload.get("authority")
+    routes = payload.get("documented_get_allowlist")
+    normalization = payload.get("normalization")
+    verified_at = _parse_timestamp(payload.get("verified_at"))
+    shape_valid = (
+        set(payload) == TOUGH_TONGUE_OPERATOR_CONTRACT_FIELDS
+        and payload.get("schema") == TOUGH_TONGUE_OPERATOR_CONTRACT_SCHEMA
+        and payload.get("provider_key") == "tough_tongue"
+        and payload.get("base_url") == "https://api.toughtongueai.com/api/public"
+        and payload.get("source_type") == "provider_documentation"
+        and verified_at is not None
+        and isinstance(authority, dict)
+        and set(authority) == {"operator_verified", "source_ref_sha256"}
+        and authority.get("operator_verified") is True
+        and isinstance(authority.get("source_ref_sha256"), str)
+        and SHA256.fullmatch(str(authority.get("source_ref_sha256"))) is not None
+        and payload.get("slot_cardinality") == 6
+        and type(payload.get("maximum_snapshot_age_seconds")) is int
+        and 60 <= payload.get("maximum_snapshot_age_seconds", 0) <= 86400
+        and payload.get("premium_plan_values") == ["premium"]
+        and payload.get("live_avatar_providers")
+        == ["anam", "avatario", "heygen", "liveavatar"]
+        and isinstance(routes, dict)
+        and set(routes) == set(TOUGH_TONGUE_OPERATOR_ROUTES)
+        and all(
+            routes.get(name) == {"method": "GET", "path": path}
+            for name, path in TOUGH_TONGUE_OPERATOR_ROUTES.items()
+        )
+        and normalization == TOUGH_TONGUE_OPERATOR_NORMALIZATION
+        and payload.get("unsupported_direct_resources")
+        == ["agent", "voice", "function", "avatar"]
+        and isinstance(payload.get("stock_avatar_readback_receipt_digest"), str)
+        and SHA256.fullmatch(str(payload.get("stock_avatar_readback_receipt_digest")))
+        is not None
+    )
+    digest_valid = (
+        SHA256.fullmatch(deployed_contract_digest) is not None
+        and file_digest == canonical_digest == deployed_contract_digest
+    )
+    receipt_binding_valid = (
+        SHA256.fullmatch(receipt_file_digest) is not None
+        and payload.get("stock_avatar_readback_receipt_digest")
+        == receipt_file_digest
+    )
+    if not shape_valid:
+        _add(blockers, "tough-tongue-runtime-contract-schema-invalid")
+    if not digest_valid:
+        _add(blockers, "tough-tongue-runtime-contract-digest-mismatch")
+    if not receipt_binding_valid:
+        _add(blockers, "tough-tongue-runtime-contract-stock-avatar-receipt-mismatch")
+    return {
+        "verified": shape_valid and digest_valid and receipt_binding_valid,
+        "fileDigest": file_digest,
+        "canonicalDigest": canonical_digest,
+        "stockAvatarReadbackReceiptFileDigest": (
+            str(payload.get("stock_avatar_readback_receipt_digest"))
+            if isinstance(payload.get("stock_avatar_readback_receipt_digest"), str)
+            and SHA256.fullmatch(str(payload.get("stock_avatar_readback_receipt_digest")))
+            else ""
+        ),
+    }
+
+
 def _deployed_tough_tongue_binding(
     inspect: Mapping[str, Any],
     blockers: list[str],
@@ -678,12 +848,27 @@ def _deployed_tough_tongue_binding(
         "preferred_account_ref": preferred,
         "candidate_refs": dict(sorted(candidate_digests.items())),
     }
+    contract_authority = (
+        _mounted_tough_tongue_operator_contract(
+            inspect,
+            contract_digest,
+            stock_avatar_receipt["file_digest"] if stock_avatar_receipt is not None else "",
+            blockers,
+        )
+        if candidate_values["live_avatar"] else {
+            "verified": False,
+            "fileDigest": "",
+            "canonicalDigest": "",
+            "stockAvatarReadbackReceiptFileDigest": "",
+        }
+    )
     configured = bool(
         account_refs
         and credential_slots
         and preferred
         and contract_digest
         and (not candidate_values["live_avatar"] or stock_avatar_receipt is not None)
+        and (not candidate_values["live_avatar"] or contract_authority["verified"] is True)
     )
     return {
         "configured": configured,
@@ -698,6 +883,12 @@ def _deployed_tough_tongue_binding(
         "candidateRefDigests": candidate_digests,
         "expectationDigest": _upstream_digest(expectation_payload),
         "readOnlyContractDigest": contract_digest,
+        "readOnlyContractFileDigest": contract_authority["fileDigest"],
+        "readOnlyContractCanonicalDigest": contract_authority["canonicalDigest"],
+        "readOnlyContractVerified": contract_authority["verified"],
+        "contractStockAvatarReadbackReceiptFileDigest": contract_authority[
+            "stockAvatarReadbackReceiptFileDigest"
+        ],
         "stockAvatarReadbackReceiptFileDigest": (
             stock_avatar_receipt["file_digest"]
             if stock_avatar_receipt is not None else ""
@@ -1304,6 +1495,10 @@ def _collect_runtime(
             "candidateRefDigests": {kind: "" for kind in TOUGH_TONGUE_CANDIDATE_ENV},
             "expectationDigest": "",
             "readOnlyContractDigest": "",
+            "readOnlyContractFileDigest": "",
+            "readOnlyContractCanonicalDigest": "",
+            "readOnlyContractVerified": False,
+            "contractStockAvatarReadbackReceiptFileDigest": "",
             "stockAvatarReadbackReceiptFileDigest": "",
             "stockAvatarReadbackReceiptDigest": "",
             "stockAvatarCanonicalResponseDigest": "",
@@ -2017,6 +2212,13 @@ def _probe_team_truth(
         )
         contract_binding_match = (
             deployed_binding.get("configured") is True
+            and deployed_binding.get("readOnlyContractVerified") is True
+            and deployed_binding.get("readOnlyContractFileDigest")
+            == deployed_binding.get("readOnlyContractDigest")
+            and deployed_binding.get("readOnlyContractCanonicalDigest")
+            == deployed_binding.get("readOnlyContractDigest")
+            and deployed_binding.get("contractStockAvatarReadbackReceiptFileDigest")
+            == deployed_binding.get("stockAvatarReadbackReceiptFileDigest")
             and contract_configured_valid
             and isinstance(contract.get("digest"), str)
             and contract.get("digest") == deployed_binding.get("readOnlyContractDigest")

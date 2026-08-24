@@ -202,11 +202,17 @@ public sealed class ToughTongueBuildGhostPremiumLiveAvatarContractTests
                 ToughTongueBuildGhostLiveAvatarProviders.Anam,
                 "rook-anam-persona-v1");
 
+        BuildGhostToughTongueStockAvatarReadbackReceipt stockReceipt =
+            StockAvatarReadbackReceipt();
         ToughTongueBuildGhostScenarioCandidate candidate =
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookPremiumLiveAvatarCandidate(
                 deployment,
                 BuildGhostToughTongueStockAvatarBindingContract.CreateReadVerified(
-                    StockAvatarReadbackReceipt()),
+                    stockReceipt,
+                    $"sha256:{new string('a', 64)}",
+                    $"sha256:{new string('a', 64)}",
+                    BuildGhostToughTongueStockAvatarBindingContract.ComputeReadbackReceiptFileDigest(
+                        stockReceipt)),
                 voiceBinding,
                 liveAvatarBinding,
                 receipt);

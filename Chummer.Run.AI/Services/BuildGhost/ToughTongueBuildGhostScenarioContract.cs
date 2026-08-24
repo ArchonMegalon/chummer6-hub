@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -1609,10 +1610,24 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID";
     public const string AllowLegacyCascadeConfigurationKey =
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE";
+    public const string OperatorReadOnlyContractPathConfigurationKey =
+        "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH";
+    public const string OperatorReadOnlyContractDigestConfigurationKey =
+        "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST";
     public const string ScenarioIdConfigurationKey =
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID";
     public const string RequiredReadbackSource = "tough_tongue_api_public_scenario_get";
     public const int MaximumPermittedAgeSeconds = 900;
+    private const int MaximumOperatorContractBytes = 64 * 1024;
+
+    private static readonly IReadOnlySet<string> OperatorContractProperties = new HashSet<string>(
+        [
+            "schema", "provider_key", "base_url", "source_type", "verified_at", "authority",
+            "slot_cardinality", "maximum_snapshot_age_seconds", "premium_plan_values",
+            "live_avatar_providers", "documented_get_allowlist", "normalization",
+            "unsupported_direct_resources", "stock_avatar_readback_receipt_digest"
+        ],
+        StringComparer.Ordinal);
 
     private static readonly IReadOnlySet<string> ReadbackReceiptProperties = new HashSet<string>(
         [
@@ -1636,6 +1651,9 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
 
     public static BuildGhostToughTongueStockAvatarBinding CreateReadVerified(
         BuildGhostToughTongueStockAvatarReadbackReceipt receipt,
+        string operatorReadOnlyContractDigest,
+        string operatorReadOnlyContractFileDigest,
+        string providerReadbackReceiptFileDigest,
         DateTimeOffset? nowUtc = null)
     {
         ArgumentNullException.ThrowIfNull(receipt);
@@ -1647,6 +1665,16 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         if (receiptFailures.Count != 0)
         {
             throw new ArgumentException(string.Join(',', receiptFailures), nameof(receipt));
+        }
+        if (!IsSha256(operatorReadOnlyContractDigest)
+            || operatorReadOnlyContractDigest != operatorReadOnlyContractFileDigest)
+        {
+            throw new ArgumentException("stock-avatar-operator-contract-digest-invalid", nameof(operatorReadOnlyContractDigest));
+        }
+        if (!IsSha256(providerReadbackReceiptFileDigest)
+            || providerReadbackReceiptFileDigest != ComputeReadbackReceiptFileDigest(receipt))
+        {
+            throw new ArgumentException("stock-avatar-provider-readback-receipt-file-digest-invalid", nameof(providerReadbackReceiptFileDigest));
         }
         BuildGhostToughTongueStockAvatarBinding binding = new(
             ToughTongueBuildGhostContractVersions.StockAvatarBindingV1,
@@ -1667,6 +1695,9 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
             receipt.ObservedAtUtc,
             receipt.MaximumAgeSeconds,
             ProviderReadVerified: true,
+            operatorReadOnlyContractDigest,
+            operatorReadOnlyContractFileDigest,
+            providerReadbackReceiptFileDigest,
             string.Empty);
         IReadOnlyList<string> failures = ValidateShape(binding, nowUtc);
         if (failures.Count != 0)
@@ -1686,7 +1717,7 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         string assetPath = configuration[AssetPathConfigurationKey]?.Trim() ?? string.Empty;
         string providerAvatarId = configuration[ProviderAvatarIdConfigurationKey]?.Trim() ?? string.Empty;
         string providerReadbackDigest = configuration[ProviderReadbackDigestConfigurationKey]?.Trim() ?? string.Empty;
-        string receiptJson = configuration[ProviderReadbackReceiptJsonConfigurationKey]?.Trim() ?? string.Empty;
+        string receiptJson = configuration[ProviderReadbackReceiptJsonConfigurationKey] ?? string.Empty;
         string modelProvider = configuration[ModelProviderConfigurationKey]?.Trim() ?? string.Empty;
         string modelId = configuration[ModelIdConfigurationKey]?.Trim() ?? string.Empty;
         string scenarioRef = configuration[ScenarioIdConfigurationKey]?.Trim() ?? string.Empty;
@@ -1712,6 +1743,10 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         }
 
         BuildGhostToughTongueStockAvatarReadbackReceipt? receipt = ParseReceipt(receiptJson, failures);
+        OperatorContractAuthority? operatorAuthority = ValidateOperatorContract(
+            configuration,
+            receiptJson,
+            failures);
         if (receipt is not null)
         {
             string scenarioRefDigest = string.IsNullOrWhiteSpace(scenarioRef)
@@ -1734,7 +1769,12 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
                 failures.Distinct(StringComparer.Ordinal).OrderBy(static value => value, StringComparer.Ordinal).ToArray());
         }
 
-        BuildGhostToughTongueStockAvatarBinding binding = CreateReadVerified(receipt!, nowUtc);
+        BuildGhostToughTongueStockAvatarBinding binding = CreateReadVerified(
+            receipt!,
+            operatorAuthority!.ContractDigest,
+            operatorAuthority.ContractFileDigest,
+            operatorAuthority.ReceiptFileDigest,
+            nowUtc);
         return new BuildGhostToughTongueStockAvatarBindingValidation(true, binding, []);
     }
 
@@ -1767,7 +1807,10 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
             ["providerReadbackSource"] = binding.ProviderReadbackSource,
             ["providerReadbackObservedAtUtc"] = binding.ProviderReadbackObservedAtUtc,
             ["providerReadbackMaximumAgeSeconds"] = binding.ProviderReadbackMaximumAgeSeconds,
-            ["providerReadVerified"] = binding.ProviderReadVerified
+            ["providerReadVerified"] = binding.ProviderReadVerified,
+            ["operatorReadOnlyContractDigest"] = binding.OperatorReadOnlyContractDigest,
+            ["operatorReadOnlyContractFileDigest"] = binding.OperatorReadOnlyContractFileDigest,
+            ["providerReadbackReceiptFileDigest"] = binding.ProviderReadbackReceiptFileDigest
         };
 
     public static IReadOnlyList<string> ValidateReadbackReceipt(
@@ -1832,6 +1875,14 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         BuildGhostToughTongueStockAvatarReadbackReceipt receipt)
         => Digest(ReadbackReceiptAuthority(receipt));
 
+    public static string ComputeReadbackReceiptFileDigest(
+        BuildGhostToughTongueStockAvatarReadbackReceipt receipt)
+        => Digest(CanonicalJson(JsonSerializer.SerializeToElement(receipt)));
+
+    public static string SerializeReadbackReceiptFile(
+        BuildGhostToughTongueStockAvatarReadbackReceipt receipt)
+        => Encoding.UTF8.GetString(CanonicalJson(JsonSerializer.SerializeToElement(receipt)));
+
     private static IReadOnlyList<string> ValidateShape(
         BuildGhostToughTongueStockAvatarBinding binding,
         DateTimeOffset? nowUtc)
@@ -1858,9 +1909,268 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
             binding.ProviderReadbackScenarioRefDigest,
             nowUtc));
         if (binding.ProviderReadbackDigest != receipt.ReceiptDigest) failures.Add("stock-avatar-provider-readback-digest-invalid");
+        if (!IsSha256(binding.OperatorReadOnlyContractDigest)
+            || binding.OperatorReadOnlyContractDigest != binding.OperatorReadOnlyContractFileDigest)
+        {
+            failures.Add("stock-avatar-operator-contract-digest-invalid");
+        }
+        if (!IsSha256(binding.ProviderReadbackReceiptFileDigest)
+            || binding.ProviderReadbackReceiptFileDigest != ComputeReadbackReceiptFileDigest(receipt))
+        {
+            failures.Add("stock-avatar-provider-readback-receipt-file-digest-invalid");
+        }
         if (!binding.ProviderReadVerified) failures.Add("stock-avatar-provider-read-unverified");
         return failures;
     }
+
+    private static OperatorContractAuthority? ValidateOperatorContract(
+        IConfiguration configuration,
+        string receiptJson,
+        List<string> failures)
+    {
+        string path = configuration[OperatorReadOnlyContractPathConfigurationKey]?.Trim() ?? string.Empty;
+        string expectedDigest = configuration[OperatorReadOnlyContractDigestConfigurationKey]?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+        {
+            failures.Add("stock-avatar-operator-contract-path-missing-or-invalid");
+            return null;
+        }
+        string normalized;
+        try
+        {
+            normalized = Path.GetFullPath(path);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            failures.Add("stock-avatar-operator-contract-path-missing-or-invalid");
+            return null;
+        }
+        if (normalized != path || !IsSha256(expectedDigest))
+        {
+            failures.Add(normalized != path
+                ? "stock-avatar-operator-contract-path-missing-or-invalid"
+                : "stock-avatar-operator-contract-digest-missing-or-invalid");
+            return null;
+        }
+
+        byte[] raw;
+        try
+        {
+            FileInfo file = new(path);
+            if (!file.Exists
+                || file.LinkTarget is not null
+                || file.Length is < 1 or > MaximumOperatorContractBytes
+                || (!OperatingSystem.IsWindows() && File.GetUnixFileMode(path) != UnixFileMode.UserRead))
+            {
+                failures.Add("stock-avatar-operator-contract-file-authority-invalid");
+                return null;
+            }
+            using FileStream stream = new(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 4096,
+                FileOptions.SequentialScan);
+            raw = new byte[checked((int)stream.Length)];
+            stream.ReadExactly(raw);
+            if (raw.Length != file.Length)
+            {
+                failures.Add("stock-avatar-operator-contract-file-authority-invalid");
+                return null;
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            failures.Add("stock-avatar-operator-contract-file-unreadable");
+            return null;
+        }
+
+        string fileDigest = DigestText(raw);
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(raw, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow
+            });
+            JsonElement root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !ExactProperties(root, OperatorContractProperties)
+                || fileDigest != expectedDigest
+                || Digest(CanonicalJson(root)) != expectedDigest
+                || Text(root, "schema") != ToughTongueBuildGhostContractVersions.ReadOnlyBindingContractV3
+                || Text(root, "provider_key") != "tough_tongue"
+                || Text(root, "base_url") != "https://api.toughtongueai.com/api/public"
+                || Text(root, "source_type") != "provider_documentation"
+                || !OperatorAuthorityShapeValid(root)
+                || !OperatorContractShapeValid(root))
+            {
+                failures.Add("stock-avatar-operator-contract-invalid");
+                return null;
+            }
+            string receiptFileDigest = DigestText(Encoding.UTF8.GetBytes(receiptJson));
+            if (receiptFileDigest != Digest(CanonicalJson(ParseExactReceiptElement(receiptJson)))
+                || Text(root, "stock_avatar_readback_receipt_digest") != receiptFileDigest)
+            {
+                failures.Add("stock-avatar-operator-contract-receipt-digest-mismatch");
+                return null;
+            }
+            return new OperatorContractAuthority(expectedDigest, fileDigest, receiptFileDigest);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException)
+        {
+            failures.Add("stock-avatar-operator-contract-invalid");
+            return null;
+        }
+    }
+
+    private static bool OperatorAuthorityShapeValid(JsonElement root)
+    {
+        JsonElement authority = root.GetProperty("authority");
+        return authority.ValueKind == JsonValueKind.Object
+            && ExactProperties(authority, new HashSet<string>(["operator_verified", "source_ref_sha256"], StringComparer.Ordinal))
+            && authority.GetProperty("operator_verified").ValueKind == JsonValueKind.True
+            && IsSha256(Text(authority, "source_ref_sha256"))
+            && TryParseUtc(Text(root, "verified_at"), out _);
+    }
+
+    private static bool OperatorContractShapeValid(JsonElement root)
+    {
+        if (!root.GetProperty("slot_cardinality").TryGetInt32(out int slotCount)
+            || slotCount != 6
+            || !root.GetProperty("maximum_snapshot_age_seconds").TryGetInt32(out int maximumAge)
+            || maximumAge is < 60 or > 86400)
+        {
+            return false;
+        }
+        if (!ExactStringArray(root.GetProperty("premium_plan_values"), ["premium"])
+            || !ExactStringArray(
+                root.GetProperty("live_avatar_providers"),
+                ["anam", "avatario", "heygen", "liveavatar"])
+            || !ExactStringArray(
+                root.GetProperty("unsupported_direct_resources"),
+                ["agent", "voice", "function", "avatar"]))
+        {
+            return false;
+        }
+        JsonElement routes = root.GetProperty("documented_get_allowlist");
+        if (routes.ValueKind != JsonValueKind.Object
+            || !ExactProperties(routes, new HashSet<string>(["balance", "subscriptions", "organizations", "scenario"], StringComparer.Ordinal))
+            || !ExactRoute(routes, "balance", "balance")
+            || !ExactRoute(routes, "subscriptions", "subscriptions")
+            || !ExactRoute(routes, "organizations", "v2/organizations")
+            || !ExactRoute(routes, "scenario", "scenarios/{resource_ref}"))
+        {
+            return false;
+        }
+        JsonElement normalization = root.GetProperty("normalization");
+        return normalization.ValueKind == JsonValueKind.Object
+            && ExactProperties(
+                normalization,
+                new HashSet<string>(
+                    ["plan", "remaining_minutes", "refresh_at", "organization", "resource_ownership"],
+                    StringComparer.Ordinal))
+            && Text(normalization, "plan") == "subscriptions.active.product_name"
+            && Text(normalization, "remaining_minutes") == "balance.available_minutes"
+            && Text(normalization, "refresh_at") == "balance.last_updated"
+            && Text(normalization, "organization") == "organizations.id"
+            && Text(normalization, "resource_ownership") == "organization_scoped_scenario_readback"
+            && IsSha256(Text(root, "stock_avatar_readback_receipt_digest"));
+    }
+
+    private static bool ExactRoute(JsonElement routes, string name, string path)
+    {
+        JsonElement route = routes.GetProperty(name);
+        return route.ValueKind == JsonValueKind.Object
+            && ExactProperties(route, new HashSet<string>(["method", "path"], StringComparer.Ordinal))
+            && Text(route, "method") == "GET"
+            && Text(route, "path") == path;
+    }
+
+    private static bool ExactStringArray(JsonElement element, IReadOnlyList<string> expected)
+        => element.ValueKind == JsonValueKind.Array
+            && element.GetArrayLength() == expected.Count
+            && element.EnumerateArray().Select(static value => value.ValueKind == JsonValueKind.String
+                ? value.GetString() ?? string.Empty
+                : string.Empty).SequenceEqual(expected, StringComparer.Ordinal);
+
+    private static bool ExactProperties(JsonElement element, IReadOnlySet<string> expected)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return false;
+        string[] names = element.EnumerateObject().Select(static property => property.Name).ToArray();
+        return names.Length == expected.Count
+            && names.Distinct(StringComparer.Ordinal).Count() == names.Length
+            && names.ToHashSet(StringComparer.Ordinal).SetEquals(expected);
+    }
+
+    private static string Text(JsonElement element, string property)
+        => element.TryGetProperty(property, out JsonElement value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : string.Empty;
+
+    private static JsonElement ParseExactReceiptElement(string receiptJson)
+    {
+        using JsonDocument receiptDocument = JsonDocument.Parse(receiptJson, new JsonDocumentOptions
+        {
+            AllowTrailingCommas = false,
+            CommentHandling = JsonCommentHandling.Disallow
+        });
+        return receiptDocument.RootElement.Clone();
+    }
+
+    private static byte[] CanonicalJson(JsonElement element)
+    {
+        using MemoryStream output = new();
+        using (Utf8JsonWriter writer = new(output, new JsonWriterOptions { Indented = false }))
+        {
+            WriteCanonical(writer, element);
+        }
+        return output.ToArray();
+    }
+
+    private static void WriteCanonical(Utf8JsonWriter writer, JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (JsonProperty property in element.EnumerateObject().OrderBy(static value => value.Name, StringComparer.Ordinal))
+                {
+                    writer.WritePropertyName(property.Name);
+                    WriteCanonical(writer, property.Value);
+                }
+                writer.WriteEndObject();
+                break;
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (JsonElement value in element.EnumerateArray()) WriteCanonical(writer, value);
+                writer.WriteEndArray();
+                break;
+            case JsonValueKind.String:
+                writer.WriteStringValue(element.GetString());
+                break;
+            case JsonValueKind.Number:
+                writer.WriteRawValue(element.GetRawText(), skipInputValidation: false);
+                break;
+            case JsonValueKind.True:
+                writer.WriteBooleanValue(true);
+                break;
+            case JsonValueKind.False:
+                writer.WriteBooleanValue(false);
+                break;
+            case JsonValueKind.Null:
+                writer.WriteNullValue();
+                break;
+            default:
+                throw new JsonException("Unsupported JSON token in operator contract.");
+        }
+    }
+
+    private sealed record OperatorContractAuthority(
+        string ContractDigest,
+        string ContractFileDigest,
+        string ReceiptFileDigest);
 
     private static BuildGhostToughTongueStockAvatarReadbackReceipt? ParseReceipt(
         string json,
@@ -1973,7 +2283,13 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
             && value.AsSpan(7).ToString().All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     private static string DigestText(string value)
-        => $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
+        => DigestText(Encoding.UTF8.GetBytes(value));
+
+    private static string DigestText(ReadOnlySpan<byte> value)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant()}";
+
+    private static string Digest(ReadOnlySpan<byte> value)
+        => DigestText(value);
 
     private static string Digest(JsonNode node)
         => $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(node, new JsonSerializerOptions { WriteIndented = false }))).ToLowerInvariant()}";
@@ -2122,6 +2438,9 @@ public static class ToughTongueBuildGhostScenarioContract
                 ["avatar_provider_readback_source"] = avatarBinding.ProviderReadbackSource,
                 ["avatar_provider_readback_observed_at_utc"] = avatarBinding.ProviderReadbackObservedAtUtc,
                 ["avatar_provider_readback_maximum_age_seconds"] = avatarBinding.ProviderReadbackMaximumAgeSeconds,
+                ["avatar_operator_read_only_contract_digest"] = avatarBinding.OperatorReadOnlyContractDigest,
+                ["avatar_operator_read_only_contract_file_digest"] = avatarBinding.OperatorReadOnlyContractFileDigest,
+                ["avatar_provider_readback_receipt_file_digest"] = avatarBinding.ProviderReadbackReceiptFileDigest,
                 ["avatar_binding_digest"] = avatarBinding.ContractDigest,
                 ["avatar_provider_read_verified"] = avatarBinding.ProviderReadVerified,
                 ["model_provider"] = avatarBinding.ModelProvider,
@@ -2350,6 +2669,9 @@ public static class ToughTongueBuildGhostScenarioContract
         RequireText(metadata, "avatar_provider_readback_source", expected.StockAvatarBinding.ProviderReadbackSource, "scenario-avatar-readback-source-mismatch", reasons);
         RequireText(metadata, "avatar_provider_readback_observed_at_utc", expected.StockAvatarBinding.ProviderReadbackObservedAtUtc, "scenario-avatar-readback-observed-at-mismatch", reasons);
         RequireInteger(metadata, "avatar_provider_readback_maximum_age_seconds", expected.StockAvatarBinding.ProviderReadbackMaximumAgeSeconds, "scenario-avatar-readback-maximum-age-mismatch", reasons);
+        RequireText(metadata, "avatar_operator_read_only_contract_digest", expected.StockAvatarBinding.OperatorReadOnlyContractDigest, "scenario-avatar-operator-contract-digest-mismatch", reasons);
+        RequireText(metadata, "avatar_operator_read_only_contract_file_digest", expected.StockAvatarBinding.OperatorReadOnlyContractFileDigest, "scenario-avatar-operator-contract-file-digest-mismatch", reasons);
+        RequireText(metadata, "avatar_provider_readback_receipt_file_digest", expected.StockAvatarBinding.ProviderReadbackReceiptFileDigest, "scenario-avatar-readback-receipt-file-digest-mismatch", reasons);
         RequireText(metadata, "avatar_binding_digest", expected.StockAvatarBinding.ContractDigest, "scenario-avatar-binding-digest-mismatch", reasons);
         RequireBoolean(metadata, "avatar_provider_read_verified", expected: true, "scenario-avatar-read-unverified", reasons);
         RequireText(metadata, "model_provider", expected.StockAvatarBinding.ModelProvider, "scenario-model-provider-metadata-mismatch", reasons);

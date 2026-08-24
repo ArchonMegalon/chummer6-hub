@@ -44,7 +44,6 @@ CANDIDATE_REFS = {
 CANDIDATE_DIGESTS = {
     kind: MODULE._candidate_ref_digest(value) for kind, value in CANDIDATE_REFS.items()
 }
-CONTRACT_DIGEST = "sha256:" + "7" * 64
 PRIVATE_NETWORK = MODULE.PROJECT + "_build-ghost-private"
 LOOPBACK_NETWORK = MODULE.PROJECT + "_build-ghost-loopback"
 
@@ -80,6 +79,42 @@ def stock_avatar_receipt() -> dict[str, object]:
         key: value for key, value in payload.items() if key != "ReceiptDigest"
     })
     return payload
+
+
+def operator_contract_payload(
+    receipt_file_digest: str,
+) -> dict[str, object]:
+    return {
+        "schema": MODULE.TOUGH_TONGUE_OPERATOR_CONTRACT_SCHEMA,
+        "provider_key": "tough_tongue",
+        "base_url": "https://api.toughtongueai.com/api/public",
+        "source_type": "provider_documentation",
+        "verified_at": "2026-08-23T05:00:00Z",
+        "authority": {
+            "operator_verified": True,
+            "source_ref_sha256": "sha256:" + "8" * 64,
+        },
+        "slot_cardinality": 6,
+        "maximum_snapshot_age_seconds": 900,
+        "premium_plan_values": ["premium"],
+        "live_avatar_providers": ["anam", "avatario", "heygen", "liveavatar"],
+        "documented_get_allowlist": {
+            name: {"method": "GET", "path": path}
+            for name, path in MODULE.TOUGH_TONGUE_OPERATOR_ROUTES.items()
+        },
+        "normalization": dict(MODULE.TOUGH_TONGUE_OPERATOR_NORMALIZATION),
+        "unsupported_direct_resources": ["agent", "voice", "function", "avatar"],
+        "stock_avatar_readback_receipt_digest": receipt_file_digest,
+    }
+
+
+STOCK_AVATAR_RECEIPT_FILE_DIGEST = MODULE._digest(
+    MODULE._canonical(stock_avatar_receipt())
+)
+OPERATOR_CONTRACT_RAW = MODULE._canonical(
+    operator_contract_payload(STOCK_AVATAR_RECEIPT_FILE_DIGEST)
+)
+CONTRACT_DIGEST = MODULE._digest(OPERATOR_CONTRACT_RAW)
 
 
 def labels(role: str, compose: Path) -> dict[str, str]:
@@ -382,6 +417,8 @@ class FakeRunner:
         self.fallback_canary_called = False
         self.live_probe_called = False
         self.account_audit_contract: Path | None = None
+        self.operator_contract: Path | None = None
+        self.contract_digest_override: str | None = None
 
     def result(self, stdout: bytes | str = b"", returncode: int = 0, stderr: bytes = b""):
         if isinstance(stdout, str):
@@ -390,6 +427,13 @@ class FakeRunner:
 
     def container(self, role: str) -> dict[str, object]:
         env = environment(role)
+        if role == "ai" and self.contract_digest_override is not None:
+            env = [
+                f"{MODULE.TOUGH_TONGUE_CONTRACT_DIGEST_ENV}={self.contract_digest_override}"
+                if row.startswith(MODULE.TOUGH_TONGUE_CONTRACT_DIGEST_ENV + "=")
+                else row
+                for row in env
+            ]
         if role == "ai" and self.account_audit_contract is not None:
             candidate_names = set(MODULE.TOUGH_TONGUE_CANDIDATE_ENV.values())
             stock_names = set(MODULE.TOUGH_TONGUE_STOCK_AVATAR_ENV.values())
@@ -432,10 +476,14 @@ class FakeRunner:
                 "Type": "bind", "Source": str(self.caddy),
                 "Destination": "/etc/caddy/Caddyfile", "RW": False,
             }]
-        elif role == "ai" and self.account_audit_contract is not None:
+        elif role == "ai" and (
+            self.account_audit_contract is not None or self.operator_contract is not None
+        ):
+            contract_source = self.account_audit_contract or self.operator_contract
+            assert contract_source is not None
             mounts = [{
                 "Type": "bind",
-                "Source": str(self.account_audit_contract),
+                "Source": str(contract_source),
                 "Destination": MODULE.TOUGH_TONGUE_CONTRACT_TARGET,
                 "RW": False,
             }]
@@ -541,7 +589,12 @@ def fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path, FakeRunner]:
     live_ops.write_text("raise SystemExit(99)\n", encoding="utf-8")
     for path in (compose, caddy, canary, live_ops):
         os.chmod(path, 0o700 if path in (canary, live_ops) else 0o600)
-    return compose, canary, live_ops, tmp_path / "receipt.json", FakeRunner(compose, caddy)
+    operator_contract = tmp_path / "tough-tongue-read-only-binding-contract.json"
+    operator_contract.write_bytes(OPERATOR_CONTRACT_RAW)
+    os.chmod(operator_contract, 0o400)
+    runner = FakeRunner(compose, caddy)
+    runner.operator_contract = operator_contract
+    return compose, canary, live_ops, tmp_path / "receipt.json", runner
 
 
 def invoke(tmp_path: Path, runner: FakeRunner):
@@ -732,6 +785,61 @@ def test_deployed_readback_contract_digest_mismatch_blocks(tmp_path: Path):
     seal_truth(runner.truth)
     payload = invoke(tmp_path, runner)
     assert "tough-tongue-deployed-readback-contract-digest-mismatch" in payload["blockers"]
+
+
+def test_full_candidate_without_exact_mounted_operator_contract_blocks_before_canaries(
+    tmp_path: Path,
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    runner.operator_contract = None
+
+    payload = invoke(tmp_path, runner)
+
+    assert "tough-tongue-runtime-contract-mount-invalid" in payload["blockers"]
+    assert payload["claim"] is None
+    assert runner.packet_canary_called is False
+    assert runner.live_probe_called is True
+
+
+def test_resealed_operator_contract_cannot_rebind_a_different_stock_receipt(
+    tmp_path: Path,
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    assert runner.operator_contract is not None
+    hostile = operator_contract_payload("sha256:" + "0" * 64)
+    hostile_raw = MODULE._canonical(hostile)
+    runner.operator_contract.chmod(0o600)
+    runner.operator_contract.write_bytes(hostile_raw)
+    runner.operator_contract.chmod(0o400)
+    hostile_digest = MODULE._digest(hostile_raw)
+    runner.contract_digest_override = hostile_digest
+    contract = runner.truth["contract"]
+    assert isinstance(contract, dict)
+    contract["digest"] = hostile_digest
+    seal_truth(runner.truth)
+
+    payload = invoke(tmp_path, runner)
+
+    assert (
+        "tough-tongue-runtime-contract-stock-avatar-receipt-mismatch"
+        in payload["blockers"]
+    )
+    assert payload["claim"] is None
+
+
+def test_symlink_swapped_operator_contract_is_never_accepted_as_the_mount_authority(
+    tmp_path: Path,
+):
+    _, _, _, _, runner = fixture(tmp_path)
+    assert runner.operator_contract is not None
+    link = tmp_path / "swapped-operator-contract.json"
+    link.symlink_to(runner.operator_contract)
+    runner.operator_contract = link
+
+    payload = invoke(tmp_path, runner)
+
+    assert "tough-tongue-runtime-contract-unverifiable" in payload["blockers"]
+    assert payload["claim"] is None
 
 
 @pytest.mark.parametrize("mutation", ["missing", "extra", "true"])

@@ -913,7 +913,10 @@ def _validated_config(
         "evidenceDigestContract": "sha256-canonical-json-without-evidenceDigest",
     }
     receipt["evidenceDigest"] = _digest(_canonical(receipt))
-    return environment, receipt, _canonical(contract_payload) + b"\n"
+    # The mounted snapshot is itself the canonical authority. Keeping the exact
+    # file bytes canonical makes its full-file SHA-256 identical to the operator
+    # contract digest consumed by both the runtime and the attester.
+    return environment, receipt, _canonical(contract_payload)
 
 
 def _open_private_output_parent(path: Path) -> int:

@@ -12,6 +12,7 @@ public static class ToughTongueBuildGhostContractVersions
     public const string PersonaReleaseV1 = "chummer.build_ghost_persona_release.v1";
     public const string StockAvatarBindingV1 = "chummer.tough_tongue.stock_avatar_binding.v1";
     public const string StockAvatarReadbackReceiptV1 = "chummer.tough_tongue.stock_avatar_readback_receipt.v1";
+    public const string ReadOnlyBindingContractV3 = "chummer.build_ghost.tough_tongue.read_only_binding_contract.v3";
     public const string ScenarioContractV1 = "chummer.tough_tongue.build_ghost_scenario.v1";
     public const string ScenarioContractV2 = "chummer.tough_tongue.build_ghost_scenario.v2";
     public const string ToolContractV1 = "chummer.tough_tongue.build_ghost_tool.v1";
@@ -434,6 +435,9 @@ public sealed record BuildGhostToughTongueStockAvatarBinding(
     string ProviderReadbackObservedAtUtc,
     int ProviderReadbackMaximumAgeSeconds,
     bool ProviderReadVerified,
+    string OperatorReadOnlyContractDigest,
+    string OperatorReadOnlyContractFileDigest,
+    string ProviderReadbackReceiptFileDigest,
     string ContractDigest);
 
 public sealed record BuildGhostToughTongueStockAvatarReadbackReceipt(
