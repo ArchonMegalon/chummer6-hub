@@ -22,10 +22,17 @@ from typing import Any, Mapping
 
 CONFIG_SCHEMA = "chummer.build_ghost.tough_tongue.runtime_config.v1"
 RECEIPT_SCHEMA = "chummer.build_ghost.tough_tongue.runtime_config_receipt.v1"
-CONTRACT_SCHEMA = "chummer.build_ghost.tough_tongue.read_only_binding_contract.v2"
+CONTRACT_SCHEMA = "chummer.build_ghost.tough_tongue.read_only_binding_contract.v3"
+STOCK_AVATAR_READBACK_RECEIPT_SCHEMA = (
+    "chummer.tough_tongue.stock_avatar_readback_receipt.v1"
+)
+STOCK_AVATAR_READBACK_SOURCE = "tough_tongue_api_public_scenario_get"
 STATUS = "ready-for-read-only-probe"
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 PROVIDER_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,511}$")
+UUID = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
 CREDENTIAL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._~+/@:=-]{15,511}$")
 SAFE_ABSOLUTE_PATH = re.compile(r"^/(?:[A-Za-z0-9._@:+~-]+/?)+$")
 SAFE_LOWER_VALUE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
@@ -34,7 +41,12 @@ MAX_CONFIG_BYTES = 256 * 1024
 MAX_ENVIRONMENT_BYTES = 256 * 1024
 MAX_CONTRACT_BYTES = 512 * 1024
 MAX_ACCOUNT_SELECTION_POLICY_BYTES = 512 * 1024
+MAX_STOCK_AVATAR_READBACK_RECEIPT_BYTES = 64 * 1024
 CANDIDATE_KINDS = ("agent", "voice", "function", "scenario", "live_avatar")
+STOCK_AVATAR_MIGRATION_KINDS = frozenset(("voice", "scenario", "live_avatar"))
+ALLOWED_LIVE_AVATAR_PROVIDERS = frozenset(
+    ("anam", "avatario", "heygen", "liveavatar")
+)
 EXPECTED_SLOT_COUNT = 6
 ACCOUNT_SELECTION_POLICY_SCHEMA = "ea.tough_tongue.operator_premium_grants.v1"
 PREMIUM_BASIS = "operator_policy_available_minutes_gt_threshold"
@@ -60,6 +72,25 @@ ENVIRONMENT_NAMES = {
     "function": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID",
     "scenario": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID",
     "live_avatar": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID",
+}
+STOCK_AVATAR_ENVIRONMENT_NAMES = {
+    "provider": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER",
+    "name": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME",
+    "asset_path": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH",
+    "readback_digest": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST",
+    "model_provider": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER",
+    "model_id": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID",
+    "allow_legacy_cascade": "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE",
+}
+STOCK_AVATAR_READBACK_JSON_ENV = (
+    "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON"
+)
+STOCK_AVATAR_READBACK_FIELDS = {
+    "Schema", "HttpStatus", "CanonicalWhitelistedResponseDigest",
+    "ObservedProvider", "ObservedAvatarName", "ObservedAvatarAssetPath",
+    "ObservedLiveAvatarId", "ObservedModelProvider", "ObservedModelId",
+    "LegacyCascadePolicyOptIn", "ScenarioRefDigest", "Source",
+    "ObservedAtUtc", "MaximumAgeSeconds", "ReceiptDigest",
 }
 
 
@@ -369,13 +400,108 @@ def _validated_account_selection_policy(
     }
 
 
+def _validated_stock_avatar_readback_receipt(
+    payload: dict[str, Any],
+    expected_file_digest: str,
+    expected_contract_digest: str,
+    scenario_ref: str,
+    live_avatar_ref: str,
+    contract_maximum_age_seconds: int,
+) -> dict[str, Any]:
+    if set(payload) != STOCK_AVATAR_READBACK_FIELDS:
+        raise ConfigError("stock-avatar-readback-receipt-schema-invalid")
+    if (
+        payload.get("Schema") != STOCK_AVATAR_READBACK_RECEIPT_SCHEMA
+        or payload.get("HttpStatus") != 200
+        or payload.get("ObservedProvider") != "avatario"
+        or payload.get("ObservedAvatarName") != "Amelia"
+        or payload.get("ObservedAvatarAssetPath")
+        != "/live-avatars/avatars/Amelia.jpg"
+        or payload.get("ObservedModelProvider") != "Landmass"
+        or payload.get("Source") != STOCK_AVATAR_READBACK_SOURCE
+    ):
+        raise ConfigError("stock-avatar-readback-receipt-authority-invalid")
+    live_avatar_id = payload.get("ObservedLiveAvatarId")
+    if (
+        not isinstance(live_avatar_id, str)
+        or live_avatar_id != live_avatar_ref
+        or UUID.fullmatch(live_avatar_id) is None
+    ):
+        raise ConfigError("stock-avatar-readback-receipt-live-avatar-invalid")
+    scenario_digest = payload.get("ScenarioRefDigest")
+    if scenario_digest != _candidate_digest(scenario_ref):
+        raise ConfigError("stock-avatar-readback-receipt-scenario-invalid")
+    legacy_opt_in = payload.get("LegacyCascadePolicyOptIn")
+    model_id = payload.get("ObservedModelId")
+    if type(legacy_opt_in) is not bool or not (
+        (model_id == "gemini" and legacy_opt_in is False)
+        or (model_id == "cascade" and legacy_opt_in is True)
+    ):
+        raise ConfigError("stock-avatar-readback-receipt-model-invalid")
+    maximum_age = payload.get("MaximumAgeSeconds")
+    if (
+        type(maximum_age) is not int
+        or not 60 <= maximum_age <= contract_maximum_age_seconds
+        or maximum_age > 900
+    ):
+        raise ConfigError("stock-avatar-readback-receipt-freshness-invalid")
+    observed_at = _utc_timestamp(
+        payload.get("ObservedAtUtc"), "stock-avatar-readback-receipt-observed-at"
+    )
+    now = _utc_now().astimezone(dt.timezone.utc)
+    if observed_at > now or now - observed_at > dt.timedelta(seconds=maximum_age):
+        raise ConfigError("stock-avatar-readback-receipt-stale")
+
+    response_authority = {
+        "ObservedAvatarAssetPath": payload["ObservedAvatarAssetPath"],
+        "ObservedAvatarName": payload["ObservedAvatarName"],
+        "ObservedLiveAvatarId": payload["ObservedLiveAvatarId"],
+        "ObservedModelId": payload["ObservedModelId"],
+        "ObservedModelProvider": payload["ObservedModelProvider"],
+        "ObservedProvider": payload["ObservedProvider"],
+        "ScenarioRefDigest": payload["ScenarioRefDigest"],
+    }
+    if payload.get("CanonicalWhitelistedResponseDigest") != _digest(
+        _canonical(response_authority)
+    ):
+        raise ConfigError("stock-avatar-readback-receipt-response-digest-invalid")
+    receipt_authority = {
+        key: value for key, value in payload.items() if key != "ReceiptDigest"
+    }
+    if payload.get("ReceiptDigest") != _digest(_canonical(receipt_authority)):
+        raise ConfigError("stock-avatar-readback-receipt-digest-invalid")
+    file_digest = _digest(_canonical(payload))
+    if (
+        not isinstance(expected_file_digest, str)
+        or SHA256.fullmatch(expected_file_digest) is None
+        or file_digest != expected_file_digest
+        or file_digest != expected_contract_digest
+    ):
+        raise ConfigError("stock-avatar-readback-receipt-file-digest-mismatch")
+    return {
+        "file_digest": file_digest,
+        "receipt_digest": payload["ReceiptDigest"],
+        "readback_digest": payload["ReceiptDigest"],
+        "response_digest": payload["CanonicalWhitelistedResponseDigest"],
+        "provider": payload["ObservedProvider"],
+        "name": payload["ObservedAvatarName"],
+        "asset_path": payload["ObservedAvatarAssetPath"],
+        "model_provider": payload["ObservedModelProvider"],
+        "model_id": payload["ObservedModelId"],
+        "allow_legacy_cascade": legacy_opt_in,
+        "observed_at": payload["ObservedAtUtc"],
+        "scenario_ref_digest": payload["ScenarioRefDigest"],
+        "canonical_json": _canonical(payload).decode("utf-8"),
+    }
+
+
 def _validated_contract(payload: dict[str, Any], expected_digest: str) -> None:
     required = {
         "schema", "provider_key", "base_url", "source_type", "verified_at",
         "authority", "slot_cardinality", "maximum_snapshot_age_seconds",
         "premium_plan_values", "live_avatar_providers",
         "documented_get_allowlist", "normalization",
-        "unsupported_direct_resources",
+        "unsupported_direct_resources", "stock_avatar_readback_receipt_digest",
     }
     if set(payload) != required:
         raise ConfigError("read-only-contract-schema-invalid")
@@ -417,6 +543,11 @@ def _validated_contract(payload: dict[str, Any], expected_digest: str) -> None:
             or len(set(values)) != len(values)
         ):
             raise ConfigError("read-only-contract-entitlements-invalid")
+    if any(
+        provider not in ALLOWED_LIVE_AVATAR_PROVIDERS
+        for provider in payload["live_avatar_providers"]
+    ):
+        raise ConfigError("read-only-contract-live-avatar-provider-invalid")
 
     if payload.get("slot_cardinality") != EXPECTED_SLOT_COUNT:
         raise ConfigError("read-only-contract-cardinality-invalid")
@@ -436,6 +567,12 @@ def _validated_contract(payload: dict[str, Any], expected_digest: str) -> None:
         raise ConfigError("read-only-contract-normalization-invalid")
     if payload.get("unsupported_direct_resources") != UNSUPPORTED_DIRECT_RESOURCES:
         raise ConfigError("read-only-contract-unsupported-resources-invalid")
+    stock_receipt_digest = payload.get("stock_avatar_readback_receipt_digest")
+    if stock_receipt_digest != "" and (
+        not isinstance(stock_receipt_digest, str)
+        or SHA256.fullmatch(stock_receipt_digest) is None
+    ):
+        raise ConfigError("read-only-contract-stock-avatar-receipt-invalid")
 
     if _digest(_canonical(payload)) != expected_digest:
         raise ConfigError("read-only-contract-digest-mismatch")
@@ -453,9 +590,10 @@ def _validated_config(
         "read_only_contract",
     }
     if (
-        set(payload) not in (
-            required_config_keys,
-            required_config_keys | {"account_selection_policy"},
+        not required_config_keys.issubset(payload)
+        or not set(payload).issubset(
+            required_config_keys
+            | {"account_selection_policy", "stock_avatar_readback_receipt"}
         )
         or payload.get("schema") != CONFIG_SCHEMA
     ):
@@ -510,10 +648,17 @@ def _validated_config(
         raise ConfigError("candidate-refs-schema-invalid")
     if any(not isinstance(candidates.get(kind), str) for kind in CANDIDATE_KINDS):
         raise ConfigError("candidate-refs-schema-invalid")
-    candidate_configured = [bool(candidates[kind]) for kind in CANDIDATE_KINDS]
-    if any(candidate_configured) and not all(candidate_configured):
+    configured_candidate_kinds = {
+        kind for kind in CANDIDATE_KINDS if bool(candidates[kind])
+    }
+    binding_candidates_configured = configured_candidate_kinds == set(CANDIDATE_KINDS)
+    stock_avatar_migration_configured = (
+        configured_candidate_kinds == STOCK_AVATAR_MIGRATION_KINDS
+    )
+    if configured_candidate_kinds and not (
+        binding_candidates_configured or stock_avatar_migration_configured
+    ):
         raise ConfigError("candidate-refs-partial")
-    binding_candidates_configured = all(candidate_configured)
     candidate_digests: dict[str, str] = {}
     for kind in CANDIDATE_KINDS:
         value = candidates.get(kind)
@@ -576,6 +721,43 @@ def _validated_config(
     )
     _validated_contract(contract_payload, contract_digest)
 
+    stock_avatar_receipt_config = payload.get("stock_avatar_readback_receipt")
+    stock_avatar_receipt: dict[str, Any] | None = None
+    if stock_avatar_receipt_config is not None:
+        if (
+            not isinstance(stock_avatar_receipt_config, dict)
+            or set(stock_avatar_receipt_config) != {"path", "digest"}
+        ):
+            raise ConfigError("stock-avatar-readback-receipt-config-invalid")
+        receipt_path_value = stock_avatar_receipt_config.get("path")
+        receipt_file_digest = stock_avatar_receipt_config.get("digest")
+        if (
+            not isinstance(receipt_path_value, str)
+            or SAFE_ABSOLUTE_PATH.fullmatch(receipt_path_value) is None
+        ):
+            raise ConfigError("stock-avatar-readback-receipt-path-invalid")
+        receipt_payload = _json_object(
+            _capture_owned_file(
+                Path(receipt_path_value),
+                "stock-avatar-readback-receipt",
+                MAX_STOCK_AVATAR_READBACK_RECEIPT_BYTES,
+            ),
+            "stock-avatar-readback-receipt",
+        )
+        stock_avatar_receipt = _validated_stock_avatar_readback_receipt(
+            receipt_payload,
+            receipt_file_digest,
+            contract_payload["stock_avatar_readback_receipt_digest"],
+            candidates["scenario"],
+            candidates["live_avatar"],
+            contract_payload["maximum_snapshot_age_seconds"],
+        )
+    if bool(candidates["live_avatar"]) != (stock_avatar_receipt is not None):
+        raise ConfigError("stock-avatar-readback-receipt-required-or-unexpected")
+    if stock_avatar_receipt is None \
+            and contract_payload["stock_avatar_readback_receipt_digest"] != "":
+        raise ConfigError("read-only-contract-stock-avatar-receipt-unexpected")
+
     environment = {
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS": ";".join(credentials),
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS": ";".join(account_refs),
@@ -589,6 +771,31 @@ def _validated_config(
     environment.update(
         {ENVIRONMENT_NAMES[kind]: candidates[kind] for kind in CANDIDATE_KINDS}
     )
+    stock_avatar_environment = {
+        STOCK_AVATAR_ENVIRONMENT_NAMES["provider"]: "",
+        STOCK_AVATAR_ENVIRONMENT_NAMES["name"]: "",
+        STOCK_AVATAR_ENVIRONMENT_NAMES["asset_path"]: "",
+        STOCK_AVATAR_ENVIRONMENT_NAMES["readback_digest"]: "",
+        STOCK_AVATAR_ENVIRONMENT_NAMES["model_provider"]: "",
+        STOCK_AVATAR_ENVIRONMENT_NAMES["model_id"]: "",
+        STOCK_AVATAR_ENVIRONMENT_NAMES["allow_legacy_cascade"]: "false",
+        STOCK_AVATAR_READBACK_JSON_ENV: "",
+    }
+    if stock_avatar_receipt is not None:
+        for key in (
+            "provider", "name", "asset_path", "readback_digest",
+            "model_provider", "model_id",
+        ):
+            stock_avatar_environment[STOCK_AVATAR_ENVIRONMENT_NAMES[key]] = str(
+                stock_avatar_receipt[key]
+            )
+        stock_avatar_environment[
+            STOCK_AVATAR_ENVIRONMENT_NAMES["allow_legacy_cascade"]
+        ] = str(stock_avatar_receipt["allow_legacy_cascade"]).lower()
+        stock_avatar_environment[STOCK_AVATAR_READBACK_JSON_ENV] = str(
+            stock_avatar_receipt["canonical_json"]
+        )
+    environment.update(stock_avatar_environment)
     expectation_digest = _digest(
         _canonical(
             {
@@ -624,6 +831,31 @@ def _validated_config(
         "candidateRefDigests": dict(sorted(candidate_digests.items())),
         "candidateRefCount": len(candidate_digests),
         "bindingCandidatesConfigured": binding_candidates_configured,
+        "stockAvatarMigrationConfigured": stock_avatar_migration_configured,
+        "stockAvatarReadbackReceiptFileDigest": (
+            stock_avatar_receipt["file_digest"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarReadbackReceiptDigest": (
+            stock_avatar_receipt["receipt_digest"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarCanonicalResponseDigest": (
+            stock_avatar_receipt["response_digest"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarReadbackObservedAtUtc": (
+            stock_avatar_receipt["observed_at"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarReadbackScenarioRefDigest": (
+            stock_avatar_receipt["scenario_ref_digest"]
+            if stock_avatar_receipt is not None else ""
+        ),
+        "stockAvatarLegacyCascadePolicyOptIn": (
+            stock_avatar_receipt["allow_legacy_cascade"]
+            if stock_avatar_receipt is not None else False
+        ),
         "expectationDigest": expectation_digest,
         "readOnlyContractDigest": contract_digest,
         "accountSelectionPolicyDigest": (
@@ -672,14 +904,19 @@ def _validated_config(
         "environmentContainsCredentials": True,
         "environmentMode": "0600",
         "nextAction": (
-            "deploy-private-account-audit-only-runtime-with-all-gates-false"
+            "attach-read-verified-grounded-custom-function-before-any-remote-execution"
+            if stock_avatar_migration_configured
+            else "deploy-private-account-audit-only-runtime-with-all-gates-false"
             if not binding_candidates_configured
             else "run-fresh-ea-live-ops-read-only-binding-probe"
         ),
         "evidenceDigestContract": "sha256-canonical-json-without-evidenceDigest",
     }
     receipt["evidenceDigest"] = _digest(_canonical(receipt))
-    return environment, receipt, _canonical(contract_payload) + b"\n"
+    # The mounted snapshot is itself the canonical authority. Keeping the exact
+    # file bytes canonical makes its full-file SHA-256 identical to the operator
+    # contract digest consumed by both the runtime and the attester.
+    return environment, receipt, _canonical(contract_payload)
 
 
 def _open_private_output_parent(path: Path) -> int:
