@@ -162,6 +162,7 @@ def package_bytes(
     nuspec_id: str | None = None,
     nuspec_dependencies: list[dict[str, str]] | None = None,
     foreign_entry: str | None = None,
+    additional_entries: dict[str, bytes] | None = None,
     assembly_entry: str | None = None,
     omit_dependency_group: bool = False,
 ) -> bytes:
@@ -199,6 +200,8 @@ def package_bytes(
     }
     if foreign_entry is not None:
         entries[foreign_entry] = b"foreign\n"
+    if additional_entries is not None:
+        entries.update(additional_entries)
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name in sorted(entries, key=lambda value: (value.casefold(), value)):
@@ -567,6 +570,7 @@ def test_cli_writes_a_deterministic_validation_receipt(tmp_path: Path) -> None:
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["contract"] == module.VALIDATION_CONTRACT
     assert payload["status"] == "pass"
+    assert output.stat().st_mode & 0o777 == 0o644
     assert result.stdout == ""
 
 
@@ -595,6 +599,170 @@ def test_cli_rejects_output_inside_validated_artifact(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "outside the immutable artifact root" in result.stderr
     assert output.exists() is False
+
+
+def test_cli_holds_output_directory_across_hostile_parent_symlink_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    safe_output = tmp_path / "safe-output"
+    safe_output.mkdir()
+    output_parent = tmp_path / "output-parent"
+    output_parent.symlink_to(safe_output, target_is_directory=True)
+    output = output_parent / "validation.json"
+    original = module.validate_artifact
+
+    def swap_parent_after_verdict(
+        artifact_root: Path, authority_path: Path
+    ) -> dict[str, Any]:
+        result = original(artifact_root, authority_path)
+        output_parent.unlink()
+        output_parent.symlink_to(fixture.root, target_is_directory=True)
+        return result
+
+    monkeypatch.setattr(module, "validate_artifact", swap_parent_after_verdict)
+
+    assert module.main(
+        [
+            "--artifact-root",
+            str(fixture.root),
+            "--authority",
+            str(fixture.authority_path),
+            "--output",
+            str(output),
+        ]
+    ) == 0
+    result = json.loads((safe_output / output.name).read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+    assert (fixture.root / output.name).exists() is False
+
+
+def test_cli_atomically_replaces_hostile_output_file_symlink_without_following_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    output_root = tmp_path / "output"
+    output_root.mkdir()
+    output = output_root / "validation.json"
+    protected = tmp_path / "protected.txt"
+    protected.write_text("protected\n", encoding="utf-8")
+    original = module.validate_artifact
+
+    def swap_file_after_verdict(
+        artifact_root: Path, authority_path: Path
+    ) -> dict[str, Any]:
+        result = original(artifact_root, authority_path)
+        output.symlink_to(protected)
+        return result
+
+    monkeypatch.setattr(module, "validate_artifact", swap_file_after_verdict)
+
+    assert module.main(
+        [
+            "--artifact-root",
+            str(fixture.root),
+            "--authority",
+            str(fixture.authority_path),
+            "--output",
+            str(output),
+        ]
+    ) == 0
+    assert output.is_symlink() is False
+    assert json.loads(output.read_text(encoding="utf-8"))["status"] == "pass"
+    assert protected.read_text(encoding="utf-8") == "protected\n"
+
+
+def test_cli_never_resolves_the_output_path_after_the_verdict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    output = tmp_path / "validation.json"
+    original_validate = module.validate_artifact
+    original_resolve = Path.resolve
+    verdict_complete = False
+
+    def record_verdict(
+        artifact_root: Path, authority_path: Path
+    ) -> dict[str, Any]:
+        nonlocal verdict_complete
+        result = original_validate(artifact_root, authority_path)
+        verdict_complete = True
+        return result
+
+    def guarded_resolve(path: Path, *args: Any, **kwargs: Any) -> Path:
+        if verdict_complete:
+            raise AssertionError("no path may be resolved after the artifact verdict")
+        return original_resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(module, "validate_artifact", record_verdict)
+    monkeypatch.setattr(Path, "resolve", guarded_resolve)
+
+    assert module.main(
+        [
+            "--artifact-root",
+            str(fixture.root),
+            "--authority",
+            str(fixture.authority_path),
+            "--output",
+            str(output),
+        ]
+    ) == 0
+    assert json.loads(output.read_text(encoding="utf-8"))["status"] == "pass"
+
+
+def test_cli_cleans_dirfd_temporary_entry_when_atomic_replace_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    output_root = tmp_path / "output"
+    output_root.mkdir()
+    output = output_root / "validation.json"
+
+    def fail_replace(*_args: Any, **_kwargs: Any) -> None:
+        raise OSError("injected replace failure")
+
+    monkeypatch.setattr(module.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="injected replace failure"):
+        module.main(
+            [
+                "--artifact-root",
+                str(fixture.root),
+                "--authority",
+                str(fixture.authority_path),
+                "--output",
+                str(output),
+            ]
+        )
+
+    assert list(output_root.iterdir()) == []
+
+
+def test_cli_rejects_replacing_the_trusted_authority_file(tmp_path: Path) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+
+    with pytest.raises(
+        module.ArtifactValidationError,
+        match="must not replace the trusted authority file",
+    ):
+        module.main(
+            [
+                "--artifact-root",
+                str(fixture.root),
+                "--authority",
+                str(fixture.authority_path),
+                "--output",
+                str(fixture.authority_path),
+            ]
+        )
 
 
 @pytest.mark.parametrize("name", ["foreign.txt", "Packages", "receipt.json"])
@@ -677,6 +845,116 @@ def test_rejects_hardlinked_package_member(tmp_path: Path) -> None:
 
     with pytest.raises(module.ArtifactValidationError, match="single-link regular file"):
         module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+def test_governed_resource_limits_cover_the_verified_producer_envelope() -> None:
+    module = load_module()
+
+    assert module.MAX_PACKAGE_BYTES == 8 * 1024 * 1024
+    assert module.MAX_IMMUTABLE_SNAPSHOT_BYTES == 32 * 1024 * 1024
+    assert module.MAX_NUPKG_ENTRY_COUNT == 256
+    assert module.MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES == 16 * 1024 * 1024
+    assert module.MAX_NUPKG_TOTAL_UNCOMPRESSED_BYTES == 16 * 1024 * 1024
+    assert 1_544_098 < module.MAX_IMMUTABLE_SNAPSHOT_BYTES
+    assert 6 < module.MAX_NUPKG_ENTRY_COUNT
+    assert 2_847_232 < module.MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES
+    assert 2_849_940 < module.MAX_NUPKG_TOTAL_UNCOMPRESSED_BYTES
+
+
+def test_rejects_aggregate_snapshot_bound_before_any_member_allocation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    member_paths = [
+        fixture.lock_path,
+        fixture.inventory_path,
+        fixture.receipt_path,
+        *fixture.packages_root.iterdir(),
+    ]
+    observed_size = sum(path.stat().st_size for path in member_paths)
+    captures = 0
+    original = module._capture_immutable_member
+
+    def recording_capture(snapshot: Any) -> Any:
+        nonlocal captures
+        captures += 1
+        return original(snapshot)
+
+    monkeypatch.setattr(module, "MAX_IMMUTABLE_SNAPSHOT_BYTES", observed_size - 1)
+    monkeypatch.setattr(module, "_capture_immutable_member", recording_capture)
+
+    with pytest.raises(
+        module.ArtifactValidationError,
+        match="governed aggregate byte bound",
+    ):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+    assert captures == 0
+
+
+def test_rejects_member_bound_before_snapshot_allocation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    package = fixture.packages_root / fixture.inventory["packages"][0]["file_name"]
+    captures = 0
+    original = module._capture_immutable_member
+
+    def recording_capture(snapshot: Any) -> Any:
+        nonlocal captures
+        captures += 1
+        return original(snapshot)
+
+    monkeypatch.setattr(module, "MAX_PACKAGE_BYTES", package.stat().st_size - 1)
+    monkeypatch.setattr(module, "_capture_immutable_member", recording_capture)
+
+    with pytest.raises(module.ArtifactValidationError, match="bounded, single-link"):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+    assert captures == 0
+
+
+def test_rechecks_aggregate_snapshot_bound_during_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    member_paths = [
+        fixture.lock_path,
+        fixture.inventory_path,
+        fixture.receipt_path,
+        *fixture.packages_root.iterdir(),
+    ]
+    observed_size = sum(path.stat().st_size for path in member_paths)
+    original = module._capture_immutable_member
+    substituted = False
+
+    def oversized_capture(snapshot: Any) -> Any:
+        nonlocal substituted
+        member = original(snapshot)
+        if not substituted:
+            substituted = True
+            payload = member.payload + b"x"
+            return module.ImmutableMemberSnapshot(
+                member_path=member.member_path,
+                label=member.label,
+                payload=payload,
+                sha256=digest(payload),
+            )
+        return member
+
+    monkeypatch.setattr(module, "MAX_IMMUTABLE_SNAPSHOT_BYTES", observed_size)
+    monkeypatch.setattr(module, "_capture_immutable_member", oversized_capture)
+
+    with pytest.raises(
+        module.ArtifactValidationError,
+        match="during capture",
+    ):
+        module.validate_artifact(fixture.root, fixture.authority_path)
+    assert substituted is True
 
 
 def test_rejects_package_digest_and_size_drift(tmp_path: Path) -> None:
@@ -1237,6 +1515,81 @@ def test_rejects_rebound_nupkg_semantic_or_payload_substitution(
 
     with pytest.raises(module.ArtifactValidationError, match=message):
         module.validate_artifact(fixture.root, fixture.authority_path)
+
+
+def test_rejects_nupkg_entry_count_before_zipfile_metadata_allocation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    row = fixture.inventory["packages"][0]
+    rendered = package_bytes(
+        row["id"],
+        row["assembly"],
+        [dict(dependency) for dependency in row["dependencies"]],
+        additional_entries={
+            f"tools/entry-{index:03}.bin": b"x"
+            for index in range(module.MAX_NUPKG_ENTRY_COUNT - 3)
+        },
+    )
+
+    def forbid_zipfile(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("ZipFile must not run before the entry-count gate")
+
+    monkeypatch.setattr(module.zipfile, "ZipFile", forbid_zipfile)
+    with pytest.raises(module.ArtifactValidationError, match="entry-count bound"):
+        module._inspect_nupkg(rendered, package=row)
+
+
+def test_rejects_nupkg_per_entry_expansion_before_archive_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    row = fixture.inventory["packages"][0]
+    rendered = package_bytes(
+        row["id"],
+        row["assembly"],
+        [dict(dependency) for dependency in row["dependencies"]],
+        additional_entries={"tools/oversized.bin": b"x" * 2048},
+    )
+
+    def forbid_read(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("archive bytes must not be extracted before expansion gates")
+
+    monkeypatch.setattr(module, "MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES", 1024)
+    monkeypatch.setattr(module.zipfile.ZipFile, "read", forbid_read)
+    with pytest.raises(module.ArtifactValidationError, match="uncompressed bound"):
+        module._inspect_nupkg(rendered, package=row)
+
+
+def test_rejects_nupkg_aggregate_expansion_before_archive_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    row = fixture.inventory["packages"][0]
+    rendered = package_bytes(
+        row["id"],
+        row["assembly"],
+        [dict(dependency) for dependency in row["dependencies"]],
+        additional_entries={
+            "tools/one.bin": b"x" * 700,
+            "tools/two.bin": b"y" * 700,
+        },
+    )
+
+    def forbid_read(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("archive bytes must not be extracted before expansion gates")
+
+    monkeypatch.setattr(module, "MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES", 4096)
+    monkeypatch.setattr(module, "MAX_NUPKG_TOTAL_UNCOMPRESSED_BYTES", 1024)
+    monkeypatch.setattr(module.zipfile.ZipFile, "read", forbid_read)
+    with pytest.raises(module.ArtifactValidationError, match="aggregate uncompressed bound"):
+        module._inspect_nupkg(rendered, package=row)
 
 
 @pytest.mark.parametrize(("field", "value"), [("version", "9.9.9"), ("sha256", "a" * 64)])

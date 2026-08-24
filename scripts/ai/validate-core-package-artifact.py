@@ -19,9 +19,10 @@ import io
 import json
 import os
 import re
+import secrets
 import stat
+import struct
 import sys
-import tempfile
 import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
@@ -270,11 +271,22 @@ CORE_PROPERTIES_PATTERN = re.compile(
     r"^package/services/metadata/core-properties/[0-9a-f]{64}\.psmdcp$"
 )
 
+# These resource ceilings are governed validator policy. Raising one requires a
+# reviewed policy update based on measured producer output; artifact data must
+# never be allowed to expand these limits merely by rebinding its own metadata.
+# The selected Core-main artifact measures 1,544,098 snapshot bytes, with 5-6
+# entries per nupkg, a 2,847,232-byte largest entry, and 2,849,940-byte largest
+# per-nupkg aggregate expansion.
 MAX_AUTHORITY_BYTES = 128 * 1024
-MAX_INVENTORY_BYTES = 2 * 1024 * 1024
-MAX_LOCK_BYTES = 8 * 1024 * 1024
-MAX_RECEIPT_BYTES = 8 * 1024 * 1024
-MAX_PACKAGE_BYTES = 512 * 1024 * 1024
+MAX_INVENTORY_BYTES = 1 * 1024 * 1024
+MAX_LOCK_BYTES = 1 * 1024 * 1024
+MAX_RECEIPT_BYTES = 2 * 1024 * 1024
+MAX_PACKAGE_BYTES = 8 * 1024 * 1024
+MAX_IMMUTABLE_SNAPSHOT_BYTES = 32 * 1024 * 1024
+MAX_NUPKG_ENTRY_COUNT = 256
+MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES = 16 * 1024 * 1024
+MAX_NUPKG_TOTAL_UNCOMPRESSED_BYTES = 16 * 1024 * 1024
+MAX_OUTPUT_NAME_BYTES = 128
 
 AUTHORITY_KEYS = {
     "contract",
@@ -440,6 +452,13 @@ class ImmutableMemberSnapshot:
     label: str
     payload: bytes
     sha256: str
+
+
+@dataclass(frozen=True)
+class HeldOutputDestination:
+    descriptor: int
+    name: str
+    identity: tuple[int, int, int, int, int, int]
 
 
 def _reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
@@ -795,16 +814,28 @@ def _capture_immutable_member(snapshot: HeldFileSnapshot) -> ImmutableMemberSnap
             raise ArtifactValidationError(
                 f"snapshot descriptor cannot be rewound for {snapshot.label}"
             )
-        chunks: list[bytes] = []
-        remaining = snapshot.opened_size
-        while remaining:
-            chunk = os.read(snapshot.descriptor, min(1024 * 1024, remaining))
+        # Preallocate exactly the already-governed member size. This avoids the
+        # former chunk-list plus join copy while preserving an immutable bytes
+        # object after capture.
+        captured = bytearray(snapshot.opened_size)
+        captured_view = memoryview(captured)
+        offset = 0
+        while offset < snapshot.opened_size:
+            chunk = os.read(
+                snapshot.descriptor,
+                min(1024 * 1024, snapshot.opened_size - offset),
+            )
             if not chunk:
                 raise ArtifactValidationError(
                     f"snapshot byte capture ended early for {snapshot.label}"
                 )
-            chunks.append(chunk)
-            remaining -= len(chunk)
+            next_offset = offset + len(chunk)
+            if next_offset > snapshot.opened_size:
+                raise ArtifactValidationError(
+                    f"snapshot byte capture exceeds its bound for {snapshot.label}"
+                )
+            captured_view[offset:next_offset] = chunk
+            offset = next_offset
         if os.read(snapshot.descriptor, 1):
             raise ArtifactValidationError(
                 f"snapshot byte capture exceeds exact size for {snapshot.label}"
@@ -842,7 +873,7 @@ def _capture_immutable_member(snapshot: HeldFileSnapshot) -> ImmutableMemberSnap
         raise ArtifactValidationError(
             f"source identity changed during snapshot capture for {snapshot.label}"
         )
-    payload = b"".join(chunks)
+    payload = bytes(captured)
     return ImmutableMemberSnapshot(
         member_path=snapshot.member_path,
         label=snapshot.label,
@@ -1380,13 +1411,56 @@ def _one_xml_text(root: ET.Element, name: str, *, package_id: str) -> str:
     return values[0]
 
 
+def _declared_zip_entry_count(payload: bytes, *, package_id: str) -> int:
+    """Read the bounded classic EOCD before ZipFile allocates member objects."""
+
+    eocd_size = 22
+    search_start = max(0, len(payload) - eocd_size - 65535)
+    eocd_offset = payload.rfind(b"PK\x05\x06", search_start)
+    if eocd_offset < 0 or eocd_offset + eocd_size > len(payload):
+        raise ArtifactValidationError(f"package {package_id} has no canonical ZIP directory")
+    (
+        _signature,
+        disk_number,
+        directory_disk,
+        disk_entries,
+        total_entries,
+        directory_size,
+        directory_offset,
+        comment_size,
+    ) = struct.unpack_from("<4s4H2LH", payload, eocd_offset)
+    if (
+        disk_number != 0
+        or directory_disk != 0
+        or disk_entries != total_entries
+        or total_entries == 0xFFFF
+        or directory_size == 0xFFFFFFFF
+        or directory_offset == 0xFFFFFFFF
+        or eocd_offset + eocd_size + comment_size != len(payload)
+        or directory_offset + directory_size != eocd_offset
+    ):
+        raise ArtifactValidationError(
+            f"package {package_id} ZIP directory authority is not canonical"
+        )
+    if total_entries > MAX_NUPKG_ENTRY_COUNT:
+        raise ArtifactValidationError(
+            f"package {package_id} exceeds the governed archive entry-count bound"
+        )
+    return total_entries
+
+
 def _inspect_nupkg(payload: bytes, *, package: Mapping[str, Any]) -> None:
     package_id = str(package["id"])
     expected_assembly = f"lib/net10.0/{package['assembly']}"
     expected_nuspec = f"{package_id}.nuspec"
+    declared_entry_count = _declared_zip_entry_count(payload, package_id=package_id)
     try:
         with zipfile.ZipFile(io.BytesIO(payload)) as archive:
             infos = archive.infolist()
+            if len(infos) != declared_entry_count:
+                raise ArtifactValidationError(
+                    f"package {package_id} archive entry count differs from its directory"
+                )
             names = [info.filename for info in infos]
             if names != sorted(names, key=lambda value: (value.casefold(), value)):
                 raise ArtifactValidationError(f"package {package_id} archive is not canonical")
@@ -1396,9 +1470,19 @@ def _inspect_nupkg(payload: bytes, *, package: Mapping[str, Any]) -> None:
                 raise ArtifactValidationError(
                     f"package {package_id} archive members are not uniquely named"
                 )
+            total_uncompressed = 0
             for info in infos:
                 path = PurePosixPath(info.filename)
                 mode = (info.external_attr >> 16) & 0xFFFF
+                if info.file_size > MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES:
+                    raise ArtifactValidationError(
+                        f"package {package_id} archive member exceeds its uncompressed bound"
+                    )
+                total_uncompressed += info.file_size
+                if total_uncompressed > MAX_NUPKG_TOTAL_UNCOMPRESSED_BYTES:
+                    raise ArtifactValidationError(
+                        f"package {package_id} exceeds its aggregate uncompressed bound"
+                    )
                 if (
                     path.is_absolute()
                     or "\\" in info.filename
@@ -1719,9 +1803,35 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
         # performed solely against these private immutable bytes. Mutable
         # source paths are intentionally not claimed to remain current after
         # their individual capture completes.
-        immutable_members = tuple(
-            _capture_immutable_member(held_file) for held_file in held_files
-        )
+        if len(held_files) != 11:
+            raise ArtifactValidationError("artifact snapshot must contain exactly eleven members")
+        opened_snapshot_size = sum(held_file.opened_size for held_file in held_files)
+        if opened_snapshot_size > MAX_IMMUTABLE_SNAPSHOT_BYTES:
+            raise ArtifactValidationError(
+                "artifact snapshot exceeds the governed aggregate byte bound"
+            )
+        captured_size = 0
+        captured_members: list[ImmutableMemberSnapshot] = []
+        for held_file in held_files:
+            if (
+                held_file.opened_size
+                > MAX_IMMUTABLE_SNAPSHOT_BYTES - captured_size
+            ):
+                raise ArtifactValidationError(
+                    "artifact snapshot exceeded the governed aggregate byte bound during capture"
+                )
+            member = _capture_immutable_member(held_file)
+            captured_size += len(member.payload)
+            if captured_size > MAX_IMMUTABLE_SNAPSHOT_BYTES:
+                raise ArtifactValidationError(
+                    "artifact snapshot exceeded the governed aggregate byte bound during capture"
+                )
+            captured_members.append(member)
+        if captured_size != opened_snapshot_size:
+            raise ArtifactValidationError(
+                "artifact snapshot captured size differs from its held member authority"
+            )
+        immutable_members = tuple(captured_members)
         if len(immutable_members) != 11:
             raise ArtifactValidationError("artifact snapshot must contain exactly eleven members")
         member_by_path = {member.member_path: member for member in immutable_members}
@@ -1868,21 +1978,133 @@ def validate_artifact(artifact_root: Path, authority_path: Path) -> dict[str, An
         os.close(root_snapshot.descriptor)
 
 
-def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
-    destination = path.absolute()
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    handle, temporary = tempfile.mkstemp(prefix=f".{destination.name}.", dir=destination.parent)
-    temporary_path = Path(temporary)
+def _safe_output_name(path: Path) -> str:
+    name = _canonical_string(path.name, label="validation output name")
+    if (
+        PurePosixPath(name).name != name
+        or name in {".", ".."}
+        or "/" in name
+        or "\\" in name
+        or len(os.fsencode(name)) > MAX_OUTPUT_NAME_BYTES
+    ):
+        raise ArtifactValidationError(
+            "validation output must use one bounded contained file name"
+        )
+    return name
+
+
+def _hold_output_destination(
+    path: Path,
+    *,
+    artifact_root: Path,
+    authority_path: Path,
+) -> HeldOutputDestination:
+    """Resolve and hold the output directory before artifact capture begins."""
+
+    name = _safe_output_name(path)
+    resolved_artifact_root = artifact_root.resolve(strict=True)
+    resolved_authority_path = authority_path.resolve(strict=True)
+    resolved_parent = path.parent.resolve(strict=True)
+    resolved_destination = resolved_parent / name
+    if (
+        resolved_destination == resolved_artifact_root
+        or resolved_artifact_root in resolved_destination.parents
+    ):
+        raise ArtifactValidationError(
+            "validation output must remain outside the immutable artifact root"
+        )
+    if resolved_destination == resolved_authority_path:
+        raise ArtifactValidationError(
+            "validation output must not replace the trusted authority file"
+        )
+
+    snapshot = _open_directory(resolved_parent, label="validation output directory")
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            json.dump(payload, stream, indent=2, sort_keys=True)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary_path, destination)
+        by_path = os.stat(resolved_parent, follow_symlinks=False)
+    except OSError as exc:
+        os.close(snapshot.descriptor)
+        raise ArtifactValidationError(
+            "validation output directory changed while it was held"
+        ) from exc
+    if _directory_identity(by_path) != snapshot.identity:
+        os.close(snapshot.descriptor)
+        raise ArtifactValidationError(
+            "validation output directory changed while it was held"
+        )
+    return HeldOutputDestination(snapshot.descriptor, name, snapshot.identity)
+
+
+def _atomic_json_at(
+    destination: HeldOutputDestination,
+    payload: Mapping[str, Any],
+) -> None:
+    """Durably replace one output basename relative to its pre-held directory."""
+
+    metadata = os.fstat(destination.descriptor)
+    if (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+    ) != destination.identity[:3] or not stat.S_ISDIR(metadata.st_mode):
+        raise ArtifactValidationError("held validation output directory identity changed")
+
+    rendered = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    temporary_name: str | None = None
+    temporary_descriptor: int | None = None
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        for _attempt in range(128):
+            candidate = f".{destination.name}.{secrets.token_hex(16)}.tmp"
+            try:
+                temporary_descriptor = os.open(
+                    candidate,
+                    flags,
+                    0o600,
+                    dir_fd=destination.descriptor,
+                )
+            except FileExistsError:
+                continue
+            temporary_name = candidate
+            break
+        if temporary_descriptor is None or temporary_name is None:
+            raise ArtifactValidationError(
+                "unable to allocate a unique validation output temporary file"
+            )
+
+        offset = 0
+        while offset < len(rendered):
+            written = os.write(temporary_descriptor, rendered[offset:])
+            if written <= 0:
+                raise ArtifactValidationError("validation output write ended early")
+            offset += written
+        os.fchmod(temporary_descriptor, 0o644)
+        os.fsync(temporary_descriptor)
+        os.close(temporary_descriptor)
+        temporary_descriptor = None
+        os.replace(
+            temporary_name,
+            destination.name,
+            src_dir_fd=destination.descriptor,
+            dst_dir_fd=destination.descriptor,
+        )
+        temporary_name = None
+        os.fsync(destination.descriptor)
     finally:
-        if temporary_path.exists():
-            temporary_path.unlink()
+        if temporary_descriptor is not None:
+            os.close(temporary_descriptor)
+        if temporary_name is not None:
+            try:
+                os.unlink(temporary_name, dir_fd=destination.descriptor)
+            except FileNotFoundError:
+                pass
+            else:
+                os.fsync(destination.descriptor)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -1897,19 +2119,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    output_destination: HeldOutputDestination | None = None
     if args.output is not None:
-        artifact_root = args.artifact_root.resolve(strict=True)
-        output = args.output.resolve(strict=False)
-        if output == artifact_root or artifact_root in output.parents:
-            raise ArtifactValidationError(
-                "validation output must remain outside the immutable artifact root"
-            )
-    result = validate_artifact(args.artifact_root, args.authority)
-    if args.output is not None:
-        _atomic_json(args.output, result)
-    else:
-        json.dump(result, sys.stdout, indent=2, sort_keys=True)
-        sys.stdout.write("\n")
+        output_destination = _hold_output_destination(
+            args.output,
+            artifact_root=args.artifact_root,
+            authority_path=args.authority,
+        )
+    try:
+        result = validate_artifact(args.artifact_root, args.authority)
+        if output_destination is not None:
+            _atomic_json_at(output_destination, result)
+        else:
+            json.dump(result, sys.stdout, indent=2, sort_keys=True)
+            sys.stdout.write("\n")
+    finally:
+        if output_destination is not None:
+            os.close(output_destination.descriptor)
     return 0
 
 
