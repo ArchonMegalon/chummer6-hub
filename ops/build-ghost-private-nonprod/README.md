@@ -40,6 +40,20 @@ exact source/runtime boundary, blocker map, first-rollout sequencing, and
 operator stop conditions. This source does not activate or configure a
 VidBoard asset, Zoom, Teams, Tough Tongue, Cloudflare, or a public route.
 
+For the first provider-disabled Rook transition, use the governed
+[`deploy-first-provider-disabled-rook-lane.sh`](deploy-first-provider-disabled-rook-lane.sh)
+instead of the rolling AI or Presentation helpers. It requires the clean Hub
+source to equal authoritative `origin/main`, all six exact clean source
+revisions, a caller-supplied stable and distinct live-support journal key, an
+existing mode-0700 directory for a new redacted receipt, at least 28 GiB free
+under `/docker`, safe IO PSI, and the existing healthy loopback-only lane. It
+preserves immutable image rollback references and every existing volume,
+admits only a new absent live-support volume, keeps all provider and VidBoard
+inputs disabled/empty, and runs the exact local canary. It never generates or
+prints the journal key and never deletes a volume or image. The optional
+Cloudflare profile remains disabled; its strict Compose network-name input
+must still name an existing network so model rendering can fail closed.
+
 ### Optional Cloudflare Access ingress (not activated)
 
 The default lane remains loopback-only. A separate
