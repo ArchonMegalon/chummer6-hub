@@ -96,6 +96,13 @@ public sealed class DisabledToughTongueLiveSupportMeetingClient : IToughTongueLi
             false,
             false,
             "tough-tongue-meeting-bot-disabled",
+            0,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
             string.Empty,
             string.Empty,
             string.Empty));
@@ -113,8 +120,6 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
     public const string RookVidBoardMediaHrefKey = "CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_HREF";
     public const string RookVidBoardMediaDigestKey = "CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_DIGEST";
 
-    private const string DeterministicFallback =
-        "Rook can continue in the grounded Chummer help flow while live support is unavailable.";
     private const int MaximumReceiptBytes = 64 * 1024;
     private static readonly Regex SafeIdentifier = new(
         "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
@@ -408,6 +413,10 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
                         request.RequestId,
                         request.MeetingProvider,
                         meeting.JoinUrl,
+                        receipt.AccountScopeRefDigest,
+                        receipt.ScenarioRefDigest,
+                        receipt.AvatarAlias,
+                        receipt.AvatarBindingDigest,
                         request.IdempotencyKey),
                     cancellationToken).ConfigureAwait(false);
             }
@@ -460,7 +469,11 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
                 return uncertain;
             }
 
-            IReadOnlyList<string> botFailures = ValidateBot(bot);
+            IReadOnlyList<string> botFailures = ValidateBot(
+                bot,
+                receipt,
+                request.MeetingProvider,
+                meeting.JoinUrl);
             if (botFailures.Count != 0)
             {
                 List<string> compensatedFailures = [.. botFailures];
@@ -618,15 +631,35 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
             providers.Add(provider);
         }
 
+        JsonArray providerCanaries = [];
+        foreach (BuildGhostLiveSupportProviderCanaryReceipt canary in receipt.ProviderCanaries ?? [])
+        {
+            providerCanaries.Add(new JsonObject
+            {
+                ["schema"] = canary.Schema,
+                ["meetingProvider"] = canary.MeetingProvider,
+                ["accountScopeRefDigest"] = canary.AccountScopeRefDigest,
+                ["scenarioRefDigest"] = canary.ScenarioRefDigest,
+                ["avatarAlias"] = canary.AvatarAlias,
+                ["avatarBindingDigest"] = canary.AvatarBindingDigest,
+                ["photorealisticVideoInMeetingVerified"] = canary.PhotorealisticVideoInMeetingVerified,
+                ["evidenceSource"] = canary.EvidenceSource,
+                ["observedAtUtc"] = canary.ObservedAtUtc.ToUniversalTime().ToString("O"),
+                ["maximumAgeSeconds"] = canary.MaximumAgeSeconds,
+                ["receiptDigest"] = canary.ReceiptDigest,
+                ["authorityMac"] = canary.AuthorityMac
+            });
+        }
+
         JsonObject authority = new()
         {
             ["schema"] = receipt.Schema,
             ["meetingProviders"] = providers,
+            ["providerCanaries"] = providerCanaries,
             ["accountScopeRefDigest"] = receipt.AccountScopeRefDigest,
             ["scenarioRefDigest"] = receipt.ScenarioRefDigest,
             ["avatarAlias"] = receipt.AvatarAlias,
             ["avatarBindingDigest"] = receipt.AvatarBindingDigest,
-            ["photorealisticVideoInMeetingVerified"] = receipt.PhotorealisticVideoInMeetingVerified,
             ["recordingDisclosureRequired"] = receipt.RecordingDisclosureRequired,
             ["availableMinutesAtObservation"] = receipt.AvailableMinutesAtObservation,
             ["reservedMinutes"] = receipt.ReservedMinutes,
@@ -636,6 +669,40 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
             ["maximumAgeSeconds"] = receipt.MaximumAgeSeconds
         };
         return DigestText(authority.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
+    }
+
+    public static string DigestProviderCanaryReceipt(BuildGhostLiveSupportProviderCanaryReceipt receipt)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        JsonObject authority = new()
+        {
+            ["schema"] = receipt.Schema,
+            ["meetingProvider"] = receipt.MeetingProvider,
+            ["accountScopeRefDigest"] = receipt.AccountScopeRefDigest,
+            ["scenarioRefDigest"] = receipt.ScenarioRefDigest,
+            ["avatarAlias"] = receipt.AvatarAlias,
+            ["avatarBindingDigest"] = receipt.AvatarBindingDigest,
+            ["photorealisticVideoInMeetingVerified"] = receipt.PhotorealisticVideoInMeetingVerified,
+            ["evidenceSource"] = receipt.EvidenceSource,
+            ["observedAtUtc"] = receipt.ObservedAtUtc.ToUniversalTime().ToString("O"),
+            ["maximumAgeSeconds"] = receipt.MaximumAgeSeconds
+        };
+        return DigestText(authority.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
+    }
+
+    public static string ComputeProviderCanaryAuthorityMac(
+        BuildGhostLiveSupportProviderCanaryReceipt receipt,
+        ReadOnlySpan<byte> key)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        if (key.Length != 32)
+        {
+            throw new ArgumentException("Provider canary authority key must contain exactly 32 bytes.", nameof(key));
+        }
+
+        string receiptDigest = DigestProviderCanaryReceipt(receipt);
+        byte[] mac = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(receiptDigest));
+        return $"hmac-sha256:{Convert.ToHexString(mac).ToLowerInvariant()}";
     }
 
     public static string ComputeCapabilityReceiptAuthorityMac(
@@ -687,7 +754,7 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
             videoReady ? configuredDigest : string.Empty,
             videoReady,
             videoReady ? "ready" : "text-fallback",
-            DeterministicFallback,
+            BuildGhostDefaultSupportContract.DeterministicRookTextFallback,
             blockers.Distinct(StringComparer.Ordinal).OrderBy(static reason => reason, StringComparer.Ordinal).ToArray());
     }
 
@@ -757,7 +824,8 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
         DateTimeOffset now)
     {
         List<string> failures = [];
-        if (!string.Equals(receipt.Schema, ToughTongueBuildGhostContractVersions.LiveSupportCapabilityReceiptV1, StringComparison.Ordinal))
+        byte[] authorityKey = ResolveCapabilityAuthorityKey(_configuration[CapabilityReceiptHmacKey]);
+        if (!string.Equals(receipt.Schema, ToughTongueBuildGhostContractVersions.LiveSupportCapabilityReceiptV2, StringComparison.Ordinal))
             failures.Add("live-support-capability-receipt-schema-invalid");
         if (receipt.MeetingProviders is null
             || receipt.MeetingProviders.Count == 0
@@ -765,13 +833,21 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
             || receipt.MeetingProviders.Distinct(StringComparer.Ordinal).Count() != receipt.MeetingProviders.Count
             || !receipt.MeetingProviders.SequenceEqual(receipt.MeetingProviders.OrderBy(static value => value, StringComparer.Ordinal), StringComparer.Ordinal))
             failures.Add("live-support-capability-meeting-providers-invalid");
+        if (receipt.ProviderCanaries is null
+            || receipt.MeetingProviders is null
+            || receipt.ProviderCanaries.Count != receipt.MeetingProviders.Count
+            || receipt.ProviderCanaries.Any(static canary => canary is null)
+            || !receipt.ProviderCanaries
+                .Select(static canary => canary.MeetingProvider)
+                .SequenceEqual(receipt.MeetingProviders, StringComparer.Ordinal))
+        {
+            failures.Add("live-support-provider-canary-set-invalid");
+        }
         if (!IsSha256(receipt.AccountScopeRefDigest)) failures.Add("live-support-capability-account-scope-digest-invalid");
         if (!IsSha256(receipt.ScenarioRefDigest)) failures.Add("live-support-capability-scenario-digest-invalid");
         if (!string.Equals(receipt.AvatarAlias, ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, StringComparison.Ordinal))
             failures.Add("live-support-capability-avatar-alias-invalid");
         if (!IsSha256(receipt.AvatarBindingDigest)) failures.Add("live-support-capability-avatar-binding-digest-invalid");
-        if (!receipt.PhotorealisticVideoInMeetingVerified)
-            failures.Add("live-support-photorealistic-video-in-meeting-unverified");
         if (!receipt.RecordingDisclosureRequired)
             failures.Add("live-support-recording-disclosure-not-required");
         if (receipt.AvailableMinutesAtObservation is < 0 or > 1_000_000)
@@ -810,7 +886,18 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
             || !FixedTimeDigestEquals(receipt.AvatarBindingDigest, expectedAvatarBinding))
             failures.Add("live-support-capability-avatar-binding-authority-mismatch");
 
-        byte[] authorityKey = ResolveCapabilityAuthorityKey(_configuration[CapabilityReceiptHmacKey]);
+        if (receipt.ProviderCanaries is not null)
+        {
+            foreach (BuildGhostLiveSupportProviderCanaryReceipt? canary in receipt.ProviderCanaries)
+            {
+                if (canary is null)
+                {
+                    continue;
+                }
+                failures.AddRange(ValidateProviderCanary(canary, receipt, now, authorityKey));
+            }
+        }
+
         if (authorityKey.Length != 32
             || !FixedTimeMacEquals(
                 receipt.AuthorityMac,
@@ -821,6 +908,54 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
             failures.Add("live-support-capability-authority-mac-invalid");
         }
         CryptographicOperations.ZeroMemory(authorityKey);
+        return failures;
+    }
+
+    private static IReadOnlyList<string> ValidateProviderCanary(
+        BuildGhostLiveSupportProviderCanaryReceipt canary,
+        BuildGhostLiveSupportCapabilityReceipt capability,
+        DateTimeOffset now,
+        ReadOnlySpan<byte> authorityKey)
+    {
+        string providerLabel = IsMeetingProvider(canary.MeetingProvider)
+            ? canary.MeetingProvider
+            : "unknown-provider";
+        string Prefix(string reason) => $"{providerLabel}-live-support-provider-canary-{reason}";
+        List<string> failures = [];
+        if (!string.Equals(
+                canary.Schema,
+                ToughTongueBuildGhostContractVersions.LiveSupportProviderCanaryReceiptV1,
+                StringComparison.Ordinal))
+            failures.Add(Prefix("schema-invalid"));
+        if (!IsMeetingProvider(canary.MeetingProvider)) failures.Add(Prefix("meeting-provider-invalid"));
+        if (!FixedTimeDigestEquals(canary.AccountScopeRefDigest, capability.AccountScopeRefDigest))
+            failures.Add(Prefix("account-scope-authority-mismatch"));
+        if (!FixedTimeDigestEquals(canary.ScenarioRefDigest, capability.ScenarioRefDigest))
+            failures.Add(Prefix("scenario-authority-mismatch"));
+        if (!string.Equals(canary.AvatarAlias, capability.AvatarAlias, StringComparison.Ordinal))
+            failures.Add(Prefix("avatar-alias-mismatch"));
+        if (!FixedTimeDigestEquals(canary.AvatarBindingDigest, capability.AvatarBindingDigest))
+            failures.Add(Prefix("avatar-binding-authority-mismatch"));
+        if (!canary.PhotorealisticVideoInMeetingVerified)
+            failures.Add(Prefix("photorealistic-video-unverified"));
+        if (string.IsNullOrWhiteSpace(canary.EvidenceSource) || canary.EvidenceSource.Length > 160)
+            failures.Add(Prefix("evidence-source-invalid"));
+        if (canary.MaximumAgeSeconds is < 60 or > 86_400
+            || canary.MaximumAgeSeconds > capability.MaximumAgeSeconds)
+            failures.Add(Prefix("maximum-age-invalid"));
+        if (canary.ObservedAtUtc > now.AddMinutes(5)
+            || now - canary.ObservedAtUtc > TimeSpan.FromSeconds(Math.Max(canary.MaximumAgeSeconds, 0)))
+            failures.Add(Prefix("stale-or-future"));
+        if (!IsSha256(canary.ReceiptDigest)
+            || !FixedTimeDigestEquals(canary.ReceiptDigest, DigestProviderCanaryReceipt(canary)))
+            failures.Add(Prefix("receipt-digest-invalid"));
+        if (authorityKey.Length != 32
+            || !FixedTimeMacEquals(
+                canary.AuthorityMac,
+                authorityKey.Length == 32
+                    ? ComputeProviderCanaryAuthorityMac(canary, authorityKey)
+                    : string.Empty))
+            failures.Add(Prefix("authority-mac-invalid"));
         return failures;
     }
 
@@ -876,13 +1011,33 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
         return failures.Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static IReadOnlyList<string> ValidateBot(BuildGhostToughTongueMeetingBotResult bot)
+    private static IReadOnlyList<string> ValidateBot(
+        BuildGhostToughTongueMeetingBotResult bot,
+        BuildGhostLiveSupportCapabilityReceipt capability,
+        string meetingProvider,
+        Uri joinUrl)
     {
         List<string> failures = [];
         if (!bot.Success) failures.Add(NormalizeOutcome(bot.OutcomeCode, "tough-tongue-meeting-bot-provisioning-failed"));
+        if (bot.BotCount != 1) failures.Add("tough-tongue-meeting-bot-count-invalid");
+        if (!string.Equals(bot.LifecycleStatus, "joined", StringComparison.Ordinal))
+            failures.Add("tough-tongue-meeting-bot-not-joined");
+        if (!FixedTimeDigestEquals(bot.AccountScopeRefDigest, capability.AccountScopeRefDigest))
+            failures.Add("tough-tongue-meeting-bot-account-scope-authority-mismatch");
+        if (!FixedTimeDigestEquals(bot.ScenarioRefDigest, capability.ScenarioRefDigest))
+            failures.Add("tough-tongue-meeting-bot-scenario-authority-mismatch");
+        if (!string.Equals(bot.AvatarAlias, capability.AvatarAlias, StringComparison.Ordinal))
+            failures.Add("tough-tongue-meeting-bot-avatar-alias-mismatch");
+        if (!FixedTimeDigestEquals(bot.AvatarBindingDigest, capability.AvatarBindingDigest))
+            failures.Add("tough-tongue-meeting-bot-avatar-binding-authority-mismatch");
         if (!IsSha256(bot.BotRefDigest)) failures.Add("tough-tongue-meeting-bot-ref-digest-invalid");
         if (!IsSha256(bot.SessionRefDigest)) failures.Add("tough-tongue-meeting-session-ref-digest-invalid");
         if (!IsSha256(bot.ProviderResponseDigest)) failures.Add("tough-tongue-meeting-response-digest-invalid");
+        if (!IsSha256(bot.JoinReceiptDigest)
+            || !FixedTimeDigestEquals(
+                bot.JoinReceiptDigest,
+                DigestBotJoinReceipt(bot, meetingProvider, joinUrl)))
+            failures.Add("tough-tongue-meeting-bot-join-receipt-digest-invalid");
         return failures.Distinct(StringComparer.Ordinal).ToArray();
     }
 
@@ -1156,8 +1311,33 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
     private static string DigestBotReceipt(BuildGhostToughTongueMeetingBotResult bot)
         => DigestText(string.Join(
             '\n',
+            bot.BotCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            bot.LifecycleStatus,
+            bot.AccountScopeRefDigest,
+            bot.ScenarioRefDigest,
+            bot.AvatarAlias,
+            bot.AvatarBindingDigest,
             bot.BotRefDigest,
             bot.SessionRefDigest,
+            bot.ProviderResponseDigest,
+            bot.JoinReceiptDigest));
+
+    private static string DigestBotJoinReceipt(
+        BuildGhostToughTongueMeetingBotResult bot,
+        string meetingProvider,
+        Uri joinUrl)
+        => DigestText(string.Join(
+            '\n',
+            "chummer.build_ghost.live_support_join_receipt.v1",
+            meetingProvider,
+            joinUrl.AbsoluteUri,
+            bot.BotRefDigest,
+            bot.SessionRefDigest,
+            bot.LifecycleStatus,
+            bot.AccountScopeRefDigest,
+            bot.ScenarioRefDigest,
+            bot.AvatarAlias,
+            bot.AvatarBindingDigest,
             bot.ProviderResponseDigest));
 
     private static string DigestText(string value)

@@ -45,6 +45,8 @@ public static class ToughTongueBuildGhostContractVersions
     public const string LiveSupportRequestV1 = "chummer.build_ghost.live_support_request.v1";
     public const string LiveSupportSessionV1 = "chummer.build_ghost.live_support_session.v1";
     public const string LiveSupportCapabilityReceiptV1 = "chummer.build_ghost.live_support_capability_receipt.v1";
+    public const string LiveSupportCapabilityReceiptV2 = "chummer.build_ghost.live_support_capability_receipt.v2";
+    public const string LiveSupportProviderCanaryReceiptV1 = "chummer.build_ghost.live_support_provider_canary_receipt.v1";
     public const string LiveSupportStatusRequestV1 = "chummer.build_ghost.live_support_status_request.v1";
 }
 
@@ -61,6 +63,12 @@ public static class BuildGhostSupportChannelKinds
 {
     public const string RookVidBoard = "rook_vidboard";
     public const string LivePhotorealMeeting = "live_photoreal_meeting";
+}
+
+public static class BuildGhostDefaultSupportContract
+{
+    public const string DeterministicRookTextFallback =
+        "Rook can continue with grounded Chummer text help while the VidBoard clip is unavailable.";
 }
 
 public static class BuildGhostLiveMeetingProviders
@@ -669,15 +677,29 @@ public sealed record BuildGhostLiveSupportStatusRequest(
 public sealed record BuildGhostLiveSupportCapabilityReceipt(
     string Schema,
     IReadOnlyList<string> MeetingProviders,
+    IReadOnlyList<BuildGhostLiveSupportProviderCanaryReceipt> ProviderCanaries,
+    string AccountScopeRefDigest,
+    string ScenarioRefDigest,
+    string AvatarAlias,
+    string AvatarBindingDigest,
+    bool RecordingDisclosureRequired,
+    decimal AvailableMinutesAtObservation,
+    decimal ReservedMinutes,
+    decimal LiveAvatarMinutesMultiplier,
+    string EvidenceSource,
+    DateTimeOffset ObservedAtUtc,
+    int MaximumAgeSeconds,
+    string ReceiptDigest,
+    string AuthorityMac);
+
+public sealed record BuildGhostLiveSupportProviderCanaryReceipt(
+    string Schema,
+    string MeetingProvider,
     string AccountScopeRefDigest,
     string ScenarioRefDigest,
     string AvatarAlias,
     string AvatarBindingDigest,
     bool PhotorealisticVideoInMeetingVerified,
-    bool RecordingDisclosureRequired,
-    decimal AvailableMinutesAtObservation,
-    decimal ReservedMinutes,
-    decimal LiveAvatarMinutesMultiplier,
     string EvidenceSource,
     DateTimeOffset ObservedAtUtc,
     int MaximumAgeSeconds,
@@ -719,15 +741,26 @@ public sealed record BuildGhostToughTongueMeetingBotCommand(
     string RequestId,
     string MeetingProvider,
     Uri JoinUrl,
+    string AccountScopeRefDigest,
+    string ScenarioRefDigest,
+    string AvatarAlias,
+    string AvatarBindingDigest,
     string IdempotencyKey);
 
 public sealed record BuildGhostToughTongueMeetingBotResult(
     bool Success,
     bool ReconciliationRequired,
     string OutcomeCode,
+    int BotCount,
+    string LifecycleStatus,
+    string AccountScopeRefDigest,
+    string ScenarioRefDigest,
+    string AvatarAlias,
+    string AvatarBindingDigest,
     string BotRefDigest,
     string SessionRefDigest,
-    string ProviderResponseDigest);
+    string ProviderResponseDigest,
+    string JoinReceiptDigest);
 
 public sealed record BuildGhostLiveSupportSessionProjection(
     string Schema,

@@ -30,7 +30,7 @@ public sealed class ToughTongueLiveSupportMeetingClientTests
         RecordingHandler handler = new(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(
-                "{\"success\":true,\"bots\":[{\"bot_id\":\"bot-1\",\"session_id\":\"session-1\"}]}",
+                BotResponse(),
                 Encoding.UTF8,
                 "application/json")
         });
@@ -39,10 +39,17 @@ public sealed class ToughTongueLiveSupportMeetingClientTests
         BuildGhostToughTongueMeetingBotResult result = await client.ScheduleAsync(Command(), CancellationToken.None);
 
         Assert.IsTrue(result.Success);
-        Assert.AreEqual("scheduled", result.OutcomeCode);
+        Assert.AreEqual("joined", result.OutcomeCode);
+        Assert.AreEqual(1, result.BotCount);
+        Assert.AreEqual("joined", result.LifecycleStatus);
+        Assert.AreEqual(Digest("account"), result.AccountScopeRefDigest);
+        Assert.AreEqual(Digest("0123456789abcdef01234567"), result.ScenarioRefDigest);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, result.AvatarAlias);
+        Assert.AreEqual(Digest("avatar-binding"), result.AvatarBindingDigest);
         Assert.IsTrue(result.BotRefDigest.StartsWith("sha256:", StringComparison.Ordinal));
         Assert.IsTrue(result.SessionRefDigest.StartsWith("sha256:", StringComparison.Ordinal));
         Assert.IsTrue(result.ProviderResponseDigest.StartsWith("sha256:", StringComparison.Ordinal));
+        Assert.IsTrue(result.JoinReceiptDigest.StartsWith("sha256:", StringComparison.Ordinal));
         Assert.AreEqual(1, handler.Calls);
         Assert.AreEqual(HttpMethod.Post, handler.Method);
         Assert.AreEqual(
@@ -56,6 +63,16 @@ public sealed class ToughTongueLiveSupportMeetingClientTests
         Assert.AreEqual("0123456789abcdef01234567", body.RootElement.GetProperty("scenario_id").GetString());
         Assert.AreEqual("https://zoom.us/j/123456789", body.RootElement.GetProperty("meeting_url").GetString());
         Assert.AreEqual("zoom", body.RootElement.GetProperty("meeting_provider").GetString());
+        Assert.AreEqual(Digest("account"), body.RootElement.GetProperty("account_scope_ref_digest").GetString());
+        Assert.AreEqual(
+            Digest("0123456789abcdef01234567"),
+            body.RootElement.GetProperty("scenario_ref_digest").GetString());
+        Assert.AreEqual(
+            ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+            body.RootElement.GetProperty("avatar_alias").GetString());
+        Assert.AreEqual(
+            Digest("avatar-binding"),
+            body.RootElement.GetProperty("avatar_binding_digest").GetString());
         Assert.AreEqual("Chummer Live Support", body.RootElement.GetProperty("bot_name").GetString());
         Assert.AreEqual(JsonValueKind.Null, body.RootElement.GetProperty("scheduled_ts").ValueKind);
         Assert.IsFalse(JsonSerializer.Serialize(result).Contains("bot-1", StringComparison.Ordinal));
@@ -101,6 +118,68 @@ public sealed class ToughTongueLiveSupportMeetingClientTests
         Assert.IsTrue(accepted.ReconciliationRequired);
     }
 
+    [TestMethod]
+    public async Task Scheduled_but_not_joined_bot_is_rejected()
+    {
+        RecordingHandler handler = new(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(BotResponse(lifecycleStatus: "scheduled"), Encoding.UTF8, "application/json")
+        });
+
+        BuildGhostToughTongueMeetingBotResult result = await Client(handler, ValidConfiguration())
+            .ScheduleAsync(Command(), CancellationToken.None);
+
+        Assert.IsFalse(result.Success);
+        Assert.IsTrue(result.ReconciliationRequired);
+        Assert.AreEqual("tough-tongue-meeting-bot-not-joined", result.OutcomeCode);
+        Assert.AreEqual(0, result.BotCount);
+    }
+
+    [TestMethod]
+    [DataRow("account")]
+    [DataRow("scenario")]
+    [DataRow("alias")]
+    [DataRow("binding")]
+    public async Task Joined_bot_with_mismatched_authority_is_rejected(string mismatch)
+    {
+        RecordingHandler handler = new(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                BotResponse(
+                    accountScopeRefDigest: mismatch == "account" ? Digest("other-account") : null,
+                    scenarioRefDigest: mismatch == "scenario" ? Digest("other-scenario") : null,
+                    avatarAlias: mismatch == "alias" ? "unapproved-avatar" : null,
+                    avatarBindingDigest: mismatch == "binding" ? Digest("other-binding") : null),
+                Encoding.UTF8,
+                "application/json")
+        });
+
+        BuildGhostToughTongueMeetingBotResult result = await Client(handler, ValidConfiguration())
+            .ScheduleAsync(Command(), CancellationToken.None);
+
+        Assert.IsFalse(result.Success);
+        Assert.IsTrue(result.ReconciliationRequired);
+        Assert.AreEqual("tough-tongue-meeting-bot-authority-binding-invalid", result.OutcomeCode);
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(2)]
+    public async Task Zero_or_multiple_bots_are_rejected(int botCount)
+    {
+        RecordingHandler handler = new(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(BotResponse(botCount: botCount), Encoding.UTF8, "application/json")
+        });
+
+        BuildGhostToughTongueMeetingBotResult result = await Client(handler, ValidConfiguration())
+            .ScheduleAsync(Command(), CancellationToken.None);
+
+        Assert.IsFalse(result.Success);
+        Assert.IsTrue(result.ReconciliationRequired);
+        Assert.AreEqual("tough-tongue-meeting-bot-response-invalid", result.OutcomeCode);
+    }
+
     private static ToughTongueLiveSupportMeetingClient Client(
         HttpMessageHandler handler,
         IReadOnlyDictionary<string, string?> values)
@@ -126,7 +205,36 @@ public sealed class ToughTongueLiveSupportMeetingClientTests
             "request-live-1",
             BuildGhostLiveMeetingProviders.Zoom,
             new Uri("https://zoom.us/j/123456789", UriKind.Absolute),
+            Digest("account"),
+            Digest("0123456789abcdef01234567"),
+            ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+            Digest("avatar-binding"),
             "idempotency-live-1");
+
+    private static string BotResponse(
+        string lifecycleStatus = "joined",
+        string? accountScopeRefDigest = null,
+        string? scenarioRefDigest = null,
+        string? avatarAlias = null,
+        string? avatarBindingDigest = null,
+        int botCount = 1)
+        => JsonSerializer.Serialize(new
+        {
+            success = true,
+            bots = Enumerable.Range(1, botCount).Select(index => new
+            {
+                bot_id = $"bot-{index}",
+                session_id = $"session-{index}",
+                lifecycle_status = lifecycleStatus,
+                account_scope_ref_digest = accountScopeRefDigest ?? Digest("account"),
+                scenario_ref_digest = scenarioRefDigest ?? Digest("0123456789abcdef01234567"),
+                avatar_alias = avatarAlias ?? ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+                avatar_binding_digest = avatarBindingDigest ?? Digest("avatar-binding")
+            }).ToArray()
+        });
+
+    private static string Digest(string value)
+        => $"sha256:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
 
     private sealed class RecordingHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {

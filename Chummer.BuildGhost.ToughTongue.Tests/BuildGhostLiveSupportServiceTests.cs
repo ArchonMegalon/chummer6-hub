@@ -33,6 +33,9 @@ public sealed class BuildGhostLiveSupportServiceTests
         Assert.AreEqual(ToughTongueBuildGhostPersonaIds.RookAvatar, experience.DefaultSupport.AvatarId);
         Assert.AreEqual(ToughTongueBuildGhostPersonaIds.RookVidBoardSupport, experience.DefaultSupport.MediaAssetId);
         Assert.IsFalse(experience.DefaultSupport.PreRenderedVideoReady);
+        Assert.AreEqual(
+            BuildGhostDefaultSupportContract.DeterministicRookTextFallback,
+            experience.DefaultSupport.DeterministicTextFallback);
         Assert.IsFalse(experience.LiveSupport.RequestAvailable);
         Assert.AreEqual(BuildGhostLiveSupportStatuses.Unavailable, session.Status);
         Assert.IsNull(session.JoinUrl);
@@ -53,7 +56,7 @@ public sealed class BuildGhostLiveSupportServiceTests
         };
         RecordingMeetingBotClient bots = new()
         {
-            Result = SuccessfulBot()
+            Result = SuccessfulBot(new Uri("https://chummer.zoom.us/j/123456789?pwd=opaque", UriKind.Absolute))
         };
         BuildGhostLiveSupportService service = CreateService(Configuration(receipt.Path), broker, bots);
 
@@ -186,6 +189,97 @@ public sealed class BuildGhostLiveSupportServiceTests
     }
 
     [TestMethod]
+    public void Outer_capability_signature_cannot_turn_one_provider_canary_into_another()
+    {
+        using ReceiptFile receipt = ReceiptFile.Create([
+            BuildGhostLiveMeetingProviders.Teams,
+            BuildGhostLiveMeetingProviders.Zoom
+        ]);
+        BuildGhostLiveSupportCapabilityReceipt original =
+            JsonSerializer.Deserialize<BuildGhostLiveSupportCapabilityReceipt>(File.ReadAllText(receipt.Path))!;
+        BuildGhostLiveSupportProviderCanaryReceipt confusedZoomCanary = original.ProviderCanaries[0] with
+        {
+            MeetingProvider = BuildGhostLiveMeetingProviders.Zoom
+        };
+        BuildGhostLiveSupportCapabilityReceipt confused = original with
+        {
+            ProviderCanaries = [original.ProviderCanaries[0], confusedZoomCanary],
+            ReceiptDigest = string.Empty,
+            AuthorityMac = string.Empty
+        };
+        confused = confused with
+        {
+            ReceiptDigest = BuildGhostLiveSupportService.DigestCapabilityReceipt(confused)
+        };
+        confused = confused with
+        {
+            AuthorityMac = BuildGhostLiveSupportService.ComputeCapabilityReceiptAuthorityMac(
+                confused,
+                ReceiptAuthorityKey)
+        };
+        File.WriteAllText(receipt.Path, JsonSerializer.Serialize(confused));
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(receipt.Path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        BuildGhostLiveSupportService service = CreateService(
+            Configuration(receipt.Path),
+            new RecordingMeetingBroker(),
+            new RecordingMeetingBotClient());
+
+        BuildGhostSupportExperienceProjection experience = service.BuildExperience();
+
+        Assert.IsFalse(experience.LiveSupport.RequestAvailable);
+        Assert.IsEmpty(experience.LiveSupport.MeetingProviders);
+        CollectionAssert.Contains(
+            experience.LiveSupport.BlockingReasons.ToArray(),
+            "zoom-live-support-provider-canary-receipt-digest-invalid");
+        CollectionAssert.Contains(
+            experience.LiveSupport.BlockingReasons.ToArray(),
+            "zoom-live-support-provider-canary-authority-mac-invalid");
+    }
+
+    [TestMethod]
+    [DataRow("scheduled", "tough-tongue-meeting-bot-not-joined")]
+    [DataRow("account", "tough-tongue-meeting-bot-account-scope-authority-mismatch")]
+    [DataRow("scenario", "tough-tongue-meeting-bot-scenario-authority-mismatch")]
+    [DataRow("alias", "tough-tongue-meeting-bot-avatar-alias-mismatch")]
+    [DataRow("binding", "tough-tongue-meeting-bot-avatar-binding-authority-mismatch")]
+    public async Task Ready_requires_joined_bot_bound_to_capability_authority(
+        string mismatch,
+        string expectedReason)
+    {
+        using ReceiptFile receipt = ReceiptFile.Create([BuildGhostLiveMeetingProviders.Zoom]);
+        BuildGhostToughTongueMeetingBotResult result = mismatch switch
+        {
+            "scheduled" => SuccessfulBot() with { LifecycleStatus = "scheduled" },
+            "account" => SuccessfulBot() with { AccountScopeRefDigest = Digest("other-account") },
+            "scenario" => SuccessfulBot() with { ScenarioRefDigest = Digest("other-scenario") },
+            "alias" => SuccessfulBot() with { AvatarAlias = "unapproved-avatar" },
+            "binding" => SuccessfulBot() with { AvatarBindingDigest = Digest("other-binding") },
+            _ => throw new AssertFailedException("Unexpected mismatch case.")
+        };
+        RecordingMeetingBroker broker = new()
+        {
+            CreateResult = SuccessfulMeeting(
+                BuildGhostLiveMeetingProviders.Zoom,
+                new Uri("https://zoom.us/j/123456789", UriKind.Absolute))
+        };
+        RecordingMeetingBotClient bots = new() { Result = result };
+        BuildGhostLiveSupportService service = CreateService(Configuration(receipt.Path), broker, bots);
+
+        BuildGhostLiveSupportSessionProjection session = await service.RequestAsync(
+            Request(),
+            CancellationToken.None);
+
+        Assert.AreEqual(BuildGhostLiveSupportStatuses.Unavailable, session.Status);
+        Assert.IsNull(session.JoinUrl);
+        CollectionAssert.Contains(session.BlockingReasons.ToArray(), expectedReason);
+        Assert.AreEqual(1, broker.CancelCalls);
+    }
+
+    [TestMethod]
     public void Configured_meeting_bot_scenario_must_match_the_signed_capability_receipt()
     {
         using ReceiptFile receipt = ReceiptFile.Create([BuildGhostLiveMeetingProviders.Zoom]);
@@ -219,6 +313,13 @@ public sealed class BuildGhostLiveSupportServiceTests
                 false,
                 false,
                 "provider-unavailable",
+                0,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
                 string.Empty,
                 string.Empty,
                 string.Empty)
@@ -324,9 +425,16 @@ public sealed class BuildGhostLiveSupportServiceTests
                 false,
                 true,
                 "tough-tongue-meeting-bot-response-invalid",
+                0,
                 string.Empty,
                 string.Empty,
-                Digest("ambiguous-response"))
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                Digest("ambiguous-response"),
+                string.Empty)
         };
         BuildGhostLiveSupportService service = CreateService(Configuration(receipt.Path), broker, bots);
 
@@ -605,14 +713,39 @@ public sealed class BuildGhostLiveSupportServiceTests
             Now,
             Now.AddMinutes(45));
 
-    private static BuildGhostToughTongueMeetingBotResult SuccessfulBot()
-        => new(
+    private static BuildGhostToughTongueMeetingBotResult SuccessfulBot(Uri? joinUrl = null)
+    {
+        BuildGhostToughTongueMeetingBotResult result = new(
             true,
             false,
-            "scheduled",
+            "joined",
+            1,
+            "joined",
+            Digest("account"),
+            Digest("scenario"),
+            ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+            Digest("avatar-binding"),
             Digest("bot"),
             Digest("session"),
-            Digest("bot-response"));
+            Digest("bot-response"),
+            string.Empty);
+        return result with
+        {
+            JoinReceiptDigest = Digest(string.Join(
+                '\n',
+                "chummer.build_ghost.live_support_join_receipt.v1",
+                BuildGhostLiveMeetingProviders.Zoom,
+                (joinUrl ?? new Uri("https://zoom.us/j/123456789", UriKind.Absolute)).AbsoluteUri,
+                result.BotRefDigest,
+                result.SessionRefDigest,
+                result.LifecycleStatus,
+                result.AccountScopeRefDigest,
+                result.ScenarioRefDigest,
+                result.AvatarAlias,
+                result.AvatarBindingDigest,
+                result.ProviderResponseDigest))
+        };
+    }
 
     private static string Digest(string value)
         => $"sha256:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
@@ -756,6 +889,13 @@ public sealed class BuildGhostLiveSupportServiceTests
             false,
             false,
             "tough-tongue-meeting-bot-disabled",
+            0,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
             string.Empty,
             string.Empty,
             string.Empty);
@@ -791,14 +931,43 @@ public sealed class BuildGhostLiveSupportServiceTests
             IReadOnlyList<string> meetingProviders,
             decimal availableMinutes = 2425m)
         {
+            BuildGhostLiveSupportProviderCanaryReceipt[] providerCanaries = meetingProviders
+                .Select(provider =>
+                {
+                    BuildGhostLiveSupportProviderCanaryReceipt unsignedCanary = new(
+                        ToughTongueBuildGhostContractVersions.LiveSupportProviderCanaryReceiptV1,
+                        provider,
+                        Digest("account"),
+                        Digest("scenario"),
+                        ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+                        Digest("avatar-binding"),
+                        true,
+                        $"{provider}-photorealistic-in-meeting-canary",
+                        Now,
+                        900,
+                        string.Empty,
+                        string.Empty);
+                    string canaryDigest = BuildGhostLiveSupportService.DigestProviderCanaryReceipt(unsignedCanary);
+                    BuildGhostLiveSupportProviderCanaryReceipt withDigest = unsignedCanary with
+                    {
+                        ReceiptDigest = canaryDigest
+                    };
+                    return withDigest with
+                    {
+                        AuthorityMac = BuildGhostLiveSupportService.ComputeProviderCanaryAuthorityMac(
+                            withDigest,
+                            ReceiptAuthorityKey)
+                    };
+                })
+                .ToArray();
             BuildGhostLiveSupportCapabilityReceipt unsigned = new(
-                ToughTongueBuildGhostContractVersions.LiveSupportCapabilityReceiptV1,
+                ToughTongueBuildGhostContractVersions.LiveSupportCapabilityReceiptV2,
                 meetingProviders,
+                providerCanaries,
                 Digest("account"),
                 Digest("scenario"),
                 ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
                 Digest("avatar-binding"),
-                true,
                 true,
                 availableMinutes,
                 120m,

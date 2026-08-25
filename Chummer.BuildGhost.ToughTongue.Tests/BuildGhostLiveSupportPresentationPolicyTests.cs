@@ -20,6 +20,7 @@ public sealed class BuildGhostLiveSupportPresentationPolicyTests
         StringAssert.Contains(view, "Link available until:");
         StringAssert.Contains(view, "BuildGhostLiveSupportDisclosureContract.RecordingDisclosure");
         StringAssert.Contains(view, "BuildGhostLiveSupportDisclosureContract.ExternalProviderProcessingDisclosure");
+        StringAssert.Contains(view, "provider-specific photorealistic-video canary");
         Assert.IsFalse(view.Contains("session.BlockingReasons", StringComparison.Ordinal));
     }
 
@@ -33,8 +34,43 @@ public sealed class BuildGhostLiveSupportPresentationPolicyTests
         StringAssert.Contains(support, "Text alternative and transcript status");
         StringAssert.Contains(support, "No separate transcript or captions are claimed on this page.");
         StringAssert.Contains(support, "Continue with Rook's text help");
+        StringAssert.Contains(
+            support,
+            "href=\"/account/alice/@Uri.EscapeDataString(Model.HandoffId)\"");
+        StringAssert.Contains(
+            support,
+            "action=\"/account/alice/@Uri.EscapeDataString(Model.HandoffId)/live-support\"");
         StringAssert.Contains(handoff, ">Live support options</a>");
+        StringAssert.Contains(
+            handoff,
+            "href=\"/account/alice/@Uri.EscapeDataString(handoff.HandoffId)/live-support\"");
+        Assert.IsFalse(support.Contains("href=\"/alice\"", StringComparison.Ordinal));
         Assert.IsFalse(handoff.Contains(">Request live support</a>", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Rook_text_fallback_is_canonical_across_the_gateway_and_signed_in_page_model()
+    {
+        string gateway = ReadRepositoryFile(
+            "Chummer.Run.Api",
+            "Services",
+            "KarmaForge",
+            "BuildGhostLiveSupportGateway.cs");
+        string controller = ReadRepositoryFileThree(
+            "Chummer.Run.Api",
+            "Controllers",
+            "BuildGhostLiveSupportController.cs");
+
+        StringAssert.Contains(
+            gateway,
+            "BuildGhostDefaultSupportContract.DeterministicRookTextFallback");
+        StringAssert.Contains(
+            controller,
+            "BuildGhostDefaultSupportContract.DeterministicRookTextFallback");
+        Assert.IsFalse(
+            controller.Contains(
+                "Rook is available with deterministic text while the VidBoard clip is unavailable or stale.",
+                StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -47,6 +83,15 @@ public sealed class BuildGhostLiveSupportPresentationPolicyTests
 
         StringAssert.Contains(controller, "[AutoValidateAntiforgeryToken]");
         StringAssert.Contains(controller, "[RequestSizeLimit(16 * 1024)]");
+        StringAssert.Contains(
+            controller,
+            "private const string PagePathTemplate = \"/account/alice/{handoffId}/live-support\";");
+        StringAssert.Contains(controller, "[HttpGet(PagePathTemplate)]");
+        StringAssert.Contains(controller, "[HttpPost(PagePathTemplate)]");
+        StringAssert.Contains(
+            controller,
+            "[HttpGet(\"/account/alice/{handoffId}/live-support/{requestId}\")]");
+        StringAssert.Contains(controller, "Redirect($\"/login?next={Uri.EscapeDataString(pagePath)}\")");
         StringAssert.Contains(controller, "identity.RequireSubjectAsync");
         StringAssert.Contains(controller, "ResolveHandoff(subject, handoffId)");
         StringAssert.Contains(controller, "BuildWorkspaceId(handoff)");

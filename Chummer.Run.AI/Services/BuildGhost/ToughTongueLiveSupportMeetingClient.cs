@@ -67,7 +67,15 @@ public sealed class ToughTongueLiveSupportMeetingClient :
             || !ProviderId.IsMatch(command.RequestId)
             || !ProviderId.IsMatch(command.IdempotencyKey)
             || command.MeetingProvider is not (BuildGhostLiveMeetingProviders.Zoom or BuildGhostLiveMeetingProviders.Teams)
-            || !command.JoinUrl.IsAbsoluteUri)
+            || !command.JoinUrl.IsAbsoluteUri
+            || !IsSha256(command.AccountScopeRefDigest)
+            || !IsSha256(command.ScenarioRefDigest)
+            || !FixedTimeDigestEquals(command.ScenarioRefDigest, ScenarioRefDigest)
+            || !string.Equals(
+                command.AvatarAlias,
+                ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+                StringComparison.Ordinal)
+            || !IsSha256(command.AvatarBindingDigest))
         {
             return Failed("tough-tongue-meeting-bot-configuration-invalid");
         }
@@ -77,6 +85,10 @@ public sealed class ToughTongueLiveSupportMeetingClient :
             ["scenario_id"] = _scenarioId,
             ["meeting_url"] = command.JoinUrl.AbsoluteUri,
             ["meeting_provider"] = command.MeetingProvider,
+            ["account_scope_ref_digest"] = command.AccountScopeRefDigest,
+            ["scenario_ref_digest"] = command.ScenarioRefDigest,
+            ["avatar_alias"] = command.AvatarAlias,
+            ["avatar_binding_digest"] = command.AvatarBindingDigest,
             ["scheduled_ts"] = null,
             ["bot_name"] = _botName
         };
@@ -130,21 +142,56 @@ public sealed class ToughTongueLiveSupportMeetingClient :
             JsonElement bot = bots[0];
             string botId = ReadProviderId(bot, "bot_id");
             string sessionId = ReadProviderId(bot, "session_id");
-            if (string.IsNullOrEmpty(botId) || string.IsNullOrEmpty(sessionId))
+            string lifecycleStatus = ReadProviderId(bot, "lifecycle_status");
+            string accountScopeRefDigest = ReadDigest(bot, "account_scope_ref_digest");
+            string scenarioRefDigest = ReadDigest(bot, "scenario_ref_digest");
+            string avatarAlias = ReadProviderId(bot, "avatar_alias");
+            string avatarBindingDigest = ReadDigest(bot, "avatar_binding_digest");
+            if (string.IsNullOrEmpty(botId)
+                || string.IsNullOrEmpty(sessionId)
+                || !string.Equals(lifecycleStatus, "joined", StringComparison.Ordinal)
+                || !FixedTimeDigestEquals(accountScopeRefDigest, command.AccountScopeRefDigest)
+                || !FixedTimeDigestEquals(scenarioRefDigest, command.ScenarioRefDigest)
+                || !string.Equals(avatarAlias, command.AvatarAlias, StringComparison.Ordinal)
+                || !FixedTimeDigestEquals(avatarBindingDigest, command.AvatarBindingDigest))
             {
                 return Failed(
-                    "tough-tongue-meeting-bot-response-invalid",
+                    string.Equals(lifecycleStatus, "joined", StringComparison.Ordinal)
+                        ? "tough-tongue-meeting-bot-authority-binding-invalid"
+                        : "tough-tongue-meeting-bot-not-joined",
                     responseDigest,
                     reconciliationRequired: true);
             }
 
+            string botRefDigest = Digest(Encoding.UTF8.GetBytes(botId));
+            string sessionRefDigest = Digest(Encoding.UTF8.GetBytes(sessionId));
+            string joinReceiptDigest = Digest(Encoding.UTF8.GetBytes(string.Join(
+                '\n',
+                "chummer.build_ghost.live_support_join_receipt.v1",
+                command.MeetingProvider,
+                command.JoinUrl.AbsoluteUri,
+                botRefDigest,
+                sessionRefDigest,
+                lifecycleStatus,
+                accountScopeRefDigest,
+                scenarioRefDigest,
+                avatarAlias,
+                avatarBindingDigest,
+                responseDigest)));
             return new BuildGhostToughTongueMeetingBotResult(
                 true,
                 false,
-                "scheduled",
-                Digest(Encoding.UTF8.GetBytes(botId)),
-                Digest(Encoding.UTF8.GetBytes(sessionId)),
-                responseDigest);
+                "joined",
+                1,
+                lifecycleStatus,
+                accountScopeRefDigest,
+                scenarioRefDigest,
+                avatarAlias,
+                avatarBindingDigest,
+                botRefDigest,
+                sessionRefDigest,
+                responseDigest,
+                joinReceiptDigest);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -194,6 +241,19 @@ public sealed class ToughTongueLiveSupportMeetingClient :
         return ProviderId.IsMatch(candidate) ? candidate : string.Empty;
     }
 
+    private static string ReadDigest(JsonElement element, string property)
+    {
+        if (element.ValueKind != JsonValueKind.Object
+            || !element.TryGetProperty(property, out JsonElement value)
+            || value.ValueKind != JsonValueKind.String)
+        {
+            return string.Empty;
+        }
+
+        string candidate = value.GetString()?.Trim() ?? string.Empty;
+        return IsSha256(candidate) ? candidate : string.Empty;
+    }
+
     private static string NormalizeSecret(string? value)
     {
         string candidate = value?.Trim() ?? string.Empty;
@@ -215,7 +275,32 @@ public sealed class ToughTongueLiveSupportMeetingClient :
         string reason,
         string responseDigest = "",
         bool reconciliationRequired = false)
-        => new(false, reconciliationRequired, reason, string.Empty, string.Empty, responseDigest);
+        => new(
+            false,
+            reconciliationRequired,
+            reason,
+            0,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            responseDigest,
+            string.Empty);
+
+    private static bool IsSha256(string? value)
+        => value is { Length: 71 }
+            && value.StartsWith("sha256:", StringComparison.Ordinal)
+            && value.AsSpan(7).IndexOfAnyExcept("0123456789abcdef") < 0;
+
+    private static bool FixedTimeDigestEquals(string? left, string? right)
+        => IsSha256(left)
+            && IsSha256(right)
+            && CryptographicOperations.FixedTimeEquals(
+                Encoding.ASCII.GetBytes(left!),
+                Encoding.ASCII.GetBytes(right!));
 
     private static string Digest(ReadOnlySpan<byte> value)
         => $"sha256:{Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant()}";

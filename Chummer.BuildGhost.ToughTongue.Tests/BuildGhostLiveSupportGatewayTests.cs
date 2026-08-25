@@ -27,6 +27,13 @@ public sealed class BuildGhostLiveSupportGatewayTests
 
         Assert.AreEqual(0, handler.Calls);
         Assert.AreEqual(BuildGhostSupportChannelKinds.RookVidBoard, experience.DefaultSupport.ChannelKind);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.Rook, experience.DefaultSupport.PersonaId);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.RookAvatar, experience.DefaultSupport.AvatarId);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.RookVidBoardSupport, experience.DefaultSupport.MediaAssetId);
+        Assert.AreEqual(
+            BuildGhostDefaultSupportContract.DeterministicRookTextFallback,
+            experience.DefaultSupport.DeterministicTextFallback);
+        Assert.IsNull(experience.DefaultSupport.PreRenderedVideoHref);
         Assert.IsFalse(experience.LiveSupport.RequestAvailable);
     }
 
@@ -60,6 +67,9 @@ public sealed class BuildGhostLiveSupportGatewayTests
         Assert.AreEqual(new Uri("https://ai.internal/api/v1/ai/build-ghost/support-experience"), handler.LastUri);
         Assert.AreEqual("Bearer", handler.LastAuthorization?.Scheme);
         Assert.AreEqual(Token, handler.LastAuthorization?.Parameter);
+        Assert.AreEqual(
+            BuildGhostDefaultSupportContract.DeterministicRookTextFallback,
+            result.DefaultSupport.DeterministicTextFallback);
     }
 
     [TestMethod]
@@ -109,6 +119,9 @@ public sealed class BuildGhostLiveSupportGatewayTests
 
         Assert.IsFalse(result.DefaultSupport.PreRenderedVideoReady);
         Assert.IsNull(result.DefaultSupport.PreRenderedVideoHref);
+        Assert.AreEqual(
+            BuildGhostDefaultSupportContract.DeterministicRookTextFallback,
+            result.DefaultSupport.DeterministicTextFallback);
         Assert.IsTrue(result.LiveSupport.RequestAvailable);
         CollectionAssert.Contains(
             result.DefaultSupport.BlockingReasons.ToArray(),
@@ -119,28 +132,12 @@ public sealed class BuildGhostLiveSupportGatewayTests
     public async Task Ready_session_with_lookalike_host_is_rejected_and_link_is_not_returned()
     {
         BuildGhostLiveSupportRequest request = Request();
-        BuildGhostLiveSupportSessionProjection unsafeSession = new(
-            ToughTongueBuildGhostContractVersions.LiveSupportSessionV1,
-            request.RequestId,
-            BuildGhostSupportChannelKinds.LivePhotorealMeeting,
-            BuildGhostLiveSupportStatuses.Ready,
-            BuildGhostLiveMeetingProviders.Zoom,
-            new Uri("https://zoom.us.attacker.example/j/123"),
-            request.RequestedAtUtc.AddMinutes(30),
-            ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
-            "photorealistic-provider-managed",
-            true,
-            true,
-            request.DisclosureVersion,
-            request.DisclosureDigest,
-            Digest(),
-            Digest(),
-            Digest(),
-            Digest(),
-            request.RequestedAtUtc,
-            request.RequestedAtUtc,
-            DefaultSupport(),
-            []);
+        Uri lookalikeJoinUrl = new("https://zoom.us.attacker.example/j/123");
+        BuildGhostLiveSupportSessionProjection unsafeSession = ReadySession(request) with
+        {
+            JoinUrl = lookalikeJoinUrl,
+            MeetingLinkDigest = Digest(lookalikeJoinUrl.AbsoluteUri)
+        };
         RecordingHandler handler = new()
         {
             Response = JsonResponse(unsafeSession)
@@ -156,43 +153,97 @@ public sealed class BuildGhostLiveSupportGatewayTests
     }
 
     [TestMethod]
+    public async Task Ready_session_with_complete_bound_proof_exposes_the_provider_join_link()
+    {
+        BuildGhostLiveSupportRequest request = Request();
+        BuildGhostLiveSupportSessionProjection ready = ReadySession(request);
+        RecordingHandler handler = new() { Response = JsonResponse(ready) };
+        BuildGhostLiveSupportGateway gateway = Create(handler, Configuration());
+
+        BuildGhostLiveSupportSessionProjection result =
+            await gateway.RequestAsync(request, CancellationToken.None);
+
+        Assert.AreEqual(BuildGhostLiveSupportStatuses.Ready, result.Status);
+        Assert.AreEqual(ready.JoinUrl, result.JoinUrl);
+        Assert.AreEqual(ready.MeetingLinkDigest, result.MeetingLinkDigest);
+    }
+
+    [TestMethod]
+    [DataRow("avatar-alias")]
+    [DataRow("avatar-presentation")]
+    [DataRow("recording-consent")]
+    [DataRow("external-provider-consent")]
+    [DataRow("meeting-link-digest-invalid")]
+    [DataRow("meeting-link-digest-empty")]
+    [DataRow("meeting-receipt-digest-invalid")]
+    [DataRow("meeting-receipt-digest-empty")]
+    [DataRow("meeting-bot-receipt-digest-invalid")]
+    [DataRow("meeting-bot-receipt-digest-empty")]
+    [DataRow("capability-receipt-digest-invalid")]
+    [DataRow("capability-receipt-digest-empty")]
+    public async Task Malformed_Ready_proof_does_not_expose_a_join_link(string malformedField)
+    {
+        BuildGhostLiveSupportRequest request = Request();
+        BuildGhostLiveSupportSessionProjection malformed = malformedField switch
+        {
+            "avatar-alias" => ReadySession(request) with { AvatarAlias = "unapproved-avatar" },
+            "avatar-presentation" => ReadySession(request) with { AvatarPresentation = "unapproved-presentation" },
+            "recording-consent" => ReadySession(request) with { RecordingConsentGranted = false },
+            "external-provider-consent" => ReadySession(request) with { ExternalProviderProcessingConsentGranted = false },
+            "meeting-link-digest-invalid" => ReadySession(request) with { MeetingLinkDigest = "not-a-digest" },
+            "meeting-link-digest-empty" => ReadySession(request) with { MeetingLinkDigest = string.Empty },
+            "meeting-receipt-digest-invalid" => ReadySession(request) with { MeetingReceiptDigest = "not-a-digest" },
+            "meeting-receipt-digest-empty" => ReadySession(request) with { MeetingReceiptDigest = string.Empty },
+            "meeting-bot-receipt-digest-invalid" => ReadySession(request) with { MeetingBotReceiptDigest = "not-a-digest" },
+            "meeting-bot-receipt-digest-empty" => ReadySession(request) with { MeetingBotReceiptDigest = string.Empty },
+            "capability-receipt-digest-invalid" => ReadySession(request) with { CapabilityReceiptDigest = "not-a-digest" },
+            "capability-receipt-digest-empty" => ReadySession(request) with { CapabilityReceiptDigest = string.Empty },
+            _ => throw new AssertFailedException($"Unexpected malformed field: {malformedField}")
+        };
+        BuildGhostLiveSupportGateway requestGateway = Create(
+            new RecordingHandler { Response = JsonResponse(malformed) },
+            Configuration());
+        BuildGhostLiveSupportGateway statusGateway = Create(
+            new RecordingHandler { Response = JsonResponse(malformed) },
+            Configuration());
+
+        BuildGhostLiveSupportSessionProjection requested =
+            await requestGateway.RequestAsync(request, CancellationToken.None);
+        BuildGhostLiveSupportSessionProjection? status = await statusGateway.GetSessionAsync(
+            StatusRequest(request),
+            CancellationToken.None);
+
+        Assert.AreEqual(BuildGhostLiveSupportStatuses.Unavailable, requested.Status);
+        Assert.IsNull(requested.JoinUrl);
+        Assert.AreEqual(
+            BuildGhostDefaultSupportContract.DeterministicRookTextFallback,
+            requested.FallbackSupport.DeterministicTextFallback);
+        CollectionAssert.Contains(
+            requested.BlockingReasons.ToArray(),
+            "live-support-ai-session-invalid");
+        Assert.IsNull(status);
+    }
+
+    [TestMethod]
     public async Task Session_with_stale_disclosure_authority_is_rejected_at_the_BFF_boundary()
     {
         BuildGhostLiveSupportRequest request = Request();
-        BuildGhostLiveSupportSessionProjection stale = new(
-            ToughTongueBuildGhostContractVersions.LiveSupportSessionV1,
-            request.RequestId,
-            BuildGhostSupportChannelKinds.LivePhotorealMeeting,
-            BuildGhostLiveSupportStatuses.Ready,
-            request.MeetingProvider,
-            new Uri("https://zoom.us/j/123456789"),
-            request.RequestedAtUtc.AddMinutes(30),
-            ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
-            "photorealistic-provider-managed",
-            true,
-            true,
-            "chummer.build_ghost.live_support_disclosure.stale",
-            Digest(),
-            Digest(),
-            Digest(),
-            Digest(),
-            Digest(),
-            request.RequestedAtUtc,
-            request.RequestedAtUtc,
-            DefaultSupport(),
-            []);
-        RecordingHandler handler = new() { Response = JsonResponse(stale) };
-        BuildGhostLiveSupportGateway gateway = Create(handler, Configuration());
+        BuildGhostLiveSupportSessionProjection stale = ReadySession(request) with
+        {
+            DisclosureVersion = "chummer.build_ghost.live_support_disclosure.stale",
+            DisclosureDigest = Digest("stale-disclosure")
+        };
+        BuildGhostLiveSupportGateway requestGateway = Create(
+            new RecordingHandler { Response = JsonResponse(stale) },
+            Configuration());
+        BuildGhostLiveSupportGateway statusGateway = Create(
+            new RecordingHandler { Response = JsonResponse(stale) },
+            Configuration());
 
         BuildGhostLiveSupportSessionProjection requested =
-            await gateway.RequestAsync(request, CancellationToken.None);
-        BuildGhostLiveSupportSessionProjection? status = await gateway.GetSessionAsync(
-            new BuildGhostLiveSupportStatusRequest(
-                ToughTongueBuildGhostContractVersions.LiveSupportStatusRequestV1,
-                request.OwnerScopeHash,
-                request.RequestId,
-                request.WorkspaceId,
-                request.SourceDigest),
+            await requestGateway.RequestAsync(request, CancellationToken.None);
+        BuildGhostLiveSupportSessionProjection? status = await statusGateway.GetSessionAsync(
+            StatusRequest(request),
             CancellationToken.None);
 
         Assert.AreEqual(BuildGhostLiveSupportStatuses.Unavailable, requested.Status);
@@ -237,6 +288,41 @@ public sealed class BuildGhostLiveSupportGatewayTests
             "idempotency-1",
             DateTimeOffset.Parse("2026-08-25T00:00:00Z"));
 
+    private static BuildGhostLiveSupportStatusRequest StatusRequest(BuildGhostLiveSupportRequest request)
+        => new(
+            ToughTongueBuildGhostContractVersions.LiveSupportStatusRequestV1,
+            request.OwnerScopeHash,
+            request.RequestId,
+            request.WorkspaceId,
+            request.SourceDigest);
+
+    private static BuildGhostLiveSupportSessionProjection ReadySession(BuildGhostLiveSupportRequest request)
+    {
+        Uri joinUrl = new("https://zoom.us/j/123456789");
+        return new BuildGhostLiveSupportSessionProjection(
+            ToughTongueBuildGhostContractVersions.LiveSupportSessionV1,
+            request.RequestId,
+            BuildGhostSupportChannelKinds.LivePhotorealMeeting,
+            BuildGhostLiveSupportStatuses.Ready,
+            request.MeetingProvider,
+            joinUrl,
+            request.RequestedAtUtc.AddMinutes(30),
+            ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+            "photorealistic-provider-managed",
+            true,
+            true,
+            request.DisclosureVersion,
+            request.DisclosureDigest,
+            Digest(joinUrl.AbsoluteUri),
+            Digest("meeting-receipt"),
+            Digest("meeting-bot-receipt"),
+            Digest("capability-receipt"),
+            request.RequestedAtUtc,
+            request.RequestedAtUtc,
+            DefaultSupport(),
+            []);
+    }
+
     private static BuildGhostDefaultSupportProjection DefaultSupport(string? digest = null)
         => new(
             BuildGhostSupportChannelKinds.RookVidBoard,
@@ -251,6 +337,9 @@ public sealed class BuildGhostLiveSupportGatewayTests
             []);
 
     private static string Digest() => "sha256:" + new string('a', 64);
+
+    private static string Digest(string value)
+        => Digest(Encoding.UTF8.GetBytes(value));
 
     private static string Digest(ReadOnlySpan<byte> value)
         => $"sha256:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(value)).ToLowerInvariant()}";

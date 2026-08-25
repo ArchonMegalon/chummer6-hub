@@ -231,7 +231,7 @@ public sealed class BuildGhostLiveSupportController(
             handoff.Title,
             experience.DefaultSupport.PreRenderedVideoReady
                 ? "Rook and the approved VidBoard support clip are ready."
-                : "Rook is available with deterministic text while the VidBoard clip is unavailable or stale.",
+                : BuildGhostDefaultSupportContract.DeterministicRookTextFallback,
             experience.DefaultSupport.PreRenderedVideoReady
                 ? experience.DefaultSupport.PreRenderedVideoHref
                 : null,
