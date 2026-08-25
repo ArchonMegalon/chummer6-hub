@@ -936,6 +936,8 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
             failures.Add(Prefix("avatar-alias-mismatch"));
         if (!FixedTimeDigestEquals(canary.AvatarBindingDigest, capability.AvatarBindingDigest))
             failures.Add(Prefix("avatar-binding-authority-mismatch"));
+        // Meeting-bot lifecycle proves only that a bot joined. It cannot replace
+        // an independently observed and signed photorealistic video canary.
         if (!canary.PhotorealisticVideoInMeetingVerified)
             failures.Add(Prefix("photorealistic-video-unverified"));
         if (string.IsNullOrWhiteSpace(canary.EvidenceSource) || canary.EvidenceSource.Length > 160)

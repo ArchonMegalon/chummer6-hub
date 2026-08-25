@@ -38,6 +38,7 @@ public sealed class ToughTongueLiveSupportMeetingClient :
         "scheduled",
         "in_call_recording",
         "call_ended",
+        "done",
         "failed"
     };
 
@@ -429,7 +430,7 @@ public sealed class ToughTongueLiveSupportMeetingClient :
         {
             return Failed("tough-tongue-meeting-bot-failed", transcriptDigest);
         }
-        if (string.Equals(bot.Status, "call_ended", StringComparison.Ordinal))
+        if (bot.Status is "call_ended" or "done")
         {
             return Failed("tough-tongue-meeting-bot-call-ended-before-ready", transcriptDigest);
         }

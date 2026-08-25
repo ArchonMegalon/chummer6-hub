@@ -103,6 +103,8 @@ public sealed class ToughTongueLiveSupportMeetingClientTests
 
     [TestMethod]
     [DataRow("failed", "tough-tongue-meeting-bot-failed", false)]
+    [DataRow("call_ended", "tough-tongue-meeting-bot-call-ended-before-ready", false)]
+    [DataRow("done", "tough-tongue-meeting-bot-call-ended-before-ready", false)]
     [DataRow("scheduled", "tough-tongue-meeting-bot-join-timeout", true)]
     [DataRow("in_call_recording", "tough-tongue-meeting-bot-join-timeout", true)]
     public async Task Failed_or_unjoined_bot_never_becomes_ready(
@@ -124,7 +126,7 @@ public sealed class ToughTongueLiveSupportMeetingClientTests
         Assert.IsFalse(result.Success);
         Assert.AreEqual(expectedOutcome, result.OutcomeCode);
         Assert.AreEqual(expectedReconciliation, result.ReconciliationRequired);
-        Assert.HasCount(status == "failed" ? 3 : 4, handler.Requests);
+        Assert.HasCount(expectedReconciliation ? 4 : 3, handler.Requests);
     }
 
     [TestMethod]

@@ -189,6 +189,31 @@ public sealed class BuildGhostLiveSupportServiceTests
     }
 
     [TestMethod]
+    public async Task Signed_join_lifecycle_cannot_replace_photorealistic_video_canary()
+    {
+        using ReceiptFile receipt = ReceiptFile.Create(
+            [BuildGhostLiveMeetingProviders.Zoom],
+            photorealisticVideoVerified: false);
+        RecordingMeetingBroker broker = new();
+        RecordingMeetingBotClient bots = new() { Result = SuccessfulBot() };
+        BuildGhostLiveSupportService service = CreateService(Configuration(receipt.Path), broker, bots);
+
+        BuildGhostSupportExperienceProjection experience = service.BuildExperience();
+        BuildGhostLiveSupportSessionProjection result = await service.RequestAsync(
+            Request(),
+            CancellationToken.None);
+
+        Assert.IsFalse(experience.LiveSupport.RequestAvailable);
+        Assert.AreEqual(BuildGhostLiveSupportStatuses.Unavailable, result.Status);
+        Assert.IsNull(result.JoinUrl);
+        CollectionAssert.Contains(
+            result.BlockingReasons.ToArray(),
+            "zoom-live-support-provider-canary-photorealistic-video-unverified");
+        Assert.AreEqual(0, broker.CreateCalls);
+        Assert.AreEqual(0, bots.Calls);
+    }
+
+    [TestMethod]
     public void Outer_capability_signature_cannot_turn_one_provider_canary_into_another()
     {
         using ReceiptFile receipt = ReceiptFile.Create([
@@ -929,7 +954,8 @@ public sealed class BuildGhostLiveSupportServiceTests
 
         public static ReceiptFile Create(
             IReadOnlyList<string> meetingProviders,
-            decimal availableMinutes = 2425m)
+            decimal availableMinutes = 2425m,
+            bool photorealisticVideoVerified = true)
         {
             BuildGhostLiveSupportProviderCanaryReceipt[] providerCanaries = meetingProviders
                 .Select(provider =>
@@ -941,7 +967,7 @@ public sealed class BuildGhostLiveSupportServiceTests
                         Digest("scenario"),
                         ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
                         Digest("avatar-binding"),
-                        true,
+                        photorealisticVideoVerified,
                         $"{provider}-photorealistic-in-meeting-canary",
                         Now,
                         900,
