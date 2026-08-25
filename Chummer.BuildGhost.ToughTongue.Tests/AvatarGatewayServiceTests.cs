@@ -52,6 +52,125 @@ public sealed class AvatarGatewayServiceTests
     }
 
     [TestMethod]
+    public async Task Idempotency_digest_includes_typed_intent_and_rejects_a_changed_intent()
+    {
+        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
+        FakeAuthority authority = new();
+        AvatarGatewayService service = CreateService(time, authority);
+        AvatarSessionContextProjection context = Mint(service);
+        AvatarRuleQuestionRequest first = Question(context.ContextRef, "nonce-1", "idem-rule-1");
+        await service.ResolveRuleAsync(first, CancellationToken.None);
+
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> conflict =
+            await service.ResolveRuleAsync(
+                first with
+                {
+                    Nonce = "nonce-2",
+                    Intent = SupportedIntent() with { IntentVersion = 2 }
+                },
+                CancellationToken.None);
+
+        Assert.AreEqual(AvatarGatewayCallStatus.IdempotencyConflict, conflict.Status);
+        Assert.AreEqual(1, authority.Calls);
+    }
+
+    [TestMethod]
+    public async Task Missing_or_unsupported_typed_intent_is_cached_unresolved_without_calling_authority()
+    {
+        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
+        FakeAuthority authority = new();
+        AvatarGatewayService service = CreateService(time, authority);
+        AvatarSessionContextProjection context = Mint(service);
+        AvatarRuleQuestionRequest missing = Question(context.ContextRef, "nonce-1", "idem-missing") with
+        {
+            Intent = null
+        };
+
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> missingResult =
+            await service.ResolveRuleAsync(missing, CancellationToken.None);
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> missingReplay =
+            await service.ResolveRuleAsync(missing with { Nonce = "nonce-2" }, CancellationToken.None);
+        AvatarRuleQuestionRequest unsupported = Question(context.ContextRef, "nonce-3", "idem-unsupported") with
+        {
+            Intent = SupportedIntent() with { IntentVersion = 2 }
+        };
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> unsupportedResult =
+            await service.ResolveRuleAsync(unsupported, CancellationToken.None);
+
+        Assert.AreEqual(AvatarGatewayStatuses.Unresolved, missingResult.Value?.Status);
+        Assert.AreEqual(AvatarRuleIntentAdapter.MissingReason, missingResult.Value?.UncertaintyReason);
+        Assert.AreEqual(AvatarGatewayCallStatus.IdempotentReplay, missingReplay.Status);
+        Assert.AreSame(missingResult.Value, missingReplay.Value);
+        Assert.AreEqual(AvatarGatewayStatuses.Unresolved, unsupportedResult.Value?.Status);
+        Assert.AreEqual(AvatarRuleIntentAdapter.UnsupportedReason, unsupportedResult.Value?.UncertaintyReason);
+        Assert.AreEqual(0, authority.Calls);
+    }
+
+    [TestMethod]
+    public async Task Malformed_typed_argument_fails_before_nonce_or_idempotency_is_consumed()
+    {
+        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
+        FakeAuthority authority = new();
+        AvatarGatewayService service = CreateService(time, authority);
+        AvatarSessionContextProjection context = Mint(service);
+        AvatarRuleQuestionRequest valid = Question(context.ContextRef, "nonce-1", "idem-rule-1");
+        AvatarRuleQuestionRequest malformed = valid with
+        {
+            Intent = SupportedIntent() with
+            {
+                Arguments =
+                [
+                    new AvatarRuleIntentArgument(
+                        "mode",
+                        AvatarRuleAuthorityArgumentKinds.Boolean,
+                        IdentifierValue: "invented",
+                        BooleanValue: true)
+                ]
+            }
+        };
+
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> rejected =
+            await service.ResolveRuleAsync(malformed, CancellationToken.None);
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> corrected =
+            await service.ResolveRuleAsync(valid, CancellationToken.None);
+
+        Assert.AreEqual(AvatarGatewayCallStatus.InvalidRequest, rejected.Status);
+        Assert.IsNull(rejected.Value);
+        Assert.IsTrue(corrected.Succeeded);
+        Assert.AreEqual(1, authority.Calls);
+    }
+
+    [TestMethod]
+    public async Task Supported_intent_builds_exact_core_request_without_conversation_text()
+    {
+        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
+        FakeAuthority authority = new();
+        AvatarGatewayService service = CreateService(time, authority);
+        AvatarSessionContextProjection context = Mint(service);
+
+        await service.ResolveRuleAsync(
+            Question(context.ContextRef, "nonce-1", "idem-rule-1"),
+            CancellationToken.None);
+
+        AvatarRuleAuthorityInvocation invocation = authority.LastInvocation!;
+        Assert.AreEqual(AvatarGatewayContractVersions.RuleAuthorityV1, invocation.Request.ContractVersion);
+        Assert.AreEqual(AvatarRuleIntentAdapter.SupportedIntentId, invocation.Request.IntentId);
+        Assert.AreEqual(AvatarRuleIntentAdapter.SupportedCapabilityId, invocation.Request.CapabilityId);
+        Assert.AreEqual("session-actions", invocation.Request.SubjectId);
+        Assert.IsEmpty(invocation.Request.Arguments);
+        Assert.AreEqual("sr6", invocation.Request.ExpectedBinding.RulesetId);
+        Assert.AreEqual("official.sr6.core", invocation.Request.ExpectedBinding.ProfileId);
+        Assert.AreEqual(DigestA, invocation.Request.ExpectedBinding.SourceDigest);
+        Assert.AreEqual(DigestA, invocation.Request.ExpectedBinding.SourcebookFingerprint);
+        Assert.AreEqual(DigestA, invocation.Request.ExpectedBinding.CustomDataFingerprint);
+        Assert.AreEqual(DigestA, invocation.Request.ExpectedBinding.GmPolicyFingerprint);
+        Assert.AreEqual("workspace-1", invocation.WorkspaceId);
+        Assert.ThrowsExactly<NotSupportedException>(() =>
+            ((IList<AvatarRuleAuthorityArgument>)invocation.Request.Arguments).Add(
+                new AvatarRuleAuthorityArgument("invented", AvatarRuleAuthorityArgumentKinds.Boolean, BooleanValue: true)));
+    }
+
+    [TestMethod]
     public async Task Missing_character_read_scope_returns_a_bound_forbidden_envelope_without_authority_call()
     {
         ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
@@ -162,7 +281,8 @@ public sealed class AvatarGatewayServiceTests
             417,
             "character-1",
             "campaign-1",
-            "sr5",
+            "sr6",
+            AvatarRuleIntentAdapter.SupportedRulesetProfileId,
             DigestA,
             DigestA,
             DigestA,
@@ -191,7 +311,16 @@ public sealed class AvatarGatewayServiceTests
             nonce,
             idempotencyKey,
             "Wie berechnet sich mein Rückstoßausgleich?",
-            "recoil");
+            "session-actions",
+            SupportedIntent());
+
+    private static AvatarRuleIntentSelection SupportedIntent() => new(
+        AvatarGatewayContractVersions.RuleIntentV1,
+        AvatarRuleIntentAdapter.SupportedIntentId,
+        AvatarRuleIntentAdapter.SupportedIntentVersion,
+        AvatarRuleIntentAdapter.SupportedCapabilityId,
+        AvatarRuleIntentAdapter.SupportedInvocationKind,
+        []);
 
     private static AvatarContextRequest ContextRequest(
         string contextRef,
@@ -209,21 +338,24 @@ public sealed class AvatarGatewayServiceTests
     {
         public int Calls { get; private set; }
 
+        public AvatarRuleAuthorityInvocation? LastInvocation { get; private set; }
+
         public AvatarRuleAuthorityException? Failure { get; init; }
 
         public Task<AvatarRuleAnswerEnvelope> ResolveAsync(
-            AvatarRuleAuthorityRequest request,
+            AvatarRuleAuthorityInvocation invocation,
             CancellationToken cancellationToken)
         {
             Calls++;
+            LastInvocation = invocation;
             if (Failure is not null) throw Failure;
             AvatarSourceAnchor anchor = new(
                 "anchor-recoil",
-                "sr5-core",
-                "Shadowrun 5 Grundregelwerk",
-                175,
-                "combat.recoil.compensation",
-                "chummer://sources/sr5-core?page=175");
+                "sr6-core",
+                "Shadowrun Sixth World Core Rulebook",
+                41,
+                "session.quick-actions",
+                "chummer://sources/sr6-core?page=41");
             AvatarRuleAnswerEnvelope unsigned = new(
                 AvatarGatewayContractVersions.RuleAnswerV1,
                 AvatarGatewayStatuses.Resolved,
@@ -234,9 +366,9 @@ public sealed class AvatarGatewayServiceTests
                 true,
                 [anchor],
                 [new AvatarAllowedAction("open-rule", AvatarGatewayActionTypes.OpenRuleSource, anchor.LocalSourceRoute, false)],
-                request.WorkspaceRevision,
-                request.RuntimeFingerprint,
-                request.SourceDigest,
+                invocation.Request.ExpectedBinding.WorkspaceRevision,
+                invocation.Request.ExpectedBinding.RuntimeFingerprint,
+                invocation.Request.ExpectedBinding.SourceDigest,
                 string.Empty,
                 null);
             return Task.FromResult(unsigned with { AnswerDigest = AvatarRuleAnswerDigest.Compute(unsigned) });
@@ -250,7 +382,7 @@ public sealed class AvatarGatewayServiceTests
         public bool CancellationObserved { get; private set; }
 
         public async Task<AvatarRuleAnswerEnvelope> ResolveAsync(
-            AvatarRuleAuthorityRequest request,
+            AvatarRuleAuthorityInvocation invocation,
             CancellationToken cancellationToken)
         {
             Started.TrySetResult();

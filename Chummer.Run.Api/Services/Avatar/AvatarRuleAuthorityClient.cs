@@ -7,10 +7,15 @@ using System.Text.Json.Serialization;
 
 namespace Chummer.Run.Api.Services.Avatar;
 
-public interface IAvatarRuleAuthorityClient
+internal sealed record AvatarRuleAuthorityInvocation(
+    AvatarRuleAuthorityRequest Request,
+    string WorkspaceId,
+    string Locale);
+
+internal interface IAvatarRuleAuthorityClient
 {
     Task<AvatarRuleAnswerEnvelope> ResolveAsync(
-        AvatarRuleAuthorityRequest request,
+        AvatarRuleAuthorityInvocation invocation,
         CancellationToken cancellationToken);
 }
 
@@ -22,7 +27,7 @@ public sealed class AvatarRuleAuthorityException(
     public int StatusCode { get; } = statusCode;
 }
 
-public sealed class AvatarRuleAuthorityClient(
+internal sealed class AvatarRuleAuthorityClient(
     HttpClient httpClient,
     IConfiguration configuration) : IAvatarRuleAuthorityClient
 {
@@ -39,10 +44,16 @@ public sealed class AvatarRuleAuthorityClient(
     };
 
     public async Task<AvatarRuleAnswerEnvelope> ResolveAsync(
-        AvatarRuleAuthorityRequest request,
+        AvatarRuleAuthorityInvocation invocation,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(invocation);
+        if (!AvatarRuleIntentAdapter.IsValidAuthorityInvocation(invocation))
+        {
+            throw new AvatarRuleAuthorityException(
+                "avatar-rule-authority-request-invalid",
+                StatusCodes.Status502BadGateway);
+        }
         Uri endpoint = ResolveEndpoint(configuration[EndpointConfigurationKey]);
         string serviceToken = configuration[ServiceTokenConfigurationKey]?.Trim() ?? string.Empty;
         if (!AvatarGatewayInput.IsServiceCredential(serviceToken))
@@ -54,7 +65,7 @@ public sealed class AvatarRuleAuthorityClient(
 
         using HttpRequestMessage upstream = new(HttpMethod.Post, endpoint)
         {
-            Content = JsonContent.Create(request, options: SerializerOptions)
+            Content = JsonContent.Create(invocation.Request, options: SerializerOptions)
         };
         upstream.Headers.Authorization = new AuthenticationHeaderValue("Bearer", serviceToken);
         upstream.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
@@ -79,9 +90,12 @@ public sealed class AvatarRuleAuthorityClient(
                 throw new AvatarRuleAuthorityException("avatar-rule-authority-rejected", status);
             }
 
+            // The outbound request is the typed Core ABI. The inbound parser remains
+            // isolated here until the canonical typed Core result DTO and per-intent
+            // provider projection land; it must never reinterpret the audit question.
             AvatarRuleAnswerEnvelope answer = await ReadBoundedAsync(response.Content, budget.Token)
                 .ConfigureAwait(false);
-            IReadOnlyList<string> failures = AvatarRuleAnswerValidator.Validate(answer, request);
+            IReadOnlyList<string> failures = AvatarRuleAnswerValidator.Validate(answer, invocation);
             if (failures.Count != 0)
             {
                 throw new AvatarRuleAuthorityException("avatar-rule-answer-invalid:" + string.Join(',', failures));
@@ -158,7 +172,7 @@ public sealed class AvatarRuleAuthorityClient(
     }
 }
 
-public static class AvatarRuleAnswerValidator
+internal static class AvatarRuleAnswerValidator
 {
     private static readonly IReadOnlySet<string> AllowedStatuses = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -178,7 +192,7 @@ public static class AvatarRuleAnswerValidator
 
     public static IReadOnlyList<string> Validate(
         AvatarRuleAnswerEnvelope? answer,
-        AvatarRuleAuthorityRequest expected)
+        AvatarRuleAuthorityInvocation expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
         if (answer is null) return ["answer-required"];
@@ -186,9 +200,9 @@ public static class AvatarRuleAnswerValidator
         List<string> failures = [];
         if (answer.ContractName != AvatarGatewayContractVersions.RuleAnswerV1) failures.Add("contract-invalid");
         if (!AllowedStatuses.Contains(answer.Status ?? string.Empty)) failures.Add("status-invalid");
-        if (answer.WorkspaceRevision != expected.WorkspaceRevision) failures.Add("workspace-revision-drift");
-        if (!string.Equals(answer.RuntimeFingerprint, expected.RuntimeFingerprint, StringComparison.Ordinal)) failures.Add("runtime-fingerprint-drift");
-        if (!string.Equals(answer.SourceDigest, expected.SourceDigest, StringComparison.Ordinal)) failures.Add("source-digest-drift");
+        if (answer.WorkspaceRevision != expected.Request.ExpectedBinding.WorkspaceRevision) failures.Add("workspace-revision-drift");
+        if (!string.Equals(answer.RuntimeFingerprint, expected.Request.ExpectedBinding.RuntimeFingerprint, StringComparison.Ordinal)) failures.Add("runtime-fingerprint-drift");
+        if (!string.Equals(answer.SourceDigest, expected.Request.ExpectedBinding.SourceDigest, StringComparison.Ordinal)) failures.Add("source-digest-drift");
         if (!AvatarGatewayInput.IsBoundedText(answer.SpokenAnswer, 1, 8_000)) failures.Add("spoken-answer-invalid");
         if (!AvatarGatewayInput.IsBoundedText(answer.ShortAnswer, 1, 2_000)) failures.Add("short-answer-invalid");
         if (answer.CalculationSteps is null || answer.CalculationSteps.Count > 64) failures.Add("calculation-steps-invalid");
@@ -275,7 +289,7 @@ public static class AvatarRuleAnswerValidator
     }
 
     public static AvatarRuleAnswerEnvelope SafeUnavailable(
-        AvatarRuleAuthorityRequest expected,
+        AvatarRuleAuthorityInvocation expected,
         string? reason = null)
         => SafeFailure(
             expected,
@@ -291,7 +305,7 @@ public static class AvatarRuleAnswerValidator
                 : "Chummer Core is currently unavailable for this rule question."));
 
     public static AvatarRuleAnswerEnvelope SafeFailure(
-        AvatarRuleAuthorityRequest expected,
+        AvatarRuleAuthorityInvocation expected,
         string status,
         string spokenAnswer,
         string shortAnswer,
@@ -315,9 +329,9 @@ public static class AvatarRuleAnswerValidator
             false,
             [],
             [],
-            expected.WorkspaceRevision,
-            expected.RuntimeFingerprint,
-            expected.SourceDigest,
+            expected.Request.ExpectedBinding.WorkspaceRevision,
+            expected.Request.ExpectedBinding.RuntimeFingerprint,
+            expected.Request.ExpectedBinding.SourceDigest,
             string.Empty,
             reason);
         return unsigned with { AnswerDigest = AvatarRuleAnswerDigest.Compute(unsigned) };

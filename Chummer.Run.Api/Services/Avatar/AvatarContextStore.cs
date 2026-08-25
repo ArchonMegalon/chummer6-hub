@@ -33,6 +33,7 @@ internal sealed record AvatarContextSnapshot(
     string CharacterId,
     string? CampaignId,
     string RulesetId,
+    string RulesetProfileId,
     string RuntimeFingerprint,
     string SourceDigest,
     string SourcebookFingerprint,
@@ -345,6 +346,7 @@ internal sealed class AvatarContextStore
                     && StringComparer.Ordinal.Equals(current.CharacterId, expected.CharacterId)
                     && StringComparer.Ordinal.Equals(current.CampaignId, expected.CampaignId)
                     && StringComparer.Ordinal.Equals(current.RulesetId, expected.RulesetId)
+                    && StringComparer.Ordinal.Equals(current.RulesetProfileId, expected.RulesetProfileId)
                     && StringComparer.Ordinal.Equals(current.RuntimeFingerprint, expected.RuntimeFingerprint)
                     && StringComparer.Ordinal.Equals(current.SourceDigest, expected.SourceDigest)
                     && StringComparer.Ordinal.Equals(current.SourcebookFingerprint, expected.SourcebookFingerprint)
@@ -524,6 +526,7 @@ internal sealed class AvatarContextStore
             !IsIdentifier(request.CharacterId) ||
             (request.CampaignId is not null && !IsIdentifier(request.CampaignId)) ||
             !IsIdentifier(request.RulesetId) ||
+            !IsIdentifier(request.RulesetProfileId) ||
             !IsSha256(request.RuntimeFingerprint) ||
             !IsSha256(request.SourceDigest) ||
             !IsSha256(request.SourcebookFingerprint) ||
@@ -574,7 +577,8 @@ internal sealed class AvatarContextStore
         IsIdentifier(request.Nonce) &&
         IsIdentifier(request.IdempotencyKey) &&
         IsSafeQuestion(request.Question) &&
-        (request.SubjectId is null || IsIdentifier(request.SubjectId));
+        (request.SubjectId is null || IsIdentifier(request.SubjectId)) &&
+        AvatarRuleIntentAdapter.IsStructurallyValidProviderRequest(request);
 
     private static bool IsValidRevocationRequest(AvatarContextRevocationRequest? request) =>
         request is not null &&
@@ -714,6 +718,7 @@ internal sealed class AvatarContextStore
             CharacterId = request.CharacterId;
             CampaignId = request.CampaignId;
             RulesetId = request.RulesetId;
+            RulesetProfileId = request.RulesetProfileId;
             RuntimeFingerprint = request.RuntimeFingerprint;
             SourceDigest = request.SourceDigest;
             SourcebookFingerprint = request.SourcebookFingerprint;
@@ -741,6 +746,8 @@ internal sealed class AvatarContextStore
         public string? CampaignId { get; }
 
         public string RulesetId { get; }
+
+        public string RulesetProfileId { get; }
 
         public string RuntimeFingerprint { get; }
 
@@ -780,6 +787,7 @@ internal sealed class AvatarContextStore
             CharacterId,
             CampaignId,
             RulesetId,
+            RulesetProfileId,
             RuntimeFingerprint,
             SourceDigest,
             SourcebookFingerprint,
@@ -803,6 +811,7 @@ internal sealed class AvatarContextStore
                 !IsIdentifier(CharacterId) ||
                 (CampaignId is not null && !IsIdentifier(CampaignId)) ||
                 !IsIdentifier(RulesetId) ||
+                !IsIdentifier(RulesetProfileId) ||
                 !IsSha256(RuntimeFingerprint) ||
                 !IsSha256(SourceDigest) ||
                 !IsSha256(SourcebookFingerprint) ||

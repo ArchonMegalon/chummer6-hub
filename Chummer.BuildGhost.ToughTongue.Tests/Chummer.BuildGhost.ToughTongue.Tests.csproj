@@ -13,6 +13,7 @@
     <Compile Include="../Chummer.Run.Api/Services/Avatar/AvatarContextStore.cs" Link="AvatarContextStore.cs" />
     <Compile Include="../Chummer.Run.Api/Services/Avatar/AvatarGatewayCredentialPolicy.cs" Link="AvatarGatewayCredentialPolicy.cs" />
     <Compile Include="../Chummer.Run.Api/Services/Avatar/AvatarGatewayService.cs" Link="AvatarGatewayService.cs" />
+    <Compile Include="../Chummer.Run.Api/Services/Avatar/AvatarRuleIntentAdapter.cs" Link="AvatarRuleIntentAdapter.cs" />
     <Compile Include="../Chummer.Run.Api/Services/Avatar/AvatarRuleAuthorityClient.cs" Link="AvatarRuleAuthorityClient.cs" />
     <Compile Include="../Chummer.Run.Api/Controllers/AvatarGatewayController.cs" Link="AvatarGatewayController.cs" />
     <Compile Include="../Chummer.Run.Contracts/BuildGhost/ToughTongueBuildGhostContracts.cs" Link="ToughTongueBuildGhostContracts.cs" />

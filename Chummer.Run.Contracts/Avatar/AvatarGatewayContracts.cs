@@ -11,7 +11,9 @@ public static class AvatarGatewayContractVersions
     public const string ContextRequestV1 = "chummer.avatar-context-request/v1";
     public const string ContextResponseV1 = "chummer.avatar-context/v1";
     public const string RuleQuestionV1 = "chummer.avatar-rule-question/v1";
-    public const string RuleAuthorityRequestV1 = "chummer.avatar-rule-authority-request/v1";
+    public const string RuleIntentV1 = "chummer.avatar-rule-intent/v1";
+    public const string RuleAuthorityV1 = "chummer.avatar-rule-authority/v1";
+    public const string RuleAuthorityRequestV1 = RuleAuthorityV1;
     public const string RuleAnswerV1 = "chummer.avatar-rule-answer/v1";
     public const string RevocationV1 = "chummer.avatar-context-revocation/v1";
     public const string ErrorV1 = "chummer.avatar-error/v1";
@@ -44,6 +46,13 @@ public static class AvatarGatewayStatuses
     public const string Unavailable = "unavailable";
 }
 
+public static class AvatarRuleAuthorityArgumentKinds
+{
+    public const string Identifier = "identifier";
+    public const string Integer = "integer";
+    public const string Boolean = "boolean";
+}
+
 public static class AvatarGatewayActionTypes
 {
     public const string OpenRuleSource = "chummer.open_rule_source";
@@ -61,6 +70,7 @@ public sealed record AvatarContextMintRequest(
     [property: JsonPropertyName("character_id")] string CharacterId,
     [property: JsonPropertyName("campaign_id")] string? CampaignId,
     [property: JsonPropertyName("ruleset_id")] string RulesetId,
+    [property: JsonPropertyName("ruleset_profile_id")] string RulesetProfileId,
     [property: JsonPropertyName("runtime_fingerprint")] string RuntimeFingerprint,
     [property: JsonPropertyName("source_digest")] string SourceDigest,
     [property: JsonPropertyName("sourcebook_fingerprint")] string SourcebookFingerprint,
@@ -105,7 +115,25 @@ public sealed record AvatarRuleQuestionRequest(
     [property: JsonPropertyName("nonce")] string Nonce,
     [property: JsonPropertyName("idempotency_key")] string IdempotencyKey,
     [property: JsonPropertyName("question")] string Question,
-    [property: JsonPropertyName("subject_id")] string? SubjectId);
+    [property: JsonPropertyName("subject_id")] string? SubjectId,
+    [property: JsonPropertyName("intent")] AvatarRuleIntentSelection? Intent);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AvatarRuleIntentSelection(
+    [property: JsonPropertyName("contract_name")] string ContractName,
+    [property: JsonPropertyName("intent_id")] string IntentId,
+    [property: JsonPropertyName("intent_version")] int IntentVersion,
+    [property: JsonPropertyName("capability_id")] string CapabilityId,
+    [property: JsonPropertyName("invocation_kind")] string InvocationKind,
+    [property: JsonPropertyName("arguments")] IReadOnlyList<AvatarRuleIntentArgument> Arguments);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AvatarRuleIntentArgument(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("identifier_value")] string? IdentifierValue = null,
+    [property: JsonPropertyName("integer_value")] long? IntegerValue = null,
+    [property: JsonPropertyName("boolean_value")] bool? BooleanValue = null);
 
 public sealed record AvatarCalculationStep(
     [property: JsonPropertyName("step_id")] string StepId,
@@ -163,22 +191,34 @@ public sealed record AvatarGatewayErrorEnvelope(
     [property: JsonPropertyName("retryable")] bool Retryable);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AvatarRuleAuthorityArgument(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("identifierValue")] string? IdentifierValue = null,
+    [property: JsonPropertyName("integerValue")] long? IntegerValue = null,
+    [property: JsonPropertyName("booleanValue")] bool? BooleanValue = null);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AvatarRuleAuthorityBinding(
+    [property: JsonPropertyName("rulesetId")] string RulesetId,
+    [property: JsonPropertyName("runtimeFingerprint")] string RuntimeFingerprint,
+    [property: JsonPropertyName("profileId")] string ProfileId,
+    [property: JsonPropertyName("workspaceRevision")] long WorkspaceRevision,
+    [property: JsonPropertyName("sourceDigest")] string SourceDigest,
+    [property: JsonPropertyName("sourcebookFingerprint")] string SourcebookFingerprint,
+    [property: JsonPropertyName("customDataFingerprint")] string CustomDataFingerprint,
+    [property: JsonPropertyName("gmPolicyFingerprint")] string GmPolicyFingerprint);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AvatarRuleAuthorityRequest(
-    [property: JsonPropertyName("contract_name")] string ContractName,
-    [property: JsonPropertyName("owner_id")] string OwnerId,
-    [property: JsonPropertyName("workspace_id")] string WorkspaceId,
-    [property: JsonPropertyName("workspace_revision")] long WorkspaceRevision,
-    [property: JsonPropertyName("character_id")] string CharacterId,
-    [property: JsonPropertyName("campaign_id")] string? CampaignId,
-    [property: JsonPropertyName("ruleset_id")] string RulesetId,
-    [property: JsonPropertyName("runtime_fingerprint")] string RuntimeFingerprint,
-    [property: JsonPropertyName("source_digest")] string SourceDigest,
-    [property: JsonPropertyName("sourcebook_fingerprint")] string SourcebookFingerprint,
-    [property: JsonPropertyName("custom_data_fingerprint")] string CustomDataFingerprint,
-    [property: JsonPropertyName("gm_policy_fingerprint")] string GmPolicyFingerprint,
-    [property: JsonPropertyName("locale")] string Locale,
-    [property: JsonPropertyName("question")] string Question,
-    [property: JsonPropertyName("subject_id")] string? SubjectId);
+    [property: JsonPropertyName("contractVersion")] string ContractVersion,
+    [property: JsonPropertyName("intentId")] string IntentId,
+    [property: JsonPropertyName("intentVersion")] int IntentVersion,
+    [property: JsonPropertyName("capabilityId")] string CapabilityId,
+    [property: JsonPropertyName("invocationKind")] string InvocationKind,
+    [property: JsonPropertyName("subjectId")] string SubjectId,
+    [property: JsonPropertyName("arguments")] IReadOnlyList<AvatarRuleAuthorityArgument> Arguments,
+    [property: JsonPropertyName("expectedBinding")] AvatarRuleAuthorityBinding ExpectedBinding);
 
 public static class AvatarRuleAnswerDigest
 {

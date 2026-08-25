@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Services.Avatar;
 using Chummer.Run.Contracts.Avatar;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Text.Json;
 
 namespace Chummer.BuildGhost.ToughTongue.Tests;
 
@@ -10,7 +11,7 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void ExactResolvedAnswerIsAccepted()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
         AvatarRuleAnswerEnvelope answer = ValidAnswer(request);
 
         IReadOnlyList<string> failures = AvatarRuleAnswerValidator.Validate(answer, request);
@@ -21,7 +22,7 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void UnknownDirectApplyActionAndDigestRewriteAreRejected()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
         AvatarRuleAnswerEnvelope answer = ValidAnswer(request) with
         {
             AllowedActions =
@@ -43,10 +44,10 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void StaleWorkspaceAndInventedAnchorReferenceAreRejected()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
         AvatarRuleAnswerEnvelope answer = ValidAnswer(request) with
         {
-            WorkspaceRevision = request.WorkspaceRevision - 1,
+            WorkspaceRevision = request.Request.ExpectedBinding.WorkspaceRevision - 1,
             CalculationSteps =
             [
                 new AvatarCalculationStep("step-1", "Agility + skill", "12 dice", ["invented-page-999"])
@@ -63,7 +64,7 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void Open_source_action_must_reference_an_exact_current_anchor()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
         AvatarRuleAnswerEnvelope answer = ValidAnswer(request) with
         {
             AllowedActions =
@@ -85,7 +86,7 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void Workbench_action_cannot_disguise_a_mutation_route()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
         AvatarRuleAnswerEnvelope answer = ValidAnswer(request) with
         {
             AllowedActions =
@@ -107,7 +108,7 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void Only_the_exact_read_only_workbench_template_is_accepted()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
         AvatarRuleAnswerEnvelope answer = ValidAnswer(request) with
         {
             AllowedActions =
@@ -129,10 +130,10 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void Source_route_is_bound_to_exact_source_and_page_query_only()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
         AvatarSourceAnchor inventedRoute = ValidAnswer(request).SourceAnchors[0] with
         {
-            LocalSourceRoute = "chummer://sources/sr5-core?page=175&apply=1"
+            LocalSourceRoute = "chummer://sources/sr6-core?page=41&apply=1"
         };
         AvatarRuleAnswerEnvelope answer = ValidAnswer(request) with
         {
@@ -156,7 +157,7 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void Malformed_null_packet_members_are_rejected_without_throwing()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
         AvatarRuleAnswerEnvelope answer = ValidAnswer(request) with
         {
             SourceAnchors = [null!],
@@ -172,7 +173,7 @@ public sealed class AvatarRuleAnswerValidatorTests
     [TestMethod]
     public void SafeUnavailableEnvelopeIsBoundAndValid()
     {
-        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAuthorityInvocation request = Request();
 
         AvatarRuleAnswerEnvelope answer = AvatarRuleAnswerValidator.SafeUnavailable(request);
         IReadOnlyList<string> failures = AvatarRuleAnswerValidator.Validate(answer, request);
@@ -197,33 +198,56 @@ public sealed class AvatarRuleAnswerValidatorTests
                 "https://core.chummer.run/api/internal/avatar-rule-authority/resolve?leak=true"));
     }
 
-    private static AvatarRuleAuthorityRequest Request()
-        => new(
-            AvatarGatewayContractVersions.RuleAuthorityRequestV1,
-            "owner-1",
-            "workspace-1",
-            417,
-            "character-1",
-            "campaign-1",
-            "sr5",
-            Sha('a'),
-            Sha('b'),
-            Sha('c'),
-            Sha('d'),
-            Sha('e'),
-            "de-AT",
-            "Wie berechnet sich mein Rückstoßausgleich?",
-            "recoil");
+    [TestMethod]
+    public void Core_wire_request_contains_only_typed_authority_and_exact_binding()
+    {
+        AvatarRuleAuthorityInvocation invocation = Request();
 
-    private static AvatarRuleAnswerEnvelope ValidAnswer(AvatarRuleAuthorityRequest request)
+        string json = JsonSerializer.Serialize(
+            invocation.Request,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        StringAssert.Contains(json, "\"contractVersion\":\"chummer.avatar-rule-authority/v1\"");
+        StringAssert.Contains(json, "\"intentId\":\"rules.session.quick-actions\"");
+        StringAssert.Contains(json, "\"profileId\":\"official.sr6.core\"");
+        StringAssert.Contains(json, "\"sourceDigest\":\"sha256:");
+        Assert.IsFalse(json.Contains("question", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(json.Contains("ownerId", StringComparison.Ordinal));
+        Assert.IsFalse(json.Contains("workspaceId", StringComparison.Ordinal));
+        Assert.IsFalse(json.Contains("characterId", StringComparison.Ordinal));
+    }
+
+    private static AvatarRuleAuthorityInvocation Request()
+        => new(
+            new AvatarRuleAuthorityRequest(
+                AvatarGatewayContractVersions.RuleAuthorityV1,
+                AvatarRuleIntentAdapter.SupportedIntentId,
+                AvatarRuleIntentAdapter.SupportedIntentVersion,
+                AvatarRuleIntentAdapter.SupportedCapabilityId,
+                AvatarRuleIntentAdapter.SupportedInvocationKind,
+                "session-actions",
+                [],
+                new AvatarRuleAuthorityBinding(
+                    AvatarRuleIntentAdapter.SupportedRulesetId,
+                    Sha('a'),
+                    AvatarRuleIntentAdapter.SupportedRulesetProfileId,
+                    417,
+                    Sha('b'),
+                    Sha('c'),
+                    Sha('d'),
+                    Sha('e'))),
+            "workspace-1",
+            "de-AT");
+
+    private static AvatarRuleAnswerEnvelope ValidAnswer(AvatarRuleAuthorityInvocation request)
     {
         AvatarSourceAnchor anchor = new(
             "anchor-recoil-1",
-            "sr5-core",
-            "Shadowrun 5 Grundregelwerk",
-            175,
-            "combat.recoil.compensation",
-            "chummer://sources/sr5-core?page=175");
+            "sr6-core",
+            "Shadowrun Sixth World Core Rulebook",
+            41,
+            "session.quick-actions",
+            "chummer://sources/sr6-core?page=41");
         AvatarRuleAnswerEnvelope unsigned = new(
             AvatarGatewayContractVersions.RuleAnswerV1,
             AvatarGatewayStatuses.Resolved,
@@ -234,9 +258,9 @@ public sealed class AvatarRuleAnswerValidatorTests
             true,
             [anchor],
             [new AvatarAllowedAction("open-rule-recoil", AvatarGatewayActionTypes.OpenRuleSource, anchor.LocalSourceRoute, false)],
-            request.WorkspaceRevision,
-            request.RuntimeFingerprint,
-            request.SourceDigest,
+            request.Request.ExpectedBinding.WorkspaceRevision,
+            request.Request.ExpectedBinding.RuntimeFingerprint,
+            request.Request.ExpectedBinding.SourceDigest,
             string.Empty,
             null);
         return unsigned with { AnswerDigest = AvatarRuleAnswerDigest.Compute(unsigned) };

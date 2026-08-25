@@ -41,6 +41,7 @@ public sealed class AvatarContextStoreTests
         Assert.AreEqual("character-1", context.CharacterId);
         Assert.AreEqual("campaign-1", context.CampaignId);
         Assert.AreEqual("sr6-core", context.RulesetId);
+        Assert.AreEqual("official.sr6.core", context.RulesetProfileId);
         Assert.AreEqual(DigestA, context.RuntimeFingerprint);
         Assert.AreEqual(DigestA, context.SourceDigest);
         Assert.AreEqual(DigestA, context.SourcebookFingerprint);
@@ -71,6 +72,7 @@ public sealed class AvatarContextStoreTests
             valid with { OwnerId = "owner/../other" },
             valid with { WorkspaceRevision = -1 },
             valid with { CampaignId = string.Empty },
+            valid with { RulesetProfileId = string.Empty },
             valid with { RuntimeFingerprint = $"sha256:{new string('A', 64)}" },
             valid with { SourceDigest = $"sha256:{new string('a', 63)}" },
             valid with { Locale = "en-us" },
@@ -337,7 +339,8 @@ public sealed class AvatarContextStoreTests
             "nonce-1",
             "idem-1",
             "How much karma remains?",
-            "attribute-body");
+            "attribute-body",
+            SupportedIntent());
 
         Assert.AreEqual(
             AvatarContextStoreStatus.InvalidRequest,
@@ -347,10 +350,76 @@ public sealed class AvatarContextStoreTests
             store.Authorize(valid with { Question = " \t" }, DigestA).Status);
         Assert.AreEqual(
             AvatarContextStoreStatus.InvalidRequest,
+            store.Authorize(valid with
+            {
+                Intent = SupportedIntent() with
+                {
+                    Arguments = [new AvatarRuleIntentArgument("mode", "text", "invented")]
+                }
+            }, DigestA).Status);
+        Assert.AreEqual(
+            AvatarContextStoreStatus.InvalidRequest,
             store.Authorize(valid, $"sha256:{new string('A', 64)}").Status);
         Assert.AreEqual(
             AvatarContextStoreStatus.Granted,
             store.Authorize(valid, DigestA).Status);
+    }
+
+    [TestMethod]
+    public void Typed_arguments_have_a_strict_bounded_scalar_shape_allowlist()
+    {
+        AvatarContextStore store = new(new ManualTimeProvider(Start));
+        string contextRef = Mint(store).ContextRef;
+        AvatarRuleQuestionRequest request = new(
+            AvatarGatewayContractVersions.RuleQuestionV1,
+            contextRef,
+            "scenario-private",
+            "session-1",
+            "nonce-1",
+            "idem-1",
+            "Which session actions are available?",
+            "session-actions",
+            SupportedIntent() with
+            {
+                Arguments =
+                [
+                    new AvatarRuleIntentArgument("mode", AvatarRuleAuthorityArgumentKinds.Identifier, IdentifierValue: "defense"),
+                    new AvatarRuleIntentArgument("modifier", AvatarRuleAuthorityArgumentKinds.Integer, IntegerValue: -1_000_000),
+                    new AvatarRuleIntentArgument("includeEdge", AvatarRuleAuthorityArgumentKinds.Boolean, BooleanValue: false)
+                ]
+            });
+
+        Assert.IsTrue(AvatarRuleIntentAdapter.IsStructurallyValidProviderRequest(request));
+        Assert.IsFalse(AvatarRuleIntentAdapter.IsStructurallyValidProviderRequest(request with
+        {
+            Intent = request.Intent! with
+            {
+                Arguments = [new AvatarRuleIntentArgument("modifier", AvatarRuleAuthorityArgumentKinds.Integer, IntegerValue: 1_000_001)]
+            }
+        }));
+        Assert.IsFalse(AvatarRuleIntentAdapter.IsStructurallyValidProviderRequest(request with
+        {
+            Intent = request.Intent! with
+            {
+                Arguments =
+                [
+                    new AvatarRuleIntentArgument("mode", AvatarRuleAuthorityArgumentKinds.Identifier, IdentifierValue: "defense"),
+                    new AvatarRuleIntentArgument("mode", AvatarRuleAuthorityArgumentKinds.Boolean, BooleanValue: true)
+                ]
+            }
+        }));
+        Assert.IsFalse(AvatarRuleIntentAdapter.IsStructurallyValidProviderRequest(request with
+        {
+            Intent = request.Intent! with
+            {
+                Arguments = Enumerable.Range(0, AvatarRuleIntentAdapter.MaximumArguments + 1)
+                    .Select(index => new AvatarRuleIntentArgument(
+                        $"argument{index}",
+                        AvatarRuleAuthorityArgumentKinds.Boolean,
+                        BooleanValue: true))
+                    .ToArray()
+            }
+        }));
     }
 
     [TestMethod]
@@ -394,6 +463,7 @@ public sealed class AvatarContextStoreTests
         "character-1",
         "campaign-1",
         "sr6-core",
+        "official.sr6.core",
         DigestA,
         DigestA,
         DigestA,
@@ -405,6 +475,14 @@ public sealed class AvatarContextStoreTests
         "career",
         new[] { AvatarGatewayScopes.RulesRead, AvatarGatewayScopes.CharacterRead },
         300);
+
+    private static AvatarRuleIntentSelection SupportedIntent() => new(
+        AvatarGatewayContractVersions.RuleIntentV1,
+        AvatarRuleIntentAdapter.SupportedIntentId,
+        AvatarRuleIntentAdapter.SupportedIntentVersion,
+        AvatarRuleIntentAdapter.SupportedCapabilityId,
+        AvatarRuleIntentAdapter.SupportedInvocationKind,
+        []);
 
     private static AvatarContextRequest CreateContextRequest(
         string contextRef,

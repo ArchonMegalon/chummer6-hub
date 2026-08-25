@@ -189,10 +189,26 @@ internal sealed class AvatarGatewayService(
                     return new AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope>(AvatarGatewayCallStatus.CapacityExceeded, null);
                 }
 
-                AvatarRuleAuthorityRequest authorityRequest = BuildAuthorityRequest(authorization.Context, request);
-                answerTask = HasRuleCharacterScopes(authorization.Context)
-                    ? ResolveRuleCoreAsync(authorityRequest, lifetime.Cancellation.Token)
-                    : Task.FromResult(SafeScopeFailure(authorityRequest));
+                AvatarRuleIntentDecision intentDecision = AvatarRuleIntentAdapter.Classify(
+                    authorization.Context,
+                    request);
+                if (!HasRuleCharacterScopes(authorization.Context))
+                {
+                    answerTask = Task.FromResult(SafeScopeFailure(authorization.Context));
+                }
+                else if (!intentDecision.Supported)
+                {
+                    answerTask = Task.FromResult(SafeIntentFailure(
+                        authorization.Context,
+                        intentDecision.Reason ?? AvatarRuleIntentAdapter.UnsupportedReason));
+                }
+                else
+                {
+                    AvatarRuleAuthorityInvocation invocation = AvatarRuleIntentAdapter.CreateInvocation(
+                        authorization.Context,
+                        request);
+                    answerTask = ResolveRuleCoreAsync(invocation, lifetime.Cancellation.Token);
+                }
                 _ruleResponses.Add(key, new CachedRuleAnswer(answerTask, authorization.Context.ExpiresAt));
             }
         }
@@ -245,20 +261,20 @@ internal sealed class AvatarGatewayService(
     }
 
     private async Task<AvatarRuleAnswerEnvelope> ResolveRuleCoreAsync(
-        AvatarRuleAuthorityRequest request,
+        AvatarRuleAuthorityInvocation invocation,
         CancellationToken cancellationToken)
     {
         try
         {
-            return await ruleAuthorityClient.ResolveAsync(request, cancellationToken).ConfigureAwait(false);
+            return await ruleAuthorityClient.ResolveAsync(invocation, cancellationToken).ConfigureAwait(false);
         }
         catch (AvatarRuleAuthorityException exception)
         {
             return exception.StatusCode switch
             {
-                StatusCodes.Status409Conflict => SafeAuthorityConflict(request, exception.Reason),
-                StatusCodes.Status410Gone => SafeAuthorityStale(request, exception.Reason),
-                _ => AvatarRuleAnswerValidator.SafeUnavailable(request, exception.Reason)
+                StatusCodes.Status409Conflict => SafeAuthorityConflict(invocation, exception.Reason),
+                StatusCodes.Status410Gone => SafeAuthorityStale(invocation, exception.Reason),
+                _ => AvatarRuleAnswerValidator.SafeUnavailable(invocation, exception.Reason)
             };
         }
         catch (Exception exception) when (exception is InvalidOperationException
@@ -267,73 +283,92 @@ internal sealed class AvatarGatewayService(
             or NotSupportedException)
         {
             return AvatarRuleAnswerValidator.SafeUnavailable(
-                request,
+                invocation,
                 "avatar-rule-authority-unexpected-failure");
         }
     }
 
-    private static AvatarRuleAnswerEnvelope SafeScopeFailure(AvatarRuleAuthorityRequest request)
-        => AvatarRuleAnswerValidator.SafeFailure(
-            request,
+    private static AvatarRuleAnswerEnvelope SafeScopeFailure(AvatarContextSnapshot context)
+        => SafeContextFailure(
+            context,
             AvatarGatewayStatuses.Forbidden,
-            IsGerman(request.Locale)
+            IsGerman(context.Locale)
                 ? "Dieser Rook-Kontext ist nicht für charakterbezogene Regelfragen freigegeben."
                 : "This Rook context is not authorized for character-bound rule questions.",
-            IsGerman(request.Locale)
+            IsGerman(context.Locale)
                 ? "Regelabfrage nicht freigegeben."
                 : "Rule question is not authorized.",
             "required-read-scopes-missing");
 
+    private static AvatarRuleAnswerEnvelope SafeIntentFailure(
+        AvatarContextSnapshot context,
+        string reason)
+        => SafeContextFailure(
+            context,
+            AvatarGatewayStatuses.Unresolved,
+            IsGerman(context.Locale)
+                ? "Diese Regelfrage benötigt eine unterstützte, versionierte Chummer-Absicht."
+                : "This rule question requires a supported, versioned Chummer intent.",
+            IsGerman(context.Locale)
+                ? "Regelabsicht nicht unterstützt."
+                : "Rule intent is not supported.",
+            reason);
+
+    private static AvatarRuleAnswerEnvelope SafeContextFailure(
+        AvatarContextSnapshot context,
+        string status,
+        string spokenAnswer,
+        string shortAnswer,
+        string reason)
+    {
+        AvatarRuleAnswerEnvelope unsigned = new(
+            AvatarGatewayContractVersions.RuleAnswerV1,
+            status,
+            spokenAnswer,
+            shortAnswer,
+            [],
+            [],
+            false,
+            [],
+            [],
+            context.WorkspaceRevision,
+            context.RuntimeFingerprint,
+            context.SourceDigest,
+            string.Empty,
+            reason);
+        return unsigned with { AnswerDigest = AvatarRuleAnswerDigest.Compute(unsigned) };
+    }
+
     private static AvatarRuleAnswerEnvelope SafeAuthorityConflict(
-        AvatarRuleAuthorityRequest request,
+        AvatarRuleAuthorityInvocation invocation,
         string reason)
         => AvatarRuleAnswerValidator.SafeFailure(
-            request,
+            invocation,
             AvatarGatewayStatuses.Conflict,
-            IsGerman(request.Locale)
+            IsGerman(invocation.Locale)
                 ? "Der Charakter wurde seit Beginn dieser Analyse verändert. Bitte lade den aktuellen Kontext neu."
                 : "The character changed after this analysis began. Reload the current context.",
-            IsGerman(request.Locale)
+            IsGerman(invocation.Locale)
                 ? "Charakterkontext hat sich geändert."
                 : "The character context changed.",
             reason);
 
     private static AvatarRuleAnswerEnvelope SafeAuthorityStale(
-        AvatarRuleAuthorityRequest request,
+        AvatarRuleAuthorityInvocation invocation,
         string reason)
         => AvatarRuleAnswerValidator.SafeFailure(
-            request,
+            invocation,
             AvatarGatewayStatuses.Stale,
-            IsGerman(request.Locale)
+            IsGerman(invocation.Locale)
                 ? "Dieser Charakterkontext ist abgelaufen. Bitte öffne Rook erneut aus Chummer."
                 : "This character context expired. Open Rook again from Chummer.",
-            IsGerman(request.Locale)
+            IsGerman(invocation.Locale)
                 ? "Charakterkontext ist abgelaufen."
                 : "The character context expired.",
             reason);
 
     private static bool IsGerman(string? locale)
         => locale?.StartsWith("de", StringComparison.OrdinalIgnoreCase) is true;
-
-    private static AvatarRuleAuthorityRequest BuildAuthorityRequest(
-        AvatarContextSnapshot context,
-        AvatarRuleQuestionRequest request)
-        => new(
-            AvatarGatewayContractVersions.RuleAuthorityRequestV1,
-            context.OwnerId,
-            context.WorkspaceId,
-            context.WorkspaceRevision,
-            context.CharacterId,
-            context.CampaignId,
-            context.RulesetId,
-            context.RuntimeFingerprint,
-            context.SourceDigest,
-            context.SourcebookFingerprint,
-            context.CustomDataFingerprint,
-            context.GmPolicyFingerprint,
-            context.Locale,
-            request.Question,
-            request.SubjectId);
 
     private static AvatarSessionContextProjection Project(AvatarContextSnapshot context)
     {
@@ -408,6 +443,26 @@ internal sealed class AvatarGatewayService(
         AddDigestField(canonical, "idempotency_key", request?.IdempotencyKey);
         AddDigestField(canonical, "question", request?.Question);
         AddDigestField(canonical, "subject_id", request?.SubjectId);
+        AddDigestField(canonical, "intent_present", request?.Intent is null ? "false" : "true");
+        AddDigestField(canonical, "intent_contract", request?.Intent?.ContractName);
+        AddDigestField(canonical, "intent_id", request?.Intent?.IntentId);
+        AddDigestField(canonical, "intent_version", request?.Intent?.IntentVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        AddDigestField(canonical, "capability_id", request?.Intent?.CapabilityId);
+        AddDigestField(canonical, "invocation_kind", request?.Intent?.InvocationKind);
+        AddDigestField(canonical, "argument_count", request?.Intent?.Arguments?.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        foreach (AvatarRuleIntentArgument? argument in request?.Intent?.Arguments ?? [])
+        {
+            AddDigestField(canonical, "argument_name", argument?.Name);
+            AddDigestField(canonical, "argument_kind", argument?.Kind);
+            AddDigestField(canonical, "argument_identifier", argument?.IdentifierValue);
+            AddDigestField(canonical, "argument_integer", argument?.IntegerValue?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            AddDigestField(canonical, "argument_boolean", argument?.BooleanValue switch
+            {
+                true => "true",
+                false => "false",
+                _ => null
+            });
+        }
         return HashCanonical(canonical);
     }
 
