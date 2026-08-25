@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 
 import pytest
@@ -45,12 +46,17 @@ def write_json(path: Path, schema: str) -> None:
     path.write_text(json.dumps({"schema": schema}), encoding="utf-8")
 
 
-def run_deploy_harness(body: str, *arguments: str) -> subprocess.CompletedProcess[str]:
+def run_deploy_harness(
+    body: str,
+    *arguments: str,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["bash", "-c", 'source "$1"; shift; ' + body, "harness", str(DEPLOY), *arguments],
         check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
 
 
@@ -401,6 +407,41 @@ def test_lifecycle_canary_requires_the_exact_private_rook_terminal_receipt(tmp_p
     assert rejected.returncode != 0
     assert rejected.stdout == ""
     assert "stage=lifecycle-canary-receipt-drift" in rejected.stderr
+
+
+def test_lifecycle_canary_is_portable_without_ripgrep(tmp_path):
+    tool_path = tmp_path / "tools"
+    tool_path.mkdir()
+    for command in ("awk", "bash", "dirname", "sed", "timeout"):
+        executable = shutil.which(command)
+        assert executable is not None
+        (tool_path / command).symlink_to(executable)
+
+    canary = tmp_path / "portable-canary.sh"
+    canary.write_text(
+        "#!/bin/sh\n"
+        "printf 'positive_canary=passed tool=200 replay=410 revoked=410 "
+        "terminal_equivalent=true gates=false cleanup=404 rook=text-fallback "
+        "live_support=disabled store=private\\n'\n",
+        encoding="utf-8",
+    )
+    canary.chmod(0o700)
+    environment = os.environ.copy()
+    environment["PATH"] = str(tool_path)
+
+    result = run_deploy_harness(
+        'deploy_tmp="$1"; canary_script="$2"; verify_lifecycle_canary',
+        str(tmp_path),
+        str(canary),
+        env=environment,
+    )
+
+    assert shutil.which("rg", path=environment["PATH"]) is None
+    assert not any(line.lstrip().startswith("rg ") for line in SCRIPT.splitlines())
+    assert " realpath rg rmdir " not in SCRIPT
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+    assert result.stderr == ""
 
 
 def test_release_pin_and_oci_revision_share_the_exact_presentation_main_commit():

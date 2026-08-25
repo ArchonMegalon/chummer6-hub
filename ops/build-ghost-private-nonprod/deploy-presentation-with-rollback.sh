@@ -810,7 +810,9 @@ verify_rendered_compose() {
              and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE == "false"' \
             "$rendered" >/dev/null || fail "compose-stock-avatar-unconfigured-posture-drift"
     fi
-    if rg --fixed-strings '/api/v1/ai/build-ghost/explain' "$script_root/Caddyfile" >/dev/null; then
+    if awk -v needle='/api/v1/ai/build-ghost/explain' \
+        'index($0, needle) { found = 1; exit } END { exit !found }' \
+        "$script_root/Caddyfile"; then
         fail "public-explain-route-present"
     fi
 }
@@ -928,8 +930,10 @@ verify_lifecycle_canary() {
     local receipt
     if ! timeout --signal=TERM --kill-after=60s 900s \
         "$canary_script" > "$deploy_tmp/lifecycle-canary.log" 2>&1; then
-        receipt="$(rg --line-regexp 'positive_canary=(failed|passed) .*' \
-            "$deploy_tmp/lifecycle-canary.log" | sed -n '$p' || true)"
+        receipt="$(awk \
+            '/^positive_canary=(failed|passed) .*$/ { receipt = $0 } \
+             END { if (receipt != "") print receipt }' \
+            "$deploy_tmp/lifecycle-canary.log")"
         if [ -n "$receipt" ]; then
             printf '%s\n' "$receipt" >&2
         else
@@ -937,9 +941,10 @@ verify_lifecycle_canary() {
         fi
         fail "lifecycle-canary-failed"
     fi
-    rg --line-regexp \
-        'positive_canary=passed .*tool=200 replay=410 revoked=410 terminal_equivalent=true .*gates=false cleanup=404 rook=text-fallback live_support=disabled store=private' \
-        "$deploy_tmp/lifecycle-canary.log" >/dev/null \
+    awk \
+        '/^positive_canary=passed .*tool=200 replay=410 revoked=410 terminal_equivalent=true .*gates=false cleanup=404 rook=text-fallback live_support=disabled store=private$/ \
+         { found = 1; exit } END { exit !found }' \
+        "$deploy_tmp/lifecycle-canary.log" \
         || fail "lifecycle-canary-receipt-drift"
 }
 
@@ -1415,7 +1420,7 @@ main() {
         require_command "$lock_required"
     done
     acquire_deploy_lock "$deploy_lock_file"
-    for required in awk bash cat curl cut date df docker find git id jq mktemp mv openssl python3 realpath rg rmdir sed seq setsid sha256sum shred sleep stat timeout truncate unlink wc; do
+    for required in awk bash cat curl cut date df docker find git id jq mktemp mv openssl python3 realpath rmdir sed seq setsid sha256sum shred sleep stat timeout truncate unlink wc; do
         require_command "$required"
     done
     [ -x "$packet_preflight" ] || fail "packet-store-preflight-not-executable"
