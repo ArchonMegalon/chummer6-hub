@@ -3,7 +3,9 @@ using System.Text.Json;
 using System.Net;
 using Chummer.Contracts.Presentation;
 using Chummer.Run.Api;
+using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Avatar;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
@@ -53,11 +55,17 @@ builder.Services.AddSingleton<IReleaseShelfPublicationReadinessProbe, ReleaseShe
 builder.Services.AddSingleton<IReleaseShelfPublicationReadinessProbe, ReleaseUploadStoragePublicationReadinessProbe>();
 builder.Services.AddHostedService<ReleaseShelfPublicationReadinessRefreshService>();
 builder.Services
-    .AddControllersWithViews()
+    .AddControllersWithViews(options =>
+        options.Filters.AddService<AvatarGatewayAuthorizationFilter>())
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = context =>
         {
+            if (IsAvatarGatewayPath(context.HttpContext.Request.Path))
+            {
+                AvatarGatewayHttpResult.ApplyPrivateHeaders(context.HttpContext.Response);
+                return AvatarGatewayHttpResult.Error(AvatarGatewayCallStatus.InvalidRequest);
+            }
             var problem = new ValidationProblemDetails(context.ModelState)
             {
                 Title = "Request validation failed.",
@@ -128,6 +136,22 @@ builder.Services
         UseCookies = false
     });
 builder.Services.AddSingleton<IBuildGhostLiveSupportGateway, BuildGhostLiveSupportGateway>();
+builder.Services.AddSingleton(provider => new AvatarContextStore(
+    provider.GetService<TimeProvider>() ?? TimeProvider.System));
+builder.Services.AddSingleton<AvatarGatewayCredentialPolicy>();
+builder.Services.AddSingleton<AvatarGatewayAuthorizationFilter>();
+builder.Services.AddSingleton<IAvatarGatewayService>(provider => new AvatarGatewayService(
+    provider.GetRequiredService<AvatarContextStore>(),
+    provider.GetRequiredService<IAvatarRuleAuthorityClient>(),
+    provider.GetService<TimeProvider>() ?? TimeProvider.System));
+builder.Services
+    .AddHttpClient<IAvatarRuleAuthorityClient, AvatarRuleAuthorityClient>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false,
+        AutomaticDecompression = DecompressionMethods.None,
+        UseCookies = false
+    });
 builder.Services.AddSingleton<PublicPlayProxyGateway>();
 builder.Services.AddSingleton<IPublicPlayPrivateRouteDelegator, DenyAllPublicPlayPrivateRouteDelegator>();
 builder.Services.AddSingleton<PlayReviewAccessService>();
@@ -681,6 +705,7 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.StartsWithSegments(PlayAuthorizationApiPolicy.AccountPathPrefix, StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments(PlayAuthorizationApiPolicy.InternalPathPrefix, StringComparison.OrdinalIgnoreCase)
         || CampaignCollaborationRoutePrivacyPolicy.RequiresPrivateHeaders(path)
+        || IsAvatarGatewayPath(path)
         || IsInstallLinkingSensitivePath(path)
         || IsLegacyMacReleaseBootstrapArtifactPath(path)
         || IsPublicVideoMediaPath(path)
@@ -716,7 +741,12 @@ static bool RequiresNoReferrerHeaders(PathString path)
         || PrivateResponseCacheHeaders.IsPrivateAccountSurface(path)
         || PrivateResponseCacheHeaders.IsPrivateAdminSurface(path)
         || CampaignCollaborationRoutePrivacyPolicy.RequiresPrivateHeaders(path)
+        || IsAvatarGatewayPath(path)
         || path.StartsWithSegments("/downloads/g", StringComparison.OrdinalIgnoreCase);
+
+static bool IsAvatarGatewayPath(PathString path)
+    => path.StartsWithSegments("/api/v1/avatar", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/api/internal/avatar", StringComparison.OrdinalIgnoreCase);
 
 static bool IsGovernedReleaseStaticPath(PathString path)
 {
