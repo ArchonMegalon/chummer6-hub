@@ -141,6 +141,9 @@ public sealed class BuildGhostExplainEndpointIntegrationTests
         builder.Services.AddSingleton<IBuildGhostClock, FixedClock>();
         builder.Services.AddSingleton<IToughTongueBuildGhostAdapter, ToughTongueBuildGhostAdapter>();
         builder.Services.AddSingleton<IBuildGhostPersonaReleaseRegistry, StaticReleaseRegistry>();
+        builder.Services.AddSingleton<IBuildGhostMeetingLinkBroker, DisabledBuildGhostMeetingLinkBroker>();
+        builder.Services.AddSingleton<IToughTongueLiveSupportMeetingClient, DisabledToughTongueLiveSupportMeetingClient>();
+        builder.Services.AddSingleton<IBuildGhostLiveSupportService, BuildGhostLiveSupportService>();
         builder.Services.AddSingleton<IBuildGhostPrivateToolAuthorityClient, RejectingAuthority>();
 
         WebApplication app = builder.Build();

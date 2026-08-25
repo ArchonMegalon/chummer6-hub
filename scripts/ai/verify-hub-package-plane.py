@@ -38,6 +38,7 @@ LOCKED_PROJECTS = (
     "Chummer.World.Contracts",
     "Chummer.Run.Api",
     "Chummer.Run.Api.Tests",
+    "Chummer.BuildGhost.ToughTongue.Tests",
 )
 LOCAL_PROJECT_PACKAGE_IDS = frozenset(
     {
@@ -182,6 +183,7 @@ def _audit_assets(
         consumer / "Chummer.Run.Contracts/obj/project.assets.json",
         consumer / "Chummer.Run.Api/obj/project.assets.json",
         consumer / "Chummer.Run.Api.Tests/obj/project.assets.json",
+        consumer / "Chummer.BuildGhost.ToughTongue.Tests/obj/project.assets.json",
     )
     expected_root = package_root.resolve()
     observed_libraries: dict[str, dict] = {}
@@ -310,6 +312,16 @@ def _trx_counts(path: Path) -> dict[str, int]:
     }
 
 
+def _require_passing_tests(counts: Mapping[str, int], label: str) -> None:
+    if (
+        counts.get("total", 0) <= 0
+        or counts.get("executed", 0) != counts.get("total", 0)
+        or counts.get("passed", 0) != counts.get("total", 0)
+        or any(counts.get(key, 0) != 0 for key in ("failed", "error", "timeout", "aborted"))
+    ):
+        raise VerificationError(f"{label} did not fully pass: {dict(counts)}")
+
+
 def _atomic_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -431,11 +443,33 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "-p:UseSharedCompilation=false",
         )
         test_project = consumer / "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj"
+        build_ghost_test_project = (
+            consumer
+            / "Chummer.BuildGhost.ToughTongue.Tests/Chummer.BuildGhost.ToughTongue.Tests.csproj"
+        )
         _run(
             (
                 dotnet,
                 "restore",
                 str(test_project),
+                "--configfile",
+                str(nuget_config),
+                "--packages",
+                str(package_root),
+                "--locked-mode",
+                "--no-cache",
+                "--nologo",
+                "-m:1",
+                *common,
+            ),
+            cwd=consumer,
+            env=env,
+        )
+        _run(
+            (
+                dotnet,
+                "restore",
+                str(build_ghost_test_project),
                 "--configfile",
                 str(nuget_config),
                 "--packages",
@@ -468,6 +502,27 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             (
                 dotnet,
                 "test",
+                str(build_ghost_test_project),
+                "--configuration",
+                "Release",
+                "--framework",
+                "net10.0",
+                "--no-restore",
+                "--nologo",
+                "-m:1",
+                "--logger",
+                "trx;LogFileName=build-ghost-tough-tongue-package-plane.trx",
+                "--results-directory",
+                str(results),
+                *common,
+            ),
+            cwd=consumer,
+            env=env,
+        )
+        _run(
+            (
+                dotnet,
+                "test",
                 str(test_project),
                 "--configuration",
                 "Release",
@@ -491,8 +546,14 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             consumer, contract_output, commit, lock.package_version, dotnet, common, env
         )
         test_counts = _trx_counts(results / "package-plane.trx")
-        if test_counts["failed"] or test_counts["error"] or test_counts["timeout"] or test_counts["aborted"]:
-            raise VerificationError(f"package-plane tests did not pass: {test_counts}")
+        build_ghost_test_counts = _trx_counts(
+            results / "build-ghost-tough-tongue-package-plane.trx"
+        )
+        _require_passing_tests(test_counts, "package-plane API tests")
+        _require_passing_tests(
+            build_ghost_test_counts,
+            "Build Ghost Tough Tongue package-plane tests",
+        )
         payload: dict[str, object] = {
             "contract": RECEIPT_CONTRACT,
             "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -534,6 +595,7 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "locked_mode_restore": True,
             "api_build": "pass",
             "api_tests": test_counts,
+            "build_ghost_tough_tongue_tests": build_ghost_test_counts,
             "release_control_python_tests": {
                 "status": "pass",
                 "files": list(RELEASE_CONTROL_PYTHON_TESTS),
@@ -541,7 +603,10 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "contract_pack_license_gate": "pass",
         }
         _atomic_json(receipt_path.resolve(), payload)
-    print(f"hub-no-siblings-package-plane: ok ({test_counts['passed']} tests)")
+    print(
+        "hub-no-siblings-package-plane: ok "
+        f"({test_counts['passed'] + build_ghost_test_counts['passed']} tests)"
+    )
     print(f"receipt: {receipt_path.resolve()}")
 
 

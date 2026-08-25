@@ -2048,7 +2048,7 @@ public static class BuildGhostToughTongueStockAvatarBindingContract
         string fileDigest = DigestText(raw);
         try
         {
-            using JsonDocument document = JsonDocument.Parse(raw, new JsonDocumentOptions
+            using JsonDocument document = JsonDocument.Parse(raw.ToArray(), new JsonDocumentOptions
             {
                 AllowTrailingCommas = false,
                 CommentHandling = JsonCommentHandling.Disallow

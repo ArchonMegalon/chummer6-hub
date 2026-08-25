@@ -34,6 +34,8 @@ public sealed record BuildGhostConciergeProjection(
     string ClientReportHref,
     string PublicFeedbackHref,
     IReadOnlyList<BuildGhostConciergeActionProjection> Actions,
+    string DefaultSupportStatus,
+    IReadOnlyList<string> DefaultSupportResponsibilities,
     string ToughTongueStatus,
     IReadOnlyList<string> ToughTongueResponsibilities);
 
@@ -86,16 +88,14 @@ public sealed class BuildGhostConciergeService
         string answerlyStatus = _answerlyPolicy.CanUseHumanizer
             ? "Limited explainer fail-closed"
             : "Fallback explainer only";
-        bool toughTongueRemoteEnabled = bool.TryParse(
-            _configuration["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_ENABLED"],
+        bool liveSupportRemoteEnabled = bool.TryParse(
+            _configuration["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED"],
             out bool parsedRemoteEnabled) && parsedRemoteEnabled;
-        int configuredToughTongueSlots = Enumerable.Range(1, 3).Count(index =>
-            !string.IsNullOrWhiteSpace(_configuration[$"CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_{index}"]));
-        string toughTongueStatus = !toughTongueRemoteEnabled
-            ? "Deterministic fallback active; remote explanation is disabled"
-            : configuredToughTongueSlots == 3
-                ? "Three credential slots configured; health is evaluated per request"
-                : $"Fail-closed: {configuredToughTongueSlots}/3 credential slots configured";
+        bool liveSupportReceiptConfigured = !string.IsNullOrWhiteSpace(
+            _configuration["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_RECEIPT_PATH"]);
+        string toughTongueStatus = liveSupportRemoteEnabled && liveSupportReceiptConfigured
+            ? "Live support is capability-gated per meeting provider"
+            : "Live support is unavailable until provider proof and meeting provisioning are ready";
         const string clientReportHref = "/contact?kind=bug_report&title=Character%20helper%20report&summary=Character%20helper%20compare%20or%20apply%20did%20not%20behave%20as%20expected.&runtime=character_helper&bundle=character_helper&sceneId=character-helper";
         const string publicFeedbackHref = "/feedback?topic=character-helper";
         BuildGhostConciergeInsightProjection[] insights = BuildChartBrickInsights();
@@ -106,8 +106,8 @@ public sealed class BuildGhostConciergeService
             AnswerlyStatus: answerlyStatus,
             EngineStatus: "First-party compare/apply only",
             HumanizedSummary: packet.FallbackMessage,
-            CanonicalLane: "Short intake -> digest-bound Tough Tongue explanation -> Chummer character compare bench",
-            RuntimeBoundary: "Neither the public concierge nor any bounded explainer may compute legality, mutate the runner, or become apply truth. Tough Tongue receives only an already-grounded packet and its response is validated again.",
+            CanonicalLane: "Rook help in Chummer -> reviewed VidBoard clip when useful -> Chummer character compare bench -> optional consented live meeting",
+            RuntimeBoundary: "Rook and VidBoard may explain only Chummer-owned facts. Tough Tongue is an explicit live-support escalation, never the default path, and neither provider may compute legality, mutate the runner, or become apply truth.",
             FacePopResponsibilities:
             [
                 "Greet the builder and ask which runner decision needs comparison.",
@@ -158,12 +158,19 @@ public sealed class BuildGhostConciergeService
                     "secondary",
                     "Open support with the character-helper context already attached.")
             ],
+            DefaultSupportStatus: "Rook is the default guide; approved VidBoard clips augment the deterministic text fallback",
+            DefaultSupportResponsibilities:
+            [
+                "Keep Rook as the consistent default character-help persona.",
+                "Use only approved, pre-rendered VidBoard clips from grounded Chummer help packets.",
+                "Fall back to deterministic text whenever a clip is missing, stale, or unverified."
+            ],
             ToughTongueStatus: toughTongueStatus,
             ToughTongueResponsibilities:
             [
-                "Explain only facts, variants, sources, actions, and links present in the digest-bound Chummer packet.",
-                "Use one healthy credential slot per idempotent request and emit a redacted receipt.",
-                "Return Chummer's locale-matched deterministic fallback when remote execution, quota, circuit, or validation is unavailable."
+                "Start only after a signed-in user explicitly requests live support, chooses Zoom or Teams, and grants both required consents.",
+                "Return a meeting link only after meeting creation, Tough Tongue bot scheduling, and a fresh provider-specific photorealistic-video canary all succeed.",
+                "Cancel an orphaned meeting and return to Rook when any provider, quota, capability, or validation gate fails."
             ]);
     }
 

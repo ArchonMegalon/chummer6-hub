@@ -404,6 +404,12 @@ public sealed class BuildGhostPrivateToolEndpointTests
         BuildGhostController controller = new(
             new NeverRemoteAdapter(),
             new StaticReleaseRegistry(),
+            new BuildGhostLiveSupportService(
+                Configuration(),
+                new StaticReleaseRegistry(),
+                new DisabledBuildGhostMeetingLinkBroker(),
+                new DisabledToughTongueLiveSupportMeetingClient(),
+                new SystemBuildGhostClock()),
             authority,
             NullLogger<BuildGhostController>.Instance,
             Configuration());

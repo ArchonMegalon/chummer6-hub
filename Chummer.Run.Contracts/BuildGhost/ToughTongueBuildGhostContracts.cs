@@ -1,5 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Chummer.Run.Contracts.BuildGhost;
 
@@ -39,13 +41,65 @@ public static class ToughTongueBuildGhostContractVersions
     public const string ScenarioCanaryReceiptV1 = "chummer.tough_tongue.build_ghost_canary_receipt.v1";
     public const string CartesiaVoiceDeletionReceiptV1 = "chummer.build_ghost.cartesia_voice_deletion_receipt.v1";
     public const string ScenarioDeletionBlockerReceiptV1 = "chummer.tough_tongue.scenario_deletion_blocker_receipt.v1";
+    public const string SupportExperienceV1 = "chummer.build_ghost.support_experience.v1";
+    public const string LiveSupportRequestV1 = "chummer.build_ghost.live_support_request.v1";
+    public const string LiveSupportSessionV1 = "chummer.build_ghost.live_support_session.v1";
+    public const string LiveSupportCapabilityReceiptV1 = "chummer.build_ghost.live_support_capability_receipt.v1";
+    public const string LiveSupportStatusRequestV1 = "chummer.build_ghost.live_support_status_request.v1";
 }
 
 public static class ToughTongueBuildGhostPersonaIds
 {
     public const string Rook = "build-ghost-rook-v1";
+    public const string RookAvatar = "build-ghost-rook-avatar-v1";
+    public const string RookVidBoardSupport = "build-ghost-rook-vidboard-support-v1";
     public const string StockDefaultAvatar = "build-ghost-tough-tongue-stock-avatar-v1";
     public const string RookVoice = "build-ghost-rook-voice-v1";
+}
+
+public static class BuildGhostSupportChannelKinds
+{
+    public const string RookVidBoard = "rook_vidboard";
+    public const string LivePhotorealMeeting = "live_photoreal_meeting";
+}
+
+public static class BuildGhostLiveMeetingProviders
+{
+    public const string Zoom = "zoom";
+    public const string Teams = "teams";
+}
+
+public static class BuildGhostLiveSupportStatuses
+{
+    public const string Unavailable = "unavailable";
+    public const string Requested = "requested";
+    public const string ProvisioningMeeting = "provisioning_meeting";
+    public const string ProvisioningAvatar = "provisioning_avatar";
+    public const string Ready = "ready";
+    public const string Active = "active";
+    public const string Completed = "completed";
+    public const string Failed = "failed";
+    public const string Cancelled = "cancelled";
+    public const string Expired = "expired";
+}
+
+public static class BuildGhostLiveSupportDisclosureContract
+{
+    public const string CurrentVersion = "chummer.build_ghost.live_support_disclosure.v1";
+    public const string RecordingDisclosure =
+        "The live-support meeting may be recorded or transcribed and the meeting must disclose this before it starts.";
+    public const string ExternalProviderProcessingDisclosure =
+        "The selected meeting provider and Tough Tongue may process the meeting data needed for live support.";
+
+    public static string ComputeDigest()
+    {
+        string authority = string.Join(
+            '\n',
+            CurrentVersion,
+            RecordingDisclosure,
+            ExternalProviderProcessingDisclosure);
+        return $"sha256:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(authority))).ToLowerInvariant()}";
+    }
 }
 
 public static class ToughTongueBuildGhostStockAvatarSelections
@@ -559,4 +613,141 @@ public sealed record BuildGhostPersonaReleaseProjection(
     bool AvatarReady,
     bool VoiceReady,
     string FallbackPosture,
+    IReadOnlyList<string> BlockingReasons);
+
+public sealed record BuildGhostDefaultSupportProjection(
+    string ChannelKind,
+    string PersonaId,
+    string AvatarId,
+    string MediaAssetId,
+    string? PreRenderedVideoHref,
+    string MediaContentDigest,
+    bool PreRenderedVideoReady,
+    string AvailabilityStatus,
+    string DeterministicTextFallback,
+    IReadOnlyList<string> BlockingReasons);
+
+public sealed record BuildGhostLiveSupportCapabilityProjection(
+    string ChannelKind,
+    bool RequestAvailable,
+    IReadOnlyList<string> MeetingProviders,
+    string AvatarPresentation,
+    bool RecordingDisclosureRequired,
+    IReadOnlyList<string> BlockingReasons);
+
+public sealed record BuildGhostSupportExperienceProjection(
+    string Schema,
+    BuildGhostDefaultSupportProjection DefaultSupport,
+    BuildGhostLiveSupportCapabilityProjection LiveSupport);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record BuildGhostLiveSupportRequest(
+    [property: JsonPropertyName("schema")] string Schema,
+    [property: JsonPropertyName("request_id")] string RequestId,
+    [property: JsonPropertyName("owner_scope_hash")] string OwnerScopeHash,
+    [property: JsonPropertyName("workspace_id")] string WorkspaceId,
+    [property: JsonPropertyName("workspace_revision")] long WorkspaceRevision,
+    [property: JsonPropertyName("source_digest")] string SourceDigest,
+    [property: JsonPropertyName("locale")] string Locale,
+    [property: JsonPropertyName("meeting_provider")] string MeetingProvider,
+    [property: JsonPropertyName("recording_consent_granted")] bool RecordingConsentGranted,
+    [property: JsonPropertyName("external_provider_processing_consent_granted")] bool ExternalProviderProcessingConsentGranted,
+    [property: JsonPropertyName("disclosure_version")] string DisclosureVersion,
+    [property: JsonPropertyName("disclosure_digest")] string DisclosureDigest,
+    [property: JsonPropertyName("requested_duration_minutes")] int RequestedDurationMinutes,
+    [property: JsonPropertyName("idempotency_key")] string IdempotencyKey,
+    [property: JsonPropertyName("requested_at_utc")] DateTimeOffset RequestedAtUtc);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record BuildGhostLiveSupportStatusRequest(
+    [property: JsonPropertyName("schema")] string Schema,
+    [property: JsonPropertyName("owner_scope_hash")] string OwnerScopeHash,
+    [property: JsonPropertyName("request_id")] string RequestId,
+    [property: JsonPropertyName("workspace_id")] string WorkspaceId,
+    [property: JsonPropertyName("source_digest")] string SourceDigest);
+
+public sealed record BuildGhostLiveSupportCapabilityReceipt(
+    string Schema,
+    IReadOnlyList<string> MeetingProviders,
+    string AccountScopeRefDigest,
+    string ScenarioRefDigest,
+    string AvatarAlias,
+    string AvatarBindingDigest,
+    bool PhotorealisticVideoInMeetingVerified,
+    bool RecordingDisclosureRequired,
+    decimal AvailableMinutesAtObservation,
+    decimal ReservedMinutes,
+    decimal LiveAvatarMinutesMultiplier,
+    string EvidenceSource,
+    DateTimeOffset ObservedAtUtc,
+    int MaximumAgeSeconds,
+    string ReceiptDigest,
+    string AuthorityMac);
+
+public sealed record BuildGhostMeetingLinkProvisioningCommand(
+    string RequestId,
+    string OwnerScopeHash,
+    string MeetingProvider,
+    string Locale,
+    int DurationMinutes,
+    string IdempotencyKey);
+
+public sealed record BuildGhostMeetingLinkProvisioningResult(
+    bool Success,
+    bool ReconciliationRequired,
+    string OutcomeCode,
+    string MeetingProvider,
+    Uri? JoinUrl,
+    [property: JsonIgnore] string CancellationHandle,
+    string ProviderMeetingRefDigest,
+    string ProviderResponseDigest,
+    DateTimeOffset? StartsAtUtc,
+    DateTimeOffset? ExpiresAtUtc);
+
+public sealed record BuildGhostMeetingLinkCancellationCommand(
+    string RequestId,
+    string MeetingProvider,
+    string CancellationHandle,
+    string IdempotencyKey);
+
+public sealed record BuildGhostMeetingLinkCancellationResult(
+    bool Success,
+    string OutcomeCode,
+    string ProviderResponseDigest);
+
+public sealed record BuildGhostToughTongueMeetingBotCommand(
+    string RequestId,
+    string MeetingProvider,
+    Uri JoinUrl,
+    string IdempotencyKey);
+
+public sealed record BuildGhostToughTongueMeetingBotResult(
+    bool Success,
+    bool ReconciliationRequired,
+    string OutcomeCode,
+    string BotRefDigest,
+    string SessionRefDigest,
+    string ProviderResponseDigest);
+
+public sealed record BuildGhostLiveSupportSessionProjection(
+    string Schema,
+    string RequestId,
+    string ChannelKind,
+    string Status,
+    string MeetingProvider,
+    Uri? JoinUrl,
+    DateTimeOffset? JoinUrlExpiresAtUtc,
+    string AvatarAlias,
+    string AvatarPresentation,
+    bool RecordingConsentGranted,
+    bool ExternalProviderProcessingConsentGranted,
+    string DisclosureVersion,
+    string DisclosureDigest,
+    string MeetingLinkDigest,
+    string MeetingReceiptDigest,
+    string MeetingBotReceiptDigest,
+    string CapabilityReceiptDigest,
+    DateTimeOffset RequestedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    BuildGhostDefaultSupportProjection FallbackSupport,
     IReadOnlyList<string> BlockingReasons);

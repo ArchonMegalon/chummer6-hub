@@ -116,6 +116,18 @@ builder.Services
         AllowAutoRedirect = false,
         UseCookies = false
     });
+builder.Services
+    .AddHttpClient(BuildGhostLiveSupportGateway.HttpClientName, client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(25);
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false,
+        AutomaticDecompression = System.Net.DecompressionMethods.None,
+        UseCookies = false
+    });
+builder.Services.AddSingleton<IBuildGhostLiveSupportGateway, BuildGhostLiveSupportGateway>();
 builder.Services.AddSingleton<PublicPlayProxyGateway>();
 builder.Services.AddSingleton<IPublicPlayPrivateRouteDelegator, DenyAllPublicPlayPrivateRouteDelegator>();
 builder.Services.AddSingleton<PlayReviewAccessService>();
