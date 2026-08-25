@@ -149,6 +149,35 @@ ai_id="$(container_id chummer-build-ghost-ai)"
 docker cp "$edge_id:/data/caddy/pki/authorities/local/root.crt" "$canary_tmp/root.crt" >/dev/null
 chmod 0600 "$canary_tmp/root.crt"
 
+support_response="$(docker exec "$ai_id" sh -ec '
+    { printf "Authorization: Bearer %s\n" "$CHUMMER_AI_INTERNAL_API_TOKEN"; } \
+    | curl --silent --show-error --max-time 15 \
+        --output - --write-out "\n%{http_code}" \
+        --header @- \
+        http://127.0.0.1:8080/api/v1/ai/build-ghost/support-experience
+')"
+support_status="${support_response##*$'\n'}"
+printf '%s' "${support_response%$'\n'*}" > "$canary_tmp/support-experience.json"
+if [ "$support_status" != "200" ] \
+    || ! jq -e '
+        .schema == "chummer.build_ghost.support_experience.v1"
+        and .defaultSupport.channelKind == "rook_vidboard"
+        and .defaultSupport.personaId == "build-ghost-rook-v1"
+        and .defaultSupport.mediaAssetId == "build-ghost-rook-vidboard-support-v1"
+        and .defaultSupport.preRenderedVideoHref == null
+        and .defaultSupport.mediaContentDigest == ""
+        and .defaultSupport.preRenderedVideoReady == false
+        and .defaultSupport.availabilityStatus == "text-fallback"
+        and .defaultSupport.deterministicTextFallback == "Rook can continue in the grounded Chummer help flow while live support is unavailable."
+        and .liveSupport.requestAvailable == false
+        and .liveSupport.meetingProviders == []
+        and (.liveSupport.blockingReasons | index("live-support-remote-execution-disabled-by-default") != null)
+        and ([.liveSupport.blockingReasons[] | select(startswith("live-support-session-store-"))] | length) == 0
+    ' "$canary_tmp/support-experience.json" >/dev/null; then
+    printf 'positive_canary=failed stage=rook-support-fallback status=%s\n' "$support_status"
+    exit 1
+fi
+
 fabricated_key="synthetic-unknown-packet-key-00000000000000000001"
 fabricated_digest="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 jq -n \
@@ -550,7 +579,7 @@ if [ "$closed_status" != "404" ]; then
     exit 1
 fi
 
-printf 'positive_canary=passed legacy_unknown_key=%s legacy_wrong_contract=%s legacy_unknown_field=%s provider_unknown_key=%s provider_wrong_contract=%s provider_ambiguous_auth=%s provider_unknown_field=%s provider_noncanonical_key=%s neighbor=%s presentation_neighbor=%s import=%s cross_owner=%s grant=%s grant_cache=%s tool=%s replay=%s revoked=%s terminal_equivalent=%s auth=packet-access-key-body-v2 schema=%s locale=%s characters=%s cache=%s ttl_seconds=%s pending_grants=%s active_claims=%s audit_records=%s revocation_markers=%s gates=false cleanup=%s\n' \
+printf 'positive_canary=passed legacy_unknown_key=%s legacy_wrong_contract=%s legacy_unknown_field=%s provider_unknown_key=%s provider_wrong_contract=%s provider_ambiguous_auth=%s provider_unknown_field=%s provider_noncanonical_key=%s neighbor=%s presentation_neighbor=%s import=%s cross_owner=%s grant=%s grant_cache=%s tool=%s replay=%s revoked=%s terminal_equivalent=%s auth=packet-access-key-body-v2 schema=%s locale=%s characters=%s cache=%s ttl_seconds=%s pending_grants=%s active_claims=%s audit_records=%s revocation_markers=%s gates=false cleanup=%s rook=text-fallback live_support=disabled store=private\n' \
     "$unknown_key_status" "$wrong_contract_status" "$unknown_field_status" \
     "$provider_unknown_key_status" "$provider_wrong_contract_status" "$provider_ambiguous_auth_status" \
     "$provider_unknown_field_status" "$provider_noncanonical_key_status" "$neighbor_status" \

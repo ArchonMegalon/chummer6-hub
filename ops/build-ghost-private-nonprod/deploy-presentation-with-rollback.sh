@@ -414,6 +414,15 @@ load_runtime_environment_without_output() {
 
     read_existing_environment "$ai_id_before" CHUMMER_AI_INTERNAL_API_TOKEN required CHUMMER_AI_INTERNAL_API_TOKEN
     export CHUMMER_AI_INTERNAL_API_TOKEN
+    read_existing_environment "$ai_id_before" \
+        CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY required \
+        CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY
+    export CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY
+    [[ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]] \
+        || fail "runtime-env-CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY-invalid"
+    [ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" != "$CHUMMER_AI_INTERNAL_API_TOKEN" ] \
+        && [ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" != "$CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN" ] \
+        || fail "runtime-live-support-session-store-key-not-distinct"
     if [ -n "$operator_runtime_config_file" ]; then
         return 0
     fi
@@ -690,6 +699,30 @@ verify_rendered_compose() {
          and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED == "false"
          and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED == "false"
          and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED == "false"
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED == "false"
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_RECEIPT_PATH == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_HMAC_KEY == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_ACCOUNT_SCOPE_REF_DIGEST == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SCENARIO_REF_DIGEST == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_AVATAR_BINDING_DIGEST == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_HREF == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_DIGEST == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_PERSONA_RELEASE_REGISTRY_PATH == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_MEETING_BROKER_BASE_URL == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_MEETING_BROKER_API_TOKEN == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_API_KEY == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_SCENARIO_ID == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_NAME == ""
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_PATH == "/app/state/build-ghost-live-support"
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SINGLE_INSTANCE == "true"
+         and .services[$ai].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY == $ENV.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_AI_BASE_URL == "http://chummer-build-ghost-ai:8080"
+         and .services[$service].environment.CHUMMER_AI_INTERNAL_API_TOKEN == .services[$ai].environment.CHUMMER_AI_INTERNAL_API_TOKEN
+         and any(.services[$ai].volumes[]?;
+             .type == "volume"
+             and .source == "build-ghost-live-support"
+             and .target == "/app/state/build-ghost-live-support"
+             and (.read_only // false) == false)
          and .services[$ai].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH == "/run/secrets/tough-tongue-read-only-binding-contract.json"
          and any(.services[$ai].secrets[]?;
              .source == "build-ghost-tough-tongue-read-only-binding-contract"
@@ -777,7 +810,9 @@ verify_rendered_compose() {
              and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE == "false"' \
             "$rendered" >/dev/null || fail "compose-stock-avatar-unconfigured-posture-drift"
     fi
-    if rg --fixed-strings '/api/v1/ai/build-ghost/explain' "$script_root/Caddyfile" >/dev/null; then
+    if awk -v needle='/api/v1/ai/build-ghost/explain' \
+        'index($0, needle) { found = 1; exit } END { exit !found }' \
+        "$script_root/Caddyfile"; then
         fail "public-explain-route-present"
     fi
 }
@@ -895,8 +930,10 @@ verify_lifecycle_canary() {
     local receipt
     if ! timeout --signal=TERM --kill-after=60s 900s \
         "$canary_script" > "$deploy_tmp/lifecycle-canary.log" 2>&1; then
-        receipt="$(rg --line-regexp 'positive_canary=(failed|passed) .*' \
-            "$deploy_tmp/lifecycle-canary.log" | sed -n '$p' || true)"
+        receipt="$(awk \
+            '/^positive_canary=(failed|passed) .*$/ { receipt = $0 } \
+             END { if (receipt != "") print receipt }' \
+            "$deploy_tmp/lifecycle-canary.log")"
         if [ -n "$receipt" ]; then
             printf '%s\n' "$receipt" >&2
         else
@@ -904,9 +941,10 @@ verify_lifecycle_canary() {
         fi
         fail "lifecycle-canary-failed"
     fi
-    rg --line-regexp \
-        'positive_canary=passed .*tool=200 replay=410 revoked=410 terminal_equivalent=true .*gates=false cleanup=404' \
-        "$deploy_tmp/lifecycle-canary.log" >/dev/null \
+    awk \
+        '/^positive_canary=passed .*tool=200 replay=410 revoked=410 terminal_equivalent=true .*gates=false cleanup=404 rook=text-fallback live_support=disabled store=private$/ \
+         { found = 1; exit } END { exit !found }' \
+        "$deploy_tmp/lifecycle-canary.log" \
         || fail "lifecycle-canary-receipt-drift"
 }
 
@@ -1382,7 +1420,7 @@ main() {
         require_command "$lock_required"
     done
     acquire_deploy_lock "$deploy_lock_file"
-    for required in awk bash cat curl cut date df docker find git id jq mktemp mv openssl python3 realpath rg rmdir sed seq setsid sha256sum shred sleep stat timeout truncate unlink wc; do
+    for required in awk bash cat curl cut date df docker find git id jq mktemp mv openssl python3 realpath rmdir sed seq setsid sha256sum shred sleep stat timeout truncate unlink wc; do
         require_command "$required"
     done
     [ -x "$packet_preflight" ] || fail "packet-store-preflight-not-executable"

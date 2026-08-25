@@ -66,6 +66,7 @@ def compose_environment(
         "test-tool-token-" + "a" * 32
     )
     environment["CHUMMER_AI_INTERNAL_API_TOKEN"] = "test-ai-token-" + "b" * 32
+    environment["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY"] = "A" * 43 + "="
     for name in (
         "CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_HOST",
         "CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN",
@@ -120,6 +121,7 @@ def test_default_compose_does_not_start_or_attach_access_edge():
         "chummer-build-ghost-ai",
         "build-ghost-private-edge",
         "build-ghost-private-trust-export",
+        "build-ghost-live-support-store-init",
     }
 
 

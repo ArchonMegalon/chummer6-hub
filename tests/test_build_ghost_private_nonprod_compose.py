@@ -80,6 +80,7 @@ def test_default_unconfigured_contract_renders_every_service_fail_closed_without
         environment[name] = str(ROOT)
     environment["CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN"] = "test-tool-token-" + "a" * 32
     environment["CHUMMER_AI_INTERNAL_API_TOKEN"] = "test-ai-token-" + "b" * 32
+    environment["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY"] = "A" * 43 + "="
     environment["CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK"] = "test-build-ghost-cloudflare-ingress"
     for name in tuple(environment):
         if name.startswith("CHUMMER_BUILD_GHOST_TOUGH_TONGUE_") or name == "EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST":
@@ -104,8 +105,10 @@ def test_default_unconfigured_contract_renders_every_service_fail_closed_without
         "chummer-build-ghost-ai",
         "build-ghost-private-edge",
         "build-ghost-private-trust-export",
+        "build-ghost-live-support-store-init",
     }
     ai = rendered["services"]["chummer-build-ghost-ai"]
+    presentation = rendered["services"]["chummer-build-ghost-presentation"]
     for gate in (
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED",
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED",
@@ -113,6 +116,47 @@ def test_default_unconfigured_contract_renders_every_service_fail_closed_without
         "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED",
     ):
         assert ai["environment"][gate] == "false"
+    assert ai["environment"]["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED"] == "false"
+    for blocked_input in (
+        "CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_RECEIPT_PATH",
+        "CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_HMAC_KEY",
+        "CHUMMER_BUILD_GHOST_LIVE_SUPPORT_ACCOUNT_SCOPE_REF_DIGEST",
+        "CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SCENARIO_REF_DIGEST",
+        "CHUMMER_BUILD_GHOST_LIVE_SUPPORT_AVATAR_BINDING_DIGEST",
+        "CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_HREF",
+        "CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_DIGEST",
+        "CHUMMER_BUILD_GHOST_PERSONA_RELEASE_REGISTRY_PATH",
+        "CHUMMER_BUILD_GHOST_MEETING_BROKER_BASE_URL",
+        "CHUMMER_BUILD_GHOST_MEETING_BROKER_API_TOKEN",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_API_KEY",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_SCENARIO_ID",
+        "CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_NAME",
+    ):
+        assert ai["environment"][blocked_input] == ""
+    assert ai["environment"]["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_PATH"] == (
+        "/app/state/build-ghost-live-support"
+    )
+    assert ai["environment"]["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY"] == "A" * 43 + "="
+    assert ai["environment"]["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SINGLE_INSTANCE"] == "true"
+    live_support_mounts = [
+        mount
+        for mount in ai["volumes"]
+        if mount["target"] == "/app/state/build-ghost-live-support"
+    ]
+    assert live_support_mounts == [
+        {
+            "type": "volume",
+            "source": "build-ghost-live-support",
+            "target": "/app/state/build-ghost-live-support",
+            "volume": {},
+        }
+    ]
+    assert presentation["environment"]["CHUMMER_BUILD_GHOST_AI_BASE_URL"] == (
+        "http://chummer-build-ghost-ai:8080"
+    )
+    assert presentation["environment"]["CHUMMER_AI_INTERNAL_API_TOKEN"] == (
+        ai["environment"]["CHUMMER_AI_INTERNAL_API_TOKEN"]
+    )
     assert ai["environment"]["EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST"] == ""
     assert ai["environment"]["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER"] == "avatario"
     assert ai["environment"]["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME"] == "Amelia"

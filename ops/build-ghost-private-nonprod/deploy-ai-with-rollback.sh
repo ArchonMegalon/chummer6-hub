@@ -400,6 +400,12 @@ verify_materialized_runtime_pair() {
 load_runtime_secrets_without_output() {
     load_existing_environment "$old_ai_id" CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN required
     load_existing_environment "$old_ai_id" CHUMMER_AI_INTERNAL_API_TOKEN required
+    load_existing_environment "$old_ai_id" CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY required
+    [[ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]] \
+        || fail "runtime-env-CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY-invalid"
+    [ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" != "$CHUMMER_AI_INTERNAL_API_TOKEN" ] \
+        && [ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" != "$CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN" ] \
+        || fail "runtime-live-support-session-store-key-not-distinct"
     if [ "$quarantine_requested" = "1" ]; then
         quarantine_provider_runtime_without_output
         return 0
@@ -500,6 +506,7 @@ verify_rendered_compose() {
     chmod 0600 "$rendered"
     jq -e \
         --arg service "$ai_service" \
+        --arg presentation "$presentation_service" \
         --arg hub "$CHUMMER_RUN_SERVICES_REVISION" \
         --arg core "$CHUMMER_CORE_ENGINE_REVISION" \
         --arg registry "$CHUMMER_HUB_REGISTRY_REVISION" \
@@ -508,6 +515,30 @@ verify_rendered_compose() {
          and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED == "false"
          and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED == "false"
          and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED == "false"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED == "false"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_RECEIPT_PATH == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_HMAC_KEY == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_ACCOUNT_SCOPE_REF_DIGEST == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SCENARIO_REF_DIGEST == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_AVATAR_BINDING_DIGEST == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_HREF == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_DIGEST == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_PERSONA_RELEASE_REGISTRY_PATH == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_MEETING_BROKER_BASE_URL == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_MEETING_BROKER_API_TOKEN == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_API_KEY == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_SCENARIO_ID == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_NAME == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_PATH == "/app/state/build-ghost-live-support"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SINGLE_INSTANCE == "true"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY == $ENV.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY
+         and .services[$presentation].environment.CHUMMER_BUILD_GHOST_AI_BASE_URL == "http://chummer-build-ghost-ai:8080"
+         and .services[$presentation].environment.CHUMMER_AI_INTERNAL_API_TOKEN == .services[$service].environment.CHUMMER_AI_INTERNAL_API_TOKEN
+         and any(.services[$service].volumes[]?;
+             .type == "volume"
+             and .source == "build-ghost-live-support"
+             and .target == "/app/state/build-ghost-live-support"
+             and (.read_only // false) == false)
          and .services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH == "/run/secrets/tough-tongue-read-only-binding-contract.json"
          and any(.services[$service].secrets[]?;
              .source == "build-ghost-tough-tongue-read-only-binding-contract"
@@ -813,6 +844,54 @@ verify_authenticated_fallback() {
     [ "$invalid_status" = "401" ] || fail "postcheck-invalid-auth-not-unauthorized"
 }
 
+verify_rook_support_fallback() {
+    local container_id="$1"
+    local response status mount_record mount_type mount_read_write volume_name volume_project volume_role
+    response="$({ printf 'Authorization: Bearer %s\n' "$CHUMMER_AI_INTERNAL_API_TOKEN"; } \
+        | docker exec -i "$container_id" curl --silent --show-error --max-time 15 \
+            --output - --write-out '\n%{http_code}' \
+            --header @- \
+            http://127.0.0.1:8080/api/v1/ai/build-ghost/support-experience)"
+    status="${response##*$'\n'}"
+    printf '%s' "${response%$'\n'*}" > "$deploy_tmp/support-experience.json"
+    [ "$status" = "200" ] || fail "postcheck-rook-support-status"
+    jq -e '
+        .schema == "chummer.build_ghost.support_experience.v1"
+        and .defaultSupport.channelKind == "rook_vidboard"
+        and .defaultSupport.personaId == "build-ghost-rook-v1"
+        and .defaultSupport.preRenderedVideoReady == false
+        and .defaultSupport.availabilityStatus == "text-fallback"
+        and .defaultSupport.deterministicTextFallback == "Rook can continue in the grounded Chummer help flow while live support is unavailable."
+        and .liveSupport.requestAvailable == false
+        and .liveSupport.meetingProviders == []
+        and (.liveSupport.blockingReasons | index("live-support-remote-execution-disabled-by-default") != null)
+        and ([.liveSupport.blockingReasons[] | select(startswith("live-support-session-store-"))] | length) == 0
+    ' "$deploy_tmp/support-experience.json" >/dev/null \
+        || fail "postcheck-rook-support-fallback-drift"
+
+    mount_record="$(docker inspect "$container_id" --format \
+        '{{range .Mounts}}{{if eq .Destination "/app/state/build-ghost-live-support"}}{{printf "%s|%t|%s\n" .Type .RW .Name}}{{end}}{{end}}')"
+    [ "$(printf '%s\n' "$mount_record" | sed '/^$/d' | wc -l)" -eq 1 ] \
+        || fail "postcheck-live-support-store-mount-ambiguous"
+    IFS='|' read -r mount_type mount_read_write volume_name <<EOF
+$mount_record
+EOF
+    [ "$mount_type" = "volume" ] && [ "$mount_read_write" = "true" ] \
+        || fail "postcheck-live-support-store-mount-invalid"
+    volume_project="$(docker volume inspect "$volume_name" --format \
+        '{{index .Labels "com.docker.compose.project"}}')"
+    volume_role="$(docker volume inspect "$volume_name" --format \
+        '{{index .Labels "com.docker.compose.volume"}}')"
+    [ "$volume_project" = "$project_name" ] && [ "$volume_role" = "build-ghost-live-support" ] \
+        || fail "postcheck-live-support-store-volume-authority-invalid"
+    docker exec "$container_id" sh -ec '
+        path="$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_PATH"
+        test -d "$path"
+        test ! -L "$path"
+        test "$(stat -c "%a:%u" -- "$path")" = "700:$(id -u)"
+    ' || fail "postcheck-live-support-store-topology-invalid"
+}
+
 verify_public_explain_absent() {
     local edge_id="$1"
     local binding host_ip host_port status
@@ -851,6 +930,7 @@ run_postchecks() {
     [ "$(running_container_id "$edge_service")" = "$edge_id_before" ] \
         || fail "postcheck-edge-container-changed"
     verify_authenticated_fallback "$current_ai_id"
+    verify_rook_support_fallback "$current_ai_id"
     verify_public_explain_absent "$edge_id_before"
 }
 
@@ -956,7 +1036,7 @@ main() {
     compose up -d --no-deps --no-build --force-recreate "$ai_service"
     run_postchecks
     deploy_succeeded="true"
-    printf 'ai_deploy=passed rollback_ref=%s old_image=%s candidate_image=%s gates=false neighbors=unchanged public_explain=404 deterministic_fallback=true remote_attempted=false\n' \
+    printf 'ai_deploy=passed rollback_ref=%s old_image=%s candidate_image=%s gates=false neighbors=unchanged public_explain=404 deterministic_fallback=true rook=text-fallback live_support=disabled live_support_store=private remote_attempted=false\n' \
         "$rollback_ref" "$old_ai_image" "$(image_id "$deployment_image")"
     if [ "$quarantine_requested" = "1" ]; then
         printf 'ai_deploy_quarantine=passed scope=local-container credentials_present=false provider_side_revocation=false contract=unconfigured gates=false\n'

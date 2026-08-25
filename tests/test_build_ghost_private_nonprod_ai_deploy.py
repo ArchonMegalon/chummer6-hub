@@ -324,6 +324,10 @@ load_existing_environment() {
             printf -v "$variable_name" '%s' 'test-internal-auth-only'
             export "${variable_name?}"
             ;;
+        CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY)
+            printf -v "$variable_name" '%s' 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+            export "${variable_name?}"
+            ;;
         *) return 91 ;;
     esac
 }
@@ -332,6 +336,8 @@ old_ai_id=test-container
 load_runtime_secrets_without_output
 [ "$CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN" = test-internal-auth-only ]
 [ "$CHUMMER_AI_INTERNAL_API_TOKEN" = test-internal-auth-only ]
+[ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" = \
+  AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= ]
 for variable_name in \
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS \
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS \

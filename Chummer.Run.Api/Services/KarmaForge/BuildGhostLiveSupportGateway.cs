@@ -289,7 +289,10 @@ public sealed class BuildGhostLiveSupportGateway : IBuildGhostLiveSupportGateway
             return null;
         }
 
-        BuildGhostDefaultSupportProjection defaultSupport = experience.DefaultSupport;
+        BuildGhostDefaultSupportProjection defaultSupport = experience.DefaultSupport with
+        {
+            DeterministicTextFallback = BuildGhostDefaultSupportContract.DeterministicRookTextFallback
+        };
         if (defaultSupport.PreRenderedVideoReady
             && (!IsSafeSameOriginMediaHref(defaultSupport.PreRenderedVideoHref)
                 || !IsSha256(defaultSupport.MediaContentDigest)
@@ -417,7 +420,7 @@ public sealed class BuildGhostLiveSupportGateway : IBuildGhostLiveSupportGateway
             return session.JoinUrl is null;
         }
 
-        return session.JoinUrl is not null && IsAllowedJoinUrl(session.JoinUrl, session.MeetingProvider);
+        return HasValidReadyProof(session);
     }
 
     private static bool IsValidStatusSession(
@@ -437,9 +440,39 @@ public sealed class BuildGhostLiveSupportGateway : IBuildGhostLiveSupportGateway
                 session.DisclosureDigest,
                 BuildGhostLiveSupportDisclosureContract.ComputeDigest(),
                 StringComparison.Ordinal)
-            && (session.JoinUrl is null
-                || (string.Equals(session.Status, BuildGhostLiveSupportStatuses.Ready, StringComparison.Ordinal)
-                    && IsAllowedJoinUrl(session.JoinUrl, session.MeetingProvider)));
+            && (string.Equals(session.Status, BuildGhostLiveSupportStatuses.Ready, StringComparison.Ordinal)
+                ? HasValidReadyProof(session)
+                : session.JoinUrl is null);
+
+    private static bool HasValidReadyProof(BuildGhostLiveSupportSessionProjection session)
+        => session.JoinUrl is not null
+            && session.JoinUrlExpiresAtUtc is not null
+            && string.Equals(
+                session.ChannelKind,
+                BuildGhostSupportChannelKinds.LivePhotorealMeeting,
+                StringComparison.Ordinal)
+            && session.MeetingProvider is BuildGhostLiveMeetingProviders.Zoom or BuildGhostLiveMeetingProviders.Teams
+            && string.Equals(
+                session.AvatarAlias,
+                ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+                StringComparison.Ordinal)
+            && string.Equals(session.AvatarPresentation, "photorealistic-provider-managed", StringComparison.Ordinal)
+            && session.RecordingConsentGranted
+            && session.ExternalProviderProcessingConsentGranted
+            && string.Equals(
+                session.DisclosureVersion,
+                BuildGhostLiveSupportDisclosureContract.CurrentVersion,
+                StringComparison.Ordinal)
+            && string.Equals(
+                session.DisclosureDigest,
+                BuildGhostLiveSupportDisclosureContract.ComputeDigest(),
+                StringComparison.Ordinal)
+            && IsSha256(session.MeetingLinkDigest)
+            && FixedTimeDigestEquals(session.MeetingLinkDigest, DigestText(session.JoinUrl.AbsoluteUri))
+            && IsSha256(session.MeetingReceiptDigest)
+            && IsSha256(session.MeetingBotReceiptDigest)
+            && IsSha256(session.CapabilityReceiptDigest)
+            && IsAllowedJoinUrl(session.JoinUrl, session.MeetingProvider);
 
     private static bool IsAllowedJoinUrl(Uri uri, string provider)
     {
@@ -483,6 +516,16 @@ public sealed class BuildGhostLiveSupportGateway : IBuildGhostLiveSupportGateway
             && value.StartsWith("sha256:", StringComparison.Ordinal)
             && value.AsSpan(7).IndexOfAnyExcept("0123456789abcdef") < 0;
 
+    private static bool FixedTimeDigestEquals(string? left, string? right)
+        => IsSha256(left)
+            && IsSha256(right)
+            && CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.ASCII.GetBytes(left!),
+                System.Text.Encoding.ASCII.GetBytes(right!));
+
+    private static string DigestText(string value)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
+
     private static BuildGhostSupportExperienceProjection UnavailableExperience(string reason)
         => new(
             ToughTongueBuildGhostContractVersions.SupportExperienceV1,
@@ -495,7 +538,7 @@ public sealed class BuildGhostLiveSupportGateway : IBuildGhostLiveSupportGateway
                 string.Empty,
                 false,
                 "text-fallback",
-                "Rook can continue in the grounded Chummer help flow.",
+                BuildGhostDefaultSupportContract.DeterministicRookTextFallback,
                 ["rook-vidboard-runtime-unverified"]),
             new BuildGhostLiveSupportCapabilityProjection(
                 BuildGhostSupportChannelKinds.LivePhotorealMeeting,

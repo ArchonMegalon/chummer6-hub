@@ -29,6 +29,8 @@ services:
       CHUMMER_BUILD_GHOST_PACKET_ACCESS_STORE_ROOT: /app/state/build-ghost-packet-access
       CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN: ${CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN:?set an operator-local token of at least 32 bytes}
       CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST: sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104
+      CHUMMER_BUILD_GHOST_AI_BASE_URL: http://chummer-build-ghost-ai:8080
+      CHUMMER_AI_INTERNAL_API_TOKEN: ${CHUMMER_AI_INTERNAL_API_TOKEN:?set a distinct operator-local token of at least 32 bytes}
       CHUMMER_STATE_PATH: /app/state
     volumes:
       - build-ghost-packet-access:/app/state
@@ -64,6 +66,8 @@ services:
         condition: service_started
       build-ghost-private-trust-export:
         condition: service_completed_successfully
+      build-ghost-live-support-store-init:
+        condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
@@ -93,6 +97,23 @@ services:
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID:-}
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID:-}
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID:-}
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_RECEIPT_PATH: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_HMAC_KEY: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_ACCOUNT_SCOPE_REF_DIGEST: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SCENARIO_REF_DIGEST: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_AVATAR_BINDING_DIGEST: ""
+      CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_HREF: ""
+      CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_DIGEST: ""
+      CHUMMER_BUILD_GHOST_PERSONA_RELEASE_REGISTRY_PATH: ""
+      CHUMMER_BUILD_GHOST_MEETING_BROKER_BASE_URL: ""
+      CHUMMER_BUILD_GHOST_MEETING_BROKER_API_TOKEN: ""
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_API_KEY: ""
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_SCENARIO_ID: ""
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_NAME: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_PATH: /app/state/build-ghost-live-support
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY: ${CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY:?set a distinct base64-encoded 32-byte live-support store key}
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SINGLE_INSTANCE: "true"
       EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH: /run/secrets/tough-tongue-read-only-binding-contract.json
       EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST: ${EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST:-}
       SSL_CERT_FILE: /caddy-trust/root.crt
@@ -102,6 +123,7 @@ services:
         mode: 0400
     volumes:
       - caddy-trust:/caddy-trust:ro
+      - build-ghost-live-support:/app/state/build-ghost-live-support
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/api/health"]
       interval: 10s
@@ -150,6 +172,35 @@ services:
       - caddy-data:/caddy-data:ro
       - caddy-trust:/caddy-trust
 
+  build-ghost-live-support-store-init:
+    image: chummer-build-ghost-ai:private-nonprod
+    restart: "no"
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        store=/live-support-store
+        runtime_uid="$${APP_UID:?runtime APP_UID is required}"
+        case "$$runtime_uid" in *[!0-9]*|'') exit 1 ;; esac
+        [ -d "$$store" ] && [ ! -L "$$store" ]
+        [ -z "$$(find "$$store" -mindepth 1 -maxdepth 1 -type l -print -quit)" ]
+        if [ -z "$$(find "$$store" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+          chown "$$runtime_uid:$$runtime_uid" "$$store"
+          chmod 0700 "$$store"
+        fi
+        [ "$$(stat -c '%a:%u' -- "$$store")" = "700:$$runtime_uid" ]
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - FOWNER
+    security_opt:
+      - no-new-privileges:true
+    network_mode: none
+    volumes:
+      - build-ghost-live-support:/live-support-store
+
   build-ghost-cloudflare-access-edge:
     profiles:
       - cloudflare-access-ingress
@@ -184,6 +235,7 @@ services:
 
 volumes:
   build-ghost-packet-access:
+  build-ghost-live-support:
   caddy-data:
   caddy-config:
   caddy-trust:
