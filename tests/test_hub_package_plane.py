@@ -16,6 +16,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
+VERIFY_SCRIPT_PATH = ROOT / "scripts" / "ai" / "verify-hub-package-plane.py"
 PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
 PACKAGE_VERSION = "0.1.0-preview"
@@ -39,6 +40,7 @@ PACKAGE_PLANE_PROJECTS = (
     "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj",
     "Chummer.Run.Api/Chummer.Run.Api.csproj",
     "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj",
+    "Chummer.BuildGhost.ToughTongue.Tests/Chummer.BuildGhost.ToughTongue.Tests.csproj",
     "Chummer.Tests/Chummer.Tests.csproj",
 )
 LOCKED_PROJECTS = (
@@ -49,6 +51,7 @@ LOCKED_PROJECTS = (
     "Chummer.World.Contracts",
     "Chummer.Run.Api",
     "Chummer.Run.Api.Tests",
+    "Chummer.BuildGhost.ToughTongue.Tests",
 )
 OWNER_VERSION_PROPERTIES = {
     "Chummer.Engine.Contracts": "ChummerEngineContractsPackageVersion",
@@ -60,6 +63,17 @@ OWNER_VERSION_PROPERTIES = {
 
 def load_module():
     spec = importlib.util.spec_from_file_location("hub_package_plane", SCRIPT_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_verifier_module():
+    spec = importlib.util.spec_from_file_location(
+        "hub_package_plane_verifier", VERIFY_SCRIPT_PATH
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -183,6 +197,35 @@ def test_package_plane_projects_enforce_content_hash_locks() -> None:
                     continue
                 assert metadata.get("resolved"), package_id
                 assert metadata.get("contentHash"), package_id
+
+
+@pytest.mark.parametrize(
+    "counts",
+    [
+        {"total": 0, "executed": 0, "passed": 0},
+        {"total": 2, "executed": 1, "passed": 1},
+        {"total": 2, "executed": 2, "passed": 1, "failed": 1},
+    ],
+)
+def test_package_plane_receipt_rejects_empty_or_partial_test_runs(
+    counts: dict[str, int],
+) -> None:
+    verifier = load_verifier_module()
+    with pytest.raises(verifier.VerificationError, match="did not fully pass"):
+        verifier._require_passing_tests(counts, "focused tests")
+
+    verifier._require_passing_tests(
+        {
+            "total": 2,
+            "executed": 2,
+            "passed": 2,
+            "failed": 0,
+            "error": 0,
+            "timeout": 0,
+            "aborted": 0,
+        },
+        "focused tests",
+    )
 
 
 @pytest.mark.parametrize(
@@ -592,7 +635,10 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     ) not in dockerfile
     assert "dotnet publish -c Release -o /app/publish --no-restore" in dockerfile
     for project_name in LOCKED_PROJECTS:
-        if project_name == "Chummer.Run.Api.Tests":
+        if project_name in {
+            "Chummer.Run.Api.Tests",
+            "Chummer.BuildGhost.ToughTongue.Tests",
+        }:
             continue
         assert (
             f"COPY --from=run-services-source {project_name}/packages.lock.json "
@@ -662,6 +708,13 @@ def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> No
     assert (
         "../Chummer.Tests/ReleaseUploadAuthorityHandoffCompatibilityTests.cs" in linked
     )
+
+    verifier = (ROOT / "scripts/ai/verify-hub-package-plane.py").read_text(
+        encoding="utf-8"
+    )
+    assert "Chummer.BuildGhost.ToughTongue.Tests" in verifier
+    assert "build-ghost-tough-tongue-package-plane.trx" in verifier
+    assert '"build_ghost_tough_tongue_tests": build_ghost_test_counts' in verifier
 
 
 def test_package_plane_runs_release_handoffs_and_candidate_ui_contracts() -> None:

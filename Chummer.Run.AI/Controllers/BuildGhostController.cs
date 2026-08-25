@@ -15,6 +15,7 @@ namespace Chummer.Run.AI.Controllers;
 public sealed class BuildGhostController(
     IToughTongueBuildGhostAdapter adapter,
     IBuildGhostPersonaReleaseRegistry releases,
+    IBuildGhostLiveSupportService liveSupport,
     IBuildGhostPrivateToolAuthorityClient privateToolAuthority,
     ILogger<BuildGhostController> logger,
     IConfiguration configuration) : ControllerBase
@@ -53,6 +54,70 @@ public sealed class BuildGhostController(
     [ProducesResponseType<BuildGhostPersonaReleaseProjection>(StatusCodes.Status200OK)]
     public ActionResult<BuildGhostPersonaReleaseProjection> RookRelease()
         => Ok(releases.ResolveRook());
+
+    [HttpGet("support-experience")]
+    [ProducesResponseType<BuildGhostSupportExperienceProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public ActionResult<BuildGhostSupportExperienceProjection> SupportExperience()
+    {
+        if (!IsInternallyAuthorized())
+        {
+            return Unauthorized();
+        }
+
+        Response.Headers.CacheControl = "no-store";
+        return Ok(liveSupport.BuildExperience());
+    }
+
+    [HttpPost("live-support")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(16 * 1024)]
+    [ProducesResponseType<BuildGhostLiveSupportSessionProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<BuildGhostLiveSupportSessionProjection>> RequestLiveSupport(
+        [FromBody] BuildGhostLiveSupportRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsInternallyAuthorized())
+        {
+            return Unauthorized();
+        }
+
+        if (request is null)
+        {
+            return BadRequest("Build Ghost live-support request is required.");
+        }
+
+        Response.Headers.CacheControl = "no-store";
+        return Ok(await liveSupport.RequestAsync(request, cancellationToken).ConfigureAwait(false));
+    }
+
+    [HttpPost("live-support/status")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(8 * 1024)]
+    [ProducesResponseType<BuildGhostLiveSupportSessionProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<BuildGhostLiveSupportSessionProjection>> LiveSupportStatus(
+        [FromBody] BuildGhostLiveSupportStatusRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsInternallyAuthorized())
+        {
+            return Unauthorized();
+        }
+
+        if (request is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers.CacheControl = "no-store";
+        BuildGhostLiveSupportSessionProjection? session =
+            await liveSupport.GetAsync(request, cancellationToken).ConfigureAwait(false);
+        return session is null ? NotFound() : Ok(session);
+    }
 
     [HttpPost("tool")]
     [IgnoreAntiforgeryToken]

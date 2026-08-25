@@ -173,6 +173,11 @@
                 {
                     <a class="button-like button-like--secondary" href="@signedInBench.LeadHandoffHref">Open build setup</a>
                 }
+                @if (!string.IsNullOrWhiteSpace(signedInBench.LeadHandoffHref)
+                    && signedInBench.LeadHandoffHref.StartsWith("/account/alice/", StringComparison.Ordinal))
+                {
+                    <a class="button-like button-like--secondary" href="@(signedInBench.LeadHandoffHref + "/live-support")">Request live support</a>
+                }
             </div>
         </div>
         <div class="route-choice-grid">
@@ -193,6 +198,48 @@
         </div>
     </section>
 }
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Support choice</p>
+        <h2 class="editorial-title">Rook stays with you by default.</h2>
+        <p class="editorial-copy">@SanitizePublicCopy(projection.DefaultSupportStatus)</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Default</span>
+            <h3>Rook via VidBoard</h3>
+            <p>Rook uses grounded Chummer guidance, with an approved pre-rendered VidBoard clip when one matches the current help topic.</p>
+            <div class="route-choice-card__details">
+                @foreach (var item in projection.DefaultSupportResponsibilities)
+                {
+                    <span>@SanitizePublicCopy(item)</span>
+                }
+            </div>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">On request</span>
+            <h3>Live support</h3>
+            <p>@SanitizePublicCopy(projection.ToughTongueStatus)</p>
+            <div class="route-choice-card__details">
+                @foreach (var item in projection.ToughTongueResponsibilities)
+                {
+                    <span>@SanitizePublicCopy(item)</span>
+                }
+            </div>
+            @if (Model.SignedInBench is not null
+                && !string.IsNullOrWhiteSpace(Model.SignedInBench.LeadHandoffHref)
+                && Model.SignedInBench.LeadHandoffHref.StartsWith("/account/alice/", StringComparison.Ordinal))
+            {
+                <a class="editorial-strip__action" href="@(Model.SignedInBench.LeadHandoffHref + "/live-support")">Choose Zoom or Teams</a>
+            }
+            else
+            {
+                <a class="editorial-strip__action" href="/account/alice/open">Open a build handoff first</a>
+            }
+        </article>
+    </div>
+</section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">

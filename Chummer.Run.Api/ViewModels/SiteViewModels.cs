@@ -1485,6 +1485,22 @@ public sealed record BuildGhostSignedInBenchViewModel(
     string? LeadHandoffSummary = null,
     IReadOnlyList<string>? ProofPoints = null);
 
+public sealed record BuildGhostLiveSupportProviderViewModel(
+    string Id,
+    string Label);
+
+public sealed record BuildGhostLiveSupportPageViewModel(
+    SiteChromeViewModel Chrome,
+    string HandoffId,
+    string HandoffTitle,
+    string DefaultSupportSummary,
+    string? RookVideoHref,
+    bool LiveSupportAvailable,
+    IReadOnlyList<BuildGhostLiveSupportProviderViewModel> Providers,
+    bool RecordingDisclosureRequired,
+    string IdempotencyKey,
+    Chummer.Run.Contracts.BuildGhost.BuildGhostLiveSupportSessionProjection? Session = null);
+
 public sealed record GmSessionVenuePageViewModel(
     SiteChromeViewModel Chrome,
     string Section,

@@ -1,0 +1,192 @@
+@model BuildGhostLiveSupportPageViewModel
+@using Chummer.Run.Contracts.BuildGhost
+@{
+    ViewData["Title"] = "Live character support";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+    var session = Model.Session;
+    var sessionStatus = session?.Status ?? string.Empty;
+    var sessionIsReady = string.Equals(sessionStatus, BuildGhostLiveSupportStatuses.Ready, StringComparison.Ordinal);
+    var sessionIsExpired = string.Equals(sessionStatus, BuildGhostLiveSupportStatuses.Expired, StringComparison.Ordinal);
+    var sessionIsUnavailable = string.Equals(sessionStatus, BuildGhostLiveSupportStatuses.Unavailable, StringComparison.Ordinal);
+    var sessionIsFailed = string.Equals(sessionStatus, BuildGhostLiveSupportStatuses.Failed, StringComparison.Ordinal);
+    var sessionIsCancelled = string.Equals(sessionStatus, BuildGhostLiveSupportStatuses.Cancelled, StringComparison.Ordinal);
+    var sessionIsCompleted = string.Equals(sessionStatus, BuildGhostLiveSupportStatuses.Completed, StringComparison.Ordinal);
+    var sessionIsProvisioning = sessionStatus is BuildGhostLiveSupportStatuses.Requested
+        or BuildGhostLiveSupportStatuses.ProvisioningMeeting
+        or BuildGhostLiveSupportStatuses.ProvisioningAvatar;
+    var sessionIsActive = string.Equals(sessionStatus, BuildGhostLiveSupportStatuses.Active, StringComparison.Ordinal);
+    var suppressMeetingCreation = session is not null
+        && (sessionIsReady || sessionIsProvisioning || sessionIsActive);
+    var selectedProviderLabel = session?.MeetingProvider switch
+    {
+        BuildGhostLiveMeetingProviders.Zoom => "Zoom",
+        BuildGhostLiveMeetingProviders.Teams => "Microsoft Teams",
+        _ => null
+    };
+}
+
+<section class="release-footnote">
+    <p class="eyebrow">Character help</p>
+    <h1 class="page-title">Request live support</h1>
+    <p class="page-copy">Rook via VidBoard is the default. Use this page only when you want a live meeting with a photorealistic Tough Tongue avatar.</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--secondary" href="/account/alice/@Uri.EscapeDataString(Model.HandoffId)">Return to @Model.HandoffTitle</a>
+    </div>
+</section>
+
+<section class="status-decision-strip" aria-label="Support availability">
+    <article class="status-decision-strip__card">
+        <span class="tag">Default</span>
+        <h2>Rook via VidBoard</h2>
+        <p>@Model.DefaultSupportSummary</p>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Live</span>
+        <h2>@(Model.LiveSupportAvailable ? "Available on request" : "Currently unavailable")</h2>
+        <p>A link appears only after the selected meeting provider and the photorealistic avatar lane pass their current checks.</p>
+    </article>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.RookVideoHref))
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Default guide</p>
+            <h2 class="editorial-title">Rook via VidBoard</h2>
+            <p class="editorial-copy">This reviewed clip is bound to the current Chummer media release. It remains an explainer, not rules or character authority.</p>
+        </div>
+        <video controls preload="metadata" playsinline aria-label="Reviewed Rook via VidBoard support clip" aria-describedby="rook-vidboard-text-alternative" style="width:100%;max-width:960px;border-radius:.85rem;background:#090e13;">
+            <source src="@Model.RookVideoHref" type="video/mp4" />
+            Your browser cannot play this optional clip. <a href="@Model.RookVideoHref">Open the reviewed video file</a> or continue with Rook's text help.
+        </video>
+        <details class="details-drawer" id="rook-vidboard-text-alternative">
+            <summary>Text alternative and transcript status</summary>
+            <div class="stacked-copy">
+                <p>No separate transcript or captions are claimed on this page. The clip is optional.</p>
+                <p>Use Rook's grounded text help for the equivalent support path; it remains available when the video cannot be seen, heard, or played.</p>
+                <a class="editorial-strip__action" href="/account/alice/@Uri.EscapeDataString(Model.HandoffId)">Continue with Rook's text help</a>
+            </div>
+        </details>
+    </section>
+}
+
+@if (session is not null)
+{
+    <section class="editorial-block" aria-live="polite">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Request status</p>
+            @if (sessionIsReady && session.JoinUrl is not null)
+            {
+                <h2 class="editorial-title">@(selectedProviderLabel is null ? "Your meeting is ready." : $"Your {selectedProviderLabel} meeting is ready.")</h2>
+                <p class="editorial-copy">The meeting link passed Chummer's provider checks and the Tough Tongue avatar was scheduled.</p>
+                @if (session.JoinUrlExpiresAtUtc is DateTimeOffset readyExpiry)
+                {
+                    <p><strong>Link available until:</strong> @readyExpiry.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</p>
+                }
+                <a class="button-like button-like--primary" href="@session.JoinUrl.AbsoluteUri" target="_blank" rel="noopener noreferrer">@(selectedProviderLabel is null ? "Join meeting" : $"Join {selectedProviderLabel} meeting")</a>
+            }
+            else if (sessionIsExpired)
+            {
+                <h2 class="editorial-title">This meeting link has expired.</h2>
+                <p class="editorial-copy">The previous join link is no longer shown. You can request a new meeting below when live support is available.</p>
+                @if (session.JoinUrlExpiresAtUtc is DateTimeOffset expiredAt)
+                {
+                    <p><strong>Expired:</strong> @expiredAt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</p>
+                }
+            }
+            else if (sessionIsUnavailable)
+            {
+                <h2 class="editorial-title">Live support is currently unavailable.</h2>
+                <p class="editorial-copy">No meeting link was released. Continue with Rook or try again after live support becomes available.</p>
+            }
+            else if (sessionIsFailed)
+            {
+                <h2 class="editorial-title">Live support could not be created.</h2>
+                <p class="editorial-copy">No meeting link was released. Continue with Rook or make a new request when the live-support checks are ready.</p>
+            }
+            else if (sessionIsCancelled)
+            {
+                <h2 class="editorial-title">This live-support request was cancelled.</h2>
+                <p class="editorial-copy">No join link is available. You can request another meeting below when live support is available.</p>
+            }
+            else if (sessionIsCompleted)
+            {
+                <h2 class="editorial-title">This live-support meeting is complete.</h2>
+                <p class="editorial-copy">The previous meeting link is no longer shown. Rook remains available for the current build handoff.</p>
+            }
+            else if (sessionIsProvisioning)
+            {
+                <h2 class="editorial-title">Your live-support meeting is being prepared.</h2>
+                <p class="editorial-copy">Chummer will not release a join link or create a second meeting until the current checks finish.</p>
+            }
+            else if (sessionIsActive)
+            {
+                <h2 class="editorial-title">Your live-support meeting is active.</h2>
+                <p class="editorial-copy">Chummer will not create a duplicate meeting while this session remains active.</p>
+            }
+            else
+            {
+                <h2 class="editorial-title">Live support was not created.</h2>
+                <p class="editorial-copy">No meeting link was released. Continue with Rook or try again after live support becomes available.</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(selectedProviderLabel))
+            {
+                <p><strong>Selected provider:</strong> @selectedProviderLabel</p>
+            }
+        </div>
+    </section>
+}
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">@(suppressMeetingCreation ? "Current meeting" : "Choose a meeting surface")</p>
+        <h2 class="editorial-title">@(suppressMeetingCreation ? "One live-support meeting at a time" : "Zoom or Microsoft Teams")</h2>
+        <p class="editorial-copy">The meeting surface does not own your character, rules, or support history. Chummer sends only the information needed to create and staff this support meeting.</p>
+    </div>
+    @if (suppressMeetingCreation)
+    {
+        <article class="route-choice-card">
+            <span class="tag">Existing request</span>
+            <h3>No second meeting will be created.</h3>
+            <p>@(sessionIsReady ? "Use the verified join action above." : "Return to this status page for the current meeting instead of starting another one.")</p>
+        </article>
+    }
+    else if (Model.LiveSupportAvailable && Model.Providers.Count > 0)
+    {
+        <form method="post" action="/account/alice/@Uri.EscapeDataString(Model.HandoffId)/live-support" class="route-choice-card">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="IdempotencyKey" value="@Model.IdempotencyKey" />
+            <fieldset>
+                <legend>Meeting provider</legend>
+                @foreach (var provider in Model.Providers)
+                {
+                    <label>
+                        <input type="radio" name="MeetingProvider" value="@provider.Id" required />
+                        @provider.Label
+                    </label>
+                }
+            </fieldset>
+            <label>
+                <input type="checkbox" name="RecordingConsentGranted" value="true" required />
+                @BuildGhostLiveSupportDisclosureContract.RecordingDisclosure
+            </label>
+            <input type="hidden" name="RecordingConsentGranted" value="false" />
+            <label>
+                <input type="checkbox" name="ExternalProviderProcessingConsentGranted" value="true" required />
+                @BuildGhostLiveSupportDisclosureContract.ExternalProviderProcessingDisclosure
+            </label>
+            <input type="hidden" name="ExternalProviderProcessingConsentGranted" value="false" />
+            <button class="button-like button-like--primary" type="submit">Create live-support meeting</button>
+        </form>
+    }
+    else
+    {
+        <article class="route-choice-card">
+            <span class="tag">Fail closed</span>
+            <h3>No provider is currently verified.</h3>
+            <p>Chummer will not create a Zoom or Teams meeting until its link broker, Tough Tongue meeting bot, and provider-specific photorealistic-video canary are all ready.</p>
+            <a class="editorial-strip__action" href="/alice">Continue with Rook</a>
+        </article>
+    }
+</section>

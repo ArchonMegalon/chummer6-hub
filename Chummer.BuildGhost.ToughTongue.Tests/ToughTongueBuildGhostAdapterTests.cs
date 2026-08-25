@@ -1479,27 +1479,34 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
-    public void Persona_registry_uses_provider_managed_stock_avatar_and_still_requires_synthetic_voice_provenance()
+    public void Persona_registry_keeps_Rook_VidBoard_as_default_and_separates_live_stock_avatar_authority()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-19T12:00:00Z");
+        BuildGhostPersonaMediaRelease video = Release(
+            ToughTongueBuildGhostPersonaIds.RookVidBoardSupport,
+            "vidboard-support-video",
+            "synthetic-rook-rendered-by-vidboard",
+            now);
         BuildGhostPersonaMediaRelease unverifiedVoice = Release(ToughTongueBuildGhostPersonaIds.RookVoice, "synthetic-voice", "human-recording", now) with
         {
             ProviderVerificationState = "pending-operator"
         };
-        BuildGhostPersonaReleaseProjection blocked = new BuildGhostPersonaReleaseRegistry([unverifiedVoice], StockAvatarBinding()).ResolveRook();
+        BuildGhostPersonaReleaseRegistry registry = new([video, unverifiedVoice], StockAvatarBinding());
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, registry.ResolveRook().AvatarId);
+        BuildGhostPersonaReleaseProjection blocked = registry.ResolveRookVidBoard();
 
         Assert.IsTrue(blocked.AvatarReady);
-        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, blocked.AvatarId);
-        Assert.AreEqual("provider-managed-default", blocked.AvatarReleaseState);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.RookAvatar, blocked.AvatarId);
+        Assert.AreEqual("approved", blocked.AvatarReleaseState);
         Assert.IsFalse(blocked.VoiceReady);
-        Assert.AreEqual("provider-managed-avatar-and-text-only", blocked.FallbackPosture);
+        Assert.AreEqual("rook-vidboard-pre-rendered-only", blocked.FallbackPosture);
         CollectionAssert.Contains(blocked.BlockingReasons.ToArray(), "voice-provenance-is-not-declared-synthetic");
 
         BuildGhostPersonaMediaRelease voice = Release(ToughTongueBuildGhostPersonaIds.RookVoice, "synthetic-voice", "synthetic-voice-generated-from-consented-seed", now);
-        BuildGhostPersonaReleaseProjection ready = new BuildGhostPersonaReleaseRegistry([voice], StockAvatarBinding()).ResolveRook();
+        BuildGhostPersonaReleaseProjection ready = new BuildGhostPersonaReleaseRegistry([video, voice], StockAvatarBinding()).ResolveRookVidBoard();
         Assert.IsTrue(ready.AvatarReady);
         Assert.IsTrue(ready.VoiceReady);
-        Assert.AreEqual("provider-managed-avatar-and-voice", ready.FallbackPosture);
+        Assert.AreEqual("rook-vidboard-and-synthetic-voice", ready.FallbackPosture);
     }
 
     [TestMethod]
