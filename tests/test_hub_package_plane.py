@@ -743,6 +743,19 @@ def test_package_plane_runs_release_handoffs_and_candidate_ui_contracts() -> Non
     )
 
 
+def test_package_plane_runs_private_rook_hosting_as_nonprovider_policy() -> None:
+    verifier = load_verifier_module()
+    assert set(
+        (
+            "tests/test_build_ghost_private_nonprod_ai_deploy.py",
+            "tests/test_build_ghost_private_nonprod_presentation_deploy.py",
+            "tests/test_build_ghost_private_nonprod_compose.py",
+            "tests/test_build_ghost_private_rook_hosting.py",
+            "tests/test_build_ghost_tough_tongue_runtime_config.py",
+        )
+    ).issubset(verifier.RELEASE_CONTROL_PYTHON_TESTS)
+
+
 def test_all_packable_hub_contracts_embed_one_proprietary_license() -> None:
     expected_license = (ROOT / "LICENSE").read_text(encoding="utf-8")
     assert "All rights reserved." in expected_license

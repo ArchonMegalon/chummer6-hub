@@ -53,6 +53,11 @@ RELEASE_CONTROL_PYTHON_TESTS = (
     "tests/test_finalize_staged_release.py",
     "tests/test_mac_release_bootstrap_authority_closure.py",
     "tests/test_mac_release_stage_only.py",
+    "tests/test_build_ghost_private_nonprod_ai_deploy.py",
+    "tests/test_build_ghost_private_nonprod_presentation_deploy.py",
+    "tests/test_build_ghost_private_nonprod_compose.py",
+    "tests/test_build_ghost_private_rook_hosting.py",
+    "tests/test_build_ghost_tough_tongue_runtime_config.py",
 )
 
 

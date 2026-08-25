@@ -938,7 +938,7 @@ verify_lifecycle_canary() {
         fail "lifecycle-canary-failed"
     fi
     rg --line-regexp \
-        'positive_canary=passed .*tool=200 replay=410 revoked=410 terminal_equivalent=true .*gates=false cleanup=404' \
+        'positive_canary=passed .*tool=200 replay=410 revoked=410 terminal_equivalent=true .*gates=false cleanup=404 rook=text-fallback live_support=disabled store=private' \
         "$deploy_tmp/lifecycle-canary.log" >/dev/null \
         || fail "lifecycle-canary-receipt-drift"
 }

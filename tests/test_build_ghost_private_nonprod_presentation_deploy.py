@@ -364,6 +364,45 @@ def test_lifecycle_canary_failure_emits_only_its_bounded_receipt(tmp_path):
     assert "transport detail" not in result.stderr
 
 
+def test_lifecycle_canary_requires_the_exact_private_rook_terminal_receipt(tmp_path):
+    current_canary = tmp_path / "current-canary.sh"
+    current_canary.write_text(
+        "#!/bin/sh\n"
+        "printf 'positive_canary=passed tool=200 replay=410 revoked=410 "
+        "terminal_equivalent=true gates=false cleanup=404 rook=text-fallback "
+        "live_support=disabled store=private\\n'\n",
+        encoding="utf-8",
+    )
+    current_canary.chmod(0o700)
+    accepted = run_deploy_harness(
+        'deploy_tmp="$1"; canary_script="$2"; verify_lifecycle_canary',
+        str(tmp_path),
+        str(current_canary),
+    )
+
+    assert accepted.returncode == 0, accepted.stderr
+    assert accepted.stdout == ""
+    assert accepted.stderr == ""
+
+    stale_canary = tmp_path / "stale-canary.sh"
+    stale_canary.write_text(
+        "#!/bin/sh\n"
+        "printf 'positive_canary=passed tool=200 replay=410 revoked=410 "
+        "terminal_equivalent=true gates=false cleanup=404\\n'\n",
+        encoding="utf-8",
+    )
+    stale_canary.chmod(0o700)
+    rejected = run_deploy_harness(
+        'deploy_tmp="$1"; canary_script="$2"; verify_lifecycle_canary',
+        str(tmp_path),
+        str(stale_canary),
+    )
+
+    assert rejected.returncode != 0
+    assert rejected.stdout == ""
+    assert "stage=lifecycle-canary-receipt-drift" in rejected.stderr
+
+
 def test_release_pin_and_oci_revision_share_the_exact_presentation_main_commit():
     release_revision = "1c492202ac708f302b59f47c2bb1e4c67e352328"
     assert f'presentation_release_revision="{release_revision}"' in SCRIPT
