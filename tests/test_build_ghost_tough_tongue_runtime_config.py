@@ -392,6 +392,8 @@ def test_account_audit_only_compose_renders_all_candidates_empty_and_gates_false
         environment[name] = str(ROOT)
     environment["CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN"] = "test-tool-token-" + "a" * 32
     environment["CHUMMER_AI_INTERNAL_API_TOKEN"] = "test-ai-token-" + "b" * 32
+    environment["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY"] = "A" * 43 + "="
+    environment["CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK"] = "test-build-ghost-cloudflare-ingress"
 
     result = subprocess.run(
         [
@@ -1088,6 +1090,8 @@ def test_materialized_contract_is_the_exact_durable_compose_secret_source(
         "test-tool-token-" + "a" * 32
     )
     environment["CHUMMER_AI_INTERNAL_API_TOKEN"] = "test-ai-token-" + "b" * 32
+    environment["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY"] = "A" * 43 + "="
+    environment["CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK"] = "test-build-ghost-cloudflare-ingress"
 
     result = subprocess.run(
         [

@@ -1,6 +1,6 @@
 # Build Ghost private non-production lane
 
-This Compose lane builds the pinned Hub AI and Presentation sources without reading either canonical dirty worktree. It binds TLS only to `127.0.0.1`, keeps every provider/remote-execution switch false, and persists opaque one-use packet grants in the Presentation-owned absolute path `/app/state/build-ghost-packet-access` on a private named volume. A no-network one-shot container exports only Caddy's public local root certificate into a separate read-only AI trust volume; AI never mounts Caddy's CA keys. The provider contract is explicitly `provider-body-key-v2`: its exact 43-character canonical base64url `packet_access_key` body value is the sole external credential, so it does not depend on unproven stored `Authorization` header interpolation.
+This Compose lane builds the pinned Hub AI and Presentation sources without reading either canonical dirty worktree. It binds TLS only to `127.0.0.1`, keeps every provider/remote-execution switch false, and persists opaque one-use packet grants in the Presentation-owned absolute path `/app/state/build-ghost-packet-access` on a private named volume. Presentation reaches the Rook support projection only over the internal application network with the existing AI service token. Rook therefore remains deterministic text while the checked-in VidBoard release inputs and all Zoom, Teams, and Tough Tongue live-support inputs are empty. The encrypted live-support journal has its own private AI-owned volume and distinct operator-held key even in this blocked posture, so a later request cannot silently fall back to process memory. A no-network one-shot container exports only Caddy's public local root certificate into a separate read-only AI trust volume; AI never mounts Caddy's CA keys. The provider contract is explicitly `provider-body-key-v2`: its exact 43-character canonical base64url `packet_access_key` body value is the sole external credential, so it does not depend on unproven stored `Authorization` header interpolation.
 
 Set these paths and a fresh operator-local token (never add it to a repository file):
 
@@ -19,9 +19,26 @@ export CHUMMER_UI_KIT_REVISION="$(git -C "$CHUMMER_UI_KIT_SOURCE" rev-parse HEAD
 export CHUMMER_MEDIA_FACTORY_REVISION="$(git -C "$CHUMMER_MEDIA_FACTORY_SOURCE" rev-parse HEAD)"
 export CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN="$(openssl rand -hex 32)"
 export CHUMMER_AI_INTERNAL_API_TOKEN="$(openssl rand -hex 32)"
+# Load one stable, distinct, canonical base64-encoded 32-byte value from the
+# operator's external secret authority. Do not generate a new value on restart.
+: "${CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY:?load the external live-support store key}"
 docker compose -f docker-compose.build-ghost-private-nonprod.yml config --quiet
 docker compose -f docker-compose.build-ghost-private-nonprod.yml up --build -d
 ```
+
+No sample value is provided. Do not put the real value in a repository dotenv
+file, Compose source, shell trace, or receipt. The value must decode to exactly
+32 bytes, remain stable for the lifetime of the encrypted journal, and differ
+from both service tokens. A no-network one-shot service initializes only an
+empty named volume to the AI runtime UID and mode 0700; it refuses a link or
+nonempty volume whose authority is not already exact. The application
+independently rejects a missing directory, link, group/other permission,
+invalid key, or any posture other than one AI instance.
+
+See [`ROOK_PRIVATE_HOSTING_HANDOFF.md`](ROOK_PRIVATE_HOSTING_HANDOFF.md) for the
+exact source/runtime boundary, blocker map, first-rollout sequencing, and
+operator stop conditions. This source does not activate or configure a
+VidBoard asset, Zoom, Teams, Tough Tongue, Cloudflare, or a public route.
 
 ### Optional Cloudflare Access ingress (not activated)
 

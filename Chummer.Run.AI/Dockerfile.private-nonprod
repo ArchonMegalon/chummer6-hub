@@ -45,7 +45,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/publish .
 RUN find /app -xdev -type d -exec chmod 0755 {} + \
- && find /app -xdev -type f -exec chmod 0644 {} +
+ && find /app -xdev -type f -exec chmod 0644 {} + \
+ && install -d -o "$APP_UID" -g "$APP_UID" -m 0700 /app/state/build-ghost-live-support
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 USER $APP_UID:$APP_UID
