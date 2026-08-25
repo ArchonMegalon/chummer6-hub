@@ -720,7 +720,7 @@ public sealed class BuildGhostLiveSupportServiceTests
             false,
             "joined",
             1,
-            "joined",
+            "in_call_recording",
             Digest("account"),
             Digest("scenario"),
             ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,

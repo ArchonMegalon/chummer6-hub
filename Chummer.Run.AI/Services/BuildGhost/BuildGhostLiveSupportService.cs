@@ -1020,7 +1020,7 @@ public sealed class BuildGhostLiveSupportService : IBuildGhostLiveSupportService
         List<string> failures = [];
         if (!bot.Success) failures.Add(NormalizeOutcome(bot.OutcomeCode, "tough-tongue-meeting-bot-provisioning-failed"));
         if (bot.BotCount != 1) failures.Add("tough-tongue-meeting-bot-count-invalid");
-        if (!string.Equals(bot.LifecycleStatus, "joined", StringComparison.Ordinal))
+        if (!string.Equals(bot.LifecycleStatus, "in_call_recording", StringComparison.Ordinal))
             failures.Add("tough-tongue-meeting-bot-not-joined");
         if (!FixedTimeDigestEquals(bot.AccountScopeRefDigest, capability.AccountScopeRefDigest))
             failures.Add("tough-tongue-meeting-bot-account-scope-authority-mismatch");
