@@ -5,8 +5,8 @@
     <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == ''">$(MSBuildThisFileDirectory)..</ChummerWorkspaceRoot>
     <ChummerUseLocalCompatibilityTree Condition="'$(ChummerUseLocalCompatibilityTree)' == ''">false</ChummerUseLocalCompatibilityTree>
     <ChummerPackagePlaneVersion Condition="'$(ChummerPackagePlaneVersion)' == ''">0.1.0-preview</ChummerPackagePlaneVersion>
-    <ChummerEngineContractsPackageVersion Condition="'$(ChummerEngineContractsPackageVersion)' == ''">0.0.0-packageplane.candidate.shadd17192f037e</ChummerEngineContractsPackageVersion>
-    <ChummerCoreGmCharacterEditsPackageVersion Condition="'$(ChummerCoreGmCharacterEditsPackageVersion)' == ''">0.0.0-packageplane.candidate.shadd17192f037e</ChummerCoreGmCharacterEditsPackageVersion>
+    <ChummerEngineContractsPackageVersion Condition="'$(ChummerEngineContractsPackageVersion)' == ''">0.0.0-packageplane.candidate.sha7599f9f5d460</ChummerEngineContractsPackageVersion>
+    <ChummerCoreGmCharacterEditsPackageVersion Condition="'$(ChummerCoreGmCharacterEditsPackageVersion)' == ''">0.0.0-packageplane.candidate.sha7599f9f5d460</ChummerCoreGmCharacterEditsPackageVersion>
     <ChummerHubRegistryContractsPackageVersion Condition="'$(ChummerHubRegistryContractsPackageVersion)' == ''">0.1.0-preview</ChummerHubRegistryContractsPackageVersion>
     <ChummerRunRegistryPackageVersion Condition="'$(ChummerRunRegistryPackageVersion)' == ''">0.1.0-preview</ChummerRunRegistryPackageVersion>
     <ChummerPackageFeed Condition="'$(ChummerPackageFeed)' == '' and '$(CHUMMER_PACKAGE_FEED)' != ''">$(CHUMMER_PACKAGE_FEED)</ChummerPackageFeed>
