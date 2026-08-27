@@ -4,34 +4,39 @@
     "net10.0": {
       "Chummer.Engine.Contracts": {
         "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.sha7599f9f5d460, )",
-        "resolved": "0.0.0-packageplane.candidate.sha7599f9f5d460",
-        "contentHash": "ZzmOawBQC1HhzczfZ+DTkxIW5B2wTl2t1LcERGzRZIB7CGWZDSfU5Y8Q0NBC4SUm2htgojcJoxkEn1hD6Auuzw=="
+        "requested": "[0.0.0-packageplane.candidate.shfebd698752e19, )",
+        "resolved": "0.0.0-packageplane.candidate.shfebd698752e19",
+        "contentHash": "HdOiFbuNKU20dtGKeyLXnrM369d1xpb96BB9sobIAXAsPZr32dphRWUjm+vb/HrgBRredNiFxPF8rztP8eB4VQ=="
       },
       "Chummer.Engine.GmCharacterEdits": {
         "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.sha7599f9f5d460, )",
-        "resolved": "0.0.0-packageplane.candidate.sha7599f9f5d460",
-        "contentHash": "/FI/Mk3GHYtu9LwiMWMP/PH4qOh6mvmny21Lux3sZ1qqhJbzgn5dXh6PGVcw+eH2h+rNWSPz3ZgxwYbigpiXpA==",
+        "requested": "[0.0.0-packageplane.candidate.shfebd698752e19, )",
+        "resolved": "0.0.0-packageplane.candidate.shfebd698752e19",
+        "contentHash": "8/NPFj842wQdKLgRQmmWeChHcAnQ1oqDV9Dl3rG4d/P7DKgHfA+J5L1aAzoqXMNhuSSLzU9Xkptb5ckwI0OEzw==",
         "dependencies": {
-          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha7599f9f5d460",
-          "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
-          "Chummer.Run.Contracts": "0.1.0-preview"
+          "Chummer.Application": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Hub.Registry.Contracts": "0.0.0-packageplane.20260721.1",
+          "Chummer.Infrastructure": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Rulesets.Hosting": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Rulesets.Sr5": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Rulesets.Sr6": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1"
         }
       },
       "Chummer.Hub.Registry.Contracts": {
         "type": "Direct",
-        "requested": "[0.1.0-preview, )",
-        "resolved": "0.1.0-preview",
-        "contentHash": "ti+zD2zVexuQXcO+/ahEVVzqcfJSND9X2MLcSG/gf3n90Uiux+xKVMC64nRzZaDT3t1rWFcFfULfBk401sRd9g=="
+        "requested": "[0.1.0-packageplane.candidate.sh66c418a5004f, )",
+        "resolved": "0.1.0-packageplane.candidate.sh66c418a5004f",
+        "contentHash": "LWCwqeEiPPCfISFe+k2bMb1wIaZ+9qsdLfBd2GzRMNAkeLIEOjzru0Q5fmBPP+O4UAUoYcZRprF6mnLYJa0PYQ=="
       },
       "Chummer.Run.Registry": {
         "type": "Direct",
-        "requested": "[0.1.0-preview, )",
-        "resolved": "0.1.0-preview",
-        "contentHash": "ztQNNH2NlX6upBPhbHXY0EYvZ5HFkqR6bapHo29Nbmz08Esc+xP/1LPATxuTnJGuHVDB0BpBMhb1IQVjZeRs4w==",
+        "requested": "[0.1.0-packageplane.candidate.sh66c418a5004f, )",
+        "resolved": "0.1.0-packageplane.candidate.sh66c418a5004f",
+        "contentHash": "xZIFyxBRaYjXxBj9VfgWZrPf2970H/esAAi9orDx6jEiTP+qrCJwXg9DBMqk0mJi6J2Ez9RarzQ90JEZXI2Z2Q==",
         "dependencies": {
-          "Chummer.Hub.Registry.Contracts": "0.1.0-preview"
+          "Chummer.Hub.Registry.Contracts": "0.1.0-packageplane.candidate.sh66c418a5004f"
         }
       },
       "Npgsql": {
@@ -46,10 +51,70 @@
         "resolved": "16.3.0",
         "contentHash": "SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA=="
       },
+      "Chummer.Application": {
+        "type": "Transitive",
+        "resolved": "0.0.0-packageplane.candidate.shfebd698752e19",
+        "contentHash": "m8ewQiwwoq8yS9e52uBzFwzfcfoJpS78UcF0t8COfPZE1R/71Cj9FYkEsLyRYFWvHaV/0NFvRCaqeLwlNxn1Mw==",
+        "dependencies": {
+          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Hub.Registry.Contracts": "0.0.0-packageplane.20260721.1",
+          "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1"
+        }
+      },
+      "Chummer.Infrastructure": {
+        "type": "Transitive",
+        "resolved": "0.0.0-packageplane.candidate.shfebd698752e19",
+        "contentHash": "P22VWo/Vi6K3TinqFsOvXbe1cenudVcWEm0KGGexxEYARk2ZeasZx95NEZwJFOXjivDnjJ4/06JsxXksh9Q/WA==",
+        "dependencies": {
+          "Chummer.Application": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Hub.Registry.Contracts": "0.0.0-packageplane.20260721.1",
+          "Chummer.Rulesets.Hosting": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Rulesets.Sr5": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Rulesets.Sr6": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1",
+          "SharpCompress": "0.50.1"
+        }
+      },
+      "Chummer.Rulesets.Hosting": {
+        "type": "Transitive",
+        "resolved": "0.0.0-packageplane.candidate.shfebd698752e19",
+        "contentHash": "UqM/qEZhegU6Neq0lTnqk307bExqExRdYBgByHrx+s4K4l9BW5+wu74vfZbjp60/xmfcbSf4XouiZlyUQY6Srg==",
+        "dependencies": {
+          "Chummer.Application": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1"
+        }
+      },
+      "Chummer.Rulesets.Sr5": {
+        "type": "Transitive",
+        "resolved": "0.0.0-packageplane.candidate.shfebd698752e19",
+        "contentHash": "ypxtnvFziLEcOR0oqn8EWlqzrsaS+9nKY8Z6CCFPrFBFLYNLte0jfzfGufZ+HBRat6E4/MuSuVZTWaXhz+dFeg==",
+        "dependencies": {
+          "Chummer.Application": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1"
+        }
+      },
+      "Chummer.Rulesets.Sr6": {
+        "type": "Transitive",
+        "resolved": "0.0.0-packageplane.candidate.shfebd698752e19",
+        "contentHash": "qPSayQyiKJllM2cFXAZl7lythoCpLDodIx+sIknXGb571pBYZszIem5Mvx4jp0/OC8cQfsGOsPhjpXWGmveOow==",
+        "dependencies": {
+          "Chummer.Application": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
+          "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1"
+        }
+      },
+      "SharpCompress": {
+        "type": "Transitive",
+        "resolved": "0.50.1",
+        "contentHash": "VY90K8BBvaAMvvRDJ8EvsfI/GgoIYxlgxMpxdgwpzaesJ0pGSHTLbZ7SD4JYxsGCnOibzua/+8HvDjV6KTw4jA=="
+      },
       "chummer.campaign.contracts": {
         "type": "Project",
         "dependencies": {
-          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sha7599f9f5d460, )"
+          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.shfebd698752e19, )"
         }
       },
       "chummer.control.contracts": {
@@ -61,9 +126,9 @@
       "chummer.run.contracts": {
         "type": "Project",
         "dependencies": {
-          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sha7599f9f5d460, )",
-          "Chummer.Hub.Registry.Contracts": "[0.1.0-preview, )",
-          "Chummer.Play.Contracts": "[0.1.0-preview, )"
+          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.shfebd698752e19, )",
+          "Chummer.Hub.Registry.Contracts": "[0.1.0-packageplane.candidate.sh66c418a5004f, )",
+          "Chummer.Play.Contracts": "[0.1.0-packageplane.candidate.sh66c418a5004f, )"
         }
       },
       "chummer.world.contracts": {

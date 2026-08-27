@@ -783,7 +783,9 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN = (
     'RUN ["/usr/local/bin/python3", "-I", "-S", '
     '"scripts/ai/bootstrap-hub-package-feed.py", '
     '"--repo-root", "/proof", '
-    '"--feed", "/opt/chummer-package-feed"]'
+    '"--feed", "/opt/chummer-package-feed", '
+    '"--core-feed", "/opt/chummer-core-runtime-feed", '
+    '"--download-core-runtime"]'
 )
 PUBLIC_EDGE_DOCKER_PROOF_COPY_INPUTS = (
     "scripts/validate_public_pwa_proof_authority.py",
@@ -836,6 +838,7 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE_INSTRUCTIONS = (
     "COPY --from=run-services-source global.json global.json",
     "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
     "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
+    "COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json",
     PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN,
 )
 PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = (
@@ -856,6 +859,10 @@ PUBLIC_EDGE_DOCKER_RECEIPT_COPY = (
 PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY = (
     "COPY --from=hub-package-feed "
     "/opt/chummer-package-feed /opt/chummer-package-feed"
+)
+PUBLIC_EDGE_DOCKER_CORE_RUNTIME_FEED_COPY = (
+    "COPY --from=hub-package-feed "
+    "/opt/chummer-core-runtime-feed /opt/chummer-core-runtime-feed"
 )
 PUBLIC_EDGE_DOCKER_FINAL_PUBLISH_COPY = "COPY --from=build /app/publish ."
 PUBLIC_EDGE_DOCKER_LOOPBACK_PROBE_PUBLISH_COPY = (
@@ -1397,6 +1404,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     package_feed_proof_receipt_copy_stages: list[str] = []
     package_feed_python_copy_stages: list[str] = []
     package_feed_copy_stages: list[str] = []
+    core_runtime_feed_copy_stages: list[str] = []
     tool_publish_copy_stages: list[str] = []
     final_publish_copy_stages: list[str] = []
     loopback_probe_publish_copy_stages: list[str] = []
@@ -1445,6 +1453,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             other_proof_copies.append(line_number)
         if line == PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY:
             package_feed_copy_stages.append(current_alias)
+        if line == PUBLIC_EDGE_DOCKER_CORE_RUNTIME_FEED_COPY:
+            core_runtime_feed_copy_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_TOOL_PUBLISH_COPY:
             tool_publish_copy_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_FINAL_PUBLISH_COPY:
@@ -1575,6 +1585,13 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     if not exact_package_feed_consumption:
         failures.append(
             "build stage must consume the exact validated hub-package-feed exactly once"
+        )
+    exact_core_runtime_feed_consumption = core_runtime_feed_copy_stages == [
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE
+    ]
+    if not exact_core_runtime_feed_consumption:
+        failures.append(
+            "build stage must consume the exact validated Core runtime feed exactly once"
         )
     if other_proof_copies:
         failures.append("no other COPY from public-pwa-proof is allowed")
@@ -1721,6 +1738,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         ),
         "exactPackageFeedPythonDependency": exact_package_feed_python_dependency,
         "exactPackageFeedConsumption": exact_package_feed_consumption,
+        "exactCoreRuntimeFeedConsumption": exact_core_runtime_feed_consumption,
         "noOtherProofCopies": not other_proof_copies,
         "exactToolPublishDependency": exact_tool_publish_dependency,
         "exactFinalPublishDependency": exact_final_publish_dependency,

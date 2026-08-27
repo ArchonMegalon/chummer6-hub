@@ -19,12 +19,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "validate-core-package-artifact.py"
-SELECTED_CORE_COMMIT = "7599f9f5d46073b589612473472fccb445512fb1"
+SELECTED_CORE_COMMIT = "febd698752e195dceef79fbc3f83dc971564fe00"
 SELECTED_CORE_LOCK_PATH = (
     ROOT / "tests" / "fixtures" / f"core-runtime-package-plane.{SELECTED_CORE_COMMIT[:12]}.lock.json"
 )
 SELECTED_CORE_LOCK_SHA256 = (
-    "08cd323a176a6db8c14213b28c7474ae8b5691b3c764a55dd361339903c23238"
+    "7d726ddea508af408d1eb50d36424385265a01a2895aa6a5e99e33a42056ae03"
 )
 SELECTED_CORE_LOCK_BYTES = SELECTED_CORE_LOCK_PATH.read_bytes()
 if hashlib.sha256(SELECTED_CORE_LOCK_BYTES).hexdigest() != SELECTED_CORE_LOCK_SHA256:
@@ -565,7 +565,7 @@ def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> N
 def test_sealed_public_handoff_recipe_has_no_additive_policy_profile() -> None:
     module = load_module()
     assert module.PUBLIC_HANDOFF_RECIPE_COMMIT == (
-        "c85ea198c19c149375913b44b304acd4d6353053"
+        "3260ac73714d8b001a3599d6776196e394dc6c35"
     )
     assert module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA == (
         module.EXPECTED_ALLOWED_RECIPE_DELTA

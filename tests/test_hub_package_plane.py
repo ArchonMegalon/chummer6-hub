@@ -19,14 +19,30 @@ SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 VERIFY_SCRIPT_PATH = ROOT / "scripts" / "ai" / "verify-hub-package-plane.py"
 PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
-PACKAGE_VERSION = "0.1.0-preview"
+PACKAGE_VERSION = "0.1.0-packageplane.candidate.sh66c418a5004f"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha7599f9f5d460",
-    "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
-    "Chummer.Run.Registry": "0.1.0-preview",
-    "Chummer.Play.Contracts": "0.1.0-preview",
-    "Chummer.Run.Contracts": "0.1.0-preview",
-    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sha7599f9f5d460",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
+    "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Registry": PACKAGE_VERSION,
+    "Chummer.Play.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Contracts": PACKAGE_VERSION,
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shfebd698752e19",
+}
+CORE_RUNTIME_PACKAGE_IDS = {
+    "Chummer.Engine.Contracts",
+    "Chummer.Application",
+    "Chummer.Rulesets.Hosting",
+    "Chummer.Rulesets.Sr5",
+    "Chummer.Rulesets.Sr6",
+    "Chummer.Infrastructure",
+    "Chummer.Rulesets.Sr4",
+    "Chummer.Engine.GmCharacterEdits",
+}
+HUB_PACKAGE_IDS = {
+    "Chummer.Hub.Registry.Contracts",
+    "Chummer.Run.Registry",
+    "Chummer.Play.Contracts",
+    "Chummer.Run.Contracts",
 }
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
@@ -102,15 +118,39 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
     lock = module.load_lock(LOCK_PATH)
     assert lock.package_version == PACKAGE_VERSION
     assert [spec.package_id for spec in lock.packages] == [
-        "Chummer.Engine.Contracts",
         "Chummer.Hub.Registry.Contracts",
         "Chummer.Run.Registry",
         "Chummer.Play.Contracts",
         "Chummer.Run.Contracts",
+    ]
+    assert [spec.package_id for spec in lock.core_runtime.packages] == [
+        "Chummer.Engine.Contracts",
+        "Chummer.Application",
+        "Chummer.Rulesets.Hosting",
+        "Chummer.Rulesets.Sr5",
+        "Chummer.Rulesets.Sr6",
+        "Chummer.Infrastructure",
+        "Chummer.Rulesets.Sr4",
         "Chummer.Engine.GmCharacterEdits",
     ]
+    assert lock.core_runtime.package_version == (
+        "0.0.0-packageplane.candidate.shfebd698752e19"
+    )
+    assert lock.core_runtime.runtime_source_commit == (
+        "febd698752e195dceef79fbc3f83dc971564fe00"
+    )
+    assert lock.core_runtime.package_recipe_commit == (
+        "3260ac73714d8b001a3599d6776196e394dc6c35"
+    )
     assert all(len(spec.commit) == 40 for spec in lock.packages)
-    assert {spec.package_id: spec.version for spec in lock.packages} == OWNER_PACKAGE_VERSIONS
+    assert {spec.package_id: spec.version for spec in lock.packages} == {
+        package_id: version
+        for package_id, version in OWNER_PACKAGE_VERSIONS.items()
+        if package_id not in {
+            "Chummer.Engine.Contracts",
+            "Chummer.Engine.GmCharacterEdits",
+        }
+    }
     assert all(spec.nupkg_sha256 and spec.nupkg_size_bytes > 0 for spec in lock.packages)
     assert lock.dotnet_install_url == "https://dot.net/v1/dotnet-install.sh"
     assert len(lock.dotnet_install_sha256) == 64
@@ -120,7 +160,7 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
     module = load_module()
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     payload["unbound"] = True
-    with pytest.raises(module.PackagePlaneError, match="exact v4 fields"):
+    with pytest.raises(module.PackagePlaneError, match="exact v5 fields"):
         module.validate_lock_payload(payload)
 
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
@@ -454,6 +494,81 @@ def test_inventory_rejects_metadata_valid_package_byte_replacement(tmp_path: Pat
         module.validate_feed_inventory(feed, lock, lock_sha)
 
 
+def test_hub_staging_rejects_stale_core_package_before_restore(tmp_path: Path) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    feed = tmp_path / "hub-feed"
+    feed.mkdir()
+    for name in module._expected_feed_entry_names(lock):
+        (feed / name).write_bytes(b"placeholder")
+    stale_core = feed / "Chummer.Engine.Contracts.0.1.0-preview.nupkg"
+    stale_core.write_bytes(b"stale core bytes must never enter Hub authority")
+
+    with pytest.raises(module.PackagePlaneError, match="exact locked file set"):
+        module._assert_exact_feed_entries(feed, lock)
+
+
+def test_observation_staging_rejects_extra_or_stale_core_packages(tmp_path: Path) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    feed = tmp_path / "observed-staging"
+    feed.mkdir()
+    for spec in lock.packages:
+        (feed / f"{spec.package_id}.{spec.version}.nupkg").write_bytes(b"hub")
+    module._assert_exact_staged_package_entries(feed, lock)
+
+    stale_core = feed / (
+        "Chummer.Engine.Contracts.0.0.0-packageplane.candidate.stale.nupkg"
+    )
+    stale_core.write_bytes(b"stale Core must not survive observation")
+    with pytest.raises(module.PackagePlaneError, match="exactly the four bound non-Core"):
+        module._assert_exact_staged_package_entries(feed, lock)
+
+
+def test_unused_sr4_core_authority_still_rejects_missing_extra_or_tampered_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    package_specs = []
+    trusted_payloads = {}
+    for spec in lock.core_runtime.packages:
+        payload = f"trusted:{spec.package_id}".encode()
+        trusted_payloads[spec.file_name] = payload
+        package_specs.append(
+            replace(
+                spec,
+                sha256=hashlib.sha256(payload).hexdigest(),
+                size_bytes=len(payload),
+            )
+        )
+    authority = replace(lock.core_runtime, packages=tuple(package_specs))
+
+    def write_feed(path: Path) -> None:
+        path.mkdir()
+        for name, payload in trusted_payloads.items():
+            (path / name).write_bytes(payload)
+
+    missing = tmp_path / "missing"
+    write_feed(missing)
+    sr4 = next(spec for spec in package_specs if spec.package_id == "Chummer.Rulesets.Sr4")
+    (missing / sr4.file_name).unlink()
+    with pytest.raises(module.PackagePlaneError, match="exactly the eight bound nupkgs"):
+        module.validate_core_runtime_feed(missing, authority)
+
+    extra = tmp_path / "extra"
+    write_feed(extra)
+    (extra / "Chummer.Rulesets.Sr4.stale.nupkg").write_bytes(b"stale")
+    with pytest.raises(module.PackagePlaneError, match="exactly the eight bound nupkgs"):
+        module.validate_core_runtime_feed(extra, authority)
+
+    tampered = tmp_path / "tampered"
+    write_feed(tampered)
+    (tampered / sr4.file_name).write_bytes(b"tampered-unused-sr4")
+    with pytest.raises(module.PackagePlaneError, match="byte authority mismatch"):
+        module.validate_core_runtime_feed(tampered, authority)
+
+
 def test_feed_validation_rejects_external_symlink_handoffs(tmp_path: Path) -> None:
     module = load_module()
     feed = tmp_path / "authority"
@@ -511,11 +626,13 @@ def test_build_feed_rejects_sdk_roll_forward(tmp_path: Path, monkeypatch) -> Non
         raise AssertionError(f"unexpected command after SDK mismatch: {rendered}")
 
     monkeypatch.setattr(module, "_run", fake_run)
+    monkeypatch.setattr(module, "validate_core_runtime_feed", lambda *_args: None)
     with pytest.raises(module.PackagePlaneError, match="expected 10.0.103, observed 10.0.110"):
         module.build_feed(
             lock,
             lock_sha256="0" * 64,
             feed=tmp_path / "feed",
+            core_feed=tmp_path / "core-feed",
             dotnet="dotnet",
         )
     assert calls == [("dotnet", "--version")]
@@ -578,6 +695,7 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     for required_input in (
         "!global.json",
         "!eng/package-plane.lock.json",
+        "!eng/core-main-runtime-artifact-authority.json",
         "!eng/NuGet.Container.Config",
         "!scripts/ai/bootstrap-hub-package-feed.py",
         "**/bin/**",
@@ -592,7 +710,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert (
         "RUN [\"/usr/local/bin/python3\", \"-I\", \"-S\", "
         "\"scripts/ai/bootstrap-hub-package-feed.py\", \"--repo-root\", "
-        "\"/proof\", \"--feed\", \"/opt/chummer-package-feed\"]"
+        "\"/proof\", \"--feed\", \"/opt/chummer-package-feed\", "
+        "\"--core-feed\", \"/opt/chummer-core-runtime-feed\", "
+        "\"--download-core-runtime\"]"
     ) in dockerfile
     assert (
         "COPY --from=public-pwa-proof "
@@ -604,6 +724,10 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert (
         "COPY --from=hub-package-feed /opt/chummer-package-feed "
         "/opt/chummer-package-feed"
+    ) in dockerfile
+    assert (
+        "COPY --from=hub-package-feed /opt/chummer-core-runtime-feed "
+        "/opt/chummer-core-runtime-feed"
     ) in dockerfile
     assert "--configfile /tmp/chummer-package-feed.NuGet.Config" in dockerfile
     assert "--packages /tmp/chummer-nuget/packages" in dockerfile
@@ -651,6 +775,7 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     }
     assert sources == {
         "locked-chummer": "/opt/chummer-package-feed",
+        "locked-core-runtime": "/opt/chummer-core-runtime-feed",
         "nuget.org": "https://api.nuget.org/v3/index.json",
     }
     assert config.find("./packageSources/clear") is not None
@@ -661,9 +786,11 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         for node in config.findall("./packageSourceMapping/packageSource")
     }
     assert mappings == {
-        "locked-chummer": set(OWNER_PACKAGE_VERSIONS),
+        "locked-chummer": HUB_PACKAGE_IDS,
+        "locked-core-runtime": CORE_RUNTIME_PACKAGE_IDS,
         "nuget.org": {"*"},
     }
+    assert mappings["locked-chummer"].isdisjoint(mappings["locked-core-runtime"])
 
     preflight = load_public_edge_preflight_module()
     contract = preflight.validate_public_pwa_docker_build_contract(
@@ -680,6 +807,7 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert contract["checks"]["exactPackageFeedStage"] is True
     assert contract["checks"]["packageFeedDependsOnProof"] is True
     assert contract["checks"]["buildDependsOnPackageFeed"] is True
+    assert contract["checks"]["exactCoreRuntimeFeedConsumption"] is True
     assert contract["checks"]["receiptIsFirstBuildInstruction"] is True
 
 
