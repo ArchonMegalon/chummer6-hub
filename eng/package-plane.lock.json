@@ -11,11 +11,11 @@
     "msbuild": "cc96c3846ae171984d29ba572ef6f22d273c675cd745c59dc7225fd5cd69610b",
     "nuget_packaging": "980fd0205cf99d02e52664ea82c678dcd32232b59d96e277b774d4743e7496b1"
   },
-  "package_version": "0.1.0-preview",
+  "package_version": "0.1.0-packageplane.candidate.sh66c418a5004f",
   "approved_remote_source": "https://api.nuget.org/v3/index.json",
   "build_recipe": {
     "path": "scripts/ai/bootstrap-hub-package-feed.py",
-    "sha256": "45696170204d5ebf4848c72d9785db935e94b4c3e39b516dd25a9f9ebf4d8580"
+    "sha256": "38e2dd040c9006134dc87eff70857e733e2c01bdcfd70992db358b1f985ced67"
   },
   "core_runtime": {
     "authority_path": "eng/core-main-runtime-artifact-authority.json",
@@ -104,7 +104,7 @@
   "packages": [
     {
       "id": "Chummer.Hub.Registry.Contracts",
-      "version": "0.1.0-preview",
+      "version": "0.1.0-packageplane.candidate.sh66c418a5004f",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
       "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29",
       "checkout_directory": "chummer-hub-registry",
@@ -112,12 +112,12 @@
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "89061d481812d9f6772c4f8c38a5b6be08609ac20760db3039d0701a3bcd681b",
-      "nupkg_size_bytes": 524782
+      "nupkg_sha256": "2916c9cbfd8da0bc4a13d6a26746ff30ada5e88a593a3e5039d632d58593935d",
+      "nupkg_size_bytes": 524842
     },
     {
       "id": "Chummer.Run.Registry",
-      "version": "0.1.0-preview",
+      "version": "0.1.0-packageplane.candidate.sh66c418a5004f",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
       "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29",
       "checkout_directory": "chummer-hub-registry",
@@ -125,34 +125,34 @@
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "2254800153d6799b753b91ec80320fec5fd502727fc1e8351df68e9d9430e922",
-      "nupkg_size_bytes": 345206
+      "nupkg_sha256": "d8ddbcf1699d568adfa7ba6108bd0560f5d8a4b9b53714f4654f6c7dbd5e3be5",
+      "nupkg_size_bytes": 345296
     },
     {
       "id": "Chummer.Play.Contracts",
-      "version": "0.1.0-preview",
+      "version": "0.1.0-packageplane.candidate.sh66c418a5004f",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
-      "commit": "fb170842d37faf2a91ddc1f5e91bf5d50cb0dc85",
+      "commit": "66c418a5004fae0cbc58ad9f2cf64e9a40954c3a",
       "checkout_directory": "chummer-run-services",
       "project": "Chummer.Play.Contracts/Chummer.Play.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "516050b43a239ee3732e7e4ce6c422468baeb82c4b3d58e9f0412d8035337e21",
-      "nupkg_size_bytes": 322484
+      "nupkg_sha256": "74040252d7f728ffd5ca882058e1dac9ec9568376cd1af95b5b50f6c01a49f01",
+      "nupkg_size_bytes": 322544
     },
     {
       "id": "Chummer.Run.Contracts",
-      "version": "0.1.0-preview",
+      "version": "0.1.0-packageplane.candidate.sh66c418a5004f",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
-      "commit": "fb170842d37faf2a91ddc1f5e91bf5d50cb0dc85",
+      "commit": "66c418a5004fae0cbc58ad9f2cf64e9a40954c3a",
       "checkout_directory": "chummer-run-services",
       "project": "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "f7782a5d0811c384965071ceb0a92071124be90cfe55cb01ebf11e33db1c7160",
-      "nupkg_size_bytes": 1450256
+      "nupkg_sha256": "86eeaaa5c39c4dc5c60f547904b2583ebfbee869cc2c4718a2d1b31a8fca06a1",
+      "nupkg_size_bytes": 1838984
     }
   ]
 }

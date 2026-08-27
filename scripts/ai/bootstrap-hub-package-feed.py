@@ -1061,6 +1061,42 @@ def _expected_feed_entry_names(lock: PackagePlaneLock) -> set[str]:
     }
 
 
+def _assert_exact_staged_package_entries(
+    feed: Path,
+    lock: PackagePlaneLock,
+    *,
+    include_observed_authority: bool = False,
+) -> None:
+    if feed.is_symlink() or not feed.is_dir():
+        raise PackagePlaneError("Hub package staging must be a regular directory")
+    resolved_feed = feed.resolve()
+    expected = {
+        f"{spec.package_id}.{spec.version}.nupkg" for spec in lock.packages
+    }
+    if include_observed_authority:
+        expected.add(OBSERVED_AUTHORITY_FILE_NAME)
+    entries = list(feed.iterdir())
+    if any(
+        entry.is_symlink()
+        or not entry.is_file()
+        or entry.resolve().parent != resolved_feed
+        for entry in entries
+    ):
+        raise PackagePlaneError("Hub package staging entries must be contained regular files")
+    observed = {entry.name for entry in entries}
+    portable_observed = {entry.name.casefold() for entry in entries}
+    portable_expected = {name.casefold() for name in expected}
+    if (
+        observed != expected
+        or portable_observed != portable_expected
+        or len(portable_observed) != len(entries)
+    ):
+        raise PackagePlaneError(
+            "Hub package staging must contain exactly the four bound non-Core packages"
+            + (" and one observed-authority file" if include_observed_authority else "")
+        )
+
+
 def _assert_exact_feed_entries(feed: Path, lock: PackagePlaneLock) -> None:
     if feed.is_symlink() or not feed.is_dir():
         raise PackagePlaneError("feed must be one regular, non-symlink directory")
@@ -1458,6 +1494,7 @@ def build_feed(
                 enforce_locked_bytes=not observe_package_authority,
             )
         if observe_package_authority:
+            _assert_exact_staged_package_entries(staged_feed, lock)
             observed = {
                 "contract": "chummer-hub.observed-package-authority/v1",
                 "packages": [
@@ -1475,6 +1512,11 @@ def build_feed(
                 ],
             }
             _write_json(staged_feed / OBSERVED_AUTHORITY_FILE_NAME, observed)
+            _assert_exact_staged_package_entries(
+                staged_feed,
+                lock,
+                include_observed_authority=True,
+            )
             observed_bytes = (staged_feed / OBSERVED_AUTHORITY_FILE_NAME).read_bytes()
             os.replace(staged_feed, feed)
             return hashlib.sha256(observed_bytes).hexdigest()

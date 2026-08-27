@@ -19,13 +19,13 @@ SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 VERIFY_SCRIPT_PATH = ROOT / "scripts" / "ai" / "verify-hub-package-plane.py"
 PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
-PACKAGE_VERSION = "0.1.0-preview"
+PACKAGE_VERSION = "0.1.0-packageplane.candidate.sh66c418a5004f"
 OWNER_PACKAGE_VERSIONS = {
     "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
-    "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
-    "Chummer.Run.Registry": "0.1.0-preview",
-    "Chummer.Play.Contracts": "0.1.0-preview",
-    "Chummer.Run.Contracts": "0.1.0-preview",
+    "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Registry": PACKAGE_VERSION,
+    "Chummer.Play.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Contracts": PACKAGE_VERSION,
     "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shfebd698752e19",
 }
 CORE_RUNTIME_PACKAGE_IDS = {
@@ -506,6 +506,67 @@ def test_hub_staging_rejects_stale_core_package_before_restore(tmp_path: Path) -
 
     with pytest.raises(module.PackagePlaneError, match="exact locked file set"):
         module._assert_exact_feed_entries(feed, lock)
+
+
+def test_observation_staging_rejects_extra_or_stale_core_packages(tmp_path: Path) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    feed = tmp_path / "observed-staging"
+    feed.mkdir()
+    for spec in lock.packages:
+        (feed / f"{spec.package_id}.{spec.version}.nupkg").write_bytes(b"hub")
+    module._assert_exact_staged_package_entries(feed, lock)
+
+    stale_core = feed / (
+        "Chummer.Engine.Contracts.0.0.0-packageplane.candidate.stale.nupkg"
+    )
+    stale_core.write_bytes(b"stale Core must not survive observation")
+    with pytest.raises(module.PackagePlaneError, match="exactly the four bound non-Core"):
+        module._assert_exact_staged_package_entries(feed, lock)
+
+
+def test_unused_sr4_core_authority_still_rejects_missing_extra_or_tampered_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    package_specs = []
+    trusted_payloads = {}
+    for spec in lock.core_runtime.packages:
+        payload = f"trusted:{spec.package_id}".encode()
+        trusted_payloads[spec.file_name] = payload
+        package_specs.append(
+            replace(
+                spec,
+                sha256=hashlib.sha256(payload).hexdigest(),
+                size_bytes=len(payload),
+            )
+        )
+    authority = replace(lock.core_runtime, packages=tuple(package_specs))
+
+    def write_feed(path: Path) -> None:
+        path.mkdir()
+        for name, payload in trusted_payloads.items():
+            (path / name).write_bytes(payload)
+
+    missing = tmp_path / "missing"
+    write_feed(missing)
+    sr4 = next(spec for spec in package_specs if spec.package_id == "Chummer.Rulesets.Sr4")
+    (missing / sr4.file_name).unlink()
+    with pytest.raises(module.PackagePlaneError, match="exactly the eight bound nupkgs"):
+        module.validate_core_runtime_feed(missing, authority)
+
+    extra = tmp_path / "extra"
+    write_feed(extra)
+    (extra / "Chummer.Rulesets.Sr4.stale.nupkg").write_bytes(b"stale")
+    with pytest.raises(module.PackagePlaneError, match="exactly the eight bound nupkgs"):
+        module.validate_core_runtime_feed(extra, authority)
+
+    tampered = tmp_path / "tampered"
+    write_feed(tampered)
+    (tampered / sr4.file_name).write_bytes(b"tampered-unused-sr4")
+    with pytest.raises(module.PackagePlaneError, match="byte authority mismatch"):
+        module.validate_core_runtime_feed(tampered, authority)
 
 
 def test_feed_validation_rejects_external_symlink_handoffs(tmp_path: Path) -> None:
