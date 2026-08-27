@@ -29,6 +29,7 @@ from verify_google_oauth_linking_proof import verify as verify_google_oauth_link
 from verify_windows_installer_visual_audit_intake_request import (
     verify as verify_windows_visual_intake_request_receipt,
 )
+import ea_release_component_policy
 from public_edge_postdeploy_contract import (
     PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
     PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS,
@@ -511,7 +512,6 @@ REQUIRED_RELEASE_VERIFIER_GATES = (
     "verify_google_oauth_linking_operator_evidence_request",
     "verify_google_oauth_linking_proof",
     "verify_ea_operator_readiness",
-    "verify_mymedia_public_surface",
     "verify_design_quality_gate",
     "verify_mobile_release_proof",
     "verify_ui_kit_package_release",
@@ -1167,13 +1167,14 @@ def isolated_python_script(command: list[str]) -> Path:
 def canonical_release_gate_specs(
     environment: dict[str, str],
 ) -> tuple[dict[str, object], ...]:
-    """Return the immutable, controller-owned 46-gate launch plan.
+    """Return the immutable, controller-owned 45-gate launch plan.
 
     This is the inspection API for integration tests.  It deliberately accepts
     only the already-sanitized controller environment; callers cannot inject
     commands, entrypoints, interpreters, or external-write classifications.
     """
 
+    ea_release_policy = ea_release_component_policy.load_and_validate_matrix()
     public_base = shlex.quote(environment["CHUMMER_PUBLIC_BASE_URL"])
     gate_timeout = int(environment["CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS"])
     guide_timeout = int(environment["CHUMMER_RELEASE_READY_GUIDE_GATE_TIMEOUT_SECONDS"])
@@ -1203,6 +1204,8 @@ def canonical_release_gate_specs(
         timeout_seconds: int | None = None,
         external_write: bool = False,
     ) -> dict[str, object]:
+        component_ids = ea_release_policy.component_ids_for_gate(name)
+        release_blocking = ea_release_policy.gate_may_block_chummer_release(name)
         return {
             "name": name,
             "command": command,
@@ -1210,6 +1213,8 @@ def canonical_release_gate_specs(
             "timeout_seconds": timeout_seconds or gate_timeout,
             "entrypoints": tuple(str(Path(value)) for value in entrypoints),
             "external_write": external_write,
+            "ea_component_ids": component_ids,
+            "release_blocking": release_blocking,
         }
 
     windows_entrypoints: tuple[str, ...]
@@ -1281,6 +1286,7 @@ def canonical_release_gate_specs(
         )
 
     ea_once = (
+        f"{python} {services}/scripts/verify_ea_release_component_matrix.py && "
         f"{python} {services}/scripts/materialize_ea_operator_readiness.py && "
         f"{python} {services}/scripts/verify_ea_operator_readiness.py"
     )
@@ -1466,8 +1472,7 @@ def canonical_release_gate_specs(
         spec("verify_account_handoff_runtime_config", f"cd {services} && {python} {services}/scripts/verify_account_handoff_runtime_config.py", f"{services}/scripts/verify_account_handoff_runtime_config.py"),
         spec("verify_google_oauth_linking_operator_evidence_request", google_request_command, *google_request_entrypoints),
         spec("verify_google_oauth_linking_proof", google_proof_command, *google_proof_entrypoints),
-        spec("verify_ea_operator_readiness", f"cd {services} && ( ({ea_once}) || (sleep 5 && {ea_once}) || (sleep 15 && {ea_once}) )", f"{services}/scripts/materialize_ea_operator_readiness.py", f"{services}/scripts/verify_ea_operator_readiness.py"),
-        spec("verify_mymedia_public_surface", f"cd {services} && {python} {services}/scripts/materialize_mymedia_public_surface.py && {python} {services}/scripts/verify_mymedia_public_surface.py", f"{services}/scripts/materialize_mymedia_public_surface.py", f"{services}/scripts/verify_mymedia_public_surface.py"),
+        spec("verify_ea_operator_readiness", f"cd {services} && ( ({ea_once}) || (sleep 5 && {ea_once}) || (sleep 15 && {ea_once}) )", f"{services}/scripts/verify_ea_release_component_matrix.py", f"{services}/scripts/materialize_ea_operator_readiness.py", f"{services}/scripts/verify_ea_operator_readiness.py"),
         spec("verify_design_quality_gate", f"cd {services} && {python} {services}/scripts/materialize_design_quality_gate.py", f"{services}/scripts/materialize_design_quality_gate.py"),
         spec("verify_mobile_release_proof", f"{bash} {root}/chummer-play/scripts/release/verify_mobile_release_proof.sh", f"{root}/chummer-play/scripts/release/verify_mobile_release_proof.sh"),
         spec("verify_ui_kit_package_release", f"{bash} {root}/chummer-ui-kit/scripts/release/verify_ui_kit_package_release.sh", f"{root}/chummer-ui-kit/scripts/release/verify_ui_kit_package_release.sh"),
@@ -1485,6 +1490,10 @@ def canonical_release_gate_specs(
     )
     if tuple(str(item["name"]) for item in values) != REQUIRED_RELEASE_VERIFIER_GATES:
         raise RuntimeError("canonical release gate declaration drifted")
+    ea_release_component_policy.validate_gate_coverage(
+        ea_release_policy,
+        (str(item["name"]) for item in values),
+    )
     return values
 RELEASE_VERIFIER_BOUND_PROGRAMS = (
     ("release_ready_materializer", Path(__file__).resolve()),
