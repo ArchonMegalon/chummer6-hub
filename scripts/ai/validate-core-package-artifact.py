@@ -54,8 +54,8 @@ SDK_ARCHIVE_SHA512 = (
     "bab94f13c57b2ac821d4924fe66084be9b44c41761ff7ff64522c8f7aba345659"
     "d31258401dcec31cc3cf6ccae1d012623075aca1c9b9165bcfe5ba9abda1c0c"
 )
-RUNTIME_PACKAGE_VERSION = "0.0.0-packageplane.candidate.shabc08228d3ce0"
-RUNTIME_SOURCE_COMMIT = "bc08228d3ce06410ca97ada63a5af41a2eaa91bf"
+RUNTIME_PACKAGE_VERSION = "0.0.0-packageplane.candidate.sh7599f9f5d460"
+RUNTIME_SOURCE_COMMIT = "7599f9f5d46073b589612473472fccb445512fb1"
 OWNER_PACKAGE_VERSION = "0.0.0-packageplane.20260721.1"
 
 INVENTORY_FILE_NAME = "chummer-core-runtime-packages.inventory.json"
@@ -74,23 +74,9 @@ EXPECTED_PACKAGE_IDS = (
     "Chummer.Engine.GmCharacterEdits",
 )
 EXPECTED_ALLOWED_RECIPE_DELTA = (
-    ".github/workflows/android-content-plane.yml",
-    ".github/workflows/package-plane.yml",
-    "Chummer.Application/Chummer.Application.csproj",
-    "Chummer.Contracts/Chummer.Contracts.csproj",
-    "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
-    "Chummer.Infrastructure/Chummer.Infrastructure.csproj",
-    "Chummer.Rulesets.Hosting/Chummer.Rulesets.Hosting.csproj",
-    "Chummer.Rulesets.Sr4/Chummer.Rulesets.Sr4.csproj",
-    "Chummer.Rulesets.Sr5/Chummer.Rulesets.Sr5.csproj",
-    "Chummer.Rulesets.Sr6/Chummer.Rulesets.Sr6.csproj",
-    "eng/android-content-plane.lock.json",
     "eng/runtime-package-plane.lock.json",
-    "scripts/ai/android-content-plane.py",
     "scripts/ai/runtime-package-plane.py",
     "scripts/ai/verify-no-siblings-package-plane.sh",
-    "tests/test_android_content_plane.py",
-    "tests/test_package_plane.py",
     "tests/test_runtime_package_plane_authority.py",
 )
 EXPECTED_BUILD_AUTHORITY_PATHS = (
@@ -103,24 +89,13 @@ EXPECTED_BUILD_AUTHORITY_PATHS = (
     "scripts/ai/_env.sh",
     "scripts/ai/bootstrap-contracts-feed.sh",
     "scripts/ai/bootstrap-owner-contracts-feed.py",
+    "scripts/ai/public-runtime-package-handoff.py",
     "scripts/ai/runtime-package-plane.py",
     "scripts/ai/verify-no-siblings-package-plane.sh",
 )
-PUBLIC_HANDOFF_RECIPE_COMMIT = "c6138ff7ca27d66e85b223d0b29381cff4811277"
-PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA = (
-    EXPECTED_ALLOWED_RECIPE_DELTA[:10]
-    + ("docs/runtime-package-public-handoff.md",)
-    + EXPECTED_ALLOWED_RECIPE_DELTA[10:13]
-    + ("scripts/ai/public-runtime-package-handoff.py",)
-    + EXPECTED_ALLOWED_RECIPE_DELTA[13:17]
-    + ("tests/test_public_runtime_package_handoff.py",)
-    + EXPECTED_ALLOWED_RECIPE_DELTA[17:]
-)
-PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS = (
-    EXPECTED_BUILD_AUTHORITY_PATHS[:9]
-    + ("scripts/ai/public-runtime-package-handoff.py",)
-    + EXPECTED_BUILD_AUTHORITY_PATHS[9:]
-)
+PUBLIC_HANDOFF_RECIPE_COMMIT = "c85ea198c19c149375913b44b304acd4d6353053"
+PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA = EXPECTED_ALLOWED_RECIPE_DELTA
+PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS = EXPECTED_BUILD_AUTHORITY_PATHS
 EXPECTED_EXTERNAL_OWNER_PACKAGES = (
     (
         "Chummer.Hub.Registry.Contracts",
@@ -156,7 +131,7 @@ EXPECTED_RUNTIME_PACKAGE_SPECS = (
     (
         "Chummer.Application",
         "Chummer.Application/Chummer.Application.csproj",
-        "cf5fc7f7f7d25c2ab20ba7719f3a60929cd78b205b9a43683b4a7048fcf0c19a",
+        "289b245ed773af33b114ceb9ed51e667801ff202f79ccee35a32ecc410da88fb",
         "Chummer.Application.dll",
         (
             ("Chummer.Engine.Contracts", RUNTIME_PACKAGE_VERSION),
@@ -233,7 +208,7 @@ EXPECTED_RUNTIME_PACKAGE_SPECS = (
     (
         "Chummer.Engine.GmCharacterEdits",
         "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
-        "7c2508ce3ee1c64338cc80df71e3a98487c5c8323db9bccb68e740f13f3db6a6",
+        "527b68de82b36057747c55b124d4bcd89be6a3daee66856db5db8c986a44b641",
         "Chummer.Engine.GmCharacterEdits.dll",
         (
             ("Chummer.Application", RUNTIME_PACKAGE_VERSION),
@@ -246,6 +221,14 @@ EXPECTED_RUNTIME_PACKAGE_SPECS = (
             ("Chummer.Run.Contracts", OWNER_PACKAGE_VERSION),
         ),
     ),
+)
+GM_RUNTIME_ASSEMBLY_PATHS = (
+    "lib/net10.0/Chummer.Application.dll",
+    "lib/net10.0/Chummer.Engine.GmCharacterEdits.dll",
+    "lib/net10.0/Chummer.Infrastructure.dll",
+    "lib/net10.0/Chummer.Rulesets.Hosting.dll",
+    "lib/net10.0/Chummer.Rulesets.Sr5.dll",
+    "lib/net10.0/Chummer.Rulesets.Sr6.dll",
 )
 LOCKED_OWNER_PACKAGE_IDS = (
     "Chummer.Engine.Contracts",
@@ -290,9 +273,9 @@ CORE_PROPERTIES_PATTERN = re.compile(
 # These resource ceilings are governed validator policy. Raising one requires a
 # reviewed policy update based on measured producer output; artifact data must
 # never be allowed to expand these limits merely by rebinding its own metadata.
-# The selected Core-main artifact measures 1,544,098 snapshot bytes, with 5-6
-# entries per nupkg, a 2,847,232-byte largest entry, and 2,849,940-byte largest
-# per-nupkg aggregate expansion.
+# The selected Core-main artifact measures 3,027,083 snapshot bytes, with at most
+# 10 entries per nupkg, a 4,281,856-byte largest entry, and 4,284,562-byte
+# largest per-nupkg aggregate expansion.
 MAX_AUTHORITY_BYTES = 128 * 1024
 MAX_INVENTORY_BYTES = 1 * 1024 * 1024
 MAX_LOCK_BYTES = 1 * 1024 * 1024
@@ -1477,7 +1460,11 @@ def _declared_zip_entry_count(payload: bytes, *, package_id: str) -> int:
 
 def _inspect_nupkg(payload: bytes, *, package: Mapping[str, Any]) -> None:
     package_id = str(package["id"])
-    expected_assembly = f"lib/net10.0/{package['assembly']}"
+    expected_assemblies = (
+        list(GM_RUNTIME_ASSEMBLY_PATHS)
+        if package_id == "Chummer.Engine.GmCharacterEdits"
+        else [f"lib/net10.0/{package['assembly']}"]
+    )
     expected_nuspec = f"{package_id}.nuspec"
     declared_entry_count = _declared_zip_entry_count(payload, package_id=package_id)
     try:
@@ -1534,15 +1521,15 @@ def _inspect_nupkg(payload: bytes, *, package: Mapping[str, Any]) -> None:
         raise ArtifactValidationError(f"package {package_id} is not a valid nupkg") from exc
 
     lib_entries = [name for name in names if name.startswith("lib/")]
-    if lib_entries != [expected_assembly]:
+    if lib_entries != expected_assemblies:
         raise ArtifactValidationError(
-            f"package {package_id} must own exactly {expected_assembly}"
+            f"package {package_id} runtime assembly set differs from authority"
         )
     allowed_entries = {
         "_rels/.rels",
         "[Content_Types].xml",
         expected_nuspec,
-        expected_assembly,
+        *expected_assemblies,
     }
     if package_id == "Chummer.Engine.Contracts":
         allowed_entries.add("README.md")

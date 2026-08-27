@@ -19,12 +19,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "validate-core-package-artifact.py"
-SELECTED_CORE_COMMIT = "6bc30bc886cbfe77585b7a7933524f282eb5e9a0"
+SELECTED_CORE_COMMIT = "7599f9f5d46073b589612473472fccb445512fb1"
 SELECTED_CORE_LOCK_PATH = (
     ROOT / "tests" / "fixtures" / f"core-runtime-package-plane.{SELECTED_CORE_COMMIT[:12]}.lock.json"
 )
 SELECTED_CORE_LOCK_SHA256 = (
-    "8f417ff62fa24373c85cbf98e53580acef109434b656359b455a12eecf967cbf"
+    "08cd323a176a6db8c14213b28c7474ae8b5691b3c764a55dd361339903c23238"
 )
 SELECTED_CORE_LOCK_BYTES = SELECTED_CORE_LOCK_PATH.read_bytes()
 if hashlib.sha256(SELECTED_CORE_LOCK_BYTES).hexdigest() != SELECTED_CORE_LOCK_SHA256:
@@ -62,6 +62,14 @@ RUNTIME_SPECS = tuple(
         tuple(dependency["id"] for dependency in row["dependencies"]),
     )
     for row in SELECTED_CORE_LOCK["packages"]
+)
+GM_RUNTIME_ASSEMBLY_PATHS = (
+    "lib/net10.0/Chummer.Application.dll",
+    "lib/net10.0/Chummer.Engine.GmCharacterEdits.dll",
+    "lib/net10.0/Chummer.Infrastructure.dll",
+    "lib/net10.0/Chummer.Rulesets.Hosting.dll",
+    "lib/net10.0/Chummer.Rulesets.Sr5.dll",
+    "lib/net10.0/Chummer.Rulesets.Sr6.dll",
 )
 
 
@@ -192,12 +200,23 @@ def package_bytes(
                 },
             )
     nuspec = ET.tostring(package, encoding="utf-8", xml_declaration=True)
+    runtime_assemblies = (
+        GM_RUNTIME_ASSEMBLY_PATHS
+        if package_id == "Chummer.Engine.GmCharacterEdits"
+        else (f"lib/net10.0/{assembly}",)
+    )
     entries = {
         "[Content_Types].xml": b"<Types />\n",
         "_rels/.rels": b"<Relationships />\n",
         f"{package_id}.nuspec": nuspec,
-        assembly_entry or f"lib/net10.0/{assembly}": f"assembly:{package_id}\n".encode(),
+        **{
+            path: f"assembly:{path}\n".encode()
+            for path in runtime_assemblies
+        },
     }
+    if assembly_entry is not None:
+        entries.pop(f"lib/net10.0/{assembly}", None)
+        entries[assembly_entry] = f"assembly:{package_id}\n".encode()
     if foreign_entry is not None:
         entries[foreign_entry] = b"foreign\n"
     if additional_entries is not None:
@@ -543,21 +562,17 @@ def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> N
     ] == "pass"
 
 
-def test_public_handoff_recipe_has_one_explicit_additive_policy_profile() -> None:
+def test_sealed_public_handoff_recipe_has_no_additive_policy_profile() -> None:
     module = load_module()
     assert module.PUBLIC_HANDOFF_RECIPE_COMMIT == (
-        "c6138ff7ca27d66e85b223d0b29381cff4811277"
+        "c85ea198c19c149375913b44b304acd4d6353053"
     )
-    assert set(module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA) - set(
+    assert module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA == (
         module.EXPECTED_ALLOWED_RECIPE_DELTA
-    ) == {
-        "docs/runtime-package-public-handoff.md",
-        "scripts/ai/public-runtime-package-handoff.py",
-        "tests/test_public_runtime_package_handoff.py",
-    }
-    assert set(module.PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS) - set(
+    )
+    assert module.PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS == (
         module.EXPECTED_BUILD_AUTHORITY_PATHS
-    ) == {"scripts/ai/public-runtime-package-handoff.py"}
+    )
 
 
 @pytest.mark.parametrize(
@@ -567,26 +582,28 @@ def test_public_handoff_recipe_has_one_explicit_additive_policy_profile() -> Non
         ("build_authority_files", "build authority path omission, addition, or order"),
     ],
 )
-def test_public_handoff_additive_policy_is_rejected_for_foreign_recipe_commit(
+def test_retired_public_handoff_additive_policy_is_rejected(
     tmp_path: Path,
     policy_field: str,
     expected_error: str,
 ) -> None:
     module = load_module()
     fixture = build_fixture(tmp_path)
-    assert fixture.authority["package_recipe_commit"] != (
-        module.PUBLIC_HANDOFF_RECIPE_COMMIT
-    )
-
     if policy_field == "allowed_recipe_delta":
-        fixture.lock[policy_field] = list(module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA)
+        fixture.lock[policy_field] = [
+            *module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA,
+            "tests/test_public_runtime_package_handoff.py",
+        ]
     else:
         existing_by_path = {
             row["path"]: row for row in fixture.lock["build_authority_files"]
         }
         fixture.lock[policy_field] = [
             existing_by_path.get(path, {"path": path, "sha256": "a" * 64})
-            for path in module.PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS
+            for path in (
+                *module.PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS,
+                "tests/test_public_runtime_package_handoff.py",
+            )
         ]
     rebind(fixture)
 
@@ -906,10 +923,10 @@ def test_governed_resource_limits_cover_the_verified_producer_envelope() -> None
     assert module.MAX_NUPKG_ENTRY_COUNT == 256
     assert module.MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES == 16 * 1024 * 1024
     assert module.MAX_NUPKG_TOTAL_UNCOMPRESSED_BYTES == 16 * 1024 * 1024
-    assert 1_544_098 < module.MAX_IMMUTABLE_SNAPSHOT_BYTES
-    assert 6 < module.MAX_NUPKG_ENTRY_COUNT
-    assert 2_847_232 < module.MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES
-    assert 2_849_940 < module.MAX_NUPKG_TOTAL_UNCOMPRESSED_BYTES
+    assert 3_027_083 < module.MAX_IMMUTABLE_SNAPSHOT_BYTES
+    assert 10 < module.MAX_NUPKG_ENTRY_COUNT
+    assert 4_281_856 < module.MAX_NUPKG_ENTRY_UNCOMPRESSED_BYTES
+    assert 4_284_562 < module.MAX_NUPKG_TOTAL_UNCOMPRESSED_BYTES
 
 
 def test_rejects_aggregate_snapshot_bound_before_any_member_allocation(
@@ -1536,7 +1553,7 @@ def test_rejects_runtime_inventory_semantic_substitution_even_when_rebound(
     [
         ("identity", "nuspec identity drifted"),
         ("dependencies", "nuspec dependencies drifted"),
-        ("assembly", "must own exactly"),
+        ("assembly", "runtime assembly set differs"),
         ("foreign_payload", "contains foreign payloads"),
     ],
 )
