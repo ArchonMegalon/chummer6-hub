@@ -30,7 +30,8 @@ WORKDIR /proof
 COPY --from=run-services-source global.json global.json
 COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py
 COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json
-RUN ["/usr/local/bin/python3", "-I", "-S", "scripts/ai/bootstrap-hub-package-feed.py", "--repo-root", "/proof", "--feed", "/opt/chummer-package-feed"]
+COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json
+RUN ["/usr/local/bin/python3", "-I", "-S", "scripts/ai/bootstrap-hub-package-feed.py", "--repo-root", "/proof", "--feed", "/opt/chummer-package-feed", "--core-feed", "/opt/chummer-core-runtime-feed", "--download-core-runtime"]
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a AS build
 COPY --from=public-pwa-proof /proof/public-pwa-proof-authority.receipt.json /tmp/public-pwa-proof-authority.receipt.json
@@ -39,6 +40,7 @@ WORKDIR /src
 COPY --from=run-services-source Directory.Build.props chummer.run-services/
 COPY --from=run-services-source eng/NuGet.Container.Config /tmp/chummer-package-feed.NuGet.Config
 COPY --from=hub-package-feed /opt/chummer-package-feed /opt/chummer-package-feed
+COPY --from=hub-package-feed /opt/chummer-core-runtime-feed /opt/chummer-core-runtime-feed
 COPY --from=run-services-source Chummer.Run.Api/Chummer.Run.Api.csproj chummer.run-services/Chummer.Run.Api/
 COPY --from=run-services-source Chummer.Run.Api/packages.lock.json chummer.run-services/Chummer.Run.Api/
 COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj chummer.run-services/Chummer.InstallLinking.Postgres.Tool/

@@ -358,6 +358,7 @@ PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
             "COPY --from=run-services-source global.json global.json",
             "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
             "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
+            "COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json",
         }
     ),
     "build": frozenset(

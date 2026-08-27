@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: core-main-public-runtime-release-377728384
+  group: core-main-public-runtime-release-378131649
   cancel-in-progress: false
 
 jobs:
@@ -63,10 +63,10 @@ jobs:
           trap cleanup_snapshot EXIT
 
           api_root="https://api.github.com/repos/ArchonMegalon/chummer6-core"
-          tag="core-runtime-package-plane-c85ea198c19c149375913b44b304acd4d6353053"
+          tag="core-runtime-package-plane-3260ac73714d8b001a3599d6776196e394dc6c35"
           download_root="https://github.com/ArchonMegalon/chummer6-core/releases/download/${tag}"
-          receipt_name="chummer-core-runtime-package-plane-c85ea198c19c149375913b44b304acd4d6353053.public-handoff.json"
-          bundle_name="chummer-core-runtime-package-plane-c85ea198c19c149375913b44b304acd4d6353053.zip"
+          receipt_name="chummer-core-runtime-package-plane-3260ac73714d8b001a3599d6776196e394dc6c35.public-handoff.json"
+          bundle_name="chummer-core-runtime-package-plane-3260ac73714d8b001a3599d6776196e394dc6c35.zip"
           curl_common=(
             --proto '=https'
             --proto-redir '=https'
@@ -84,7 +84,7 @@ jobs:
             ulimit -f 4096
             curl "${curl_common[@]}" --max-filesize 2097152 \
               --output "${snapshot_dir}/release.json" \
-              "${api_root}/releases/377728384"
+              "${api_root}/releases/378131649"
             curl "${curl_common[@]}" --max-filesize 2097152 \
               --output "${snapshot_dir}/tag.json" \
               "${api_root}/git/ref/tags/${tag}"
@@ -135,7 +135,7 @@ jobs:
       - name: Record exact public-release verdict only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: core-main-public-runtime-release-verdict-c85ea198c19c149375913b44b304acd4d6353053
+          name: core-main-public-runtime-release-verdict-3260ac73714d8b001a3599d6776196e394dc6c35
           path: ${{ runner.temp }}/core-main-runtime-artifact-verdict.json
           if-no-files-found: error
           retention-days: 30

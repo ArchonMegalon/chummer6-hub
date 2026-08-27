@@ -155,22 +155,30 @@ def _clean_commit(repo_root: Path) -> str:
 def _write_nuget_config(
     path: Path,
     feed: Path,
+    core_feed: Path,
     remote: str,
     package_ids: Iterable[str],
+    core_package_ids: Iterable[str],
 ) -> None:
     exact_patterns = "".join(
         f'<package pattern="{package_id}" />'
         for package_id in package_ids
+    )
+    core_patterns = "".join(
+        f'<package pattern="{package_id}" />'
+        for package_id in core_package_ids
     )
     path.write_text(
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
         "<configuration>\n"
         "  <packageSources><clear />"
         f'<add key="locked-chummer" value="{feed}" />'
+        f'<add key="locked-core-runtime" value="{core_feed}" />'
         f'<add key="nuget.org" value="{remote}" protocolVersion="3" />'
         "</packageSources>\n"
         "  <packageSourceMapping>\n"
         f'    <packageSource key="locked-chummer">{exact_patterns}</packageSource>\n'
+        f'    <packageSource key="locked-core-runtime">{core_patterns}</packageSource>\n'
         '    <packageSource key="nuget.org"><package pattern="*" /></packageSource>\n'
         "  </packageSourceMapping>\n"
         "</configuration>\n",
@@ -343,7 +351,7 @@ def _atomic_json(path: Path, payload: dict[str, object]) -> None:
             temporary_path.unlink()
 
 
-def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
+def verify(repo_root: Path, receipt_path: Path, core_bundle: Path, dotnet: str) -> None:
     repo_root = repo_root.resolve()
     commit = _clean_commit(repo_root)
     bootstrap = _load_bootstrap(repo_root)
@@ -357,6 +365,7 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
     with tempfile.TemporaryDirectory(prefix="chummer-hub-no-siblings-") as temporary:
         root = Path(temporary)
         feed = root / "feed"
+        core_feed = root / "core-feed"
         consumer_parent = root / "consumer"
         consumer = consumer_parent / "chummer6-hub"
         package_root = root / "packages"
@@ -366,10 +375,14 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
         contract_output = root / "contract-packages"
         for directory in (consumer_parent, package_root, cli_home, http_cache, results, contract_output):
             directory.mkdir(parents=True, exist_ok=True)
+        bootstrap.materialize_core_runtime_feed(
+            core_bundle.resolve(), core_feed, lock.core_runtime
+        )
         bootstrap.build_feed(
             lock,
             lock_sha256=lock_sha,
             feed=feed,
+            core_feed=core_feed,
             dotnet=dotnet,
         )
         inventory_path = feed / INVENTORY_NAME
@@ -415,8 +428,10 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
         _write_nuget_config(
             nuget_config,
             feed,
+            core_feed,
             lock.approved_remote_source,
             (spec.package_id for spec in lock.packages),
+            (spec.package_id for spec in lock.core_runtime.packages),
         )
         env = bootstrap.isolated_environment(os.environ, package_root, cli_home, http_cache)
         _run(
@@ -430,7 +445,13 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             cwd=consumer,
             env=env,
         )
-        owner_versions = {spec.package_id: spec.version for spec in lock.packages}
+        owner_versions = {
+            **{
+                spec.package_id: spec.version
+                for spec in lock.core_runtime.packages
+            },
+            **{spec.package_id: spec.version for spec in lock.packages},
+        }
         common = (
             "-p:ChummerUseLocalCompatibilityTree=false",
             f"-p:ChummerPackagePlaneVersion={lock.package_version}",
@@ -578,6 +599,22 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
                 }
                 for spec in lock.packages
             ],
+            "core_runtime_authority": {
+                "repository": lock.core_runtime.repository,
+                "runtime_source_commit": lock.core_runtime.runtime_source_commit,
+                "package_recipe_commit": lock.core_runtime.package_recipe_commit,
+                "package_version": lock.core_runtime.package_version,
+                "bundle_sha256": lock.core_runtime.bundle_sha256,
+                "packages": [
+                    {
+                        "id": spec.package_id,
+                        "version": spec.version,
+                        "sha256": spec.sha256,
+                        "size_bytes": spec.size_bytes,
+                    }
+                    for spec in lock.core_runtime.packages
+                ],
+            },
             "owner_package_versions": owner_versions,
             "external_packages": [
                 {
@@ -592,7 +629,8 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "no_sibling_directories": True,
             "isolated_package_cache": True,
             "package_source_mapping": {
-                "locked_external_ids": "locked-chummer",
+                "locked_non_core_ids": "locked-chummer",
+                "locked_core_runtime_ids": "locked-core-runtime",
                 "other": lock.approved_remote_source,
             },
             "asset_files_audited": asset_count,
@@ -619,13 +657,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
+    parser.add_argument("--core-bundle", type=Path, required=True)
     parser.add_argument("--dotnet", default="dotnet")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    verify(args.repo_root, args.receipt, args.dotnet)
+    verify(args.repo_root, args.receipt, args.core_bundle, args.dotnet)
     return 0
 
 
