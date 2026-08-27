@@ -15,7 +15,7 @@
   "approved_remote_source": "https://api.nuget.org/v3/index.json",
   "build_recipe": {
     "path": "scripts/ai/bootstrap-hub-package-feed.py",
-    "sha256": "45696170204d5ebf4848c72d9785db935e94b4c3e39b516dd25a9f9ebf4d8580"
+    "sha256": "38e2dd040c9006134dc87eff70857e733e2c01bdcfd70992db358b1f985ced67"
   },
   "core_runtime": {
     "authority_path": "eng/core-main-runtime-artifact-authority.json",

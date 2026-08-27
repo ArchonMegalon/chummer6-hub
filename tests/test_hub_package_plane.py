@@ -508,6 +508,23 @@ def test_hub_staging_rejects_stale_core_package_before_restore(tmp_path: Path) -
         module._assert_exact_feed_entries(feed, lock)
 
 
+def test_observation_staging_rejects_extra_or_stale_core_packages(tmp_path: Path) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    feed = tmp_path / "observed-staging"
+    feed.mkdir()
+    for spec in lock.packages:
+        (feed / f"{spec.package_id}.{spec.version}.nupkg").write_bytes(b"hub")
+    module._assert_exact_staged_package_entries(feed, lock)
+
+    stale_core = feed / (
+        "Chummer.Engine.Contracts.0.0.0-packageplane.candidate.stale.nupkg"
+    )
+    stale_core.write_bytes(b"stale Core must not survive observation")
+    with pytest.raises(module.PackagePlaneError, match="exactly the four bound non-Core"):
+        module._assert_exact_staged_package_entries(feed, lock)
+
+
 def test_unused_sr4_core_authority_still_rejects_missing_extra_or_tampered_bytes(
     tmp_path: Path,
 ) -> None:
