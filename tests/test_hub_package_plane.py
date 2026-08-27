@@ -508,6 +508,50 @@ def test_hub_staging_rejects_stale_core_package_before_restore(tmp_path: Path) -
         module._assert_exact_feed_entries(feed, lock)
 
 
+def test_unused_sr4_core_authority_still_rejects_missing_extra_or_tampered_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    package_specs = []
+    trusted_payloads = {}
+    for spec in lock.core_runtime.packages:
+        payload = f"trusted:{spec.package_id}".encode()
+        trusted_payloads[spec.file_name] = payload
+        package_specs.append(
+            replace(
+                spec,
+                sha256=hashlib.sha256(payload).hexdigest(),
+                size_bytes=len(payload),
+            )
+        )
+    authority = replace(lock.core_runtime, packages=tuple(package_specs))
+
+    def write_feed(path: Path) -> None:
+        path.mkdir()
+        for name, payload in trusted_payloads.items():
+            (path / name).write_bytes(payload)
+
+    missing = tmp_path / "missing"
+    write_feed(missing)
+    sr4 = next(spec for spec in package_specs if spec.package_id == "Chummer.Rulesets.Sr4")
+    (missing / sr4.file_name).unlink()
+    with pytest.raises(module.PackagePlaneError, match="exactly the eight bound nupkgs"):
+        module.validate_core_runtime_feed(missing, authority)
+
+    extra = tmp_path / "extra"
+    write_feed(extra)
+    (extra / "Chummer.Rulesets.Sr4.stale.nupkg").write_bytes(b"stale")
+    with pytest.raises(module.PackagePlaneError, match="exactly the eight bound nupkgs"):
+        module.validate_core_runtime_feed(extra, authority)
+
+    tampered = tmp_path / "tampered"
+    write_feed(tampered)
+    (tampered / sr4.file_name).write_bytes(b"tampered-unused-sr4")
+    with pytest.raises(module.PackagePlaneError, match="byte authority mismatch"):
+        module.validate_core_runtime_feed(tampered, authority)
+
+
 def test_feed_validation_rejects_external_symlink_handoffs(tmp_path: Path) -> None:
     module = load_module()
     feed = tmp_path / "authority"

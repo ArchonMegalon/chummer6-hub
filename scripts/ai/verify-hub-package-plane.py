@@ -200,6 +200,21 @@ def _audit_assets(
     )
     expected_root = package_root.resolve()
     observed_libraries: dict[str, dict] = {}
+    required_owner_ids = set(LOCAL_PROJECT_PACKAGE_IDS)
+    for project_name in LOCKED_PROJECTS:
+        lock_payload = json.loads(
+            (consumer / project_name / "packages.lock.json").read_text(encoding="utf-8")
+        )
+        for dependencies in (lock_payload.get("dependencies") or {}).values():
+            if not isinstance(dependencies, dict):
+                continue
+            required_owner_ids.update(
+                package_id
+                for package_id, metadata in dependencies.items()
+                if package_id in owner_versions
+                and isinstance(metadata, dict)
+                and metadata.get("type") != "Project"
+            )
     for path in asset_paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         roots = [Path(value).resolve() for value in (payload.get("packageFolders") or {})]
@@ -212,6 +227,17 @@ def _audit_assets(
     for package_id, package_version in owner_versions.items():
         identity = f"{package_id}/{package_version}"
         metadata = observed_libraries.get(identity)
+        observed_identities = {
+            candidate
+            for candidate in observed_libraries
+            if candidate.rpartition("/")[0].casefold() == package_id.casefold()
+        }
+        if observed_identities and observed_identities != {identity}:
+            raise VerificationError(
+                f"owner package resolved with an unbound identity: {sorted(observed_identities)}"
+            )
+        if package_id not in required_owner_ids and metadata is None:
+            continue
         expected_type = (
             "project" if package_id in LOCAL_PROJECT_PACKAGE_IDS else "package"
         )

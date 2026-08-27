@@ -1514,6 +1514,7 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "exactPackageFeedProofReceiptDependency": True,
         "exactPackageFeedPythonDependency": True,
         "exactPackageFeedConsumption": True,
+        "exactCoreRuntimeFeedConsumption": True,
         "noOtherProofCopies": True,
         "exactToolPublishDependency": True,
         "exactFinalPublishDependency": True,
