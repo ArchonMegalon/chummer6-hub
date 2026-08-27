@@ -4,9 +4,9 @@
     "net10.0": {
       "Chummer.Engine.Contracts": {
         "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.shabc08228d3ce0, )",
-        "resolved": "0.0.0-packageplane.candidate.shabc08228d3ce0",
-        "contentHash": "6gBh3ofB7E4JQybifFQcszmg/aoH2ds1mqjkQz/UZUQxxB4QoSj1ie4GijiW4jyRRabm04AwOte81jzHzV8b0Q=="
+        "requested": "[0.0.0-packageplane.candidate.sha7599f9f5d460, )",
+        "resolved": "0.0.0-packageplane.candidate.sha7599f9f5d460",
+        "contentHash": "ZzmOawBQC1HhzczfZ+DTkxIW5B2wTl2t1LcERGzRZIB7CGWZDSfU5Y8Q0NBC4SUm2htgojcJoxkEn1hD6Auuzw=="
       },
       "Chummer.Hub.Registry.Contracts": {
         "type": "Direct",
