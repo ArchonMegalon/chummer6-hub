@@ -19,13 +19,13 @@ SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 VERIFY_SCRIPT_PATH = ROOT / "scripts" / "ai" / "verify-hub-package-plane.py"
 PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
-PACKAGE_VERSION = "0.1.0-preview"
+PACKAGE_VERSION = "0.1.0-packageplane.candidate.sh66c418a5004f"
 OWNER_PACKAGE_VERSIONS = {
     "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
-    "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
-    "Chummer.Run.Registry": "0.1.0-preview",
-    "Chummer.Play.Contracts": "0.1.0-preview",
-    "Chummer.Run.Contracts": "0.1.0-preview",
+    "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Registry": PACKAGE_VERSION,
+    "Chummer.Play.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Contracts": PACKAGE_VERSION,
     "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shfebd698752e19",
 }
 CORE_RUNTIME_PACKAGE_IDS = {
