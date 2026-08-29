@@ -19,14 +19,14 @@ SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 VERIFY_SCRIPT_PATH = ROOT / "scripts" / "ai" / "verify-hub-package-plane.py"
 PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
-PACKAGE_VERSION = "0.1.0-packageplane.candidate.sh66c418a5004f"
+PACKAGE_VERSION = "0.1.0-packageplane.candidate.sh1852ea4eef6d"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shfebd698752e19",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh60112dccb6a3f",
     "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
     "Chummer.Run.Registry": PACKAGE_VERSION,
     "Chummer.Play.Contracts": PACKAGE_VERSION,
     "Chummer.Run.Contracts": PACKAGE_VERSION,
-    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shfebd698752e19",
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sh60112dccb6a3f",
 }
 CORE_RUNTIME_PACKAGE_IDS = {
     "Chummer.Engine.Contracts",
@@ -134,13 +134,13 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
         "Chummer.Engine.GmCharacterEdits",
     ]
     assert lock.core_runtime.package_version == (
-        "0.0.0-packageplane.candidate.shfebd698752e19"
+        "0.0.0-packageplane.candidate.sh60112dccb6a3f"
     )
     assert lock.core_runtime.runtime_source_commit == (
-        "febd698752e195dceef79fbc3f83dc971564fe00"
+        "60112dccb6a3faad330d32c3c98eef0aa81d97af"
     )
     assert lock.core_runtime.package_recipe_commit == (
-        "3260ac73714d8b001a3599d6776196e394dc6c35"
+        "c06f22c185c7b733637fdb76b3cf333f31716781"
     )
     assert all(len(spec.commit) == 40 for spec in lock.packages)
     assert {spec.package_id: spec.version for spec in lock.packages} == {
