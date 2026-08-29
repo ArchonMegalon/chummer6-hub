@@ -117,13 +117,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          core_bundle="${RUNNER_TEMP}/chummer-core-runtime-package-plane-3260ac73714d8b001a3599d6776196e394dc6c35.zip"
+          core_bundle="${RUNNER_TEMP}/chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip"
           curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
             --fail --location --silent --show-error --retry 0 \
             --connect-timeout 15 --max-time 120 --max-filesize 16777216 \
             --output "${core_bundle}" \
-            "https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-3260ac73714d8b001a3599d6776196e394dc6c35/chummer-core-runtime-package-plane-3260ac73714d8b001a3599d6776196e394dc6c35.zip"
-          echo "af48ac571fc380b5f9a59093a816ff4c31e2824ad8c0109c439bc2e275e57c63  ${core_bundle}" \
+            "https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781/chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip"
+          echo "0ed7f7ed701e65d49b3632843f81463e4ed2a99662f85648da5662bcdc54832f  ${core_bundle}" \
             | sha256sum --check --strict
           chmod 0600 "${core_bundle}"
           python3 scripts/ai/verify-hub-package-plane.py \
