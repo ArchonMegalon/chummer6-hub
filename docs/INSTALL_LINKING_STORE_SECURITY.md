@@ -63,6 +63,16 @@ Configure host paths, not secret contents:
   returning the public edge to service.
 - Prepare/validate and import use the separate `install-linking-postgres-tool-final` image target.
   The long-running public API image does not contain the migration/import executable.
+- Recovery may materialize that target without beginning a cutover by invoking
+  `scripts/run_install_linking_postgres_cutover.py --build-tool-image-only` against four exact,
+  sealed standalone source repositories beneath one private synthetic workspace. The mode accepts
+  only a fresh `INSTALL_LINKING_POSTGRES_TOOL_IMAGE_BUILD.<cutover-id>.json` output, uses a unique
+  `build-only-*` image tag, and records the source, Dockerfile, Compose, command, tag, and image ID.
+  It does not acquire the mutation lease, start an operator job, create a container, access
+  PostgreSQL, change a volume, deploy a service, or authorize the resulting tag for deployment.
+  Tracked symlinks are permitted only when their Git type and exact link text are content-bound and
+  their resolved target remains inside the sealed repository; untracked or escaping symlinks fail
+  closed.
 - Snapshot, envelope, digest, and compare-exchange request byte buffers are cleared after each
   persistence attempt. Some framework-owned managed strings (including Data Protection internals)
   cannot be deterministically cleared before garbage collection, so the portal and both operator
