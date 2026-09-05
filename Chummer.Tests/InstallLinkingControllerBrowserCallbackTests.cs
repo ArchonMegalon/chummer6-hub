@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -545,6 +546,69 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal("desktop launch ticket is invalid.", details.Detail);
     }
 
+    [Fact]
+    public async Task Account_owner_unlink_revokes_explicit_v2_grant_without_legacy_bearer_downgrade()
+    {
+        using Fixture fixture = new(authenticated: true);
+        InstallationGrantDto grant = fixture.SeedClaimedInstall(
+            "android-owner-unlink",
+            fixture.User.UserId,
+            fixture.SubjectId,
+            explicitV2: true);
+        Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.InstallLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(
+                grant.InstallationId,
+                grant.AccessToken)));
+        AccountsController controller = fixture.CreateAccountsController();
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        controller.Request.Headers.Authorization = "Bearer account-owner-session";
+
+        IActionResult result = await controller.UnlinkInstall(
+            grant.InstallationId,
+            CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/account/access?accessNotice=unlinked", redirect.Url);
+        Assert.Equal(
+            ClaimedInstallationStates.Revoked,
+            fixture.Store.InstallationsById[grant.InstallationId].Status);
+        Assert.Equal(
+            InstallationGrantStates.Revoked,
+            fixture.Store.GrantsById[grant.GrantId].Status);
+    }
+
+    [Fact]
+    public async Task Account_owner_unlink_cannot_revoke_another_owners_explicit_v2_grant()
+    {
+        using Fixture fixture = new(authenticated: true);
+        InstallationGrantDto grant = fixture.SeedClaimedInstall(
+            "android-other-owner",
+            "different-user",
+            "different-subject",
+            explicitV2: true);
+        AccountsController controller = fixture.CreateAccountsController();
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        controller.Request.Headers.Authorization = "Bearer account-owner-session";
+
+        IActionResult result = await controller.UnlinkInstall(
+            grant.InstallationId,
+            CancellationToken.None);
+
+        Assert.IsType<RedirectResult>(result);
+        Assert.Equal(
+            ClaimedInstallationStates.Active,
+            fixture.Store.InstallationsById[grant.InstallationId].Status);
+        Assert.Equal(
+            InstallationGrantStates.Active,
+            fixture.Store.GrantsById[grant.GrantId].Status);
+    }
+
     private static bool TryExtractPrimaryHref(string content, out string href)
     {
         const string classMarker = "class=\"button-like button-like--primary\"";
@@ -712,7 +776,38 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         public Chummer.Run.Contracts.Community.HubUserDto User { get; private set; } = null!;
 
-        public InstallationGrantDto SeedClaimedInstall(string installationId, string userId, string? subjectId)
+        public AccountsController CreateAccountsController()
+        {
+            System.Reflection.ConstructorInfo constructor = Assert.Single(
+                typeof(AccountsController).GetConstructors());
+            object?[] arguments = constructor.GetParameters()
+                .Select(parameter =>
+                {
+                    if (parameter.ParameterType == typeof(AccountService))
+                    {
+                        return (object?)Accounts;
+                    }
+                    if (parameter.ParameterType == typeof(HubIdentityClient))
+                    {
+                        return Identity;
+                    }
+                    if (parameter.ParameterType == typeof(InstallLinkingService))
+                    {
+                        return InstallLinking;
+                    }
+                    return parameter.ParameterType == typeof(ILogger<AccountsController>)
+                        ? NullLogger<AccountsController>.Instance
+                        : null;
+                })
+                .ToArray();
+            return Assert.IsType<AccountsController>(constructor.Invoke(arguments));
+        }
+
+        public InstallationGrantDto SeedClaimedInstall(
+            string installationId,
+            string userId,
+            string? subjectId,
+            bool explicitV2 = false)
         {
             lock (Store.Gate)
             {
@@ -746,6 +841,13 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
                     GrantId: grant.GrantId);
                 Store.InstallationsById[installationId] = installation;
                 Store.GrantsById[grant.GrantId] = grant;
+                if (explicitV2)
+                {
+                    Store.GrantTransportAuthoritiesByGrantId[grant.GrantId] =
+                        new InstallationGrantTransportAuthority(
+                            grant.GrantId,
+                            InstallationGrantTransports.AndroidLinkedV2);
+                }
                 Store.PersistLocked();
                 return grant;
             }

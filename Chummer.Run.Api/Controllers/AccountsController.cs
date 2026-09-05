@@ -373,9 +373,10 @@ public sealed class AccountsController : Controller
                 return Redirect($"{returnPath}?accessNotice=unlink_refresh");
             }
 
-            _installLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(
-                InstallationId: installation.InstallationId,
-                AccessToken: activeGrant.AccessToken));
+            _installLinking.RevokeGrantForOwner(
+                installation.InstallationId,
+                user.UserId,
+                subject.SubjectId);
             return Redirect($"{returnPath}?accessNotice=unlinked");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)

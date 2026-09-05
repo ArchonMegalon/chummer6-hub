@@ -196,7 +196,8 @@ public sealed class AndroidLinkedV2BearerProofTests
                     "0.1.0-preview.11",
                     "internal",
                     "android",
-                    "arm64"));
+                    "arm64",
+                    OperationId: Fixture.OperationId));
             response = Assert.IsType<AndroidLinkedV2GrantRefreshResponse>(
                 Assert.IsType<OkObjectResult>(action.Result).Value);
         });
@@ -233,7 +234,9 @@ public sealed class AndroidLinkedV2BearerProofTests
                 ControllerContext = new ControllerContext { HttpContext = httpContext }
             };
             Assert.IsType<OkObjectResult>(controller.RefreshGrant(
-                new AndroidLinkedV2GrantRefreshRequest("android-v2")).Result);
+                new AndroidLinkedV2GrantRefreshRequest(
+                    "android-v2",
+                    OperationId: Fixture.OperationId)).Result);
         });
 
         Assert.Null(fixture.Service.ResolveInstallationForGrant(
@@ -242,7 +245,39 @@ public sealed class AndroidLinkedV2BearerProofTests
     }
 
     [Fact]
-    public async Task Refresh_response_loss_exact_retry_recovers_same_replacement_after_restart()
+    public async Task Device_v2_unlink_still_requires_and_accepts_signed_grant_proof()
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/revoke",
+            "{\"installationId\":\"android-v2\"}");
+        AndroidLinkedV2GrantRevokeResponse? response = null;
+
+        await fixture.InvokeAsync(signed.CreateContext(), httpContext =>
+        {
+            var controller = new InstallLinkingV2Controller(
+                fixture.Service,
+                fixture.WorkspaceSnapshots,
+                fixture.TimeProvider)
+            {
+                ControllerContext = new ControllerContext { HttpContext = httpContext }
+            };
+            ActionResult<AndroidLinkedV2GrantRevokeResponse> action = controller.RevokeGrant(
+                new AndroidLinkedV2GrantRequest("android-v2"));
+            response = Assert.IsType<AndroidLinkedV2GrantRevokeResponse>(
+                Assert.IsType<OkObjectResult>(action.Result).Value);
+        });
+
+        Assert.Equal(ClaimedInstallationStates.Revoked, response!.Installation.Status);
+        Assert.Contains(response.Grants, item => item.GrantId == Fixture.GrantId);
+        Assert.Null(fixture.Service.ResolveAndroidLinkedV2Grant(
+            "android-v2",
+            Fixture.GrantId,
+            Fixture.AccessToken));
+    }
+
+    [Fact]
+    public async Task Refresh_response_loss_fresh_proof_recovers_exact_replacement_after_restart()
     {
         using Fixture fixture = new();
         const string body = "{\"installationId\":\"android-v2\",\"applicationVersion\":\"0.1.0-preview.12\"}";
@@ -252,13 +287,18 @@ public sealed class AndroidLinkedV2BearerProofTests
             await InvokeRefreshAsync(fixture, signed);
         string firstAuthorization = firstContext.Response.Headers.Authorization.ToString();
         fixture.Reload();
+        SignedRequest freshRetry = fixture.Sign(
+            signed.Path,
+            Encoding.UTF8.GetString(signed.Body),
+            issuedAtUnixSeconds: signed.IssuedAtUnixSeconds + 1);
 
         (DefaultHttpContext retryContext, AndroidLinkedV2GrantRefreshResponse retry) =
-            await InvokeRefreshAsync(fixture, signed);
+            await InvokeRefreshAsync(fixture, freshRetry);
 
         Assert.Equal(first, retry);
         Assert.Equal(firstAuthorization, retryContext.Response.Headers.Authorization.ToString());
         Assert.Equal(first.Grant.GrantId, retryContext.Response.Headers[AndroidLinkedV2RequestProof.GrantHeader]);
+        Assert.Equal(Fixture.OperationId, retry.OperationId);
         Assert.Equal(InstallLinkingService.AndroidLinkedV2GrantTransport, retry.GrantTransport);
         Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
         Assert.Single(fixture.Store.GrantsById.Values, item =>
@@ -272,40 +312,131 @@ public sealed class AndroidLinkedV2BearerProofTests
             replacementToken));
     }
 
+    [Fact]
+    public async Task Refresh_response_loss_rejects_reused_proof_envelope_without_minting_again()
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/refresh",
+            "{\"installationId\":\"android-v2\"}");
+        await InvokeRefreshAsync(fixture, signed);
+
+        DefaultHttpContext replay = signed.CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(replay, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status409Conflict, replay.Response.StatusCode);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+    }
+
+    [Fact]
+    public async Task Refresh_response_loss_at_full_grant_capacity_pins_source_and_replacement()
+    {
+        using Fixture fixture = new();
+        lock (fixture.Store.Gate)
+        {
+            DateTimeOffset now = fixture.TimeProvider.GetUtcNow();
+            for (int index = 0; index < InstallLinkingStore.MaxGrants - 1; index++)
+            {
+                string grantId = $"capacity-grant-{index:D4}";
+                fixture.Store.GrantsById[grantId] = new InstallationGrantDto(
+                    grantId,
+                    "capacity-install",
+                    InstallationGrantStates.Revoked,
+                    $"capacity-token-{index:D4}",
+                    now.AddSeconds(index),
+                    now.AddDays(20),
+                    "capacity-user",
+                    "capacity-subject");
+                fixture.Store.GrantTransportAuthoritiesByGrantId[grantId] =
+                    new InstallationGrantTransportAuthority(
+                        grantId,
+                        InstallationGrantTransports.AndroidLinkedV2);
+            }
+            fixture.Store.PersistLocked();
+        }
+
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/refresh",
+            "{\"installationId\":\"android-v2\"}");
+        (DefaultHttpContext firstContext, AndroidLinkedV2GrantRefreshResponse first) =
+            await InvokeRefreshAsync(fixture, signed);
+        string firstAuthorization = firstContext.Response.Headers.Authorization.ToString();
+        fixture.Reload();
+
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+        Assert.True(fixture.Store.GrantsById.ContainsKey(Fixture.GrantId));
+        Assert.True(fixture.Store.GrantsById.ContainsKey(first.Grant.GrantId));
+        Assert.True(fixture.Store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.ContainsKey(Fixture.GrantId));
+
+        SignedRequest fresh = fixture.Sign(signed.Path, Encoding.UTF8.GetString(signed.Body));
+        (DefaultHttpContext retryContext, AndroidLinkedV2GrantRefreshResponse retry) =
+            await InvokeRefreshAsync(fixture, fresh);
+
+        Assert.Equal(first, retry);
+        Assert.Equal(firstAuthorization, retryContext.Response.Headers.Authorization.ToString());
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+    }
+
     [Theory]
     [InlineData("body")]
     [InlineData("key")]
     [InlineData("bearer")]
-    [InlineData("packet")]
+    [InlineData("replacement-bearer")]
+    [InlineData("operation")]
+    [InlineData("installation")]
     [InlineData("owner")]
     public async Task Refresh_response_loss_rejects_changed_authority_or_request(string hostileChange)
     {
         using Fixture fixture = new();
         const string body = "{\"installationId\":\"android-v2\",\"hostLabel\":\"Pixel\"}";
         SignedRequest signed = fixture.Sign("/api/v2/install-linking/grants/refresh", body);
-        await InvokeRefreshAsync(fixture, signed);
+        (DefaultHttpContext firstContext, _) = await InvokeRefreshAsync(fixture, signed);
 
-        DefaultHttpContext retry = signed.CreateContext();
-        if (hostileChange is "body" or "key")
+        SignedRequest fresh = fixture.Sign(signed.Path, Encoding.UTF8.GetString(signed.Body));
+        DefaultHttpContext retry;
+        if (hostileChange == "body")
         {
-            string changedBody = hostileChange == "key"
-                ? "{\"installationId\":\"android-v2\",\"publicKey\":\"changed-key\"}"
-                : "{\"installationId\":\"android-v2\",\"hostLabel\":\"Other\"}";
-            byte[] changedBytes = Encoding.UTF8.GetBytes(changedBody);
-            retry.Request.ContentLength = changedBytes.Length;
-            retry.Request.Body = new MemoryStream(changedBytes, writable: false);
+            fresh = fixture.Sign(
+                signed.Path,
+                "{\"installationId\":\"android-v2\",\"hostLabel\":\"Other\"}");
+            retry = fresh.CreateContext();
+        }
+        else if (hostileChange == "key")
+        {
+            using RSA otherKey = RSA.Create(2048);
+            fresh = fixture.SignWithKey(
+                otherKey,
+                signed.Path,
+                Encoding.UTF8.GetString(signed.Body));
+            retry = fresh.CreateContext();
         }
         else if (hostileChange == "bearer")
         {
+            retry = fresh.CreateContext();
             retry.Request.Headers.Authorization = "Bearer changed-source-token";
         }
-        else if (hostileChange == "packet")
+        else if (hostileChange == "replacement-bearer")
         {
-            retry.Request.Headers[AndroidLinkedV2RequestProof.PacketKeyHeader] =
-                ToBase64Url(Enumerable.Repeat((byte)0x73, 32).ToArray());
+            retry = fresh.CreateContext(firstContext.Response.Headers.Authorization.ToString());
+        }
+        else if (hostileChange == "operation")
+        {
+            const string changedOperationId = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+            string changedBody = Encoding.UTF8.GetString(signed.Body)
+                .Replace(Fixture.OperationId, changedOperationId, StringComparison.Ordinal);
+            fresh = fixture.Sign(signed.Path, changedBody, changedOperationId);
+            retry = fresh.CreateContext();
+        }
+        else if (hostileChange == "installation")
+        {
+            retry = fresh.CreateContext();
+            retry.Request.Headers[AndroidLinkedV2RequestProof.InstallationHeader] = "other-installation";
         }
         else
         {
+            retry = fresh.CreateContext();
             lock (fixture.Store.Gate)
             {
                 ClaimedInstallationDto installation = fixture.Store.InstallationsById["android-v2"];
@@ -313,6 +444,34 @@ public sealed class AndroidLinkedV2BearerProofTests
             }
         }
 
+        bool dispatched = false;
+        await fixture.InvokeAsync(retry, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, retry.Response.StatusCode);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+    }
+
+    [Fact]
+    public async Task Refresh_response_loss_rejects_expired_operation_receipt()
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/refresh",
+            "{\"installationId\":\"android-v2\"}");
+        await InvokeRefreshAsync(fixture, signed);
+        lock (fixture.Store.Gate)
+        {
+            AndroidLinkedV2GrantRefreshReceipt receipt =
+                fixture.Store.AndroidLinkedV2RefreshReceiptsBySourceGrantId[Fixture.GrantId];
+            fixture.Store.AndroidLinkedV2RefreshReceiptsBySourceGrantId[Fixture.GrantId] = receipt with
+            {
+                RetryExpiresAtUtc = fixture.TimeProvider.GetUtcNow().AddSeconds(-1)
+            };
+        }
+
+        SignedRequest fresh = fixture.Sign(signed.Path, Encoding.UTF8.GetString(signed.Body));
+        DefaultHttpContext retry = fresh.CreateContext();
         bool dispatched = false;
         await fixture.InvokeAsync(retry, _ => dispatched = true);
 
@@ -343,7 +502,8 @@ public sealed class AndroidLinkedV2BearerProofTests
             };
         }
 
-        DefaultHttpContext retry = signed.CreateContext();
+        SignedRequest fresh = fixture.Sign(signed.Path, Encoding.UTF8.GetString(signed.Body));
+        DefaultHttpContext retry = fresh.CreateContext();
         bool dispatched = false;
         await fixture.InvokeAsync(retry, _ => dispatched = true);
 
@@ -456,11 +616,12 @@ public sealed class AndroidLinkedV2BearerProofTests
             response.Installation.InstallationId,
             response.Grant.GrantId,
             issuedToken));
+        Assert.Equal(Fixture.OperationId, response.OperationId);
         Assert.Equal(InstallLinkingService.AndroidLinkedV2GrantTransport, response.GrantTransport);
     }
 
     [Fact]
-    public void V2_bootstrap_response_loss_exact_retry_recovers_original_grant_after_restart()
+    public void V2_bootstrap_response_loss_fresh_proof_recovers_original_grant_after_restart()
     {
         using Fixture fixture = new();
         AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
@@ -472,16 +633,39 @@ public sealed class AndroidLinkedV2BearerProofTests
         string firstAuthorization = firstContext.Response.Headers.Authorization.ToString();
         fixture.Reload();
         InstallLinkingService sharedService = fixture.CreateSharedService();
+        AndroidInstallLinkProofPollV2Request freshRetry = fixture.SignBootstrap(request with
+        {
+            IssuedAtUnixSeconds = request.IssuedAtUnixSeconds + 1,
+            Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+            Signature = string.Empty
+        });
 
         (DefaultHttpContext retryContext, AndroidInstallLinkV2ExchangeResponse retry) =
-            PollBootstrap(fixture, request, sharedService);
+            PollBootstrap(fixture, freshRetry, sharedService);
 
         Assert.False(first.AlreadyClaimed);
         Assert.True(retry.AlreadyClaimed);
         Assert.Equal(first.Installation, retry.Installation);
         Assert.Equal(first.Grant, retry.Grant);
+        Assert.Equal(first.OperationId, retry.OperationId);
         Assert.Equal(firstAuthorization, retryContext.Response.Headers.Authorization.ToString());
         Assert.Equal(first.Grant.GrantId, retryContext.Response.Headers[AndroidLinkedV2RequestProof.GrantHeader]);
+        Assert.Single(fixture.Store.GrantsById.Values, item =>
+            item.InstallationId == request.InstallationId);
+    }
+
+    [Fact]
+    public void V2_bootstrap_retry_rejects_reused_proof_envelope()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-replay",
+            useLegacyCanonical: false);
+        PollBootstrap(fixture, request);
+
+        ObjectResult denied = Assert.IsType<ObjectResult>(PollBootstrapAction(fixture, request).Result);
+
+        Assert.Equal(StatusCodes.Status409Conflict, denied.StatusCode);
         Assert.Single(fixture.Store.GrantsById.Values, item =>
             item.InstallationId == request.InstallationId);
     }
@@ -496,10 +680,28 @@ public sealed class AndroidLinkedV2BearerProofTests
         PollBootstrap(fixture, request);
 
         AndroidInstallLinkProofPollV2Request changedBody = fixture.SignBootstrap(
-            request with { HostLabel = "Different device", Signature = string.Empty });
+            request with
+            {
+                HostLabel = "Different device",
+                IssuedAtUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+                Signature = string.Empty
+            });
         ObjectResult bodyDenied = Assert.IsType<ObjectResult>(
             PollBootstrapAction(fixture, changedBody).Result);
         Assert.Equal(StatusCodes.Status409Conflict, bodyDenied.StatusCode);
+
+        const string changedOperationId = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+        AndroidInstallLinkProofPollV2Request changedOperation = fixture.SignBootstrap(request with
+        {
+            OperationId = changedOperationId,
+            IssuedAtUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+            Signature = string.Empty
+        });
+        ObjectResult operationDenied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, changedOperation).Result);
+        Assert.Equal(StatusCodes.Status409Conflict, operationDenied.StatusCode);
 
         using RSA otherKey = RSA.Create(2048);
         AndroidInstallLinkProofPollV2Request changedKey = request with
@@ -619,13 +821,15 @@ public sealed class AndroidLinkedV2BearerProofTests
             1_788_544_000,
             "0123456789abcdef0123456789abcdef",
             "signature",
-            "Pixel");
+            "Pixel",
+            Fixture.OperationId);
 
         Assert.Equal(
             string.Join('\n',
                 "chummer.install-link.remote-callback.v2",
                 "POST",
                 "/api/v2/install-linking/callbacks/poll",
+                Fixture.OperationId,
                 "android-bootstrap-v2",
                 "android",
                 "0.1.0-preview.11",
@@ -792,6 +996,7 @@ public sealed class AndroidLinkedV2BearerProofTests
 
         public const string GrantId = "grant-android-v2";
         public const string AccessToken = "token-android-v2";
+        public const string OperationId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         public InstallLinkingStore Store => _store;
         public InstallLinkingService Service { get; private set; }
         public InstallLinkedWorkspaceSnapshotService WorkspaceSnapshots { get; }
@@ -808,11 +1013,31 @@ public sealed class AndroidLinkedV2BearerProofTests
         public InstallLinkingService CreateSharedService()
             => new(_store, _configuration);
 
-        public SignedRequest Sign(string path, string body)
+        public SignedRequest Sign(
+            string path,
+            string body,
+            string operationId = OperationId,
+            long? issuedAtUnixSeconds = null)
+            => SignWithKey(_key, path, body, operationId, issuedAtUnixSeconds);
+
+        public SignedRequest SignWithKey(
+            RSA signingKey,
+            string path,
+            string body,
+            string operationId = OperationId,
+            long? issuedAtUnixSeconds = null)
         {
+            if (string.Equals(
+                    path,
+                    "/api/v2/install-linking/grants/refresh",
+                    StringComparison.OrdinalIgnoreCase)
+                && !body.Contains("\"operationId\"", StringComparison.Ordinal))
+            {
+                body = body.Insert(1, $"\"operationId\":\"{operationId}\",");
+            }
             string packetKey = ToBase64Url(RandomNumberGenerator.GetBytes(
                 AndroidLinkedV2RequestProof.PacketKeyBytes));
-            long issued = TimeProvider.GetUtcNow().ToUnixTimeSeconds();
+            long issued = issuedAtUnixSeconds ?? TimeProvider.GetUtcNow().ToUnixTimeSeconds();
             byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
             byte[] canonical = AndroidLinkedV2RequestProof.CreateCanonicalPayload(
                 HttpMethods.Post,
@@ -822,7 +1047,7 @@ public sealed class AndroidLinkedV2BearerProofTests
                 issued,
                 packetKey,
                 bodyBytes);
-            byte[] signature = _key.SignData(
+            byte[] signature = signingKey.SignData(
                 canonical,
                 HashAlgorithmName.SHA256,
                 RSASignaturePadding.Pkcs1);
@@ -884,7 +1109,8 @@ public sealed class AndroidLinkedV2BearerProofTests
                 issued,
                 nonce,
                 Signature: string.Empty,
-                hostLabel);
+                hostLabel,
+                OperationId);
             if (!useLegacyCanonical)
             {
                 return SignBootstrap(unsigned);

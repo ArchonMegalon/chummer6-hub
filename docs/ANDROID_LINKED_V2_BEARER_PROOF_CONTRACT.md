@@ -47,7 +47,7 @@ bootstrap route:
 POST /api/v2/install-linking/callbacks/poll
 ```
 
-Its token-free JSON body contains `installationId`, `headId`,
+Its token-free JSON body contains `operationId`, `installationId`, `headId`,
 `applicationVersion`, `channelId`, `platform`, `architecture`, `publicKey`,
 `issuedAtUnixSeconds`, `nonce`, `signature`, and optional `hostLabel`. The
 signature is RSA PKCS#1/SHA-256 over these UTF-8 LF-only lines with no trailing
@@ -57,6 +57,7 @@ LF:
 chummer.install-link.remote-callback.v2
 POST
 /api/v2/install-linking/callbacks/poll
+<operationId>
 <installationId>
 <headId>
 <applicationVersion>
@@ -73,25 +74,30 @@ being the key that must verify the signature and by exact equality with the
 account-approved callback key and install identity. The optional `hostLabel` is
 signed device-supplied display metadata; it is not browser-approved identity.
 Query strings are rejected.
-On success, JSON contains only
-`{installation, grant, alreadyClaimed, grantTransport}` where `grant` is safe
-metadata and `grantTransport` is the stable value `android-linked-v2`. The
-issued secret and grant ID use the same mandatory single response headers as
-refresh:
+`operationId` is required and is the canonical unpadded base64url encoding of
+exactly 24 random bytes (32 characters). It is included in the signed bootstrap
+payload after the endpoint path. On success, JSON contains only
+`{installation, grant, alreadyClaimed, operationId, grantTransport}` where
+`grant` is safe metadata, the exact `operationId` is echoed, and
+`grantTransport` is the stable value `android-linked-v2`. The issued secret and
+grant ID use the same mandatory single response headers as refresh:
 
 ```text
 Authorization: Bearer <issued installation access token>
 X-Chummer-Grant: <issued grantId>
 ```
 
-If that successful response is lost, the client may retry the exact same signed
-poll body during the original callback/proof lifetime. The Hub returns the
-original installation, grant metadata, grant ID, and bearer; it does not mint a
-second grant. Recovery is bound to the durable callback, original grant,
-transport, owner, key, and a digest of the exact signed request. A changed body,
-key, installation, owner, expired/revoked callback, or expired/revoked/replaced
-grant fails closed. Recovery receipts survive restart and share the same
-PostgreSQL compare-and-swap snapshot as the grant.
+If that successful response is lost, the client retries the same stable
+operation during the callback lifetime using the same `operationId` and
+immutable install fields but a fresh timestamp, nonce, and signature. Every
+retry proof is verified and its nonce is admitted through the durable replay
+authority; reusing a proof envelope is rejected. The Hub returns the original
+installation, grant metadata, grant ID, and bearer and does not mint a second
+grant. Recovery is bound to the durable callback, original grant, transport,
+owner, canonical device key, operation ID, and stable-operation digest. A
+changed operation, body, key, installation, owner, expired/revoked callback, or
+expired/revoked/replaced grant fails closed. Recovery receipts survive restart
+and share the same PostgreSQL compare-and-swap snapshot as the grant.
 
 ## Required headers
 
@@ -152,8 +158,8 @@ installation. Endpoint substitution is prevented by the signed exact path.
 The refresh request is authenticated with the old bearer/grant and may update
 the install identity fields included in its signed body. A successful refresh
 atomically records the old grant as revoked, issues and persists the replacement,
-and returns safe installation/grant metadata plus
-`grantTransport: "android-linked-v2"` in JSON. The old bearer is invalid for
+and returns safe installation/grant metadata plus the exact echoed `operationId`
+and `grantTransport: "android-linked-v2"` in JSON. The old bearer is invalid for
 both v2 and the retained legacy v1 resolver after commit. The newly issued
 secret is delivered only in the response header:
 
@@ -162,14 +168,18 @@ Authorization: Bearer <new installation access token>
 X-Chummer-Grant: <new grantId>
 ```
 
-If the refresh response is lost, the client may retry the exact old-bearer,
-grant, signed-header, and body tuple until the original proof window closes.
-The Hub recognizes the already-consumed proof only for that completed refresh
-and returns the same replacement bearer and grant metadata. It never rotates a
-second time. Any bearer, packet key, signature, body, installation, key, or
-owner change uses the normal denial path, as does a replacement that is no
+Refresh JSON also requires a 32-character canonical `operationId`. If the
+response is lost, the client may retry for 10 minutes with the exact old bearer,
+source grant, operation ID, and byte-identical stored request body, but a fresh
+timestamp, packet key, and signature. The Hub verifies the fresh proof with the
+same device key and admits its packet key through the ordinary durable replay
+authority before returning the same replacement bearer and grant metadata. It
+never rotates a second time. Reusing the original proof envelope is a replay
+conflict. Any bearer, operation, body, installation, key, or owner change uses
+the normal denial path, as does an expired receipt or a replacement that is no
 longer the active current v2 grant. The recovery mapping is committed in the
-same durable write/CAS as the rotation.
+same durable write/CAS as the rotation, and its source and replacement grants
+are pinned during retention for the entire recovery window.
 
 The response JSON has no access-token member. All v2 responses are private,
 `no-store`, `no-cache`, `no-referrer`, and `nosniff`. Admission logs contain
@@ -197,3 +207,12 @@ must be invalidated at rollout and the affected devices must relink. Every grant
 issued after this change is explicitly classified, and an explicitly classified
 v2 grant cannot be downgraded through v1. The v1 callback and linked-account
 routes remain available only for Preview 10 compatibility.
+
+The operation-ID proof format and the matching Android client must roll out as
+one compatibility boundary. An older Hub does not include `operationId` in the
+bootstrap signature, while this Hub requires it for bootstrap and refresh.
+Receipts written by the immediately preceding exact-proof retry implementation
+remain readable but cannot be upgraded into a stable operation: an Android
+device that lost such an in-flight response must start a fresh link. Existing
+successfully received grants retain their transport authority and continue to
+work; only bootstrap/refresh requests need the new operation field.

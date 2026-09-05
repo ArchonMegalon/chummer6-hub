@@ -10,6 +10,7 @@ public sealed class InstallLinkingService
 {
     public const int MaxRequestBodyBytes = 16 * 1024;
     public const string AndroidLinkedV2GrantTransport = InstallationGrantTransports.AndroidLinkedV2;
+    public static readonly TimeSpan AndroidLinkedV2ResponseRecoveryLifetime = TimeSpan.FromMinutes(10);
     private const int MaxInstallationIdLength = 64;
     private const int MaxAccessTokenLength = 256;
     private const int MaxGrantIdLength = 128;
@@ -441,6 +442,86 @@ public sealed class InstallLinkingService
         }
     }
 
+    internal RevokeInstallationGrantResponseDto RevokeGrantForOwner(
+        string installationId,
+        string userId,
+        string subjectId)
+    {
+        EnsureDurableStoreReady();
+        string normalizedInstallationId = NormalizeRequired(
+            installationId,
+            nameof(installationId),
+            MaxInstallationIdLength);
+        string normalizedUserId = NormalizeRequired(userId, nameof(userId), 256);
+        string normalizedSubjectId = NormalizeRequired(subjectId, nameof(subjectId), 256);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        lock (_store.Gate)
+        {
+            ExpireGrantsLocked(now);
+            if (!_store.InstallationsById.TryGetValue(
+                    normalizedInstallationId,
+                    out ClaimedInstallationDto? installation)
+                || !IdentityValueMatches(installation.UserId, normalizedUserId)
+                || !IdentityValueMatches(installation.SubjectId, normalizedSubjectId))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status404NotFound,
+                    "installation was not found for this owner.");
+            }
+
+            InstallationGrantDto[] activeGrants = _store.GrantsById.Values
+                .Where(item => string.Equals(
+                    item.InstallationId,
+                    normalizedInstallationId,
+                    StringComparison.OrdinalIgnoreCase))
+                .Where(item => string.Equals(
+                    item.Status,
+                    InstallationGrantStates.Active,
+                    StringComparison.OrdinalIgnoreCase))
+                .Where(item => item.ExpiresAtUtc > now)
+                .ToArray();
+            if (activeGrants.Length == 0
+                || activeGrants.Any(item =>
+                    !IdentityValueMatches(item.UserId, normalizedUserId)
+                    || !IdentityValueMatches(item.SubjectId, normalizedSubjectId)))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status409Conflict,
+                    "installation has no active grant for this owner.");
+            }
+
+            ClaimedInstallationDto revokedInstallation = installation with
+            {
+                Status = ClaimedInstallationStates.Revoked,
+                GrantId = null,
+                UpdatedAtUtc = now
+            };
+            InstallationGrantDto[] revokedGrants = activeGrants
+                .Select(item => item with { Status = InstallationGrantStates.Revoked })
+                .ToArray();
+            _store.InstallationsById[revokedInstallation.InstallationId] = revokedInstallation;
+            foreach (InstallationGrantDto revokedGrant in revokedGrants)
+            {
+                _store.GrantsById[revokedGrant.GrantId] = revokedGrant;
+            }
+
+            RevokeBrowserCallbacksForInstallationLocked(normalizedInstallationId);
+            foreach (string sourceGrantId in _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Values
+                         .Where(item => string.Equals(
+                             item.InstallationId,
+                             normalizedInstallationId,
+                             StringComparison.OrdinalIgnoreCase))
+                         .Select(static item => item.SourceGrantId)
+                         .ToArray())
+            {
+                _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Remove(sourceGrantId);
+            }
+            _store.PersistLocked();
+            return new RevokeInstallationGrantResponseDto(revokedInstallation, revokedGrants);
+        }
+    }
+
     public AndroidLinkedV2GrantPrincipal? ResolveAndroidLinkedV2Grant(
         string? installationId,
         string? grantId,
@@ -542,7 +623,40 @@ public sealed class InstallLinkingService
             return false;
         }
 
-        byte[] keyBytes = Encoding.UTF8.GetBytes($"{normalizedGrantId}\n{normalizedPacketKey}");
+        return TryUseAndroidLinkedV2ProofLocked(
+            $"grant\n{normalizedGrantId}\n{normalizedPacketKey}",
+            now,
+            expiresAtUtc);
+    }
+
+    private bool TryUseAndroidLinkedV2BootstrapProof(
+        string installationId,
+        string nonce,
+        DateTimeOffset now,
+        DateTimeOffset expiresAtUtc)
+    {
+        string normalizedInstallationId = NormalizeRequired(
+            installationId,
+            nameof(installationId),
+            MaxInstallationIdLength);
+        string normalizedNonce = NormalizeRequired(nonce, nameof(nonce), MaxProofNonceLength);
+        if (expiresAtUtc <= now)
+        {
+            return false;
+        }
+
+        return TryUseAndroidLinkedV2ProofLocked(
+            $"bootstrap\n{normalizedInstallationId}\n{normalizedNonce}",
+            now,
+            expiresAtUtc);
+    }
+
+    private bool TryUseAndroidLinkedV2ProofLocked(
+        string proofIdentity,
+        DateTimeOffset now,
+        DateTimeOffset expiresAtUtc)
+    {
+        byte[] keyBytes = Encoding.UTF8.GetBytes(proofIdentity);
         byte[] keyDigest = SHA256.HashData(keyBytes);
         string proofKeySha256;
         try
@@ -614,6 +728,17 @@ public sealed class InstallLinkingService
         string? arch = NormalizeOptional(command.Architecture, nameof(command.Architecture), MaxArchLength);
         string? publicKey = NormalizeOptional(command.PublicKey, nameof(command.PublicKey), MaxPublicKeyLength);
         string? hostLabel = NormalizeOptional(command.HostLabel, nameof(command.HostLabel), MaxHostLabelLength);
+        string operationId = NormalizeRequired(
+            command.OperationId,
+            nameof(command.OperationId),
+            AndroidLinkedV2RequestProof.OperationIdLength);
+        if (!AndroidLinkedV2RequestProof.IsValidOperationId(operationId)
+            || !FixedTimeEquals(operationId, authorizedRequest.OperationId))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status401Unauthorized,
+                "installation grant operation identity is invalid.");
+        }
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
         lock (_store.Gate)
@@ -634,6 +759,8 @@ public sealed class InstallLinkingService
                     StatusCodes.Status401Unauthorized,
                     "installation grant is unknown or expired.");
             }
+
+            EnsureAndroidLinkedV2RefreshReceiptCapacityLocked(currentGrant!.GrantId, now);
 
             ClaimedInstallationDto refreshedInstallation = installation! with
             {
@@ -669,9 +796,12 @@ public sealed class InstallLinkingService
                     InstallationId: refreshedInstallation.InstallationId,
                     SourceAccessTokenSha256: authorizedRequest.AccessTokenSha256,
                     RequestSha256: authorizedRequest.RequestSha256,
-                    RetryExpiresAtUtc: authorizedRequest.RetryExpiresAtUtc,
+                    RetryExpiresAtUtc: authorizedRequest.RecoveryExpiresAtUtc,
                     UserId: refreshedInstallation.UserId,
-                    SubjectId: refreshedInstallation.SubjectId);
+                    SubjectId: refreshedInstallation.SubjectId,
+                    OperationId: operationId,
+                    OperationSha256: authorizedRequest.OperationSha256,
+                    ProofPublicKey: authorizedRequest.ProofPublicKey);
             _store.PersistLocked();
             return new AndroidLinkedV2GrantRotationResult(
                 refreshedInstallation,
@@ -680,10 +810,12 @@ public sealed class InstallLinkingService
         }
     }
 
-    internal AndroidLinkedV2GrantRotationResult? ResolveAndroidLinkedV2RefreshRetry(
+    internal AndroidLinkedV2RefreshRetryAuthorization? ResolveAndroidLinkedV2RefreshRetry(
         string installationId,
         string sourceGrantId,
         string sourceAccessToken,
+        string operationId,
+        string operationSha256,
         string requestSha256,
         DateTimeOffset now)
     {
@@ -702,7 +834,11 @@ public sealed class InstallLinkingService
                 || receipt.RetryExpiresAtUtc <= now
                 || !string.Equals(receipt.InstallationId, installationId, StringComparison.Ordinal)
                 || !FixedTimeEquals(receipt.SourceAccessTokenSha256, accessTokenSha256)
-                || !FixedTimeEquals(receipt.RequestSha256, requestSha256)
+                || !RefreshRetryOperationMatches(
+                    receipt,
+                    operationId,
+                    operationSha256,
+                    requestSha256)
                 || !_store.GrantsById.TryGetValue(sourceGrantId, out InstallationGrantDto? sourceGrant)
                 || !string.Equals(sourceGrant.Status, InstallationGrantStates.Revoked, StringComparison.OrdinalIgnoreCase)
                 || !GrantHasTransportLocked(sourceGrant.GrantId, InstallationGrantTransports.AndroidLinkedV2)
@@ -719,10 +855,72 @@ public sealed class InstallLinkingService
                 return null;
             }
 
-            return new AndroidLinkedV2GrantRotationResult(
-                installation,
-                ToAndroidLinkedV2GrantMetadata(replacementGrant),
-                replacementGrant.AccessToken);
+            string? proofPublicKey = NormalizeOptional(receipt.ProofPublicKey)
+                ?? NormalizeOptional(installation.PublicKey);
+            if (proofPublicKey is null)
+            {
+                return null;
+            }
+
+            return new AndroidLinkedV2RefreshRetryAuthorization(
+                new AndroidLinkedV2GrantRotationResult(
+                    installation,
+                    ToAndroidLinkedV2GrantMetadata(replacementGrant),
+                    replacementGrant.AccessToken),
+                proofPublicKey);
+        }
+    }
+
+    private static bool RefreshRetryOperationMatches(
+        AndroidLinkedV2GrantRefreshReceipt receipt,
+        string operationId,
+        string operationSha256,
+        string requestSha256)
+    {
+        string? storedOperationId = NormalizeOptional(receipt.OperationId);
+        string? storedOperationSha256 = NormalizeOptional(receipt.OperationSha256);
+        if (storedOperationId is not null || storedOperationSha256 is not null)
+        {
+            return storedOperationId is not null
+                && storedOperationSha256 is not null
+                && FixedTimeEquals(storedOperationId, operationId)
+                && FixedTimeEquals(storedOperationSha256, operationSha256);
+        }
+
+        // Receipts from the immediately preceding contract can recover only an exact
+        // original proof envelope. They cannot opt into stable-operation recovery.
+        return FixedTimeEquals(receipt.RequestSha256, requestSha256);
+    }
+
+    private void EnsureAndroidLinkedV2RefreshReceiptCapacityLocked(
+        string sourceGrantId,
+        DateTimeOffset now)
+    {
+        foreach (string expiredSourceGrantId in _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Values
+                     .Where(item => item.RetryExpiresAtUtc <= now)
+                     .Select(static item => item.SourceGrantId)
+                     .ToArray())
+        {
+            _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Remove(expiredSourceGrantId);
+        }
+
+        if (_store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Count
+            >= InstallLinkingStore.MaxAndroidLinkedV2RefreshReceipts)
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status503ServiceUnavailable,
+                "installation grant response recovery capacity is unavailable.");
+        }
+
+        HashSet<string> pinnedGrantIds = _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Values
+            .SelectMany(static item => new[] { item.SourceGrantId, item.ReplacementGrantId })
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        pinnedGrantIds.Add(sourceGrantId);
+        if (pinnedGrantIds.Count >= InstallLinkingStore.MaxGrantTransportAuthorities)
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status503ServiceUnavailable,
+                "installation grant response recovery capacity is unavailable.");
         }
     }
 
@@ -848,7 +1046,9 @@ public sealed class InstallLinkingService
     private ExchangeInstallBrowserCallbackResponseDto ExchangeBrowserCallback(
         ExchangeInstallBrowserCallbackRequestDto request,
         string grantTransport,
-        string requestSha256)
+        string requestSha256,
+        string? operationId = null,
+        string? operationSha256 = null)
     {
         EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
@@ -929,7 +1129,11 @@ public sealed class InstallLinkingService
                         out InstallBrowserCallbackRedemptionReceipt? redemptionReceipt)
                     || !string.Equals(redemptionReceipt.GrantId, originalGrant.GrantId, StringComparison.Ordinal)
                     || !string.Equals(redemptionReceipt.Transport, grantTransport, StringComparison.Ordinal)
-                    || !FixedTimeEquals(redemptionReceipt.RequestSha256, requestSha256))
+                    || !BrowserCallbackRetryOperationMatches(
+                        redemptionReceipt,
+                        requestSha256,
+                        operationId,
+                        operationSha256))
                 {
                     throw new InstallLinkingOperationException(
                         StatusCodes.Status409Conflict,
@@ -964,7 +1168,9 @@ public sealed class InstallLinkingService
                     callback.CallbackId,
                     issuedGrant.GrantId,
                     grantTransport,
-                    requestSha256);
+                    requestSha256,
+                    operationId,
+                    operationSha256);
             _store.PersistLocked();
             return new ExchangeInstallBrowserCallbackResponseDto(callback, installation, issuedGrant, AlreadyClaimed: false);
         }
@@ -1137,6 +1343,16 @@ public sealed class InstallLinkingService
         string nonce = NormalizeRequired(request.Nonce, nameof(request.Nonce), MaxProofNonceLength);
         string signature = NormalizeRequired(request.Signature, nameof(request.Signature), MaxProofSignatureLength);
         string? hostLabel = NormalizeOptional(request.HostLabel, nameof(request.HostLabel), MaxHostLabelLength);
+        string operationId = NormalizeRequired(
+            request.OperationId,
+            nameof(request.OperationId),
+            AndroidLinkedV2RequestProof.OperationIdLength);
+        if (!AndroidLinkedV2RequestProof.IsValidOperationId(operationId))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status400BadRequest,
+                "remote proof operation identity is invalid.");
+        }
         if (nonce.Length < 16 || !nonce.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
         {
             throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof nonce is invalid.");
@@ -1232,6 +1448,19 @@ public sealed class InstallLinkingService
                     throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof signature is invalid.");
                 }
 
+                DateTimeOffset replayExpiry = DateTimeOffset.FromUnixTimeSeconds(request.IssuedAtUnixSeconds)
+                    + AndroidLinkedV2RequestProof.MaximumClockSkew;
+                if (!TryUseAndroidLinkedV2BootstrapProof(
+                        installationId,
+                        nonce,
+                        now,
+                        replayExpiry))
+                {
+                    throw new InstallLinkingOperationException(
+                        StatusCodes.Status409Conflict,
+                        "remote proof was already used.");
+                }
+
                 ExchangeInstallBrowserCallbackRequestDto exchangeRequest =
                     new(
                         callback.CallbackCode,
@@ -1246,7 +1475,18 @@ public sealed class InstallLinkingService
                 ExchangeInstallBrowserCallbackResponseDto exchange = ExchangeBrowserCallback(
                     exchangeRequest,
                     InstallationGrantTransports.AndroidLinkedV2,
-                    CreateV2BootstrapRequestSha256(request, canonicalPublicKey));
+                    CreateV2BootstrapRequestSha256(request, canonicalPublicKey),
+                    operationId,
+                    CreateV2BootstrapOperationSha256(
+                        operationId,
+                        installationId,
+                        headId,
+                        applicationVersion,
+                        channelId,
+                        platform,
+                        architecture,
+                        canonicalPublicKey,
+                        hostLabel));
                 return new PollInstallBrowserCallbackResult(
                     new AndroidInstallLinkProofPollStatus(
                         exchange.Callback.Status,
@@ -1819,6 +2059,7 @@ public sealed class InstallLinkingService
         string canonicalPublicKey)
         => Sha256Parts(
             "chummer.install-link.remote-callback-retry.v2",
+            request.OperationId,
             request.InstallationId,
             request.HeadId,
             request.ApplicationVersion,
@@ -1830,6 +2071,49 @@ public sealed class InstallLinkingService
             request.Nonce,
             request.Signature,
             request.HostLabel);
+
+    private static string CreateV2BootstrapOperationSha256(
+        string operationId,
+        string installationId,
+        string headId,
+        string applicationVersion,
+        string channelId,
+        string platform,
+        string architecture,
+        string canonicalPublicKey,
+        string? hostLabel)
+        => Sha256Parts(
+            "chummer.install-link.remote-callback-operation.v2",
+            operationId,
+            installationId,
+            headId,
+            applicationVersion,
+            channelId,
+            platform,
+            architecture,
+            canonicalPublicKey,
+            hostLabel);
+
+    private static bool BrowserCallbackRetryOperationMatches(
+        InstallBrowserCallbackRedemptionReceipt receipt,
+        string requestSha256,
+        string? operationId,
+        string? operationSha256)
+    {
+        string? storedOperationId = NormalizeOptional(receipt.OperationId);
+        string? storedOperationSha256 = NormalizeOptional(receipt.OperationSha256);
+        if (storedOperationId is not null || storedOperationSha256 is not null)
+        {
+            return storedOperationId is not null
+                && storedOperationSha256 is not null
+                && operationId is not null
+                && operationSha256 is not null
+                && FixedTimeEquals(storedOperationId, operationId)
+                && FixedTimeEquals(storedOperationSha256, operationSha256);
+        }
+
+        return FixedTimeEquals(receipt.RequestSha256, requestSha256);
+    }
 
     internal static string SecretSha256(string value)
         => Sha256Parts("chummer.install-linking.secret-digest.v1", value);
@@ -2248,7 +2532,8 @@ public sealed record AndroidInstallLinkProofPollV2Request(
     long IssuedAtUnixSeconds,
     string Nonce,
     string Signature,
-    string? HostLabel = null);
+    string? HostLabel = null,
+    string OperationId = "");
 
 public sealed record AndroidInstallLinkProofPollStatus(
     string State,
@@ -2264,7 +2549,8 @@ internal sealed record AndroidLinkedV2GrantRefreshCommand(
     string? Platform,
     string? Architecture,
     string? PublicKey,
-    string? HostLabel);
+    string? HostLabel,
+    string OperationId);
 
 public sealed record AndroidLinkedV2GrantMetadata(
     string GrantId,

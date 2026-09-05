@@ -15,7 +15,8 @@ public sealed record InstallLinkingPrincipalErasureResult(
 public sealed class InstallLinkingStore : IDisposable
 {
     internal const int MaxAndroidLinkedV2ReplayReceipts = 65_536;
-    internal const int MaxGrantTransportAuthorities = 4_096;
+    internal const int MaxGrants = 4_096;
+    internal const int MaxGrantTransportAuthorities = MaxGrants;
     internal const int MaxBrowserCallbackRedemptionReceipts = 2_048;
     internal const int MaxAndroidLinkedV2RefreshReceipts = 4_096;
     internal const string EnvelopeFormat = "chummer.install-linking-store";
@@ -455,11 +456,34 @@ public sealed class InstallLinkingStore : IDisposable
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         IReadOnlyDictionary<string, InstallBrowserCallbackDto> retainedCallbacksById = retainedCallbacks
             .ToDictionary(static item => item.CallbackId, StringComparer.OrdinalIgnoreCase);
-        InstallationGrantDto[] retainedGrants = (source.Grants ?? [])
+        InstallationGrantDto[] eligibleGrants = (source.Grants ?? [])
             .Select(item => SanitizeGrantForRetention(item, now))
             .Where(item => item.ExpiresAtUtc >= now.AddDays(-31))
             .OrderByDescending(static item => item.IssuedAtUtc)
-            .Take(4096)
+            .ToArray();
+        HashSet<string> eligibleGrantIds = eligibleGrants
+            .Select(static item => item.GrantId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        AndroidLinkedV2GrantRefreshReceipt[] retainedRefreshReceipts =
+            (source.AndroidLinkedV2RefreshReceipts ?? [])
+            .Where(item => item.RetryExpiresAtUtc > now
+                           && eligibleGrantIds.Contains(item.SourceGrantId)
+                           && eligibleGrantIds.Contains(item.ReplacementGrantId))
+            .OrderBy(static item => item.RetryExpiresAtUtc)
+            .Take(MaxAndroidLinkedV2RefreshReceipts)
+            .ToArray();
+        HashSet<string> pinnedGrantIds = retainedRefreshReceipts
+            .SelectMany(static item => new[] { item.SourceGrantId, item.ReplacementGrantId })
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (pinnedGrantIds.Count > MaxGrants)
+        {
+            throw new InvalidOperationException(
+                "Install-linking response recovery exceeds the durable grant capacity.");
+        }
+        InstallationGrantDto[] retainedGrants = eligibleGrants
+            .Where(item => pinnedGrantIds.Contains(item.GrantId))
+            .Concat(eligibleGrants.Where(item => !pinnedGrantIds.Contains(item.GrantId)))
+            .Take(MaxGrants)
             .ToArray();
         HashSet<string> retainedGrantIds = retainedGrants
             .Select(static item => item.GrantId)
@@ -509,13 +533,7 @@ public sealed class InstallLinkingStore : IDisposable
                                    StringComparison.OrdinalIgnoreCase))
                 .Take(MaxBrowserCallbackRedemptionReceipts)
                 .ToArray(),
-            AndroidLinkedV2RefreshReceipts: (source.AndroidLinkedV2RefreshReceipts ?? [])
-                .Where(item => item.RetryExpiresAtUtc > now
-                               && retainedGrantIds.Contains(item.SourceGrantId)
-                               && retainedGrantIds.Contains(item.ReplacementGrantId))
-                .OrderBy(static item => item.RetryExpiresAtUtc)
-                .Take(MaxAndroidLinkedV2RefreshReceipts)
-                .ToArray());
+            AndroidLinkedV2RefreshReceipts: retainedRefreshReceipts);
     }
 
     private void PersistSnapshot(InstallLinkingStoreSnapshot snapshot)
@@ -1806,6 +1824,10 @@ public sealed class InstallLinkingStore : IDisposable
         {
             ValidateIdentifier(item.GrantId, "browser callback redemption grant");
             ValidateSha256(item.RequestSha256, "browser callback redemption request digest");
+            ValidateStableOperationIdentity(
+                item.OperationId,
+                item.OperationSha256,
+                "browser callback redemption");
             if (!callbacksById.TryGetValue(item.CallbackId, out InstallBrowserCallbackDto? callback)
                 || !grantsById.ContainsKey(item.GrantId)
                 || !string.Equals(callback.GrantId, item.GrantId, StringComparison.OrdinalIgnoreCase)
@@ -1823,6 +1845,17 @@ public sealed class InstallLinkingStore : IDisposable
             ValidateSha256(item.SourceAccessTokenSha256, "Android linked v2 refresh bearer digest");
             ValidateSha256(item.RequestSha256, "Android linked v2 refresh request digest");
             ValidateTimestamp(item.RetryExpiresAtUtc, "Android linked v2 refresh retry expiry");
+            ValidateStableOperationIdentity(
+                item.OperationId,
+                item.OperationSha256,
+                "Android linked v2 refresh");
+            if (item.OperationId is not null
+                && (string.IsNullOrWhiteSpace(item.ProofPublicKey)
+                    || item.ProofPublicKey.Length > 1024))
+            {
+                throw new InvalidDataException(
+                    "Install-linking Android linked v2 refresh proof key is invalid.");
+            }
             if (!grantsById.TryGetValue(item.SourceGrantId, out InstallationGrantDto? sourceGrant)
                 || !grantsById.TryGetValue(item.ReplacementGrantId, out InstallationGrantDto? replacementGrant)
                 || !string.Equals(sourceGrant.InstallationId, item.InstallationId, StringComparison.OrdinalIgnoreCase)
@@ -1841,6 +1874,26 @@ public sealed class InstallLinkingStore : IDisposable
         {
             throw new InvalidDataException($"Install-linking {label} is invalid.");
         }
+    }
+
+    private static void ValidateStableOperationIdentity(
+        string? operationId,
+        string? operationSha256,
+        string label)
+    {
+        if (operationId is null && operationSha256 is null)
+        {
+            return;
+        }
+
+        if (operationId is null
+            || operationSha256 is null
+            || !AndroidLinkedV2RequestProof.IsValidOperationId(operationId))
+        {
+            throw new InvalidDataException($"Install-linking {label} operation identity is invalid.");
+        }
+
+        ValidateSha256(operationSha256, $"{label} operation digest");
     }
 
     private static T[] ValidateCollection<T>(
@@ -2267,7 +2320,9 @@ internal sealed record InstallBrowserCallbackRedemptionReceipt(
     string CallbackId,
     string GrantId,
     string Transport,
-    string RequestSha256);
+    string RequestSha256,
+    string? OperationId = null,
+    string? OperationSha256 = null);
 
 internal sealed record AndroidLinkedV2GrantRefreshReceipt(
     string SourceGrantId,
@@ -2277,4 +2332,7 @@ internal sealed record AndroidLinkedV2GrantRefreshReceipt(
     string RequestSha256,
     DateTimeOffset RetryExpiresAtUtc,
     string? UserId,
-    string? SubjectId);
+    string? SubjectId,
+    string? OperationId = null,
+    string? OperationSha256 = null,
+    string? ProofPublicKey = null);
