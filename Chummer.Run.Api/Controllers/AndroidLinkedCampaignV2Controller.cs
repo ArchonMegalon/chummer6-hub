@@ -8,14 +8,14 @@ using System.Security.Cryptography;
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/android/linked")]
-public sealed class AndroidLinkedCampaignController : ControllerBase
+[Route("api/v2/android/linked")]
+public sealed class AndroidLinkedCampaignV2Controller : ControllerBase
 {
     private const int MaxRequestBodyBytes = 16 * 1024;
     private readonly InstallLinkingService _installLinking;
     private readonly GroupService _groups;
 
-    public AndroidLinkedCampaignController(InstallLinkingService installLinking, GroupService groups)
+    public AndroidLinkedCampaignV2Controller(InstallLinkingService installLinking, GroupService groups)
     {
         _installLinking = installLinking;
         _groups = groups;
@@ -24,7 +24,8 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     [HttpPost("groups")]
     [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<AndroidLinkedGroupListResponse>(StatusCodes.Status200OK)]
-    public ActionResult<AndroidLinkedGroupListResponse> ListGroups([FromBody] AndroidLinkedGrantRequest? request)
+    public ActionResult<AndroidLinkedGroupListResponse> ListGroups(
+        [FromBody] AndroidLinkedV2GrantRequest? request)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -41,7 +42,8 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     [HttpPost("groups/create")]
     [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<AndroidLinkedGroupDto>(StatusCodes.Status200OK)]
-    public ActionResult<AndroidLinkedGroupDto> CreateGroup([FromBody] AndroidLinkedGroupCreateRequest? request)
+    public ActionResult<AndroidLinkedGroupDto> CreateGroup(
+        [FromBody] AndroidLinkedV2GroupCreateRequest? request)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -70,7 +72,7 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     [ProducesResponseType<AndroidLinkedGroupDto>(StatusCodes.Status200OK)]
     public ActionResult<AndroidLinkedGroupDto> UpdateGroup(
         [FromRoute] string groupId,
-        [FromBody] AndroidLinkedGroupUpdateRequest? request)
+        [FromBody] AndroidLinkedV2GroupUpdateRequest? request)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -91,7 +93,11 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException)
         {
-            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
+            return Problem(
+                statusCode: ex is KeyNotFoundException
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest,
+                detail: ex.Message);
         }
     }
 
@@ -100,7 +106,7 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     [ProducesResponseType<AndroidLinkedInviteResponse>(StatusCodes.Status200OK)]
     public ActionResult<AndroidLinkedInviteResponse> CreateInvite(
         [FromRoute] string groupId,
-        [FromBody] AndroidLinkedGrantRequest? request)
+        [FromBody] AndroidLinkedV2GrantRequest? request)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -124,7 +130,11 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException)
         {
-            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
+            return Problem(
+                statusCode: ex is KeyNotFoundException
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest,
+                detail: ex.Message);
         }
     }
 
@@ -133,7 +143,7 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     [ProducesResponseType<AndroidLinkedChronicleListResponse>(StatusCodes.Status200OK)]
     public ActionResult<AndroidLinkedChronicleListResponse> ListChronicles(
         [FromRoute] string groupId,
-        [FromBody] AndroidLinkedGrantRequest? request)
+        [FromBody] AndroidLinkedV2GrantRequest? request)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -155,7 +165,11 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException)
         {
-            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
+            return Problem(
+                statusCode: ex is KeyNotFoundException
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest,
+                detail: ex.Message);
         }
     }
 
@@ -164,7 +178,7 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     [ProducesResponseType<AndroidLinkedChronicleDto>(StatusCodes.Status200OK)]
     public ActionResult<AndroidLinkedChronicleDto> CreateChronicle(
         [FromRoute] string groupId,
-        [FromBody] AndroidLinkedChronicleDraftRequest? request)
+        [FromBody] AndroidLinkedV2ChronicleDraftRequest? request)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -185,7 +199,11 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException or OverflowException)
         {
-            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
+            return Problem(
+                statusCode: ex is KeyNotFoundException
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest,
+                detail: ex.Message);
         }
     }
 
@@ -195,7 +213,7 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     public ActionResult<AndroidLinkedChronicleDto> ReviseChronicle(
         [FromRoute] string groupId,
         [FromRoute] string chronicleProjectId,
-        [FromBody] AndroidLinkedChronicleDraftRequest? request)
+        [FromBody] AndroidLinkedV2ChronicleDraftRequest? request)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -217,7 +235,11 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException or OverflowException)
         {
-            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
+            return Problem(
+                statusCode: ex is KeyNotFoundException
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest,
+                detail: ex.Message);
         }
     }
 
@@ -227,7 +249,7 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     public ActionResult<AndroidLinkedChronicleDto> AdvanceChronicle(
         [FromRoute] string groupId,
         [FromRoute] string chronicleProjectId,
-        [FromBody] AndroidLinkedChronicleActionRequest? request)
+        [FromBody] AndroidLinkedV2ChronicleActionRequest? request)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -255,7 +277,11 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException)
         {
-            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
+            return Problem(
+                statusCode: ex is KeyNotFoundException
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest,
+                detail: ex.Message);
         }
     }
 
@@ -265,40 +291,8 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     public ActionResult<AndroidLinkedChroniclePacketResponse> DownloadChroniclePacket(
         [FromRoute] string groupId,
         [FromRoute] string chronicleProjectId,
-        [FromBody] AndroidLinkedGrantRequest? request)
-    {
-        ApplyPrivateResponseHeaders();
-        if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
-        {
-            return denied!;
-        }
-
-        byte[]? packet = null;
-        try
-        {
-            packet = _groups.GetChronicleSourcePacket(groupId, chronicleProjectId, installation!.SubjectId!);
-            return Ok(new AndroidLinkedChroniclePacketResponse(
-                $"chronicle-{chronicleProjectId}.md",
-                "text/markdown",
-                Convert.ToBase64String(packet),
-                Convert.ToHexString(SHA256.HashData(packet)).ToLowerInvariant()));
-        }
-        catch (CommunityAccessDeniedException ex)
-        {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException)
-        {
-            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
-        }
-        finally
-        {
-            if (packet is not null)
-            {
-                CryptographicOperations.ZeroMemory(packet);
-            }
-        }
-    }
+        [FromBody] AndroidLinkedV2GrantRequest? request)
+        => DownloadChronicleContent(groupId, chronicleProjectId, request, handoff: false);
 
     [HttpPost("groups/{groupId}/chronicles/{chronicleProjectId}/handoff")]
     [RequestSizeLimit(MaxRequestBodyBytes)]
@@ -306,7 +300,14 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     public ActionResult<AndroidLinkedChroniclePacketResponse> DownloadChronicleHandoff(
         [FromRoute] string groupId,
         [FromRoute] string chronicleProjectId,
-        [FromBody] AndroidLinkedGrantRequest? request)
+        [FromBody] AndroidLinkedV2GrantRequest? request)
+        => DownloadChronicleContent(groupId, chronicleProjectId, request, handoff: true);
+
+    private ActionResult<AndroidLinkedChroniclePacketResponse> DownloadChronicleContent(
+        string groupId,
+        string chronicleProjectId,
+        AndroidLinkedV2GrantRequest? request,
+        bool handoff)
     {
         ApplyPrivateResponseHeaders();
         if (!TryResolveInstallation(request, out ClaimedInstallationDto? installation, out ObjectResult? denied))
@@ -314,15 +315,19 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
             return denied!;
         }
 
-        byte[]? handoff = null;
+        byte[]? content = null;
         try
         {
-            handoff = _groups.GetChronicleOperatorHandoff(groupId, chronicleProjectId, installation!.SubjectId!);
+            content = handoff
+                ? _groups.GetChronicleOperatorHandoff(groupId, chronicleProjectId, installation!.SubjectId!)
+                : _groups.GetChronicleSourcePacket(groupId, chronicleProjectId, installation!.SubjectId!);
             return Ok(new AndroidLinkedChroniclePacketResponse(
-                $"chronicle-{chronicleProjectId}-handoff.json",
-                "application/json",
-                Convert.ToBase64String(handoff),
-                Convert.ToHexString(SHA256.HashData(handoff)).ToLowerInvariant()));
+                handoff
+                    ? $"chronicle-{chronicleProjectId}-handoff.json"
+                    : $"chronicle-{chronicleProjectId}.md",
+                handoff ? "application/json" : "text/markdown",
+                Convert.ToBase64String(content),
+                Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant()));
         }
         catch (CommunityAccessDeniedException ex)
         {
@@ -330,19 +335,23 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or KeyNotFoundException)
         {
-            return Problem(statusCode: ex is KeyNotFoundException ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest, detail: ex.Message);
+            return Problem(
+                statusCode: ex is KeyNotFoundException
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest,
+                detail: ex.Message);
         }
         finally
         {
-            if (handoff is not null)
+            if (content is not null)
             {
-                CryptographicOperations.ZeroMemory(handoff);
+                CryptographicOperations.ZeroMemory(content);
             }
         }
     }
 
     private bool TryResolveInstallation(
-        AndroidLinkedGrantRequest? request,
+        AndroidLinkedV2GrantRequest? request,
         out ClaimedInstallationDto? installation,
         out ObjectResult? denied)
     {
@@ -354,10 +363,14 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
             return false;
         }
 
-        installation = _installLinking.ResolveInstallationForGrant(request.InstallationId, request.AccessToken);
-        if (installation is null || string.IsNullOrWhiteSpace(installation.SubjectId))
+        if (!AndroidLinkedV2RequestProof.TryGetPrincipal(HttpContext, out AndroidLinkedV2GrantPrincipal? principal)
+            || !string.Equals(request.InstallationId, principal!.Installation.InstallationId, StringComparison.Ordinal)
+            || (installation = _installLinking.ResolveAndroidLinkedV2Principal(principal)) is null
+            || string.IsNullOrWhiteSpace(installation.SubjectId))
         {
-            denied = Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "linked device grant is unknown or expired.");
+            denied = Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "linked device grant is unknown or expired.");
             return false;
         }
 
@@ -387,7 +400,7 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
     }
 
     private static CreateChronicleProjectRequest ToCreateChronicleRequest(
-        AndroidLinkedChronicleDraftRequest request,
+        AndroidLinkedV2ChronicleDraftRequest request,
         string subjectId)
         => new(
             subjectId,
@@ -409,7 +422,7 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
             request.SpoilerReviewConfirmed);
 
     private static ReviseChronicleProjectRequest ToReviseChronicleRequest(
-        AndroidLinkedChronicleDraftRequest request,
+        AndroidLinkedV2ChronicleDraftRequest request,
         string subjectId)
         => new(
             subjectId,
@@ -472,51 +485,23 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
             project.UploadApprovedAtUtc);
 
     private void ApplyPrivateResponseHeaders()
-    {
-        Response.Headers.CacheControl = "no-store, max-age=0";
-        Response.Headers.Pragma = "no-cache";
-        Response.Headers["X-Content-Type-Options"] = "nosniff";
-        Response.Headers["Referrer-Policy"] = "no-referrer";
-        Response.Headers["Deprecation"] = "true";
-        Response.Headers["Link"] = "</api/v2/android/linked>; rel=\"successor-version\"";
-    }
+        => AndroidLinkedV2RequestProofMiddleware.ApplyPrivateResponseHeaders(Response.Headers);
 }
 
-public record AndroidLinkedGrantRequest(string InstallationId, string AccessToken);
+public record AndroidLinkedV2GrantRequest(string InstallationId);
 
-public sealed record AndroidLinkedGroupCreateRequest(
+public sealed record AndroidLinkedV2GroupCreateRequest(
     string InstallationId,
-    string AccessToken,
     string Name,
-    string Visibility) : AndroidLinkedGrantRequest(InstallationId, AccessToken);
+    string Visibility) : AndroidLinkedV2GrantRequest(InstallationId);
 
-public sealed record AndroidLinkedGroupUpdateRequest(
+public sealed record AndroidLinkedV2GroupUpdateRequest(
     string InstallationId,
-    string AccessToken,
     string Name,
-    string Visibility) : AndroidLinkedGrantRequest(InstallationId, AccessToken);
+    string Visibility) : AndroidLinkedV2GrantRequest(InstallationId);
 
-public sealed record AndroidLinkedGroupListResponse(IReadOnlyList<AndroidLinkedGroupDto> Groups);
-
-public sealed record AndroidLinkedGroupDto(
-    string GroupId,
-    string Name,
-    string GroupType,
-    string Visibility,
-    string Role,
-    bool CanManage,
-    string? RunnerDossierId,
-    string? RunnerHandle,
-    IReadOnlyList<AndroidLinkedGroupMemberDto> Members,
-    DateTimeOffset UpdatedAtUtc);
-
-public sealed record AndroidLinkedGroupMemberDto(string Role, string? RunnerHandle);
-
-public sealed record AndroidLinkedInviteResponse(string Code, string InviteUrl, DateTimeOffset? ExpiresAtUtc);
-
-public sealed record AndroidLinkedChronicleDraftRequest(
+public sealed record AndroidLinkedV2ChronicleDraftRequest(
     string InstallationId,
-    string AccessToken,
     string Title,
     string BookKind,
     string Audience,
@@ -532,61 +517,12 @@ public sealed record AndroidLinkedChronicleDraftRequest(
     bool ParticipantConsentConfirmed,
     bool RedactionReviewed,
     bool SourceRightsConfirmed,
-    bool SpoilerReviewConfirmed = false) : AndroidLinkedGrantRequest(InstallationId, AccessToken);
+    bool SpoilerReviewConfirmed = false) : AndroidLinkedV2GrantRequest(InstallationId);
 
-public sealed record AndroidLinkedChronicleActionRequest(
+public sealed record AndroidLinkedV2ChronicleActionRequest(
     string InstallationId,
-    string AccessToken,
     string Action,
     string? ExternalProjectRef = null,
     string? ArtifactUrl = null,
     string? ArtifactSha256 = null,
-    string? ExportFormat = null) : AndroidLinkedGrantRequest(InstallationId, AccessToken);
-
-public sealed record AndroidLinkedChronicleListResponse(IReadOnlyList<AndroidLinkedChronicleDto> Projects);
-
-public sealed record AndroidLinkedChronicleDto(
-    string ChronicleProjectId,
-    string Title,
-    string BookKind,
-    string Audience,
-    string Status,
-    string SourceSummary,
-    string ModelKey,
-    int TargetChapterCount,
-    int TargetWordsPerChapter,
-    bool IncludeRunnerRoster,
-    IReadOnlyList<string> RunnerRoster,
-    bool IncludeCover,
-    bool IncludeTranslation,
-    bool IncludeAudiobook,
-    bool ExternalProcessingConsent,
-    bool ParticipantConsentConfirmed,
-    bool RedactionReviewed,
-    bool SourceRightsConfirmed,
-    int SourcePacketVersion,
-    string SourcePacketSha256,
-    int EstimatedCredits,
-    string Provider,
-    bool OperatorRequired,
-    bool UnattendedAutomationAllowed,
-    string? ExternalProjectRef,
-    string? ArtifactUrl,
-    string? ArtifactSha256,
-    string? ExportFormat,
-    DateTimeOffset? SourceApprovedAtUtc,
-    DateTimeOffset? HandoffApprovedAtUtc,
-    DateTimeOffset? OutlineApprovedAtUtc,
-    DateTimeOffset? ArtifactImportedAtUtc,
-    DateTimeOffset? PublicationApprovedAtUtc,
-    DateTimeOffset UpdatedAtUtc,
-    bool SpoilerReviewConfirmed = false,
-    DateTimeOffset? GenerationApprovedAtUtc = null,
-    DateTimeOffset? ExternalSendApprovedAtUtc = null,
-    DateTimeOffset? UploadApprovedAtUtc = null);
-
-public sealed record AndroidLinkedChroniclePacketResponse(
-    string FileName,
-    string MediaType,
-    string ContentBase64,
-    string Sha256);
+    string? ExportFormat = null) : AndroidLinkedV2GrantRequest(InstallationId);
