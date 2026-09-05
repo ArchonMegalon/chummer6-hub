@@ -53,6 +53,8 @@ public sealed class InstallLinkingRequestAdmissionMiddleware(RequestDelegate nex
     {
         string value = path.Value ?? string.Empty;
         return path.StartsWithSegments("/api/v1/install-linking", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWithSegments("/api/v2/install-linking", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWithSegments("/api/v2/android/linked", StringComparison.OrdinalIgnoreCase)
             || path.Equals("/account/access/install-link", StringComparison.OrdinalIgnoreCase)
             || (path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
                 && !IsCanonicalPublicInstallRoute(value))

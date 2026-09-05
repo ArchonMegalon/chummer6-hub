@@ -305,6 +305,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         }
         services.AddSingleton<InstallLinkedWorkspaceSnapshotStore>();
         services.AddSingleton<InstallLinkedWorkspaceSnapshotService>();
+        services.AddSingleton<AndroidLinkedV2RequestProofVerifier>();
         services.AddSingleton<AccountDesktopLaunchTicketService>();
         services.AddSingleton<InstallBootstrapTicketService>();
         services.AddSingleton<ReleaseBundlePromotionService>();

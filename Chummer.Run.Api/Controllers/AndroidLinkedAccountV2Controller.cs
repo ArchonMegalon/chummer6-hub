@@ -7,14 +7,14 @@ using Microsoft.AspNetCore.Mvc;
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/android/linked/account")]
-public sealed class AndroidLinkedAccountController : ControllerBase
+[Route("api/v2/android/linked/account")]
+public sealed class AndroidLinkedAccountV2Controller : ControllerBase
 {
     private const int MaxRequestBodyBytes = 4 * 1024;
     private readonly InstallLinkingService _installLinking;
     private readonly IAccountErasureService _erasure;
 
-    public AndroidLinkedAccountController(
+    public AndroidLinkedAccountV2Controller(
         InstallLinkingService installLinking,
         IAccountErasureService erasure)
     {
@@ -29,10 +29,10 @@ public sealed class AndroidLinkedAccountController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<CurrentAccountErasureResponse>> Erase(
-        [FromBody] AndroidLinkedAccountErasureRequest? request,
+        [FromBody] AndroidLinkedV2AccountErasureRequest? request,
         CancellationToken cancellationToken)
     {
-        ApplyPrivateResponseHeaders();
+        AndroidLinkedV2RequestProofMiddleware.ApplyPrivateResponseHeaders(Response.Headers);
         if (request is null)
         {
             return Problem(
@@ -40,10 +40,9 @@ public sealed class AndroidLinkedAccountController : ControllerBase
                 detail: "linked device payload is required.");
         }
 
-        ClaimedInstallationDto? installation = _installLinking.ResolveInstallationForGrant(
-            request.InstallationId,
-            request.AccessToken);
-        if (installation is null || string.IsNullOrWhiteSpace(installation.SubjectId))
+        if (!AndroidLinkedV2RequestProof.TryGetPrincipal(HttpContext, out AndroidLinkedV2GrantPrincipal? principal)
+            || !string.Equals(request.InstallationId, principal!.Installation.InstallationId, StringComparison.Ordinal)
+            || _installLinking.ResolveAndroidLinkedV2Principal(principal) is not { SubjectId: { Length: > 0 } subjectId })
         {
             return Problem(
                 statusCode: StatusCodes.Status401Unauthorized,
@@ -62,9 +61,7 @@ public sealed class AndroidLinkedAccountController : ControllerBase
 
         try
         {
-            CurrentAccountErasureResponse result = await _erasure.EraseAsync(
-                installation.SubjectId,
-                cancellationToken);
+            CurrentAccountErasureResponse result = await _erasure.EraseAsync(subjectId, cancellationToken);
             return Ok(result);
         }
         catch (HubRequestAuthException ex)
@@ -72,23 +69,11 @@ public sealed class AndroidLinkedAccountController : ControllerBase
             return Problem(
                 statusCode: ex.StatusCode,
                 title: "Account erasure could not be completed.",
-                detail: ex.Message);
+                detail: "The authenticated account-erasure operation failed.");
         }
-    }
-
-    private void ApplyPrivateResponseHeaders()
-    {
-        Response.Headers.CacheControl = "no-store, max-age=0";
-        Response.Headers.Pragma = "no-cache";
-        Response.Headers["X-Content-Type-Options"] = "nosniff";
-        Response.Headers["Referrer-Policy"] = "no-referrer";
-        Response.Headers["Deprecation"] = "true";
-        Response.Headers["Link"] =
-            "</api/v2/android/linked/account/erase>; rel=\"successor-version\"";
     }
 }
 
-public sealed record AndroidLinkedAccountErasureRequest(
+public sealed record AndroidLinkedV2AccountErasureRequest(
     string InstallationId,
-    string AccessToken,
-    string Confirmation);
+    string Confirmation) : AndroidLinkedV2GrantRequest(InstallationId);

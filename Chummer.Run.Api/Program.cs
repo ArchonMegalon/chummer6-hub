@@ -341,6 +341,7 @@ app.UsePlayAuthorizationApiGate();
 app.UseHubRequestObservability();
 app.UseHubApiRuntimeGuardrails();
 app.UseMiddleware<InstallLinkingRequestAdmissionMiddleware>();
+app.UseMiddleware<AndroidLinkedV2RequestProofMiddleware>();
 app.Use(async (context, next) =>
 {
     if (PublicPlaySessionAccessPolicy.RequiresSessionGrant(context.Request))

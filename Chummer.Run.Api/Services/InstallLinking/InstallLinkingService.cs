@@ -11,6 +11,7 @@ public sealed class InstallLinkingService
     public const int MaxRequestBodyBytes = 16 * 1024;
     private const int MaxInstallationIdLength = 64;
     private const int MaxAccessTokenLength = 256;
+    private const int MaxGrantIdLength = 128;
     private const int MaxClaimCodeLength = 128;
     private const int MaxCallbackCodeLength = 256;
     private const int MaxVersionLength = 64;
@@ -428,6 +429,280 @@ public sealed class InstallLinkingService
         }
     }
 
+    public AndroidLinkedV2GrantPrincipal? ResolveAndroidLinkedV2Grant(
+        string? installationId,
+        string? grantId,
+        string? accessToken)
+    {
+        if (!IsDurableStoreReady())
+        {
+            return null;
+        }
+
+        string? normalizedInstallationId;
+        string? normalizedGrantId;
+        string? normalizedAccessToken;
+        try
+        {
+            normalizedInstallationId = NormalizeOptional(
+                installationId,
+                nameof(installationId),
+                MaxInstallationIdLength);
+            normalizedGrantId = NormalizeOptional(grantId, nameof(grantId), MaxGrantIdLength);
+            normalizedAccessToken = NormalizeOptional(
+                accessToken,
+                nameof(accessToken),
+                MaxAccessTokenLength);
+        }
+        catch (InstallLinkingOperationException)
+        {
+            return null;
+        }
+
+        if (normalizedInstallationId is null
+            || normalizedGrantId is null
+            || normalizedAccessToken is null)
+        {
+            return null;
+        }
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            ExpireGrantsLocked(now);
+            if (!TryResolveActiveGrantLocked(
+                    normalizedInstallationId,
+                    normalizedGrantId,
+                    now,
+                    out ClaimedInstallationDto? installation,
+                    out InstallationGrantDto? grant)
+                || !FixedTimeEquals(grant!.AccessToken, normalizedAccessToken))
+            {
+                return null;
+            }
+
+            return new AndroidLinkedV2GrantPrincipal(
+                installation!,
+                grant.GrantId,
+                grant.IssuedAtUtc,
+                grant.ExpiresAtUtc);
+        }
+    }
+
+    internal ClaimedInstallationDto? ResolveAndroidLinkedV2Principal(
+        AndroidLinkedV2GrantPrincipal principal)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
+        if (!IsDurableStoreReady())
+        {
+            return null;
+        }
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            ExpireGrantsLocked(now);
+            return TryResolveActiveGrantLocked(
+                principal.Installation.InstallationId,
+                principal.GrantId,
+                now,
+                out ClaimedInstallationDto? installation,
+                out _)
+                ? installation
+                : null;
+        }
+    }
+
+    internal bool TryUseAndroidLinkedV2Proof(
+        string grantId,
+        string packetKey,
+        DateTimeOffset now,
+        DateTimeOffset expiresAtUtc)
+    {
+        EnsureDurableStoreReady();
+        string normalizedGrantId = NormalizeRequired(grantId, nameof(grantId), MaxGrantIdLength);
+        string normalizedPacketKey = NormalizeRequired(packetKey, nameof(packetKey), 64);
+        if (!AndroidLinkedV2RequestProof.IsValidPacketKey(normalizedPacketKey)
+            || expiresAtUtc <= now)
+        {
+            return false;
+        }
+
+        byte[] keyBytes = Encoding.UTF8.GetBytes($"{normalizedGrantId}\n{normalizedPacketKey}");
+        byte[] keyDigest = SHA256.HashData(keyBytes);
+        string proofKeySha256;
+        try
+        {
+            proofKeySha256 = Convert.ToHexString(keyDigest).ToLowerInvariant();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(keyBytes);
+            CryptographicOperations.ZeroMemory(keyDigest);
+        }
+
+        lock (_store.Gate)
+        {
+            foreach (string expiredKey in _store.AndroidLinkedV2ReplayReceiptsByKey.Values
+                .Where(item => item.ExpiresAtUtc <= now)
+                .Select(static item => item.ProofKeySha256)
+                .ToArray())
+            {
+                _store.AndroidLinkedV2ReplayReceiptsByKey.Remove(expiredKey);
+            }
+
+            if (_store.AndroidLinkedV2ReplayReceiptsByKey.ContainsKey(proofKeySha256)
+                || _store.AndroidLinkedV2ReplayReceiptsByKey.Count
+                    >= InstallLinkingStore.MaxAndroidLinkedV2ReplayReceipts)
+            {
+                return false;
+            }
+
+            _store.AndroidLinkedV2ReplayReceiptsByKey.Add(
+                proofKeySha256,
+                new AndroidLinkedV2ReplayReceipt(proofKeySha256, expiresAtUtc));
+            _store.PersistLocked();
+            return true;
+        }
+    }
+
+    internal AndroidLinkedV2GrantRotationResult RefreshAndroidLinkedV2Grant(
+        AndroidLinkedV2GrantPrincipal principal,
+        AndroidLinkedV2GrantRefreshCommand command)
+    {
+        EnsureDurableStoreReady();
+        ArgumentNullException.ThrowIfNull(principal);
+        ArgumentNullException.ThrowIfNull(command);
+
+        string installationId = NormalizeRequired(
+            command.InstallationId,
+            nameof(command.InstallationId),
+            MaxInstallationIdLength);
+        if (!string.Equals(
+                installationId,
+                principal.Installation.InstallationId,
+                StringComparison.Ordinal))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status401Unauthorized,
+                "installation grant is unknown or expired.");
+        }
+
+        string? headId = NormalizeOptional(command.HeadId, nameof(command.HeadId), MaxHeadIdLength);
+        string? applicationVersion = NormalizeOptional(
+            command.ApplicationVersion,
+            nameof(command.ApplicationVersion),
+            MaxVersionLength);
+        string? channelId = NormalizeOptional(command.ChannelId, nameof(command.ChannelId), MaxChannelIdLength);
+        string? platform = NormalizeOptional(command.Platform, nameof(command.Platform), MaxPlatformLength);
+        string? arch = NormalizeOptional(command.Architecture, nameof(command.Architecture), MaxArchLength);
+        string? publicKey = NormalizeOptional(command.PublicKey, nameof(command.PublicKey), MaxPublicKeyLength);
+        string? hostLabel = NormalizeOptional(command.HostLabel, nameof(command.HostLabel), MaxHostLabelLength);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        lock (_store.Gate)
+        {
+            ExpireTicketsLocked(now);
+            ExpireGrantsLocked(now);
+            if (!TryResolveActiveGrantLocked(
+                    installationId,
+                    principal.GrantId,
+                    now,
+                    out ClaimedInstallationDto? installation,
+                    out InstallationGrantDto? currentGrant))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status401Unauthorized,
+                    "installation grant is unknown or expired.");
+            }
+
+            ClaimedInstallationDto refreshedInstallation = installation! with
+            {
+                UpdatedAtUtc = now,
+                HeadId = headId ?? installation.HeadId,
+                Version = applicationVersion ?? installation.Version,
+                Channel = channelId ?? installation.Channel,
+                Platform = platform ?? installation.Platform,
+                Arch = arch ?? installation.Arch,
+                PublicKey = publicKey ?? installation.PublicKey,
+                HostLabel = hostLabel ?? installation.HostLabel
+            };
+            InstallationGrantDto nextGrant = CreateGrantLocked(refreshedInstallation, now);
+            _store.GrantsById[currentGrant!.GrantId] = currentGrant with
+            {
+                Status = InstallationGrantStates.Revoked
+            };
+            refreshedInstallation = refreshedInstallation with
+            {
+                GrantId = nextGrant.GrantId,
+                UpdatedAtUtc = now
+            };
+
+            _store.InstallationsById[refreshedInstallation.InstallationId] = refreshedInstallation;
+            _store.GrantsById[nextGrant.GrantId] = nextGrant;
+            _store.PersistLocked();
+            return new AndroidLinkedV2GrantRotationResult(
+                refreshedInstallation,
+                ToAndroidLinkedV2GrantMetadata(nextGrant),
+                nextGrant.AccessToken);
+        }
+    }
+
+    internal AndroidLinkedV2GrantRevocationResult RevokeAndroidLinkedV2Grant(
+        AndroidLinkedV2GrantPrincipal principal)
+    {
+        EnsureDurableStoreReady();
+        ArgumentNullException.ThrowIfNull(principal);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        lock (_store.Gate)
+        {
+            ExpireGrantsLocked(now);
+            string installationId = principal.Installation.InstallationId;
+            if (!TryResolveActiveGrantLocked(
+                    installationId,
+                    principal.GrantId,
+                    now,
+                    out ClaimedInstallationDto? installation,
+                    out _))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status401Unauthorized,
+                    "installation grant is unknown or expired.");
+            }
+
+            ClaimedInstallationDto revokedInstallation = installation! with
+            {
+                Status = ClaimedInstallationStates.Revoked,
+                GrantId = null,
+                UpdatedAtUtc = now
+            };
+            _store.InstallationsById[installationId] = revokedInstallation;
+
+            InstallationGrantDto[] revokedGrants = _store.GrantsById.Values
+                .Where(item => string.Equals(
+                    item.InstallationId,
+                    installationId,
+                    StringComparison.OrdinalIgnoreCase))
+                .Where(item => string.Equals(
+                    item.Status,
+                    InstallationGrantStates.Active,
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(item => item with { Status = InstallationGrantStates.Revoked })
+                .ToArray();
+            foreach (InstallationGrantDto revokedGrant in revokedGrants)
+            {
+                _store.GrantsById[revokedGrant.GrantId] = revokedGrant;
+            }
+
+            RevokeBrowserCallbacksForInstallationLocked(installationId);
+            _store.PersistLocked();
+            return new AndroidLinkedV2GrantRevocationResult(
+                revokedInstallation,
+                revokedGrants.Select(ToAndroidLinkedV2GrantMetadata).ToArray());
+        }
+    }
+
     public IssueInstallBrowserCallbackResponseDto IssueBrowserCallback(
         IssueInstallBrowserCallbackRequestDto request,
         string? userId,
@@ -736,6 +1011,149 @@ public sealed class InstallLinkingService
         }
     }
 
+    public PollInstallBrowserCallbackResult PollBrowserCallbackV2(
+        AndroidInstallLinkProofPollV2Request request)
+    {
+        EnsureDurableStoreReady();
+        ArgumentNullException.ThrowIfNull(request);
+
+        string installationId = NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength);
+        string headId = NormalizeRequired(request.HeadId, nameof(request.HeadId), MaxHeadIdLength);
+        string applicationVersion = NormalizeRequired(request.ApplicationVersion, nameof(request.ApplicationVersion), MaxVersionLength);
+        string channelId = NormalizeRequired(request.ChannelId, nameof(request.ChannelId), MaxChannelIdLength);
+        string platform = NormalizeRequired(request.Platform, nameof(request.Platform), MaxPlatformLength);
+        string architecture = NormalizeRequired(request.Architecture, nameof(request.Architecture), MaxArchLength);
+        string publicKey = NormalizeRequired(request.PublicKey, nameof(request.PublicKey), MaxPublicKeyLength);
+        string nonce = NormalizeRequired(request.Nonce, nameof(request.Nonce), MaxProofNonceLength);
+        string signature = NormalizeRequired(request.Signature, nameof(request.Signature), MaxProofSignatureLength);
+        string? hostLabel = NormalizeOptional(request.HostLabel, nameof(request.HostLabel), MaxHostLabelLength);
+        if (nonce.Length < 16 || !nonce.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
+        {
+            throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof nonce is invalid.");
+        }
+
+        byte[] publicKeyBytes = DecodeBase64(publicKey, "public key");
+        byte[] signatureBytes = DecodeBase64(signature, "signature");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        long nowUnixSeconds = now.ToUnixTimeSeconds();
+        long allowedSkewSeconds = (long)AndroidLinkedV2RequestProof.MaximumClockSkew.TotalSeconds;
+        if (request.IssuedAtUnixSeconds <= 0
+            || request.IssuedAtUnixSeconds < nowUnixSeconds - allowedSkewSeconds
+            || request.IssuedAtUnixSeconds > nowUnixSeconds + allowedSkewSeconds)
+        {
+            CryptographicOperations.ZeroMemory(publicKeyBytes);
+            CryptographicOperations.ZeroMemory(signatureBytes);
+            throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof timestamp is outside the allowed window.");
+        }
+
+        try
+        {
+            using RSA rsa = RSA.Create();
+            try
+            {
+                rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out int bytesRead);
+                if (bytesRead != publicKeyBytes.Length || rsa.KeySize is < 2048 or > 4096)
+                {
+                    throw new CryptographicException("unsupported key size");
+                }
+            }
+            catch (CryptographicException)
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof public key is invalid.");
+            }
+
+            string canonicalPublicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+            lock (_store.Gate)
+            {
+                ExpireBrowserCallbacksLocked(now);
+                ExpireGrantsLocked(now);
+
+                InstallBrowserCallbackDto? callback = _store.BrowserCallbacksById.Values
+                    .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(static item => item.CreatedAtUtc)
+                    .FirstOrDefault();
+                if (callback is null)
+                {
+                    return new PollInstallBrowserCallbackResult(
+                        new AndroidInstallLinkProofPollStatus(
+                            InstallBrowserCallbackStates.Pending,
+                            Completed: false,
+                            Terminal: false,
+                            ExpiresAtUtc: now.Add(_browserCallbackLifetime)),
+                        Exchange: null);
+                }
+
+                if (callback.ExpiresAtUtc <= now
+                    || string.Equals(callback.Status, InstallBrowserCallbackStates.Expired, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status410Gone, "browser callback expired before it could be completed.");
+                }
+                if (string.Equals(callback.Status, InstallBrowserCallbackStates.Revoked, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was revoked.");
+                }
+                if (string.Equals(callback.Status, InstallBrowserCallbackStates.Redeemed, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was already completed; start a fresh link.");
+                }
+
+                bool callbackMatches = FixedTimeEquals(callback.PublicKey ?? string.Empty, canonicalPublicKey)
+                    && string.Equals(callback.HeadId, headId, StringComparison.Ordinal)
+                    && string.Equals(callback.Version, applicationVersion, StringComparison.Ordinal)
+                    && string.Equals(callback.Channel, channelId, StringComparison.Ordinal)
+                    && string.Equals(callback.Platform, platform, StringComparison.Ordinal)
+                    && string.Equals(callback.Arch, architecture, StringComparison.Ordinal);
+                if (!callbackMatches)
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof does not match the approved install link.");
+                }
+
+                byte[] proof = AndroidInstallLinkV2BootstrapProof.CreateCanonicalPayload(request);
+                bool signatureValid;
+                try
+                {
+                    signatureValid = rsa.VerifyData(
+                        proof,
+                        signatureBytes,
+                        HashAlgorithmName.SHA256,
+                        RSASignaturePadding.Pkcs1);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(proof);
+                }
+                if (!signatureValid)
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof signature is invalid.");
+                }
+
+                ExchangeInstallBrowserCallbackResponseDto exchange = ExchangeBrowserCallback(
+                    new ExchangeInstallBrowserCallbackRequestDto(
+                        callback.CallbackCode,
+                        installationId,
+                        headId,
+                        applicationVersion,
+                        channelId,
+                        platform,
+                        architecture,
+                        canonicalPublicKey,
+                        hostLabel));
+                return new PollInstallBrowserCallbackResult(
+                    new AndroidInstallLinkProofPollStatus(
+                        exchange.Callback.Status,
+                        Completed: true,
+                        Terminal: true,
+                        ExpiresAtUtc: exchange.Callback.ExpiresAtUtc),
+                    exchange);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(publicKeyBytes);
+            CryptographicOperations.ZeroMemory(signatureBytes);
+        }
+    }
+
     public ClaimedInstallationDto? ResolveInstallationForGrant(string? installationId, string? accessToken)
     {
         if (!IsDurableStoreReady())
@@ -785,6 +1203,42 @@ public sealed class InstallLinkingService
             return grant is null ? null : installation;
         }
     }
+
+    private bool TryResolveActiveGrantLocked(
+        string installationId,
+        string grantId,
+        DateTimeOffset now,
+        out ClaimedInstallationDto? installation,
+        out InstallationGrantDto? grant)
+    {
+        grant = null;
+        if (!_store.InstallationsById.TryGetValue(installationId, out installation)
+            || !string.Equals(
+                installation.Status,
+                ClaimedInstallationStates.Active,
+                StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(installation.GrantId, grantId, StringComparison.Ordinal)
+            || !_store.GrantsById.TryGetValue(grantId, out grant)
+            || !string.Equals(grant.InstallationId, installationId, StringComparison.Ordinal)
+            || !string.Equals(grant.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase)
+            || grant.ExpiresAtUtc <= now)
+        {
+            installation = null;
+            grant = null;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static AndroidLinkedV2GrantMetadata ToAndroidLinkedV2GrantMetadata(
+        InstallationGrantDto grant)
+        => new(
+            grant.GrantId,
+            grant.InstallationId,
+            grant.Status,
+            grant.IssuedAtUtc,
+            grant.ExpiresAtUtc);
 
     public bool CanDownloadArtifactWithClaimCode(
         string? artifactId,
@@ -1471,8 +1925,16 @@ public sealed class InstallLinkingService
     {
         byte[] leftBytes = System.Text.Encoding.ASCII.GetBytes(left);
         byte[] rightBytes = System.Text.Encoding.ASCII.GetBytes(right);
-        return leftBytes.Length == rightBytes.Length
-            && CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+        try
+        {
+            return leftBytes.Length == rightBytes.Length
+                && CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(leftBytes);
+            CryptographicOperations.ZeroMemory(rightBytes);
+        }
     }
 
     private static byte[] DecodeBase64(string value, string label)
@@ -1531,11 +1993,50 @@ public sealed record AndroidInstallLinkProofPollRequest(
     string Signature,
     string? HostLabel = null);
 
+public sealed record AndroidInstallLinkProofPollV2Request(
+    string InstallationId,
+    string HeadId,
+    string ApplicationVersion,
+    string ChannelId,
+    string Platform,
+    string Architecture,
+    string PublicKey,
+    long IssuedAtUnixSeconds,
+    string Nonce,
+    string Signature,
+    string? HostLabel = null);
+
 public sealed record AndroidInstallLinkProofPollStatus(
     string State,
     bool Completed,
     bool Terminal,
     DateTimeOffset ExpiresAtUtc);
+
+internal sealed record AndroidLinkedV2GrantRefreshCommand(
+    string InstallationId,
+    string? HeadId,
+    string? ApplicationVersion,
+    string? ChannelId,
+    string? Platform,
+    string? Architecture,
+    string? PublicKey,
+    string? HostLabel);
+
+public sealed record AndroidLinkedV2GrantMetadata(
+    string GrantId,
+    string InstallationId,
+    string Status,
+    DateTimeOffset IssuedAtUtc,
+    DateTimeOffset ExpiresAtUtc);
+
+internal sealed record AndroidLinkedV2GrantRotationResult(
+    ClaimedInstallationDto Installation,
+    AndroidLinkedV2GrantMetadata Grant,
+    string AccessToken);
+
+internal sealed record AndroidLinkedV2GrantRevocationResult(
+    ClaimedInstallationDto Installation,
+    IReadOnlyList<AndroidLinkedV2GrantMetadata> Grants);
 
 public sealed class InstallLinkingOperationException : Exception
 {

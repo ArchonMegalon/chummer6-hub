@@ -14,6 +14,7 @@ public sealed record InstallLinkingPrincipalErasureResult(
 
 public sealed class InstallLinkingStore : IDisposable
 {
+    internal const int MaxAndroidLinkedV2ReplayReceipts = 65_536;
     internal const string EnvelopeFormat = "chummer.install-linking-store";
     internal const int EnvelopeVersion = 2;
     internal const int LegacyEnvelopeVersion = 1;
@@ -141,6 +142,8 @@ public sealed class InstallLinkingStore : IDisposable
     public Dictionary<string, ClaimedInstallationDto> InstallationsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, InstallationGrantDto> GrantsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, PersonalizedInstallScriptLinkDto> PersonalizedInstallScriptsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal Dictionary<string, AndroidLinkedV2ReplayReceipt> AndroidLinkedV2ReplayReceiptsByKey { get; } =
+        new(StringComparer.Ordinal);
 
     internal InstallLinkingEnvelopeCompareExchangeRequest CreateOneShotImportRequest()
     {
@@ -409,7 +412,8 @@ public sealed class InstallLinkingStore : IDisposable
                 BrowserCallbacksById.Values.ToArray(),
                 InstallationsById.Values.ToArray(),
                 GrantsById.Values.ToArray(),
-                PersonalizedInstallScriptsById.Values.ToArray()),
+                PersonalizedInstallScriptsById.Values.ToArray(),
+                AndroidLinkedV2ReplayReceiptsByKey.Values.ToArray()),
             now);
 
     internal static InstallLinkingStoreSnapshot BuildRetainedSnapshot(
@@ -454,6 +458,11 @@ public sealed class InstallLinkingStore : IDisposable
                 .Where(item => item.ExpiresAtUtc >= now.AddDays(-7))
                 .OrderByDescending(static item => item.IssuedAtUtc)
                 .Take(1024)
+                .ToArray(),
+            AndroidLinkedV2ReplayReceipts: (source.AndroidLinkedV2ReplayReceipts ?? [])
+                .Where(item => item.ExpiresAtUtc > now)
+                .OrderBy(static item => item.ExpiresAtUtc)
+                .Take(MaxAndroidLinkedV2ReplayReceipts)
                 .ToArray());
     }
 
@@ -1597,6 +1606,11 @@ public sealed class InstallLinkingStore : IDisposable
         ClaimedInstallationDto[] installations = ValidateCollection(snapshot.Installations, 2048, static item => item.InstallationId, "installation");
         InstallationGrantDto[] grants = ValidateCollection(snapshot.Grants, 4096, static item => item.GrantId, "grant");
         PersonalizedInstallScriptLinkDto[] scripts = ValidateCollection(snapshot.PersonalizedInstallScripts ?? [], 1024, static item => item.ScriptId, "personalized script");
+        AndroidLinkedV2ReplayReceipt[] replayReceipts = ValidateCollection(
+            snapshot.AndroidLinkedV2ReplayReceipts ?? [],
+            MaxAndroidLinkedV2ReplayReceipts,
+            static item => item.ProofKeySha256,
+            "Android linked v2 replay receipt");
 
         foreach (DownloadReceiptDto item in receipts)
         {
@@ -1700,6 +1714,18 @@ public sealed class InstallLinkingStore : IDisposable
             {
                 throw new InvalidDataException("Install-linking personalized script payload is too large.");
             }
+        }
+
+        foreach (AndroidLinkedV2ReplayReceipt item in replayReceipts)
+        {
+            if (item.ProofKeySha256.Length != 64
+                || item.ProofKeySha256.Any(static character =>
+                    character is not (>= '0' and <= '9' or >= 'a' and <= 'f')))
+            {
+                throw new InvalidDataException(
+                    "Install-linking Android linked v2 replay digest is invalid.");
+            }
+            ValidateTimestamp(item.ExpiresAtUtc, "Android linked v2 replay expiry");
         }
     }
 
@@ -1970,6 +1996,7 @@ public sealed class InstallLinkingStore : IDisposable
         InstallationsById.Clear();
         GrantsById.Clear();
         PersonalizedInstallScriptsById.Clear();
+        AndroidLinkedV2ReplayReceiptsByKey.Clear();
 
         foreach (DownloadReceiptDto receipt in snapshot.Receipts ?? Array.Empty<DownloadReceiptDto>())
         {
@@ -1999,6 +2026,11 @@ public sealed class InstallLinkingStore : IDisposable
         foreach (PersonalizedInstallScriptLinkDto script in snapshot.PersonalizedInstallScripts ?? Array.Empty<PersonalizedInstallScriptLinkDto>())
         {
             PersonalizedInstallScriptsById[script.ScriptId] = script;
+        }
+
+        foreach (AndroidLinkedV2ReplayReceipt receipt in snapshot.AndroidLinkedV2ReplayReceipts ?? [])
+        {
+            AndroidLinkedV2ReplayReceiptsByKey[receipt.ProofKeySha256] = receipt;
         }
     }
 
@@ -2075,4 +2107,9 @@ internal sealed record InstallLinkingStoreSnapshot(
     IReadOnlyList<InstallBrowserCallbackDto>? BrowserCallbacks,
     IReadOnlyList<ClaimedInstallationDto> Installations,
     IReadOnlyList<InstallationGrantDto> Grants,
-    IReadOnlyList<PersonalizedInstallScriptLinkDto>? PersonalizedInstallScripts = null);
+    IReadOnlyList<PersonalizedInstallScriptLinkDto>? PersonalizedInstallScripts = null,
+    IReadOnlyList<AndroidLinkedV2ReplayReceipt>? AndroidLinkedV2ReplayReceipts = null);
+
+internal sealed record AndroidLinkedV2ReplayReceipt(
+    string ProofKeySha256,
+    DateTimeOffset ExpiresAtUtc);
