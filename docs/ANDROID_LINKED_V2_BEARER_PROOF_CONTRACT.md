@@ -73,14 +73,25 @@ being the key that must verify the signature and by exact equality with the
 account-approved callback key and install identity. The optional `hostLabel` is
 signed device-supplied display metadata; it is not browser-approved identity.
 Query strings are rejected.
-On success, JSON contains only `{installation, grant, alreadyClaimed}` where
-`grant` is safe metadata. The issued secret and grant ID use the same mandatory
-single response headers as refresh:
+On success, JSON contains only
+`{installation, grant, alreadyClaimed, grantTransport}` where `grant` is safe
+metadata and `grantTransport` is the stable value `android-linked-v2`. The
+issued secret and grant ID use the same mandatory single response headers as
+refresh:
 
 ```text
 Authorization: Bearer <issued installation access token>
 X-Chummer-Grant: <issued grantId>
 ```
+
+If that successful response is lost, the client may retry the exact same signed
+poll body during the original callback/proof lifetime. The Hub returns the
+original installation, grant metadata, grant ID, and bearer; it does not mint a
+second grant. Recovery is bound to the durable callback, original grant,
+transport, owner, key, and a digest of the exact signed request. A changed body,
+key, installation, owner, expired/revoked callback, or expired/revoked/replaced
+grant fails closed. Recovery receipts survive restart and share the same
+PostgreSQL compare-and-swap snapshot as the grant.
 
 ## Required headers
 
@@ -141,14 +152,24 @@ installation. Endpoint substitution is prevented by the signed exact path.
 The refresh request is authenticated with the old bearer/grant and may update
 the install identity fields included in its signed body. A successful refresh
 atomically records the old grant as revoked, issues and persists the replacement,
-and returns safe installation/grant metadata in JSON. The old bearer is invalid
-for both v2 and the retained legacy v1 resolver after commit. The newly issued
+and returns safe installation/grant metadata plus
+`grantTransport: "android-linked-v2"` in JSON. The old bearer is invalid for
+both v2 and the retained legacy v1 resolver after commit. The newly issued
 secret is delivered only in the response header:
 
 ```text
 Authorization: Bearer <new installation access token>
 X-Chummer-Grant: <new grantId>
 ```
+
+If the refresh response is lost, the client may retry the exact old-bearer,
+grant, signed-header, and body tuple until the original proof window closes.
+The Hub recognizes the already-consumed proof only for that completed refresh
+and returns the same replacement bearer and grant metadata. It never rotates a
+second time. Any bearer, packet key, signature, body, installation, key, or
+owner change uses the normal denial path, as does a replacement that is no
+longer the active current v2 grant. The recovery mapping is committed in the
+same durable write/CAS as the rotation.
 
 The response JSON has no access-token member. All v2 responses are private,
 `no-store`, `no-cache`, `no-referrer`, and `nosniff`. Admission logs contain
@@ -158,8 +179,21 @@ are not logged.
 
 ## Version boundary
 
-V1 proof values cannot authorize v2. The v2 middleware does not reinterpret a
-v1 body token as bearer authority, and it does not intercept the legacy v1
-routes. The v2 bootstrap has its own scheme and endpoint binding, so a legacy
-proof cannot authorize it. The v1 callback and linked-account routes remain
-available only for deployed Preview 10 compatibility.
+Every newly issued grant has durable transport authority: `legacy-v1` or
+`android-linked-v2`. V1 proof values and grants cannot authorize v2, and v2
+grants are rejected by the legacy JSON-token resolvers, including legacy grant
+refresh/revoke. Refresh preserves the source transport. The v2 middleware does
+not reinterpret a v1 body token as bearer authority, and it does not intercept
+the legacy v1 routes. The v2 bootstrap has its own scheme and endpoint binding,
+so a legacy proof cannot authorize it.
+
+Snapshots created before transport authority existed have no marker. Those
+unmarked grants migrate only as `legacy-v1`, preserving deployed Preview 10
+clients without guessing v2 authority from mutable installation fields. The old
+record shape cannot distinguish a legacy grant from a v2 grant. Consequently,
+this compatibility migration is safe only when transport authority ships before
+v2 grant issuance; if an earlier v2 build issued grants, those ambiguous grants
+must be invalidated at rollout and the affected devices must relink. Every grant
+issued after this change is explicitly classified, and an explicitly classified
+v2 grant cannot be downgraded through v1. The v1 callback and linked-account
+routes remain available only for Preview 10 compatibility.
