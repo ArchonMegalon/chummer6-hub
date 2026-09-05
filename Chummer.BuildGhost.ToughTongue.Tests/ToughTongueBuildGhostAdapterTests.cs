@@ -337,6 +337,90 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public async Task Provider_answer_with_unknown_json_member_fails_closed()
+    {
+        FakeTransport transport = new(request =>
+        {
+            JsonObject answer = JsonSerializer.SerializeToNode(CreateAnswer(request))!.AsObject();
+            answer["UnreviewedInstruction"] = "apply the character directly";
+            return new ToughTongueBuildGhostTransportResult(true, "ok", answer.ToJsonString());
+        });
+
+        ToughTongueBuildGhostResult result = await CreateAdapter(RemoteConfiguration(), transport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.IsTrue(result.UsedDeterministicFallback);
+        Assert.AreEqual("provider-answer-rejected", result.OutcomeStatus);
+        CollectionAssert.Contains(result.Receipt.ValidationReasons.ToArray(), "provider-answer-invalid-json");
+    }
+
+    [TestMethod]
+    public async Task Provider_answer_requires_every_reference_collection_and_at_least_one_grounding_reference()
+    {
+        FakeTransport missingCollectionTransport = new(request =>
+        {
+            JsonObject answer = JsonSerializer.SerializeToNode(CreateAnswer(request))!.AsObject();
+            answer.Remove(nameof(ToughTongueBuildGhostProviderAnswer.ReferencedSourceAnchorIds));
+            return new ToughTongueBuildGhostTransportResult(true, "ok", answer.ToJsonString());
+        });
+        ToughTongueBuildGhostResult missingCollection = await CreateAdapter(
+                RemoteConfiguration(),
+                missingCollectionTransport)
+            .ExplainAsync(CreateRequest("request-missing-collection", "idem-missing-collection"), CancellationToken.None);
+
+        Assert.AreEqual("provider-answer-rejected", missingCollection.OutcomeStatus);
+        CollectionAssert.Contains(
+            missingCollection.Receipt.ValidationReasons.ToArray(),
+            "provider-source-anchor-references-missing");
+
+        FakeTransport ungroundedTransport = new(request =>
+        {
+            ToughTongueBuildGhostProviderAnswer answer = CreateAnswer(request) with
+            {
+                ReferencedFactIds = [],
+                ReferencedStrategyIds = [],
+                ReferencedRuleExplanationIds = [],
+                ReferencedVariantIds = [],
+                ReferencedMemberRefs = [],
+                ReferencedSourceAnchorIds = []
+            };
+            return new ToughTongueBuildGhostTransportResult(true, "ok", JsonSerializer.Serialize(answer));
+        });
+        ToughTongueBuildGhostResult ungrounded = await CreateAdapter(RemoteConfiguration(), ungroundedTransport)
+            .ExplainAsync(CreateRequest("request-ungrounded", "idem-ungrounded"), CancellationToken.None);
+
+        Assert.AreEqual("provider-answer-rejected", ungrounded.OutcomeStatus);
+        CollectionAssert.Contains(
+            ungrounded.Receipt.ValidationReasons.ToArray(),
+            "provider-grounding-reference-missing");
+    }
+
+    [TestMethod]
+    public async Task Provider_answer_rejects_blank_and_duplicate_authority_references()
+    {
+        FakeTransport transport = new(request =>
+        {
+            ToughTongueBuildGhostProviderAnswer answer = CreateAnswer(request) with
+            {
+                ReferencedFactIds = ["fact:matrix", "fact:matrix"],
+                ReferencedSourceAnchorIds = [" "]
+            };
+            return new ToughTongueBuildGhostTransportResult(true, "ok", JsonSerializer.Serialize(answer));
+        });
+
+        ToughTongueBuildGhostResult result = await CreateAdapter(RemoteConfiguration(), transport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.AreEqual("provider-answer-rejected", result.OutcomeStatus);
+        CollectionAssert.Contains(
+            result.Receipt.ValidationReasons.ToArray(),
+            "provider-fact-reference-duplicate:fact:matrix");
+        CollectionAssert.Contains(
+            result.Receipt.ValidationReasons.ToArray(),
+            "provider-source-anchor-reference-invalid");
+    }
+
+    [TestMethod]
     public async Task Provider_cannot_reference_group_members_without_authorized_visible_scope()
     {
         FakeTransport transport = new(request => Success(request));

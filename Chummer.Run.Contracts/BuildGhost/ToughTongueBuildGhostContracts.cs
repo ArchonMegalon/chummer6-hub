@@ -148,6 +148,7 @@ public sealed record ToughTongueBuildGhostRequest(
     string IdempotencyKey,
     DateTimeOffset RequestedAtUtc);
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ToughTongueBuildGhostProviderAnswer(
     string Schema,
     string RequestId,
