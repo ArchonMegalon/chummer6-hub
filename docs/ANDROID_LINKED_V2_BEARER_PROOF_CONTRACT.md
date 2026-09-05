@@ -33,8 +33,10 @@ bearer and device-proof headers:
 /api/v2/android/linked/groups/{groupId}/chronicles/{chronicleProjectId}/handoff
 ```
 
-The body is UTF-8 JSON and contains `installationId` plus only the endpoint's
-domain fields. An `accessToken` property at any nesting level is rejected.
+The body is UTF-8 JSON and contains exactly one top-level, camel-cased
+`installationId` plus only the endpoint's domain fields. Duplicate or
+case-variant installation identity properties fail closed. An `accessToken`
+property at any nesting level is rejected.
 
 ## V2 install-link bootstrap
 
@@ -99,7 +101,13 @@ installation, active status, expiry, and stored installation public key as one
 atomic authorization decision.
 
 The packet timestamp must be within two minutes of Hub time. A packet key is
-single-use for that grant within the acceptance window. Reuse returns `409`;
+single-use for that grant within the acceptance window. Replay receipts are
+stored as non-secret SHA-256 keys inside the encrypted InstallLinking durable
+snapshot. They therefore survive process restart and participate in the same
+PostgreSQL compare-and-swap authority when that shared authority is active.
+The local-file authority already enforces its existing exclusive writer lease.
+If replay receipt persistence or shared compare-and-swap fails, admission fails
+closed with `503`; the request is never dispatched. Reuse returns `409`;
 missing, malformed, substituted, expired, or incorrectly signed authority
 returns `401` without echoing credentials.
 
@@ -132,8 +140,10 @@ installation. Endpoint substitution is prevented by the signed exact path.
 
 The refresh request is authenticated with the old bearer/grant and may update
 the install identity fields included in its signed body. A successful refresh
-atomically revokes the old grant and returns safe installation/grant metadata in
-JSON. The newly issued secret is delivered only in the response header:
+atomically records the old grant as revoked, issues and persists the replacement,
+and returns safe installation/grant metadata in JSON. The old bearer is invalid
+for both v2 and the retained legacy v1 resolver after commit. The newly issued
+secret is delivered only in the response header:
 
 ```text
 Authorization: Bearer <new installation access token>

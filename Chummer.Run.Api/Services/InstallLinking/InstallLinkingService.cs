@@ -513,6 +513,59 @@ public sealed class InstallLinkingService
         }
     }
 
+    internal bool TryUseAndroidLinkedV2Proof(
+        string grantId,
+        string packetKey,
+        DateTimeOffset now,
+        DateTimeOffset expiresAtUtc)
+    {
+        EnsureDurableStoreReady();
+        string normalizedGrantId = NormalizeRequired(grantId, nameof(grantId), MaxGrantIdLength);
+        string normalizedPacketKey = NormalizeRequired(packetKey, nameof(packetKey), 64);
+        if (!AndroidLinkedV2RequestProof.IsValidPacketKey(normalizedPacketKey)
+            || expiresAtUtc <= now)
+        {
+            return false;
+        }
+
+        byte[] keyBytes = Encoding.UTF8.GetBytes($"{normalizedGrantId}\n{normalizedPacketKey}");
+        byte[] keyDigest = SHA256.HashData(keyBytes);
+        string proofKeySha256;
+        try
+        {
+            proofKeySha256 = Convert.ToHexString(keyDigest).ToLowerInvariant();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(keyBytes);
+            CryptographicOperations.ZeroMemory(keyDigest);
+        }
+
+        lock (_store.Gate)
+        {
+            foreach (string expiredKey in _store.AndroidLinkedV2ReplayReceiptsByKey.Values
+                .Where(item => item.ExpiresAtUtc <= now)
+                .Select(static item => item.ProofKeySha256)
+                .ToArray())
+            {
+                _store.AndroidLinkedV2ReplayReceiptsByKey.Remove(expiredKey);
+            }
+
+            if (_store.AndroidLinkedV2ReplayReceiptsByKey.ContainsKey(proofKeySha256)
+                || _store.AndroidLinkedV2ReplayReceiptsByKey.Count
+                    >= InstallLinkingStore.MaxAndroidLinkedV2ReplayReceipts)
+            {
+                return false;
+            }
+
+            _store.AndroidLinkedV2ReplayReceiptsByKey.Add(
+                proofKeySha256,
+                new AndroidLinkedV2ReplayReceipt(proofKeySha256, expiresAtUtc));
+            _store.PersistLocked();
+            return true;
+        }
+    }
+
     internal AndroidLinkedV2GrantRotationResult RefreshAndroidLinkedV2Grant(
         AndroidLinkedV2GrantPrincipal principal,
         AndroidLinkedV2GrantRefreshCommand command)
@@ -556,7 +609,7 @@ public sealed class InstallLinkingService
                     principal.GrantId,
                     now,
                     out ClaimedInstallationDto? installation,
-                    out _))
+                    out InstallationGrantDto? currentGrant))
             {
                 throw new InstallLinkingOperationException(
                     StatusCodes.Status401Unauthorized,
@@ -575,6 +628,10 @@ public sealed class InstallLinkingService
                 HostLabel = hostLabel ?? installation.HostLabel
             };
             InstallationGrantDto nextGrant = CreateGrantLocked(refreshedInstallation, now);
+            _store.GrantsById[currentGrant!.GrantId] = currentGrant with
+            {
+                Status = InstallationGrantStates.Revoked
+            };
             refreshedInstallation = refreshedInstallation with
             {
                 GrantId = nextGrant.GrantId,

@@ -67,8 +67,25 @@ public sealed class AndroidLinkedV2BearerProofTests
         Assert.DoesNotContain(signed.Signature, observed, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("{\"installationId\":\"android-v2\",\"installationId\":\"android-v2\"}")]
+    [InlineData("{\"InstallationId\":\"android-v2\"}")]
+    [InlineData("{\"installationId\":\"android-v2\",\"INSTALLATIONID\":\"android-v2\"}")]
+    public async Task V2_rejects_duplicate_or_case_variant_installation_identity(string body)
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign("/api/v2/android/linked/groups", body);
+        DefaultHttpContext context = signed.CreateContext();
+        bool dispatched = false;
+
+        await fixture.InvokeAsync(context, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+    }
+
     [Fact]
-    public async Task V2_proof_rejects_endpoint_and_grant_substitution_and_replay()
+    public async Task V2_proof_rejects_endpoint_and_grant_substitution_and_replay_after_store_restart()
     {
         using Fixture fixture = new();
         SignedRequest signed = fixture.Sign(
@@ -80,6 +97,7 @@ public sealed class AndroidLinkedV2BearerProofTests
         await fixture.InvokeAsync(accepted, _ => dispatches++);
         Assert.Equal(StatusCodes.Status204NoContent, accepted.Response.StatusCode);
 
+        fixture.Reload();
         DefaultHttpContext replay = signed.CreateContext();
         await fixture.InvokeAsync(replay, _ => dispatches++);
         Assert.Equal(StatusCodes.Status409Conflict, replay.Response.StatusCode);
@@ -193,7 +211,34 @@ public sealed class AndroidLinkedV2BearerProofTests
         Assert.DoesNotContain(rotatedToken, responseJson, StringComparison.Ordinal);
         Assert.DoesNotContain("accessToken", responseJson, StringComparison.OrdinalIgnoreCase);
         Assert.Null(fixture.Service.ResolveAndroidLinkedV2Grant("android-v2", Fixture.GrantId, Fixture.AccessToken));
+        Assert.Null(fixture.Service.ResolveInstallationForGrant("android-v2", Fixture.AccessToken));
         Assert.NotNull(fixture.Service.ResolveAndroidLinkedV2Grant("android-v2", response.Grant.GrantId, rotatedToken));
+    }
+
+    [Fact]
+    public async Task Refresh_revokes_old_bearer_for_legacy_v1_resolver()
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\"}";
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/grants/refresh", body);
+        DefaultHttpContext context = signed.CreateContext();
+
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            var controller = new InstallLinkingV2Controller(
+                fixture.Service,
+                fixture.WorkspaceSnapshots,
+                fixture.TimeProvider)
+            {
+                ControllerContext = new ControllerContext { HttpContext = httpContext }
+            };
+            Assert.IsType<OkObjectResult>(controller.RefreshGrant(
+                new AndroidLinkedV2GrantRefreshRequest("android-v2")).Result);
+        });
+
+        Assert.Null(fixture.Service.ResolveInstallationForGrant(
+            "android-v2",
+            Fixture.AccessToken));
     }
 
     [Fact]
@@ -366,8 +411,9 @@ public sealed class AndroidLinkedV2BearerProofTests
     {
         private readonly string _root;
         private readonly RSA _key = RSA.Create(2048);
-        private readonly InstallLinkingStore _store;
-        private readonly AndroidLinkedV2ReplayStore _replay = new();
+        private readonly IConfiguration _configuration;
+        private readonly IDataProtectionProvider _protection;
+        private InstallLinkingStore _store;
 
         public Fixture()
         {
@@ -376,18 +422,18 @@ public sealed class AndroidLinkedV2BearerProofTests
                 "chummer-android-linked-v2-tests",
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_root);
-            IConfiguration configuration = new ConfigurationBuilder()
+            _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking-store.json"),
                     ["CHUMMER_INSTALL_LINKED_WORKSPACE_STORE_PATH"] = Path.Combine(_root, "workspace-store.json")
                 })
                 .Build();
-            IDataProtectionProvider protection = DataProtectionProvider.Create(Path.Combine(_root, "keys"));
-            _store = new InstallLinkingStore(configuration, protection, NullLogger<InstallLinkingStore>.Instance);
-            Service = new InstallLinkingService(_store, configuration);
+            _protection = DataProtectionProvider.Create(Path.Combine(_root, "keys"));
+            _store = CreateStore();
+            Service = new InstallLinkingService(_store, _configuration);
             WorkspaceSnapshots = new InstallLinkedWorkspaceSnapshotService(
-                new InstallLinkedWorkspaceSnapshotStore(configuration));
+                new InstallLinkedWorkspaceSnapshotStore(_configuration));
             TimeProvider = new FixedTimeProvider(DateTimeOffset.UtcNow);
 
             lock (_store.Gate)
@@ -426,10 +472,17 @@ public sealed class AndroidLinkedV2BearerProofTests
 
         public const string GrantId = "grant-android-v2";
         public const string AccessToken = "token-android-v2";
-        public InstallLinkingService Service { get; }
+        public InstallLinkingService Service { get; private set; }
         public InstallLinkedWorkspaceSnapshotService WorkspaceSnapshots { get; }
         public TimeProvider TimeProvider { get; }
         public CapturingLogger Logger { get; } = new();
+
+        public void Reload()
+        {
+            _store.Dispose();
+            _store = CreateStore();
+            Service = new InstallLinkingService(_store, _configuration);
+        }
 
         public SignedRequest Sign(string path, string body)
         {
@@ -550,14 +603,20 @@ public sealed class AndroidLinkedV2BearerProofTests
                 context,
                 Service,
                 new AndroidLinkedV2RequestProofVerifier(),
-                _replay,
                 TimeProvider);
         }
+
+        private InstallLinkingStore CreateStore()
+            => new(
+                _configuration,
+                _protection,
+                NullLogger<InstallLinkingStore>.Instance);
 
         public void Dispose()
         {
             _key.Dispose();
             _store.Dispose();
+            (_protection as IDisposable)?.Dispose();
             if (Directory.Exists(_root))
             {
                 Directory.Delete(_root, recursive: true);

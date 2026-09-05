@@ -109,37 +109,6 @@ public static class AndroidLinkedV2RequestProof
     }
 }
 
-public sealed class AndroidLinkedV2ReplayStore
-{
-    private const int MaximumLivePackets = 65_536;
-    private readonly object _gate = new();
-    private readonly Dictionary<string, DateTimeOffset> _expiresByPacket = new(StringComparer.Ordinal);
-
-    public bool TryUse(string grantId, string packetKey, DateTimeOffset now, DateTimeOffset expiresAtUtc)
-    {
-        string scopedKey = $"{grantId}\n{packetKey}";
-        lock (_gate)
-        {
-            foreach (string expired in _expiresByPacket
-                .Where(item => item.Value <= now)
-                .Select(static item => item.Key)
-                .ToArray())
-            {
-                _expiresByPacket.Remove(expired);
-            }
-
-            if (_expiresByPacket.ContainsKey(scopedKey)
-                || _expiresByPacket.Count >= MaximumLivePackets)
-            {
-                return false;
-            }
-
-            _expiresByPacket.Add(scopedKey, expiresAtUtc);
-            return true;
-        }
-    }
-}
-
 public sealed class AndroidLinkedV2RequestProofVerifier
 {
     public bool Verify(
@@ -234,7 +203,6 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
         HttpContext context,
         InstallLinkingService installLinking,
         AndroidLinkedV2RequestProofVerifier verifier,
-        AndroidLinkedV2ReplayStore replayStore,
         TimeProvider timeProvider)
     {
         string path = context.Request.Path.Value ?? string.Empty;
@@ -321,7 +289,26 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                 await DenyAsync(context, StatusCodes.Status401Unauthorized, "proof-invalid");
                 return;
             }
-            if (!replayStore.TryUse(grantId, packetKey, now, replayExpiry))
+            bool acceptedReplayReceipt;
+            try
+            {
+                acceptedReplayReceipt = installLinking.TryUseAndroidLinkedV2Proof(
+                    grantId,
+                    packetKey,
+                    now,
+                    replayExpiry);
+            }
+            catch (Exception)
+            {
+                // Replay authority is part of authentication. Do not dispatch or include
+                // persistence/authority exception text in the response or admission log.
+                await DenyAsync(
+                    context,
+                    StatusCodes.Status503ServiceUnavailable,
+                    "replay-authority-unavailable");
+                return;
+            }
+            if (!acceptedReplayReceipt)
             {
                 await DenyAsync(context, StatusCodes.Status409Conflict, "proof-replay");
                 return;
@@ -396,17 +383,32 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
 
             bool containsAccessToken = ContainsProperty(document.RootElement, "accessToken");
             string? installationId = null;
+            int installationIdPropertyCount = 0;
+            bool canonicalInstallationIdProperty = true;
             foreach (JsonProperty property in document.RootElement.EnumerateObject())
             {
-                if (string.Equals(property.Name, "installationId", StringComparison.OrdinalIgnoreCase)
-                    && property.Value.ValueKind == JsonValueKind.String)
+                if (string.Equals(property.Name, "installationId", StringComparison.OrdinalIgnoreCase))
                 {
-                    installationId = property.Value.GetString()?.Trim();
-                    break;
+                    installationIdPropertyCount++;
+                    canonicalInstallationIdProperty &= string.Equals(
+                        property.Name,
+                        "installationId",
+                        StringComparison.Ordinal);
+                    if (property.Value.ValueKind == JsonValueKind.String)
+                    {
+                        string? observed = property.Value.GetString();
+                        if (observed is not null
+                            && string.Equals(observed, observed.Trim(), StringComparison.Ordinal))
+                        {
+                            installationId = observed;
+                        }
+                    }
                 }
             }
 
-            bool validInstallation = installationId is { Length: > 0 and <= 64 };
+            bool validInstallation = installationIdPropertyCount == 1
+                && canonicalInstallationIdProperty
+                && installationId is { Length: > 0 and <= 64 };
             return new BodyInspection(validInstallation, containsAccessToken, installationId);
         }
         catch (JsonException)
@@ -492,6 +494,7 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                 StatusCodes.Status400BadRequest => "Android v2 request is invalid.",
                 StatusCodes.Status409Conflict => "Android v2 request proof was already used.",
                 StatusCodes.Status413PayloadTooLarge => "Android v2 request is too large.",
+                StatusCodes.Status503ServiceUnavailable => "Android v2 authorization is temporarily unavailable.",
                 _ => "Android v2 authorization is missing or invalid."
             }
         }, cancellationToken: context.RequestAborted);
