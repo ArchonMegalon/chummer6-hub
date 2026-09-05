@@ -39,6 +39,10 @@ See [`ROOK_PRIVATE_HOSTING_HANDOFF.md`](ROOK_PRIVATE_HOSTING_HANDOFF.md) for the
 exact source/runtime boundary, blocker map, first-rollout sequencing, and
 operator stop conditions. This source does not activate or configure a
 VidBoard asset, Zoom, Teams, Tough Tongue, Cloudflare, or a public route.
+The distinct
+[`ROOK_AVATAR_GATEWAY_STATUS.md`](ROOK_AVATAR_GATEWAY_STATUS.md) matrix keeps
+implemented, tested, deployable, provider-enabled, and live-authoritative
+claims separate for the unmerged gateway foundation.
 
 For the first provider-disabled Rook transition, use the governed
 [`deploy-first-provider-disabled-rook-lane.sh`](deploy-first-provider-disabled-rook-lane.sh)

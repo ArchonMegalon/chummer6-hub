@@ -15,6 +15,11 @@ CADDY = (ROOT / "ops/build-ghost-private-nonprod/Caddyfile").read_text(encoding=
 HANDOFF = (ROOT / "ops/build-ghost-private-nonprod/ROOK_PRIVATE_HOSTING_HANDOFF.md").read_text(
     encoding="utf-8"
 )
+AVATAR_STATUS = (
+    ROOT / "ops/build-ghost-private-nonprod/ROOK_AVATAR_GATEWAY_STATUS.md"
+).read_text(encoding="utf-8")
+AI_PROGRAM = (ROOT / "Chummer.Run.AI/Program.cs").read_text(encoding="utf-8")
+RUN_API_PROGRAM = (ROOT / "Chummer.Run.Api/Program.cs").read_text(encoding="utf-8")
 
 
 def service_block(name: str, next_name: str) -> str:
@@ -32,6 +37,28 @@ def test_presentation_reaches_rook_support_only_over_the_internal_ai_boundary() 
     assert "build-ghost-loopback" not in presentation
     assert "/api/v1/ai/build-ghost/support-experience" not in CADDY
     assert "/account/alice" not in CADDY
+
+
+def test_avatar_gateway_status_is_fail_closed_and_not_added_to_private_or_public_ingress() -> None:
+    for required in (
+        "Implemented | **Yes, candidate source.**",
+        "Tested | **Focused local verification required for each exact commit.**",
+        "Deployable | **No.**",
+        "Provider enabled | **No.**",
+        "Live authoritative | **No.**",
+        "`CHUMMER_AVATAR_GATEWAY_PROVIDER_ENABLED`",
+        "there is no `/api/v1/avatar` controller",
+        "The Hub contains no static rule lookup",
+        "current source always returns the deterministic `unavailable` envelope",
+    ):
+        assert required in AVATAR_STATUS
+    assert "/api/v1/avatar" not in CADDY
+    assert "/api/internal/avatar" not in CADDY
+    ai = service_block("chummer-build-ghost-ai", "build-ghost-private-edge")
+    assert "CHUMMER_AVATAR_" not in ai
+    assert "AddSingleton<IAvatarGatewayService>" in AI_PROGRAM
+    assert "AddHttpClient<IAvatarRuleAuthorityClient, AvatarRuleAuthorityClient>" in AI_PROGRAM
+    assert "IAvatarGatewayService" not in RUN_API_PROGRAM
 
 
 def test_live_provider_and_vidboard_inputs_are_literal_empty_and_remote_is_default_off() -> None:
