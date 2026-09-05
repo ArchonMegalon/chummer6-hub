@@ -422,6 +422,81 @@ def test_synthetic_workspace_rejects_linked_worktree_git_file(
         runner._validate_build_workspace_paths()
 
 
+def test_sealed_repository_binds_only_tracked_internal_symlinks(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    repository = tmp_path / "standalone"
+    repository.mkdir()
+    subprocess.run(
+        ["git", "init", "--initial-branch=main", str(repository)],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.name", "Test"],
+        check=True,
+    )
+    target = repository / "target.txt"
+    target.write_text("bound target\n", encoding="utf-8")
+    (repository / "current").symlink_to("target.txt")
+    subprocess.run(
+        ["git", "-C", str(repository), "add", "target.txt", "current"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-m", "fixture"],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
+    seal_test_repository(repository)
+
+    module.validate_sealed_standalone_repository(repository)
+    first_record = module._source_file_record(repository, "current")
+    assert first_record["entryType"] == "symlink"
+    assert first_record["linkTarget"] == "target.txt"
+    assert first_record["sha256"] == module.sha256_bytes(b"target.txt")
+
+    unseal_test_repository(repository)
+    (repository / "untracked-link").symlink_to("target.txt")
+    seal_test_repository(repository)
+    with pytest.raises(
+        module.CutoverError,
+        match="exactly match tracked Git symlinks",
+    ):
+        module.validate_sealed_standalone_repository(repository)
+
+
+def test_source_content_symlink_digest_binds_link_text_and_rejects_escape(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    repository = tmp_path / "source"
+    repository.mkdir()
+    (repository / "first").write_text("same\n", encoding="utf-8")
+    (repository / "second").write_text("same\n", encoding="utf-8")
+    link = repository / "current"
+    link.symlink_to("first")
+
+    first, _, _ = module.source_content_sha256(repository, ["current"])
+    link.unlink()
+    link.symlink_to("second")
+    second, _, _ = module.source_content_sha256(repository, ["current"])
+    assert first != second
+
+    outside = tmp_path / "outside"
+    outside.write_text("outside\n", encoding="utf-8")
+    link.unlink()
+    link.symlink_to("../outside")
+    with pytest.raises(module.CutoverError, match="resolve within"):
+        module.source_content_sha256(repository, ["current"])
+
+
 @pytest.mark.parametrize(
     "relative_path",
     (
@@ -1411,6 +1486,154 @@ def test_candidate_build_rejects_external_source_drift_during_build(
         runner._build_candidates()
 
     assert not runner.candidate_build_info_path.exists()
+
+
+def test_tool_image_build_only_dispatches_one_build_and_writes_private_receipt(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    canonical_tool = "sha256:" + "d" * 64
+
+    class Harness(module.GovernedCutoverRunner):
+        def _validate_source(self):
+            return None
+
+        def _write_build_override(self):
+            module.write_private_json(self.build_override, {})
+
+        def _validate_rendered_tool_build_only(self):
+            return None
+
+        def _require_candidate_tags_absent(self):
+            return None
+
+        def _capture_build_source_provenance(self):
+            return {
+                "run-services-source": {"head": self.inputs.expected_head},
+                "hub-registry": {
+                    "head": self.inputs.expected_hub_registry_head,
+                },
+                "design-product": {
+                    "head": self.inputs.expected_design_product_head,
+                },
+                "fleet-media-factory-contracts": {
+                    "head": self.inputs.expected_fleet_media_factory_head,
+                },
+                "synthetic-build-context": {
+                    "dockerignoreSha256": "f" * 64,
+                },
+                "build-dependency-contract": {
+                    "dockerfileSha256": "e" * 64,
+                },
+            }
+
+        def _final_bind_tool_build_inputs(self):
+            return None
+
+        def _resolve_image(self, tag, *, allow_absent=False):
+            if tag == self.tool_build_only_tag:
+                return TOOL_IMAGE
+            if tag == module.TOOL_CANONICAL_TAG:
+                return canonical_tool
+            if tag == module.PORTAL_CANONICAL_TAG:
+                return IMAGE
+            if tag == self.portal_tag and allow_absent:
+                return ""
+            raise AssertionError(f"unexpected image resolution: {tag}")
+
+    def callback(arguments, _timeout, _check):
+        assert arguments[-4:] == [
+            "--profile",
+            "install-linking-postgres-admin",
+            "build",
+            "chummer-install-linking-postgres-admin",
+        ]
+        return module.CommandResult(0, b"", b"")
+
+    commands = FakeCommands(callback)
+    base = make_runner(module, tmp_path, commands)
+    synthetic = tmp_path / "synthetic"
+    synthetic.mkdir()
+    synthetic.chmod(0o700)
+    runner = Harness(
+        replace(base.inputs, synthetic_workspace_root=synthetic),
+        command_runner=commands,
+    )
+    output = tmp_path / (
+        "INSTALL_LINKING_POSTGRES_TOOL_IMAGE_BUILD.cutover-test.json"
+    )
+
+    result = runner.run_tool_image_build_only(output=output)
+
+    assert result == output
+    assert len(commands.calls) == 1
+    assert output.stat().st_mode & 0o777 == 0o600
+    receipt = json.loads(output.read_text(encoding="utf-8"))
+    assert receipt["contractName"] == module.TOOL_IMAGE_BUILD_ONLY_CONTRACT
+    assert receipt["imageId"] == TOOL_IMAGE
+    assert receipt["imageTag"].startswith(
+        "chummer-install-linking-postgres-tool:build-only-"
+    )
+    assert receipt["buildTarget"] == "install-linking-postgres-tool-final"
+    assert receipt["buildOnly"] is True
+    assert receipt["operatorJobCount"] == 0
+    assert receipt["portalImageBuilt"] is False
+    assert receipt["sourceContentManifestContract"].endswith(".v2")
+    assert receipt["sourceRepositoryCount"] == 4
+    for field in (
+        "cloudflareMutationAuthorized",
+        "credentialGenerationAuthorized",
+        "databaseMutationAuthorized",
+        "deploymentAuthorized",
+        "networkMutationAuthorized",
+        "volumeMutationAuthorized",
+    ):
+        assert receipt[field] is False
+
+
+def test_tool_image_build_only_has_no_operator_or_deployment_call_path() -> None:
+    tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+    runner_class = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef)
+        and node.name == "GovernedCutoverRunner"
+    )
+    method = next(
+        node
+        for node in runner_class.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "run_tool_image_build_only"
+    )
+    called_attributes = {
+        node.func.attr
+        for node in ast.walk(method)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+    }
+    assert called_attributes.isdisjoint(
+        {
+            "_acquire_lease",
+            "_final_bind_compose_inputs",
+            "_materialize",
+            "_run_job",
+            "_validate_rendered_compose",
+            "run_postquiesce_reproof",
+            "verify_source_replay",
+        }
+    )
+    source = ast.get_source_segment(
+        SCRIPT.read_text(encoding="utf-8"),
+        method,
+    )
+    assert source is not None
+    for forbidden in (
+        "docker volume",
+        "compose up",
+        "compose run",
+        "postgresql://",
+    ):
+        assert forbidden not in source.lower()
 
 
 def test_untracked_ignored_file_in_unfiltered_additional_context_is_rejected(

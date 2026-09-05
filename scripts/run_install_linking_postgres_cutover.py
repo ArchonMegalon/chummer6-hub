@@ -145,6 +145,9 @@ CONTRACT_NAME = "chummer.install_linking_postgres_cutover_run.v1"
 CANDIDATE_BUILD_INFO_CONTRACT = (
     "chummer.install_linking_postgres_candidate_build_info.v1"
 )
+TOOL_IMAGE_BUILD_ONLY_CONTRACT = (
+    "chummer.install_linking_postgres_tool_image_build_only.v1"
+)
 SOURCE_REPLAY_PREFLIGHT_CONTRACT = (
     "chummer.install_linking_postgres_source_replay_preflight.v1"
 )
@@ -182,7 +185,7 @@ BUILD_DEPENDENCY_PROVENANCE_CONTRACT = (
     "chummer.install_linking_postgres_build_dependency_provenance.v1"
 )
 SOURCE_CONTENT_MANIFEST_CONTRACT = (
-    "chummer.install_linking_postgres_source_content_manifest.v1"
+    "chummer.install_linking_postgres_source_content_manifest.v2"
 )
 MAX_SOURCE_FILE_BYTES = 256 * 1024 * 1024
 MAX_SOURCE_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
@@ -963,12 +966,61 @@ def _source_file_record(root: Path, relative_path: str) -> dict[str, Any]:
     path = root / relative
     try:
         before = path.lstat()
+    except OSError as exc:
+        raise CutoverError("source content entry is unavailable") from exc
+    if stat.S_ISLNK(before.st_mode):
+        try:
+            link_target_before = os.readlink(path)
+            target_bytes = link_target_before.encode("utf-8", "strict")
+            resolved_target = path.resolve(strict=True)
+        except (OSError, UnicodeError) as exc:
+            raise CutoverError(
+                "source content symlink target is unavailable or invalid"
+            ) from exc
+        target = Path(link_target_before)
+        if (
+            target.is_absolute()
+            or not target_bytes
+            or b"\x00" in target_bytes
+            or len(target_bytes) > MAX_SOURCE_FILE_BYTES
+            or (
+                resolved_target != root
+                and root not in resolved_target.parents
+            )
+        ):
+            raise CutoverError(
+                "source content symlink must resolve within its repository"
+            )
+        after = path.lstat()
+        try:
+            link_target_after = os.readlink(path)
+        except OSError as exc:
+            raise CutoverError(
+                "source content symlink changed while being hashed"
+            ) from exc
+        if (
+            _synthetic_entry_identity(before)
+            != _synthetic_entry_identity(after)
+            or link_target_before != link_target_after
+        ):
+            raise CutoverError(
+                "source content symlink changed while being hashed"
+            )
+        return {
+            "entryType": "symlink",
+            "linkTarget": link_target_before,
+            "linkTargetSha256": sha256_bytes(target_bytes),
+            "mode": f"{stat.S_IMODE(before.st_mode):04o}",
+            "path": relative_path,
+            "sha256": sha256_bytes(target_bytes),
+            "size": len(target_bytes),
+        }
+    try:
         resolved = path.resolve(strict=True)
     except OSError as exc:
         raise CutoverError("source content entry is unavailable") from exc
     if (
         resolved != path
-        or stat.S_ISLNK(before.st_mode)
         or not stat.S_ISREG(before.st_mode)
         or before.st_nlink != 1
         or before.st_size > MAX_SOURCE_FILE_BYTES
@@ -1081,6 +1133,8 @@ def validate_sealed_standalone_repository(repository: Path) -> None:
             "synthetic source must use a real local .git directory"
         )
 
+    worktree_symlinks: set[str] = set()
+
     def visit(directory: Path, *, require_content: bool) -> bool:
         before = directory.lstat()
         if (
@@ -1098,13 +1152,23 @@ def validate_sealed_standalone_repository(repository: Path) -> None:
         for entry in entries:
             path = directory / entry.name
             metadata = path.lstat()
-            if (
-                stat.S_ISLNK(metadata.st_mode)
-                or metadata.st_uid != operator_uid
-                or stat.S_IMODE(metadata.st_mode) & 0o222
-            ):
+            if metadata.st_uid != operator_uid:
                 raise CutoverError(
-                    "synthetic source entries must be operator-owned, non-symlinked, and sealed"
+                    "synthetic source entries must be operator-owned and sealed"
+                )
+            if stat.S_ISLNK(metadata.st_mode):
+                if git_root == path or git_root in path.parents:
+                    raise CutoverError(
+                        "synthetic Git metadata must not contain symlinks"
+                    )
+                relative_path = path.relative_to(repository).as_posix()
+                _source_file_record(repository, relative_path)
+                worktree_symlinks.add(relative_path)
+                has_content = True
+                continue
+            if stat.S_IMODE(metadata.st_mode) & 0o222:
+                raise CutoverError(
+                    "synthetic source entries must be operator-owned and sealed"
                 )
             if stat.S_ISDIR(metadata.st_mode):
                 if path == git_root:
@@ -1150,6 +1214,68 @@ def validate_sealed_standalone_repository(repository: Path) -> None:
     promisor_packs = tuple((git_root / "objects" / "pack").glob("*.promisor"))
     if promisor_packs:
         raise CutoverError("synthetic source uses partial/promisor Git objects")
+    if worktree_symlinks:
+        try:
+            completed = subprocess.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(repository),
+                    "ls-files",
+                    "--stage",
+                    "-z",
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={
+                    "PATH": "/usr/bin:/bin",
+                    "GIT_CONFIG_GLOBAL": "/dev/null",
+                    "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_NO_REPLACE_OBJECTS": "1",
+                    "GIT_OPTIONAL_LOCKS": "0",
+                    "LANG": "C",
+                    "LC_ALL": "C",
+                },
+                timeout=COMMAND_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise CutoverError(
+                "synthetic source Git index inspection timed out"
+            ) from exc
+        if (
+            completed.returncode != 0
+            or len(completed.stdout) > MAX_COMMAND_OUTPUT_BYTES
+            or len(completed.stderr) > MAX_COMMAND_OUTPUT_BYTES
+        ):
+            raise CutoverError(
+                "synthetic source Git index inspection failed"
+            )
+        index_symlinks: set[str] = set()
+        try:
+            records = completed.stdout.decode("utf-8", "strict").split("\0")
+        except UnicodeDecodeError as exc:
+            raise CutoverError(
+                "synthetic source Git index was not UTF-8"
+            ) from exc
+        for record in records:
+            if not record:
+                continue
+            match = re.fullmatch(
+                r"([0-9]{6}) ([0-9a-f]+) ([0-3])\t(.+)",
+                record,
+            )
+            if match is None or match.group(3) != "0":
+                raise CutoverError(
+                    "synthetic source Git index contains an invalid stage"
+                )
+            if match.group(1) == "120000":
+                index_symlinks.add(match.group(4))
+        if index_symlinks != worktree_symlinks:
+            raise CutoverError(
+                "synthetic source symlinks must exactly match tracked Git symlinks"
+            )
 
 
 _docker_logical_instruction_records = docker_logical_instruction_records
@@ -1392,6 +1518,10 @@ class GovernedCutoverRunner:
         suffix = hashlib.sha256(inputs.cutover_id.encode("utf-8")).hexdigest()[:24]
         self.portal_tag = f"chummer-run-api:cutover-{suffix}"
         self.tool_tag = f"chummer-install-linking-postgres-tool:cutover-{suffix}"
+        self.tool_build_only_tag = (
+            "chummer-install-linking-postgres-tool:build-only-"
+            f"{suffix}"
+        )
         self.name_suffix = suffix
         self.build_override = inputs.receipt_root / "compose.cutover-images.override.json"
         self.secret_canary = secrets.token_hex(32)
@@ -2699,6 +2829,90 @@ class GovernedCutoverRunner:
         self.public_network_name = public_name
         self.public_network_id = network_id
 
+    def _validate_rendered_tool_build_only(self) -> None:
+        """Validate only immutable build inputs; never inspect runtime mounts or networks."""
+
+        rendered = self.commands.run(
+            self._compose(
+                "--profile",
+                "*",
+                "config",
+                "--format",
+                "json",
+                project="install-linking-tool-build-only",
+            ),
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        ).stdout
+        try:
+            payload = json.loads(rendered)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise CutoverError(
+                "tool-only rendered Compose contract was not valid JSON"
+            ) from exc
+        services = payload.get("services") if isinstance(payload, dict) else None
+        if not isinstance(services, dict):
+            raise CutoverError(
+                "tool-only rendered Compose contract omitted services"
+            )
+        expected_additional_contexts = {
+            "design-product": str(self.inputs.design_product_root),
+            "fleet-media-factory-contracts": str(
+                self.inputs.fleet_media_factory_root
+                / "src"
+                / "Chummer.Media.Contracts"
+            ),
+            "hub-registry-source": str(self.inputs.hub_registry_root),
+            "run-services-source": str(self.inputs.source_root),
+        }
+        expected_dockerfile = str(
+            self.inputs.source_root / "Chummer.Run.Api" / "Dockerfile"
+        )
+        expected_images = {
+            service_name: (
+                self.portal_tag
+                if service_name == "chummer-portal"
+                else self.tool_tag
+            )
+            for service_name in PUBLIC_EDGE_BUILD_SERVICE_TARGETS
+        }
+        failures = public_edge_rendered_compose_failures(
+            payload,
+            expected_images=expected_images,
+            build_context=str(self.inputs.build_context_root),
+            dockerfile=expected_dockerfile,
+            additional_contexts=expected_additional_contexts,
+        )
+        if failures:
+            raise CutoverError(
+                "tool-only rendered build authority drifted: " + failures[0]
+            )
+        service = services.get("chummer-install-linking-postgres-admin")
+        build = service.get("build") if isinstance(service, dict) else None
+        if (
+            not isinstance(service, dict)
+            or service.get("image") != self.tool_tag
+            or not rendered_build_contract_matches(
+                build,
+                service_name="chummer-install-linking-postgres-admin",
+                build_context=str(self.inputs.build_context_root),
+                dockerfile=expected_dockerfile,
+                additional_contexts=expected_additional_contexts,
+            )
+        ):
+            raise CutoverError(
+                "tool-only rendered admin build authority drifted"
+            )
+
+    def _final_bind_tool_build_inputs(self) -> None:
+        """Make source and build-only Compose bytes the final pre-dispatch reads."""
+
+        self._validate_source()
+        self._bind_existing_build_override()
+        self._validate_rendered_tool_build_only()
+        self._validate_source()
+        self._bind_pinned_source_inputs()
+        self._bind_existing_build_override()
+
     def _final_bind_compose_inputs(
         self,
         *,
@@ -2856,6 +3070,122 @@ class GovernedCutoverRunner:
             self.candidate_build_info_path,
             build_info,
         )
+
+    def run_tool_image_build_only(self, *, output: Path) -> Path:
+        """Build one source-bound operator-tool image without running operator jobs."""
+
+        output = Path(os.path.abspath(output))
+        expected_name = (
+            "INSTALL_LINKING_POSTGRES_TOOL_IMAGE_BUILD."
+            f"{self.inputs.cutover_id}.json"
+        )
+        if (
+            output.parent != self.inputs.receipt_root
+            or output.name != expected_name
+            or output.exists()
+            or output.is_symlink()
+            or self.inputs.synthetic_workspace_root is None
+        ):
+            raise CutoverError(
+                "tool-image build output or synthetic source authority is invalid"
+            )
+
+        self.tool_tag = self.tool_build_only_tag
+        self._validate_source()
+        self._write_build_override()
+        self._validate_rendered_tool_build_only()
+        self._require_candidate_tags_absent()
+        prior_portal = self._resolve_image(PORTAL_CANONICAL_TAG, allow_absent=True)
+        prior_tool = self._resolve_image(TOOL_CANONICAL_TAG, allow_absent=True)
+        source_provenance_before = self._capture_build_source_provenance()
+        expected_provenance_keys = {
+            "build-dependency-contract",
+            "design-product",
+            "fleet-media-factory-contracts",
+            "hub-registry",
+            "run-services-source",
+            "synthetic-build-context",
+        }
+        if set(source_provenance_before) != expected_provenance_keys:
+            raise CutoverError(
+                "tool-only build does not have the exact four-repository source graph"
+            )
+        build_dependency = source_provenance_before.get(
+            "build-dependency-contract"
+        )
+        if not isinstance(build_dependency, dict):
+            raise CutoverError("tool-only build dependency provenance is missing")
+        dockerfile_sha256 = build_dependency.get("dockerfileSha256")
+        if (
+            not isinstance(dockerfile_sha256, str)
+            or HEX_SHA256_PATTERN.fullmatch(dockerfile_sha256) is None
+        ):
+            raise CutoverError("tool-only Dockerfile provenance is invalid")
+        build_command = self._compose(
+            "--profile",
+            "install-linking-postgres-admin",
+            "build",
+            "chummer-install-linking-postgres-admin",
+        )
+        self._final_bind_tool_build_inputs()
+        self.commands.run(build_command, timeout=BUILD_TIMEOUT_SECONDS)
+
+        tool_image_id = self._resolve_image(self.tool_tag)
+        if self._resolve_image(self.portal_tag, allow_absent=True):
+            raise CutoverError(
+                "tool-only build unexpectedly materialized a portal image"
+            )
+        self._validate_source()
+        self._validate_rendered_tool_build_only()
+        source_provenance_after = self._capture_build_source_provenance()
+        if source_provenance_after != source_provenance_before:
+            raise CutoverError("Docker build source changed during tool-only build")
+        if (
+            self._resolve_image(PORTAL_CANONICAL_TAG, allow_absent=True)
+            != prior_portal
+            or self._resolve_image(TOOL_CANONICAL_TAG, allow_absent=True)
+            != prior_tool
+        ):
+            raise CutoverError(
+                "tool-only build changed a canonical deployment tag"
+            )
+        receipt = {
+            "buildCommandSha256": sha256_bytes(
+                canonical_json_bytes(
+                    {"arguments": build_command},
+                    label="tool-only Docker build command",
+                )
+            ),
+            "buildOnly": True,
+            "buildService": "chummer-install-linking-postgres-admin",
+            "buildSourceProvenance": source_provenance_after,
+            "buildTarget": "install-linking-postgres-tool-final",
+            "canonicalPortalTagIdBeforeAndAfter": prior_portal or None,
+            "canonicalToolTagIdBeforeAndAfter": prior_tool or None,
+            "cloudflareMutationAuthorized": False,
+            "composeSha256": self.inputs.compose_sha256,
+            "contractName": TOOL_IMAGE_BUILD_ONLY_CONTRACT,
+            "credentialGenerationAuthorized": False,
+            "cutoverId": self.inputs.cutover_id,
+            "databaseMutationAuthorized": False,
+            "deploymentAuthorized": False,
+            "dockerfileSha256": dockerfile_sha256,
+            "generatedAtUtc": now_iso(),
+            "imageId": tool_image_id,
+            "imageTag": self.tool_tag,
+            "networkMutationAuthorized": False,
+            "operatorJobCount": 0,
+            "portalImageBuilt": False,
+            "runnerSha256": self.inputs.runner_sha256,
+            "sourceContentManifestContract": SOURCE_CONTENT_MANIFEST_CONTRACT,
+            "sourceHead": self.inputs.expected_head,
+            "sourceRepositoryCount": 4,
+            "status": "pass",
+            "tagPurpose": "nondeployment-build-only",
+            "volumeMutationAuthorized": False,
+        }
+        write_private_json(output, receipt)
+        return output
 
     def _materialize(
         self,
@@ -4258,6 +4588,7 @@ class GovernedCutoverRunner:
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-tool-image-only", action="store_true")
     parser.add_argument("--post-quiesce-reproof", action="store_true")
     parser.add_argument("--source-replay-preflight", action="store_true")
     parser.add_argument("--source-root", type=Path, required=True)
@@ -4284,7 +4615,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     )
     parser.add_argument("--cutover-id", required=True)
     parser.add_argument("--receipt-root", type=Path, required=True)
-    parser.add_argument("--boundary-output", type=Path, required=True)
+    parser.add_argument("--boundary-output", type=Path)
     parser.add_argument("--expected-boundary-sha256")
     parser.add_argument("--expected-candidate-image-id")
     parser.add_argument("--expected-candidate-tool-image-id")
@@ -4299,9 +4630,17 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
 
 def validate_args(args: argparse.Namespace) -> CutoverInputs:
-    if args.post_quiesce_reproof and args.source_replay_preflight:
+    selected_modes = sum(
+        bool(value)
+        for value in (
+            args.build_tool_image_only,
+            args.post_quiesce_reproof,
+            args.source_replay_preflight,
+        )
+    )
+    if selected_modes > 1:
         raise CutoverError(
-            "source replay preflight and post-quiesce reproof are exclusive"
+            "tool build, source replay, and post-quiesce modes are exclusive"
         )
     if (
         HEAD_PATTERN.fullmatch(args.expected_head) is None
@@ -4377,9 +4716,55 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
     receipt_root = validate_private_directory(
         Path(os.path.abspath(args.receipt_root))
     )
-    boundary_output = Path(os.path.abspath(args.boundary_output))
     if env_file != CANONICAL_ENV_FILE:
         raise CutoverError("cutover requires the canonical public-edge environment file")
+    if args.build_tool_image_only:
+        if (
+            synthetic_workspace_root is None
+            or args.output is None
+            or args.boundary_output is not None
+            or any(
+                value is not None
+                for value in (
+                    args.expected_boundary_sha256,
+                    args.expected_candidate_image_id,
+                    args.expected_candidate_tool_image_id,
+                    args.shared_mutation_lock_token,
+                    args.reproof_attempt_id,
+                    args.volume_inventory_receipt,
+                    args.expected_volume_inventory_sha256,
+                    args.active_build_info,
+                    args.expected_active_build_info_sha256,
+                )
+            )
+        ):
+            raise CutoverError(
+                "tool-only build requires only exact synthetic source and output inputs"
+            )
+        output = Path(os.path.abspath(args.output))
+        if (
+            output.parent != receipt_root
+            or output.name
+            != (
+                "INSTALL_LINKING_POSTGRES_TOOL_IMAGE_BUILD."
+                f"{args.cutover_id}.json"
+            )
+            or output.exists()
+            or output.is_symlink()
+        ):
+            raise CutoverError(
+                "tool-only build output must be a new canonical receipt path"
+            )
+        args.output = output
+        boundary_output = receipt_root / (
+            ".unused-tool-image-build-boundary."
+            f"{args.cutover_id}"
+        )
+    else:
+        if args.boundary_output is None:
+            raise CutoverError("cutover and reproof modes require a boundary output")
+        boundary_output = Path(os.path.abspath(args.boundary_output))
+
     if args.source_replay_preflight:
         if (
             args.active_build_info is None
@@ -4489,7 +4874,7 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
             raise CutoverError(
                 "post-quiesce outputs must be new files in the boundary receipt root"
             )
-    elif any(
+    elif not args.build_tool_image_only and any(
         value is not None
         for value in (
             args.expected_boundary_sha256,
@@ -4507,7 +4892,10 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
         raise CutoverError(
             "post-quiesce-only inputs are invalid for a predeploy cutover"
         )
-    elif boundary_output.parent != receipt_root:
+    elif (
+        not args.build_tool_image_only
+        and boundary_output.parent != receipt_root
+    ):
         raise CutoverError("boundary output must be directly beneath the receipt root")
     inputs = CutoverInputs(
         source_root=source_root,
@@ -4567,7 +4955,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 routing_environment=build_routing_environment(inputs),
             ),
         )
-        if args.source_replay_preflight:
+        if args.build_tool_image_only:
+            receipt = runner.run_tool_image_build_only(
+                output=Path(os.path.abspath(args.output)),
+            )
+            output_contract = TOOL_IMAGE_BUILD_ONLY_CONTRACT
+        elif args.source_replay_preflight:
             replay_verification = runner.verify_source_replay(
                 active_build_info=args.active_build_info,
                 expected_active_build_info_sha256=(
