@@ -627,6 +627,8 @@ def _is_environment_selected_run_services_root(value: ast.expr) -> bool:
     ):
         return False
     lookup = path_call.args[0]
+    if isinstance(lookup, ast.Name):
+        return lookup.id == "run_services_root_value"
     return (
         isinstance(lookup, ast.Subscript)
         and isinstance(lookup.value, ast.Attribute)
@@ -711,7 +713,13 @@ if sys.flags.isolated != 1:
     raise RuntimeError("NOT RELEASE READY: release launcher requires isolated Python startup")
 
 
-RUN_SERVICES_ROOT = Path(os.environ["CHUMMER_RUN_SERVICES_ROOT"]).resolve()
+run_services_root_value = os.environ.get("CHUMMER_RUN_SERVICES_ROOT", "").strip()
+if not run_services_root_value:
+    raise SystemExit(
+        "NOT RELEASE READY: CHUMMER_RUN_SERVICES_ROOT is required; set it to the exact "
+        "reviewed chummer6-hub/run-services checkout before invoking this launcher"
+    )
+RUN_SERVICES_ROOT = Path(run_services_root_value).resolve()
 MATERIALIZER = RUN_SERVICES_ROOT / "scripts" / "materialize_release_ready_receipt.py"
 TRUSTED_PYTHON = "/usr/bin/python3"
 TRUSTED_PATH = "/usr/bin:/bin"
@@ -764,6 +772,7 @@ def launch() -> None:
         [
             TRUSTED_PYTHON,
             "-I",
+            "-B",
             str(MATERIALIZER),
             "--run-authoritative-controller",
             *sys.argv[1:],
@@ -913,8 +922,8 @@ def _source_binding_validation(
         failures.append("shared release launcher must assign RUN_SERVICES_ROOT exactly once")
     elif not _is_environment_selected_run_services_root(run_services_root):
         failures.append(
-            "shared release launcher RUN_SERVICES_ROOT must exactly resolve "
-            "Path(os.environ['CHUMMER_RUN_SERVICES_ROOT'])"
+            "shared release launcher RUN_SERVICES_ROOT must exactly resolve the "
+            "validated CHUMMER_RUN_SERVICES_ROOT environment value"
         )
     if _protected_name_binding_count(tree, "RUN_SERVICES_ROOT") != 1:
         failures.append(
@@ -1025,14 +1034,16 @@ def _source_binding_validation(
                 )
             expected_argv = (
                 isinstance(argv, ast.List)
-                and len(argv.elts) == 5
+                and len(argv.elts) == 6
                 and _is_name(argv.elts[0], "TRUSTED_PYTHON")
                 and isinstance(argv.elts[1], ast.Constant)
                 and argv.elts[1].value == "-I"
-                and _is_str_of_name(argv.elts[2], "MATERIALIZER")
-                and isinstance(argv.elts[3], ast.Constant)
-                and argv.elts[3].value == "--run-authoritative-controller"
-                and _is_forwarded_argv(argv.elts[4])
+                and isinstance(argv.elts[2], ast.Constant)
+                and argv.elts[2].value == "-B"
+                and _is_str_of_name(argv.elts[3], "MATERIALIZER")
+                and isinstance(argv.elts[4], ast.Constant)
+                and argv.elts[4].value == "--run-authoritative-controller"
+                and _is_forwarded_argv(argv.elts[5])
             )
             if not expected_argv:
                 failures.append(
