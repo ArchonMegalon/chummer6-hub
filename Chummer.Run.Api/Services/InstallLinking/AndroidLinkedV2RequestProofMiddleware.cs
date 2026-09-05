@@ -21,6 +21,7 @@ public static class AndroidInstallLinkV2BootstrapProof
             Scheme,
             HttpMethods.Post,
             Path,
+            request.InstallLinkTransport,
             request.OperationId,
             request.InstallationId,
             request.HeadId,

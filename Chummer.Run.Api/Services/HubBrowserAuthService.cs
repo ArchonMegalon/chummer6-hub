@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Chummer.Run.Contracts.Identity;
+using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -201,7 +202,8 @@ public sealed class HubBrowserAuthService
             QueryHelpers.ParseQuery(queryIndex < 0 ? string.Empty : candidate[queryIndex..]);
         string? callbackUri = SingleQueryValue(query, "installLinkCallbackUri");
         string? transport = SingleQueryValue(query, "installLinkTransport");
-        bool proofPoll = string.Equals(transport, "proof_poll", StringComparison.Ordinal);
+        bool proofPoll = transport is not null
+            && InstallBrowserCallbackTransports.IsProofPoll(transport);
         if (!proofPoll && !string.IsNullOrWhiteSpace(transport))
         {
             return safeFallback;
@@ -230,7 +232,7 @@ public sealed class HubBrowserAuthService
             SingleQueryValue(query, "platform"),
             SingleQueryValue(query, "arch"),
             sanitizedCallback,
-            proofPoll ? "proof_poll" : null,
+            proofPoll ? transport : null,
             publicKey);
     }
 
@@ -245,7 +247,8 @@ public sealed class HubBrowserAuthService
         string? installLinkTransport = null,
         string? publicKey = null)
     {
-        bool proofPoll = string.Equals(installLinkTransport, "proof_poll", StringComparison.Ordinal);
+        bool proofPoll = installLinkTransport is not null
+            && InstallBrowserCallbackTransports.IsProofPoll(installLinkTransport);
         if (!proofPoll && !string.IsNullOrWhiteSpace(installLinkTransport))
         {
             throw new ArgumentException("Install-link transport is invalid.", nameof(installLinkTransport));
@@ -270,7 +273,7 @@ public sealed class HubBrowserAuthService
             ["platform"] = SanitizeInstallLinkValue(platform),
             ["arch"] = SanitizeInstallLinkValue(arch),
             ["installLinkCallbackUri"] = callback,
-            ["installLinkTransport"] = proofPoll ? "proof_poll" : null,
+            ["installLinkTransport"] = proofPoll ? installLinkTransport : null,
             ["publicKey"] = canonicalPublicKey
         };
         return QueryHelpers.AddQueryString(

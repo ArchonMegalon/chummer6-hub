@@ -56,6 +56,9 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
         Assert.Equal(publicKey, callback.PublicKey);
         Assert.Equal("android-play-app", callback.ArtifactId);
+        Assert.Equal(
+            InstallLinkingService.LegacyProofPollTransport,
+            fixture.Store.BrowserCallbackTransportIntentsByCallbackId[callback.CallbackId].Transport);
         Assert.DoesNotContain(callback.CallbackCode, page.Content, StringComparison.Ordinal);
 
         long issuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -111,6 +114,38 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         ObjectResult conflict = Assert.IsType<ObjectResult>(replay.Result);
         Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
         AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Android_v2_browser_approval_persists_distinct_proof_poll_intent()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer android-v2-access-token";
+        using RSA rsa = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+
+        IActionResult approval = await fixture.Controller.BrowserInstallLink(
+            installationId: "android-v2-browser-intent",
+            headId: "android",
+            applicationVersion: "0.1.0-preview.11",
+            releaseChannel: "preview",
+            platform: "android",
+            arch: "arm64",
+            installLinkCallbackUri: "https://chummer.run/app/install-link?state=android-v2-state",
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: InstallLinkingService.AndroidLinkedV2ProofPollTransport,
+            publicKey: publicKey);
+
+        Assert.Equal(StatusCodes.Status200OK, Assert.IsType<ContentResult>(approval).StatusCode);
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        Assert.Equal(
+            InstallLinkingService.AndroidLinkedV2ProofPollTransport,
+            fixture.Store.BrowserCallbackTransportIntentsByCallbackId[callback.CallbackId].Transport);
     }
 
     [Fact]
@@ -278,6 +313,42 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Install_linking_summary_redacts_all_legacy_and_v2_bearers()
+    {
+        using Fixture fixture = new(authenticated: true);
+        InstallationGrantDto legacy = fixture.SeedClaimedInstall(
+            "preview10-summary",
+            fixture.User.UserId,
+            fixture.SubjectId);
+        InstallationGrantDto v2 = fixture.SeedClaimedInstall(
+            "preview11-summary",
+            fixture.User.UserId,
+            fixture.SubjectId,
+            explicitV2: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.Request.Headers.Authorization = "Bearer account-owner-session";
+
+        ActionResult<InstallLinkingSummaryDto> action =
+            await fixture.Controller.GetSummary(CancellationToken.None);
+
+        InstallLinkingSummaryDto summary = Assert.IsType<InstallLinkingSummaryDto>(
+            Assert.IsType<OkObjectResult>(action.Result).Value);
+        IReadOnlyList<InstallationGrantDto> grants = summary.ActiveGrants
+            ?? throw new Xunit.Sdk.XunitException("active grants were missing");
+        Assert.Equal(2, grants.Count);
+        Assert.All(grants, static grant => Assert.Equal(string.Empty, grant.AccessToken));
+        string json = JsonSerializer.Serialize(summary, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.DoesNotContain(legacy.AccessToken, json, StringComparison.Ordinal);
+        Assert.DoesNotContain(v2.AccessToken, json, StringComparison.Ordinal);
+
+        // The owner-authorized Preview10/v2 UI flow uses grant metadata only.
+        Assert.All(grants, static grant => Assert.False(string.IsNullOrWhiteSpace(grant.GrantId)));
     }
 
     [Fact]
@@ -575,6 +646,38 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal(
             ClaimedInstallationStates.Revoked,
             fixture.Store.InstallationsById[grant.InstallationId].Status);
+        Assert.Equal(
+            InstallationGrantStates.Revoked,
+            fixture.Store.GrantsById[grant.GrantId].Status);
+    }
+
+    [Fact]
+    public async Task Preview10_account_unlink_uses_redacted_grant_metadata_without_page_bearer()
+    {
+        using Fixture fixture = new(authenticated: true);
+        InstallationGrantDto grant = fixture.SeedClaimedInstall(
+            "preview10-owner-unlink",
+            fixture.User.UserId,
+            fixture.SubjectId);
+        InstallLinkingSummaryDto summary = fixture.InstallLinking.GetSummary(
+            fixture.User.UserId,
+            fixture.SubjectId);
+        InstallationGrantDto pageGrant = Assert.Single(summary.ActiveGrants!);
+        Assert.Equal(string.Empty, pageGrant.AccessToken);
+        AccountsController controller = fixture.CreateAccountsController();
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        controller.Request.Headers.Authorization = "Bearer account-owner-session";
+
+        IActionResult result = await controller.UnlinkInstall(
+            grant.InstallationId,
+            CancellationToken.None);
+
+        Assert.Equal(
+            "/account/access?accessNotice=unlinked",
+            Assert.IsType<RedirectResult>(result).Url);
         Assert.Equal(
             InstallationGrantStates.Revoked,
             fixture.Store.GrantsById[grant.GrantId].Status);

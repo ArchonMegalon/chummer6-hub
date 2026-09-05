@@ -224,7 +224,8 @@ public sealed class InstallLinkingController : ControllerBase
         [FromQuery] string? publicKey = null)
     {
         ApplySensitiveResponseHeaders();
-        bool proofPoll = string.Equals(installLinkTransport, "proof_poll", StringComparison.Ordinal);
+        bool proofPoll = installLinkTransport is not null
+            && InstallBrowserCallbackTransports.IsProofPoll(installLinkTransport);
         if (!proofPoll && !string.IsNullOrWhiteSpace(installLinkTransport))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link transport is invalid.");
@@ -291,7 +292,10 @@ public sealed class InstallLinkingController : ControllerBase
                     HostLabel: null,
                     InstallAccessClass: proofPoll ? InstallAccessClasses.AccountRequired : artifact!.InstallAccessClass),
                 user.UserId,
-                subject.SubjectId);
+                subject.SubjectId,
+                proofPoll
+                    ? installLinkTransport
+                    : InstallBrowserCallbackTransports.GrantCallback);
 
             if (proofPoll)
             {
@@ -357,7 +361,7 @@ public sealed class InstallLinkingController : ControllerBase
                 platform,
                 arch,
                 normalizedCallbackUri,
-                proofPoll ? "proof_poll" : null,
+                proofPoll ? installLinkTransport : null,
                 normalizedPublicKey);
             return Redirect($"/login?next={Uri.EscapeDataString(returnPath)}");
         }

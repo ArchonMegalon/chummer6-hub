@@ -47,16 +47,19 @@ bootstrap route:
 POST /api/v2/install-linking/callbacks/poll
 ```
 
-Its token-free JSON body contains `operationId`, `installationId`, `headId`,
-`applicationVersion`, `channelId`, `platform`, `architecture`, `publicKey`,
-`issuedAtUnixSeconds`, `nonce`, `signature`, and optional `hostLabel`. The
-signature is RSA PKCS#1/SHA-256 over these UTF-8 LF-only lines with no trailing
-LF:
+The browser approval URL requires the exact query intent
+`installLinkTransport=proof_poll_v2`; the token-free poll JSON requires
+`installLinkTransport: "proof_poll_v2"`. The JSON body also contains
+`operationId`, `installationId`, `headId`, `applicationVersion`, `channelId`,
+`platform`, `architecture`, `publicKey`, `issuedAtUnixSeconds`, `nonce`,
+`signature`, and optional `hostLabel`. The signature is RSA PKCS#1/SHA-256 over
+these UTF-8 LF-only lines with no trailing LF:
 
 ```text
 chummer.install-link.remote-callback.v2
 POST
 /api/v2/install-linking/callbacks/poll
+proof_poll_v2
 <operationId>
 <installationId>
 <headId>
@@ -74,10 +77,14 @@ being the key that must verify the signature and by exact equality with the
 account-approved callback key and install identity. The optional `hostLabel` is
 signed device-supplied display metadata; it is not browser-approved identity.
 Query strings are rejected.
-`operationId` is required and is the canonical unpadded base64url encoding of
-exactly 24 random bytes (32 characters). It is included in the signed bootstrap
-payload after the endpoint path. On success, JSON contains only
-`{installation, grant, alreadyClaimed, operationId, grantTransport}` where
+The Hub persists the browser-approved transport intent in the same protected
+snapshot as the callback. The v2 route can redeem only `proof_poll_v2`; the v1
+poll can redeem only `proof_poll`, and direct callback exchange can redeem only
+`grant_callback`. This check precedes redemption, so a cross-route race cannot
+mint a downgrade grant. `operationId` is required and is the canonical unpadded
+base64url encoding of exactly 24 random bytes (32 characters). It is included
+in the signed bootstrap payload after the transport intent. On success, JSON
+contains only `{installation, grant, alreadyClaimed, operationId, grantTransport}` where
 `grant` is safe metadata, the exact `operationId` is echoed, and
 `grantTransport` is the stable value `android-linked-v2`. The issued secret and
 grant ID use the same mandatory single response headers as refresh:
@@ -98,6 +105,9 @@ owner, canonical device key, operation ID, and stable-operation digest. A
 changed operation, body, key, installation, owner, expired/revoked callback, or
 expired/revoked/replaced grant fails closed. Recovery receipts survive restart
 and share the same PostgreSQL compare-and-swap snapshot as the grant.
+Unexpired callback recovery receipts pin their original grant before the
+general 4,096-grant retention pass. If all recovery capacity is already pinned,
+the Hub returns `503` before minting a grant or consuming the callback.
 
 ## Required headers
 
@@ -175,7 +185,8 @@ timestamp, packet key, and signature. The Hub verifies the fresh proof with the
 same device key and admits its packet key through the ordinary durable replay
 authority before returning the same replacement bearer and grant metadata. It
 never rotates a second time. Reusing the original proof envelope is a replay
-conflict. Any bearer, operation, body, installation, key, or owner change uses
+conflict. Any bearer, operation, body, installation, key, owner, or source-grant
+case change uses
 the normal denial path, as does an expired receipt or a replacement that is no
 longer the active current v2 grant. The recovery mapping is committed in the
 same durable write/CAS as the rotation, and its source and replacement grants
@@ -186,6 +197,12 @@ The response JSON has no access-token member. All v2 responses are private,
 only a bounded reason code, numeric status, and a fixed surface label; request
 bodies, bearer values, signatures, installation IDs, and dynamic route values
 are not logged.
+
+The authenticated legacy `GET /api/v1/install-linking/me` account summary and
+the browser account model expose active grant metadata only. Bearer values are
+redacted for both Preview 10 and v2 grants; owner-authorized unlink uses the
+authenticated owner plus installation identity and does not depend on a bearer
+from the page model.
 
 ## Version boundary
 
@@ -210,7 +227,11 @@ routes remain available only for Preview 10 compatibility.
 
 The operation-ID proof format and the matching Android client must roll out as
 one compatibility boundary. An older Hub does not include `operationId` in the
-bootstrap signature, while this Hub requires it for bootstrap and refresh.
+bootstrap signature, while this Hub requires it for bootstrap and refresh. The
+same coordinated rollout adds `proof_poll_v2` to the browser query, poll JSON,
+and canonical proof immediately after the path. Older unmarked callbacks remain
+bounded by their existing callback expiry and may use only the legacy
+`proof_poll` or direct callback paths; they are never inferred as v2.
 Receipts written by the immediately preceding exact-proof retry implementation
 remain readable but cannot be upgraded into a stable operation: an Android
 device that lost such an in-flight response must start a fresh link. Existing

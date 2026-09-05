@@ -1,5 +1,6 @@
 using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.WebUtilities;
+using System.Security.Cryptography;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -101,6 +102,30 @@ public sealed class HubBrowserAuthSanitizationTests
         Assert.Contains("installation-safe", repeatedlyDecoded, StringComparison.Ordinal);
         Assert.DoesNotContain("top-level-secret", repeatedlyDecoded, StringComparison.Ordinal);
         Assert.DoesNotContain("nested-secret", repeatedlyDecoded, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Preview11_proof_poll_transport_survives_login_return_sanitization_exactly()
+    {
+        using RSA key = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo());
+        string nextPath = HubBrowserAuthService.BuildInstallLinkingNextPath(
+            "android-preview11",
+            "android",
+            "0.1.0-preview.11",
+            "preview",
+            "android",
+            "arm64",
+            "https://chummer.run/app/install-link?state=preview11-state",
+            "proof_poll_v2",
+            publicKey);
+
+        string sanitized = HubBrowserAuthService.SanitizeNextPath(nextPath, "/safe");
+        IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
+            QueryHelpers.ParseQuery(new Uri($"https://chummer.run{sanitized}").Query);
+
+        Assert.Equal("proof_poll_v2", Assert.Single(query["installLinkTransport"]));
+        Assert.Equal(publicKey, Assert.Single(query["publicKey"]));
     }
 
     [Fact]

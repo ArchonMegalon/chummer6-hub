@@ -10,6 +10,8 @@ public sealed class InstallLinkingService
 {
     public const int MaxRequestBodyBytes = 16 * 1024;
     public const string AndroidLinkedV2GrantTransport = InstallationGrantTransports.AndroidLinkedV2;
+    public const string LegacyProofPollTransport = InstallBrowserCallbackTransports.LegacyProofPoll;
+    public const string AndroidLinkedV2ProofPollTransport = InstallBrowserCallbackTransports.AndroidLinkedV2ProofPoll;
     public static readonly TimeSpan AndroidLinkedV2ResponseRecoveryLifetime = TimeSpan.FromMinutes(10);
     private const int MaxInstallationIdLength = 64;
     private const int MaxAccessTokenLength = 256;
@@ -213,6 +215,7 @@ public sealed class InstallLinkingService
                 .Where(item => MatchesIdentity(item.UserId, item.SubjectId, normalizedUserId, normalizedSubjectId))
                 .OrderByDescending(static item => item.IssuedAtUtc)
                 .Take(Math.Max(1, maxItems))
+                .Select(static item => item with { AccessToken = string.Empty })
                 .ToArray();
             var callbacks = _store.BrowserCallbacksById.Values
                 .Where(item => string.Equals(item.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase))
@@ -831,6 +834,7 @@ public sealed class InstallLinkingService
             if (!_store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.TryGetValue(
                     sourceGrantId,
                     out AndroidLinkedV2GrantRefreshReceipt? receipt)
+                || !FixedTimeEquals(receipt.SourceGrantId, sourceGrantId)
                 || receipt.RetryExpiresAtUtc <= now
                 || !string.Equals(receipt.InstallationId, installationId, StringComparison.Ordinal)
                 || !FixedTimeEquals(receipt.SourceAccessTokenSha256, accessTokenSha256)
@@ -915,6 +919,21 @@ public sealed class InstallLinkingService
         HashSet<string> pinnedGrantIds = _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Values
             .SelectMany(static item => new[] { item.SourceGrantId, item.ReplacementGrantId })
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (InstallBrowserCallbackRedemptionReceipt callbackReceipt in
+                 _store.BrowserCallbackRedemptionReceiptsByCallbackId.Values)
+        {
+            if (_store.BrowserCallbacksById.TryGetValue(
+                    callbackReceipt.CallbackId,
+                    out InstallBrowserCallbackDto? callback)
+                && callback.ExpiresAtUtc > now
+                && string.Equals(
+                    callback.Status,
+                    InstallBrowserCallbackStates.Redeemed,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                pinnedGrantIds.Add(callbackReceipt.GrantId);
+            }
+        }
         pinnedGrantIds.Add(sourceGrantId);
         if (pinnedGrantIds.Count >= InstallLinkingStore.MaxGrantTransportAuthorities)
         {
@@ -985,7 +1004,8 @@ public sealed class InstallLinkingService
     public IssueInstallBrowserCallbackResponseDto IssueBrowserCallback(
         IssueInstallBrowserCallbackRequestDto request,
         string? userId,
-        string? subjectId)
+        string? subjectId,
+        string? callbackTransport = null)
     {
         EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
@@ -997,6 +1017,9 @@ public sealed class InstallLinkingService
         string? normalizedCallbackUri = NormalizeOptional(request.CallbackUri)
             ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "callback uri is required.");
         string? normalizedPublicKey = NormalizeOptional(request.PublicKey, nameof(request.PublicKey), MaxPublicKeyLength);
+        string normalizedCallbackTransport = ResolveBrowserCallbackTransport(
+            callbackTransport,
+            normalizedPublicKey);
         string? normalizedUserId = NormalizeOptional(userId);
         string? normalizedSubjectId = NormalizeOptional(subjectId);
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -1014,6 +1037,7 @@ public sealed class InstallLinkingService
                     normalizedUserId,
                     normalizedSubjectId,
                     normalizedCallbackUri,
+                    normalizedCallbackTransport,
                     now);
             if (callback is null)
             {
@@ -1025,6 +1049,10 @@ public sealed class InstallLinkingService
                     CallbackUri = normalizedCallbackUri,
                     PublicKey = normalizedPublicKey
                 }, normalizedUserId, normalizedSubjectId, now);
+                _store.BrowserCallbackTransportIntentsByCallbackId[callback.CallbackId] =
+                    new InstallBrowserCallbackTransportIntent(
+                        callback.CallbackId,
+                        normalizedCallbackTransport);
             }
 
             _store.BrowserCallbacksById[callback.CallbackId] = callback;
@@ -1041,12 +1069,14 @@ public sealed class InstallLinkingService
         => ExchangeBrowserCallback(
             request,
             InstallationGrantTransports.LegacyV1,
-            CreateExchangeRequestSha256(request));
+            CreateExchangeRequestSha256(request),
+            InstallBrowserCallbackTransports.GrantCallback);
 
     private ExchangeInstallBrowserCallbackResponseDto ExchangeBrowserCallback(
         ExchangeInstallBrowserCallbackRequestDto request,
         string grantTransport,
         string requestSha256,
+        string callbackTransport,
         string? operationId = null,
         string? operationSha256 = null)
     {
@@ -1082,6 +1112,13 @@ public sealed class InstallLinkingService
             if (!string.Equals(callback.InstallationId, normalizedInstallationId, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback is already bound to another installation.");
+            }
+
+            if (!BrowserCallbackHasTransportLocked(callback, callbackTransport))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status409Conflict,
+                    "browser callback transport does not match the approved install link.");
             }
 
             EnsureBrowserCallbackRequestMatches(callback, request);
@@ -1129,6 +1166,9 @@ public sealed class InstallLinkingService
                         out InstallBrowserCallbackRedemptionReceipt? redemptionReceipt)
                     || !string.Equals(redemptionReceipt.GrantId, originalGrant.GrantId, StringComparison.Ordinal)
                     || !string.Equals(redemptionReceipt.Transport, grantTransport, StringComparison.Ordinal)
+                    || !BrowserCallbackRedemptionTransportMatchesLocked(
+                        redemptionReceipt,
+                        callbackTransport)
                     || !BrowserCallbackRetryOperationMatches(
                         redemptionReceipt,
                         requestSha256,
@@ -1145,6 +1185,13 @@ public sealed class InstallLinkingService
                     existingInstallation,
                     originalGrant,
                     AlreadyClaimed: true);
+            }
+
+            if (!_store.CanRetainNewBrowserCallbackRedemptionLocked(now))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "browser callback response recovery capacity is unavailable.");
             }
 
             ClaimedInstallationDto installation = UpsertInstallationLocked(existingInstallation, callback, request, now);
@@ -1170,7 +1217,8 @@ public sealed class InstallLinkingService
                     grantTransport,
                     requestSha256,
                     operationId,
-                    operationSha256);
+                    operationSha256,
+                    callbackTransport);
             _store.PersistLocked();
             return new ExchangeInstallBrowserCallbackResponseDto(callback, installation, issuedGrant, AlreadyClaimed: false);
         }
@@ -1246,6 +1294,15 @@ public sealed class InstallLinkingService
                         Exchange: null);
                 }
 
+                if (!BrowserCallbackHasTransportLocked(
+                        callback,
+                        InstallBrowserCallbackTransports.LegacyProofPoll))
+                {
+                    throw new InstallLinkingOperationException(
+                        StatusCodes.Status409Conflict,
+                        "remote proof transport does not match the approved install link.");
+                }
+
                 if (callback.ExpiresAtUtc <= now
                     || string.Equals(callback.Status, InstallBrowserCallbackStates.Expired, StringComparison.OrdinalIgnoreCase))
                 {
@@ -1310,7 +1367,11 @@ public sealed class InstallLinkingService
                         arch,
                         canonicalPublicKey,
                         callback.HostLabel);
-                ExchangeInstallBrowserCallbackResponseDto exchange = ExchangeBrowserCallback(exchangeRequest);
+                ExchangeInstallBrowserCallbackResponseDto exchange = ExchangeBrowserCallback(
+                    exchangeRequest,
+                    InstallationGrantTransports.LegacyV1,
+                    CreateExchangeRequestSha256(exchangeRequest),
+                    InstallBrowserCallbackTransports.LegacyProofPoll);
                 return new PollInstallBrowserCallbackResult(
                     new AndroidInstallLinkProofPollStatus(
                         exchange.Callback.Status,
@@ -1343,6 +1404,19 @@ public sealed class InstallLinkingService
         string nonce = NormalizeRequired(request.Nonce, nameof(request.Nonce), MaxProofNonceLength);
         string signature = NormalizeRequired(request.Signature, nameof(request.Signature), MaxProofSignatureLength);
         string? hostLabel = NormalizeOptional(request.HostLabel, nameof(request.HostLabel), MaxHostLabelLength);
+        string callbackTransport = NormalizeRequired(
+            request.InstallLinkTransport,
+            nameof(request.InstallLinkTransport),
+            32);
+        if (!string.Equals(
+                callbackTransport,
+                InstallBrowserCallbackTransports.AndroidLinkedV2ProofPoll,
+                StringComparison.Ordinal))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status400BadRequest,
+                "remote proof transport is invalid.");
+        }
         string operationId = NormalizeRequired(
             request.OperationId,
             nameof(request.OperationId),
@@ -1407,6 +1481,13 @@ public sealed class InstallLinkingService
                             Terminal: false,
                             ExpiresAtUtc: now.Add(_browserCallbackLifetime)),
                         Exchange: null);
+                }
+
+                if (!BrowserCallbackHasTransportLocked(callback, callbackTransport))
+                {
+                    throw new InstallLinkingOperationException(
+                        StatusCodes.Status409Conflict,
+                        "remote proof transport does not match the approved install link.");
                 }
 
                 if (callback.ExpiresAtUtc <= now
@@ -1476,8 +1557,10 @@ public sealed class InstallLinkingService
                     exchangeRequest,
                     InstallationGrantTransports.AndroidLinkedV2,
                     CreateV2BootstrapRequestSha256(request, canonicalPublicKey),
+                    callbackTransport,
                     operationId,
                     CreateV2BootstrapOperationSha256(
+                        callbackTransport,
                         operationId,
                         installationId,
                         headId,
@@ -1697,6 +1780,7 @@ public sealed class InstallLinkingService
         string? userId,
         string? subjectId,
         string callbackUri,
+        string callbackTransport,
         DateTimeOffset now)
         => _store.BrowserCallbacksById.Values
             .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
@@ -1704,6 +1788,7 @@ public sealed class InstallLinkingService
             .Where(item => item.ExpiresAtUtc > now)
             .Where(item => MatchesIdentity(item.UserId, item.SubjectId, userId, subjectId))
             .Where(item => string.Equals(item.CallbackUri, callbackUri, StringComparison.OrdinalIgnoreCase))
+            .Where(item => BrowserCallbackHasTransportLocked(item, callbackTransport))
             .OrderByDescending(static item => item.CreatedAtUtc)
             .FirstOrDefault();
 
@@ -1995,6 +2080,66 @@ public sealed class InstallLinkingService
         return string.Equals(expectedTransport, InstallationGrantTransports.LegacyV1, StringComparison.Ordinal);
     }
 
+    private static string ResolveBrowserCallbackTransport(
+        string? transport,
+        string? publicKey)
+    {
+        string? normalized = NormalizeOptional(transport);
+        if (normalized is null)
+        {
+            // Programmatic callers predating explicit callback intent issue the direct
+            // grant-callback flow. Browser proof-poll callers always supply explicit intent.
+            return InstallBrowserCallbackTransports.GrantCallback;
+        }
+
+        if (!InstallBrowserCallbackTransports.IsSupported(normalized)
+            || (InstallBrowserCallbackTransports.IsProofPoll(normalized) && publicKey is null))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status400BadRequest,
+                "browser callback transport is invalid.");
+        }
+
+        return normalized;
+    }
+
+    private bool BrowserCallbackHasTransportLocked(
+        InstallBrowserCallbackDto callback,
+        string expectedTransport)
+    {
+        if (_store.BrowserCallbackTransportIntentsByCallbackId.TryGetValue(
+                callback.CallbackId,
+                out InstallBrowserCallbackTransportIntent? intent))
+        {
+            return string.Equals(intent.Transport, expectedTransport, StringComparison.Ordinal);
+        }
+
+        // Pre-authority callbacks are short-lived. Their original state did not distinguish
+        // keyed desktop callbacks from Preview10 proof-poll callbacks, so preserve both
+        // legacy routes for that bounded migration window, but never infer v2 authority.
+        return expectedTransport switch
+        {
+            InstallBrowserCallbackTransports.LegacyProofPoll =>
+                !string.IsNullOrWhiteSpace(callback.PublicKey),
+            InstallBrowserCallbackTransports.GrantCallback => true,
+            _ => false
+        };
+    }
+
+    private bool BrowserCallbackRedemptionTransportMatchesLocked(
+        InstallBrowserCallbackRedemptionReceipt receipt,
+        string expectedTransport)
+    {
+        if (_store.BrowserCallbackTransportIntentsByCallbackId.ContainsKey(receipt.CallbackId))
+        {
+            return receipt.CallbackTransport is not null
+                   && FixedTimeEquals(receipt.CallbackTransport, expectedTransport);
+        }
+
+        return receipt.CallbackTransport is null
+               || FixedTimeEquals(receipt.CallbackTransport, expectedTransport);
+    }
+
     private static void EnsureBrowserCallbackRequestMatches(
         InstallBrowserCallbackDto callback,
         ExchangeInstallBrowserCallbackRequestDto request)
@@ -2059,6 +2204,7 @@ public sealed class InstallLinkingService
         string canonicalPublicKey)
         => Sha256Parts(
             "chummer.install-link.remote-callback-retry.v2",
+            request.InstallLinkTransport,
             request.OperationId,
             request.InstallationId,
             request.HeadId,
@@ -2073,6 +2219,7 @@ public sealed class InstallLinkingService
             request.HostLabel);
 
     private static string CreateV2BootstrapOperationSha256(
+        string callbackTransport,
         string operationId,
         string installationId,
         string headId,
@@ -2084,6 +2231,7 @@ public sealed class InstallLinkingService
         string? hostLabel)
         => Sha256Parts(
             "chummer.install-link.remote-callback-operation.v2",
+            callbackTransport,
             operationId,
             installationId,
             headId,
@@ -2533,7 +2681,8 @@ public sealed record AndroidInstallLinkProofPollV2Request(
     string Nonce,
     string Signature,
     string? HostLabel = null,
-    string OperationId = "");
+    string OperationId = "",
+    string InstallLinkTransport = "");
 
 public sealed record AndroidInstallLinkProofPollStatus(
     string State,

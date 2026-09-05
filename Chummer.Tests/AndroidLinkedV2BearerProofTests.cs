@@ -453,6 +453,27 @@ public sealed class AndroidLinkedV2BearerProofTests
     }
 
     [Fact]
+    public async Task Refresh_response_loss_rejects_case_mutated_source_grant_identity()
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\"}";
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/grants/refresh", body);
+        await InvokeRefreshAsync(fixture, signed);
+        SignedRequest caseMutated = fixture.SignForGrantId(
+            signed.Path,
+            Encoding.UTF8.GetString(signed.Body),
+            Fixture.GrantId.ToUpperInvariant());
+        DefaultHttpContext retry = caseMutated.CreateContext();
+        bool dispatched = false;
+
+        await fixture.InvokeAsync(retry, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, retry.Response.StatusCode);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+    }
+
+    [Fact]
     public async Task Refresh_response_loss_rejects_expired_operation_receipt()
     {
         using Fixture fixture = new();
@@ -655,6 +676,101 @@ public sealed class AndroidLinkedV2BearerProofTests
     }
 
     [Fact]
+    public void V2_bootstrap_recovery_grant_is_pinned_against_newer_grant_eviction()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-eviction-window",
+            useLegacyCanonical: false);
+        (DefaultHttpContext firstContext, AndroidInstallLinkV2ExchangeResponse first) =
+            PollBootstrap(fixture, request);
+        string firstAuthorization = firstContext.Response.Headers.Authorization.ToString();
+
+        lock (fixture.Store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            for (int index = 0; index < InstallLinkingStore.MaxGrants; index++)
+            {
+                string grantId = $"newer-grant-{index:D4}";
+                fixture.Store.GrantsById[grantId] = new InstallationGrantDto(
+                    grantId,
+                    "newer-install",
+                    InstallationGrantStates.Revoked,
+                    string.Empty,
+                    now.AddSeconds(index + 1),
+                    now.AddDays(30),
+                    "newer-user",
+                    "newer-subject");
+                fixture.Store.GrantTransportAuthoritiesByGrantId[grantId] =
+                    new InstallationGrantTransportAuthority(
+                        grantId,
+                        InstallationGrantTransports.AndroidLinkedV2);
+            }
+            fixture.Store.PersistLocked();
+        }
+
+        fixture.Reload();
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+        Assert.Contains(first.Grant.GrantId, fixture.Store.GrantsById.Keys);
+        Assert.Contains(
+            fixture.Store.BrowserCallbackRedemptionReceiptsByCallbackId.Values,
+            item => item.GrantId == first.Grant.GrantId);
+        AndroidInstallLinkProofPollV2Request freshRetry = fixture.SignBootstrap(request with
+        {
+            IssuedAtUnixSeconds = request.IssuedAtUnixSeconds + 1,
+            Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+            Signature = string.Empty
+        });
+
+        (DefaultHttpContext retryContext, AndroidInstallLinkV2ExchangeResponse retry) =
+            PollBootstrap(fixture, freshRetry);
+
+        Assert.Equal(first.Grant, retry.Grant);
+        Assert.Equal(firstAuthorization, retryContext.Response.Headers.Authorization.ToString());
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+    }
+
+    [Fact]
+    public void V2_bootstrap_full_recovery_capacity_fails_before_consuming_callback_across_restart()
+    {
+        using Fixture fixture = new();
+        fixture.SeedFullyPinnedGrantCapacity();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-capacity",
+            useLegacyCanonical: false);
+
+        ObjectResult firstDenied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, request).Result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, firstDenied.StatusCode);
+        InstallBrowserCallbackDto callback = Assert.Single(
+            fixture.Store.BrowserCallbacksById.Values,
+            item => item.InstallationId == request.InstallationId);
+        Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
+        Assert.Null(callback.GrantId);
+        Assert.DoesNotContain(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+
+        fixture.Reload();
+        AndroidInstallLinkProofPollV2Request freshRetry = fixture.SignBootstrap(request with
+        {
+            IssuedAtUnixSeconds = request.IssuedAtUnixSeconds + 1,
+            Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+            Signature = string.Empty
+        });
+        ObjectResult retryDenied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, freshRetry).Result);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, retryDenied.StatusCode);
+        callback = Assert.Single(
+            fixture.Store.BrowserCallbacksById.Values,
+            item => item.InstallationId == request.InstallationId);
+        Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
+        Assert.Null(callback.GrantId);
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+    }
+
+    [Fact]
     public void V2_bootstrap_retry_rejects_reused_proof_envelope()
     {
         using Fixture fixture = new();
@@ -720,6 +836,28 @@ public sealed class AndroidLinkedV2BearerProofTests
             item.InstallationId == request.InstallationId);
     }
 
+    [Fact]
+    public void V2_bootstrap_rejects_resigned_transport_substitution()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-transport-substitution",
+            useLegacyCanonical: false);
+        AndroidInstallLinkProofPollV2Request substituted = fixture.SignBootstrap(request with
+        {
+            InstallLinkTransport = InstallLinkingService.LegacyProofPollTransport,
+            Signature = string.Empty
+        });
+
+        ObjectResult denied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, substituted).Result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, denied.StatusCode);
+        Assert.DoesNotContain(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+    }
+
     [Theory]
     [InlineData("owner")]
     [InlineData("grant-expired")]
@@ -783,6 +921,96 @@ public sealed class AndroidLinkedV2BearerProofTests
     }
 
     [Fact]
+    public void V2_callback_intent_survives_restart_and_rejects_legacy_poll_before_redemption()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-v2-intent",
+            useLegacyCanonical: false);
+        InstallBrowserCallbackDto callback = Assert.Single(
+            fixture.Store.BrowserCallbacksById.Values,
+            item => item.InstallationId == request.InstallationId);
+
+        fixture.Reload();
+
+        Assert.Equal(
+            InstallLinkingService.AndroidLinkedV2ProofPollTransport,
+            fixture.Store.BrowserCallbackTransportIntentsByCallbackId[callback.CallbackId].Transport);
+        InstallLinkingOperationException downgrade = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.PollBrowserCallback(fixture.SignLegacyBootstrap(request)));
+        Assert.Equal(StatusCodes.Status409Conflict, downgrade.StatusCode);
+        Assert.DoesNotContain(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+
+        (_, AndroidInstallLinkV2ExchangeResponse response) = PollBootstrap(fixture, request);
+        Assert.Equal(
+            InstallationGrantTransports.AndroidLinkedV2,
+            fixture.Store.GrantTransportAuthoritiesByGrantId[response.Grant.GrantId].Transport);
+    }
+
+    [Fact]
+    public void Legacy_callback_intent_rejects_v2_poll_and_still_allows_preview10_poll()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-legacy-intent",
+            useLegacyCanonical: false,
+            approvedTransport: InstallLinkingService.LegacyProofPollTransport);
+
+        ObjectResult downgrade = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, request).Result);
+        Assert.Equal(StatusCodes.Status409Conflict, downgrade.StatusCode);
+        Assert.DoesNotContain(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+
+        PollInstallBrowserCallbackResult legacy = fixture.Service.PollBrowserCallback(
+            fixture.SignLegacyBootstrap(request));
+        ExchangeInstallBrowserCallbackResponseDto exchange = Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(
+            legacy.Exchange);
+        Assert.Equal(
+            InstallationGrantTransports.LegacyV1,
+            fixture.Store.GrantTransportAuthoritiesByGrantId[exchange.Grant.GrantId].Transport);
+    }
+
+    [Fact]
+    public async Task V2_callback_intent_closes_cross_route_redemption_race()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-v2-race",
+            useLegacyCanonical: false);
+        AndroidInstallLinkProofPollRequest legacyRequest = fixture.SignLegacyBootstrap(request);
+        using var start = new ManualResetEventSlim(false);
+
+        Task<ActionResult<AndroidInstallLinkV2ExchangeResponse>> v2 = Task.Run(() =>
+        {
+            start.Wait();
+            return PollBootstrapAction(fixture, request);
+        });
+        Task<InstallLinkingOperationException> v1 = Task.Run(() =>
+        {
+            start.Wait();
+            return Assert.Throws<InstallLinkingOperationException>(() =>
+                fixture.Service.PollBrowserCallback(legacyRequest));
+        });
+        start.Set();
+        ActionResult<AndroidInstallLinkV2ExchangeResponse> v2Result = await v2;
+        InstallLinkingOperationException v1Error = await v1;
+
+        Assert.Equal(StatusCodes.Status409Conflict, v1Error.StatusCode);
+        AndroidInstallLinkV2ExchangeResponse exchange = Assert.IsType<AndroidInstallLinkV2ExchangeResponse>(
+            Assert.IsType<OkObjectResult>(v2Result.Result).Value);
+        Assert.Single(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+        Assert.Equal(
+            InstallationGrantTransports.AndroidLinkedV2,
+            fixture.Store.GrantTransportAuthoritiesByGrantId[exchange.Grant.GrantId].Transport);
+    }
+
+    [Fact]
     public void Legacy_bootstrap_signature_cannot_authorize_v2_callback_poll()
     {
         using Fixture fixture = new();
@@ -822,13 +1050,15 @@ public sealed class AndroidLinkedV2BearerProofTests
             "0123456789abcdef0123456789abcdef",
             "signature",
             "Pixel",
-            Fixture.OperationId);
+            Fixture.OperationId,
+            InstallLinkingService.AndroidLinkedV2ProofPollTransport);
 
         Assert.Equal(
             string.Join('\n',
                 "chummer.install-link.remote-callback.v2",
                 "POST",
                 "/api/v2/install-linking/callbacks/poll",
+                InstallLinkingService.AndroidLinkedV2ProofPollTransport,
                 Fixture.OperationId,
                 "android-bootstrap-v2",
                 "android",
@@ -1020,12 +1250,27 @@ public sealed class AndroidLinkedV2BearerProofTests
             long? issuedAtUnixSeconds = null)
             => SignWithKey(_key, path, body, operationId, issuedAtUnixSeconds);
 
+        public SignedRequest SignForGrantId(
+            string path,
+            string body,
+            string grantId,
+            string operationId = OperationId,
+            long? issuedAtUnixSeconds = null)
+            => SignWithKey(
+                _key,
+                path,
+                body,
+                operationId,
+                issuedAtUnixSeconds,
+                grantId);
+
         public SignedRequest SignWithKey(
             RSA signingKey,
             string path,
             string body,
             string operationId = OperationId,
-            long? issuedAtUnixSeconds = null)
+            long? issuedAtUnixSeconds = null,
+            string grantId = GrantId)
         {
             if (string.Equals(
                     path,
@@ -1043,7 +1288,7 @@ public sealed class AndroidLinkedV2BearerProofTests
                 HttpMethods.Post,
                 path,
                 "android-v2",
-                GrantId,
+                grantId,
                 issued,
                 packetKey,
                 bodyBytes);
@@ -1056,7 +1301,7 @@ public sealed class AndroidLinkedV2BearerProofTests
                 return new SignedRequest(
                     path,
                     bodyBytes,
-                    GrantId,
+                    grantId,
                     AccessToken,
                     packetKey,
                     issued,
@@ -1071,7 +1316,8 @@ public sealed class AndroidLinkedV2BearerProofTests
 
         public AndroidInstallLinkProofPollV2Request IssueBootstrapRequest(
             string installationId,
-            bool useLegacyCanonical)
+            bool useLegacyCanonical,
+            string approvedTransport = InstallLinkingService.AndroidLinkedV2ProofPollTransport)
         {
             const string headId = "android";
             const string applicationVersion = "0.1.0-preview.11";
@@ -1094,7 +1340,8 @@ public sealed class AndroidLinkedV2BearerProofTests
                     HostLabel: null,
                     InstallAccessClass: InstallAccessClasses.AccountRequired),
                 "user-v2",
-                "subject-v2");
+                "subject-v2",
+                approvedTransport);
 
             long issued = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             string nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24));
@@ -1110,7 +1357,8 @@ public sealed class AndroidLinkedV2BearerProofTests
                 nonce,
                 Signature: string.Empty,
                 hostLabel,
-                OperationId);
+                OperationId,
+                InstallLinkingService.AndroidLinkedV2ProofPollTransport);
             if (!useLegacyCanonical)
             {
                 return SignBootstrap(unsigned);
@@ -1161,6 +1409,48 @@ public sealed class AndroidLinkedV2BearerProofTests
             }
         }
 
+        public AndroidInstallLinkProofPollRequest SignLegacyBootstrap(
+            AndroidInstallLinkProofPollV2Request source)
+        {
+            string nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24));
+            long issued = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            byte[] canonical = Encoding.UTF8.GetBytes(string.Join(
+                '\n',
+                "chummer.install-link.remote-callback.v1",
+                source.InstallationId,
+                source.HeadId,
+                source.ApplicationVersion,
+                source.ChannelId,
+                source.Platform,
+                source.Architecture,
+                issued.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                nonce));
+            byte[] signature = _key.SignData(
+                canonical,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            try
+            {
+                return new AndroidInstallLinkProofPollRequest(
+                    source.InstallationId,
+                    source.HeadId,
+                    source.ApplicationVersion,
+                    source.ChannelId,
+                    source.Platform,
+                    source.Architecture,
+                    source.PublicKey,
+                    issued,
+                    nonce,
+                    Convert.ToBase64String(signature),
+                    source.HostLabel);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(canonical);
+                CryptographicOperations.ZeroMemory(signature);
+            }
+        }
+
         public InstallationGrantDto SeedLegacyGrant(string installationId)
         {
             lock (_store.Gate)
@@ -1197,6 +1487,51 @@ public sealed class AndroidLinkedV2BearerProofTests
                 // Deliberately unmarked: pre-authority Preview10 grants migrate as legacy-v1.
                 _store.PersistLocked();
                 return grant;
+            }
+        }
+
+        public void SeedFullyPinnedGrantCapacity()
+        {
+            lock (_store.Gate)
+            {
+                _store.GrantsById.Clear();
+                _store.GrantTransportAuthoritiesByGrantId.Clear();
+                _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Clear();
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                for (int index = 0; index < InstallLinkingStore.MaxGrants; index++)
+                {
+                    string grantId = $"pinned-grant-{index:D4}";
+                    _store.GrantsById[grantId] = new InstallationGrantDto(
+                        grantId,
+                        "pinned-install",
+                        InstallationGrantStates.Revoked,
+                        string.Empty,
+                        now.AddMinutes(-10).AddMilliseconds(index),
+                        now.AddDays(30),
+                        "pinned-user",
+                        "pinned-subject");
+                    _store.GrantTransportAuthoritiesByGrantId[grantId] =
+                        new InstallationGrantTransportAuthority(
+                            grantId,
+                            InstallationGrantTransports.AndroidLinkedV2);
+                }
+
+                for (int index = 0; index < InstallLinkingStore.MaxGrants / 2; index++)
+                {
+                    string sourceGrantId = $"pinned-grant-{index * 2:D4}";
+                    string replacementGrantId = $"pinned-grant-{index * 2 + 1:D4}";
+                    _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId[sourceGrantId] =
+                        new AndroidLinkedV2GrantRefreshReceipt(
+                            sourceGrantId,
+                            replacementGrantId,
+                            "pinned-install",
+                            new string('a', 64),
+                            new string('b', 64),
+                            now.AddMinutes(5),
+                            "pinned-user",
+                            "pinned-subject");
+                }
+                _store.PersistLocked();
             }
         }
 
