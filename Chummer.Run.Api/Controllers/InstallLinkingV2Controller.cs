@@ -63,7 +63,8 @@ public sealed class InstallLinkingV2Controller : ControllerBase
                     grant.Status,
                     grant.IssuedAtUtc,
                     grant.ExpiresAtUtc),
-                result.Exchange.AlreadyClaimed));
+                result.Exchange.AlreadyClaimed,
+                request.OperationId));
         }
         catch (InstallLinkingOperationException ex)
         {
@@ -101,9 +102,24 @@ public sealed class InstallLinkingV2Controller : ControllerBase
         [FromBody] AndroidLinkedV2GrantRefreshRequest? request)
     {
         ApplyPrivateResponseHeaders();
+        if (AndroidLinkedV2RequestProof.TryGetRefreshRetryResult(
+                HttpContext,
+                out AndroidLinkedV2GrantRotationResult? recovered))
+        {
+            return GrantRefreshResponse(recovered!, request?.OperationId ?? string.Empty);
+        }
+
         if (!TryResolvePrincipal(request, out AndroidLinkedV2GrantPrincipal? principal, out _, out ObjectResult? denied))
         {
             return denied!;
+        }
+        if (!AndroidLinkedV2RequestProof.TryGetAuthorizedRequest(
+                HttpContext,
+                out AndroidLinkedV2AuthorizedRequest? authorizedRequest))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "linked device grant is unknown or expired.");
         }
 
         try
@@ -118,13 +134,10 @@ public sealed class InstallLinkingV2Controller : ControllerBase
                     request.Platform,
                     request.Architecture,
                     request.PublicKey,
-                    request.HostLabel));
-            Response.Headers["Authorization"] = $"Bearer {result.AccessToken}";
-            Response.Headers[AndroidLinkedV2RequestProof.GrantHeader] = result.Grant.GrantId;
-            return Ok(new AndroidLinkedV2GrantRefreshResponse(
-                result.Installation,
-                result.Grant,
-                Rotated: true));
+                    request.HostLabel,
+                    request.OperationId),
+                authorizedRequest!);
+            return GrantRefreshResponse(result, request.OperationId);
         }
         catch (InstallLinkingOperationException ex)
         {
@@ -132,6 +145,19 @@ public sealed class InstallLinkingV2Controller : ControllerBase
                 statusCode: ex.StatusCode,
                 detail: "The installation grant could not be refreshed.");
         }
+    }
+
+    private ActionResult<AndroidLinkedV2GrantRefreshResponse> GrantRefreshResponse(
+        AndroidLinkedV2GrantRotationResult result,
+        string operationId)
+    {
+        Response.Headers["Authorization"] = $"Bearer {result.AccessToken}";
+        Response.Headers[AndroidLinkedV2RequestProof.GrantHeader] = result.Grant.GrantId;
+        return Ok(new AndroidLinkedV2GrantRefreshResponse(
+            result.Installation,
+            result.Grant,
+            Rotated: true,
+            OperationId: operationId));
     }
 
     [HttpPost("grants/revoke")]
@@ -281,12 +307,15 @@ public sealed record AndroidLinkedV2GrantRefreshRequest(
     string? Platform = null,
     string? Architecture = null,
     string? PublicKey = null,
-    string? HostLabel = null) : AndroidLinkedV2GrantRequest(InstallationId);
+    string? HostLabel = null,
+    string OperationId = "") : AndroidLinkedV2GrantRequest(InstallationId);
 
 public sealed record AndroidInstallLinkV2ExchangeResponse(
     ClaimedInstallationDto Installation,
     AndroidLinkedV2GrantMetadata Grant,
-    bool AlreadyClaimed);
+    bool AlreadyClaimed,
+    string OperationId = "",
+    string GrantTransport = InstallLinkingService.AndroidLinkedV2GrantTransport);
 
 public sealed record AndroidLinkedV2GrantStatusResponse(
     string InstallationId,
@@ -299,7 +328,9 @@ public sealed record AndroidLinkedV2GrantStatusResponse(
 public sealed record AndroidLinkedV2GrantRefreshResponse(
     ClaimedInstallationDto Installation,
     AndroidLinkedV2GrantMetadata Grant,
-    bool Rotated);
+    bool Rotated,
+    string OperationId = "",
+    string GrantTransport = InstallLinkingService.AndroidLinkedV2GrantTransport);
 
 public sealed record AndroidLinkedV2GrantRevokeResponse(
     ClaimedInstallationDto Installation,

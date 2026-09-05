@@ -21,6 +21,8 @@ public static class AndroidInstallLinkV2BootstrapProof
             Scheme,
             HttpMethods.Post,
             Path,
+            request.InstallLinkTransport,
+            request.OperationId,
             request.InstallationId,
             request.HeadId,
             request.ApplicationVersion,
@@ -42,10 +44,14 @@ public static class AndroidLinkedV2RequestProof
     public const string IssuedHeader = "X-Chummer-Packet-Issued";
     public const string SignatureHeader = "X-Chummer-Packet-Signature";
     public const int PacketKeyBytes = 32;
+    public const int OperationIdBytes = 24;
+    public const int OperationIdLength = 32;
     public const int MaxBodyBytes = InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes;
     public static readonly TimeSpan MaximumClockSkew = TimeSpan.FromMinutes(2);
 
     private static readonly object PrincipalItemKey = new();
+    private static readonly object AuthorizedRequestItemKey = new();
+    private static readonly object RefreshRetryResultItemKey = new();
 
     public static byte[] CreateCanonicalPayload(
         string method,
@@ -97,6 +103,45 @@ public static class AndroidLinkedV2RequestProof
         }
     }
 
+    public static bool IsValidOperationId(string operationId)
+    {
+        if (operationId.Length != OperationIdLength
+            || operationId.Any(static character =>
+                character is not (>= 'A' and <= 'Z'
+                    or >= 'a' and <= 'z'
+                    or >= '0' and <= '9'
+                    or '-'
+                    or '_')))
+        {
+            return false;
+        }
+
+        try
+        {
+            byte[] decoded = Convert.FromBase64String(
+                operationId.Replace('-', '+').Replace('_', '/'));
+            try
+            {
+                return decoded.Length == OperationIdBytes
+                    && string.Equals(
+                        Convert.ToBase64String(decoded)
+                            .TrimEnd('=')
+                            .Replace('+', '-')
+                            .Replace('/', '_'),
+                        operationId,
+                        StringComparison.Ordinal);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(decoded);
+            }
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
     internal static void SetPrincipal(HttpContext context, AndroidLinkedV2GrantPrincipal principal)
         => context.Items[PrincipalItemKey] = principal;
 
@@ -106,6 +151,84 @@ public static class AndroidLinkedV2RequestProof
             ? value as AndroidLinkedV2GrantPrincipal
             : null;
         return principal is not null;
+    }
+
+    internal static void SetAuthorizedRequest(
+        HttpContext context,
+        AndroidLinkedV2AuthorizedRequest authorizedRequest)
+        => context.Items[AuthorizedRequestItemKey] = authorizedRequest;
+
+    internal static bool TryGetAuthorizedRequest(
+        HttpContext context,
+        out AndroidLinkedV2AuthorizedRequest? authorizedRequest)
+    {
+        authorizedRequest = context.Items.TryGetValue(AuthorizedRequestItemKey, out object? value)
+            ? value as AndroidLinkedV2AuthorizedRequest
+            : null;
+        return authorizedRequest is not null;
+    }
+
+    internal static void SetRefreshRetryResult(
+        HttpContext context,
+        AndroidLinkedV2GrantRotationResult result)
+        => context.Items[RefreshRetryResultItemKey] = result;
+
+    internal static bool TryGetRefreshRetryResult(
+        HttpContext context,
+        out AndroidLinkedV2GrantRotationResult? result)
+    {
+        result = context.Items.TryGetValue(RefreshRetryResultItemKey, out object? value)
+            ? value as AndroidLinkedV2GrantRotationResult
+            : null;
+        return result is not null;
+    }
+
+    internal static string CreateAuthorizedRequestSha256(
+        string method,
+        string path,
+        string installationId,
+        string grantId,
+        long issuedAtUnixSeconds,
+        string packetKey,
+        string signature,
+        byte[] body)
+    {
+        byte[] canonical = CreateCanonicalPayload(
+            method,
+            path,
+            installationId,
+            grantId,
+            issuedAtUnixSeconds,
+            packetKey,
+            body);
+        try
+        {
+            return InstallLinkingService.SecretSha256(string.Join(
+                '\n',
+                "chummer.android.authorized-request.v2",
+                Convert.ToBase64String(canonical),
+                signature));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(canonical);
+        }
+    }
+
+    internal static string CreateStableOperationSha256(
+        string method,
+        string path,
+        string operationId,
+        ReadOnlySpan<byte> body)
+    {
+        string bodySha256 = Convert.ToHexString(SHA256.HashData(body)).ToLowerInvariant();
+        return InstallLinkingService.SecretSha256(string.Join(
+            '\n',
+            "chummer.android.stable-operation.v2",
+            method.ToUpperInvariant(),
+            path,
+            operationId,
+            $"sha256:{bodySha256}"));
     }
 }
 
@@ -228,6 +351,10 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
 
         try
         {
+            bool refreshPath = string.Equals(
+                path,
+                "/api/v2/install-linking/grants/refresh",
+                StringComparison.OrdinalIgnoreCase);
             BodyInspection bodyInspection = InspectBody(body);
             if (bodyInspection.ContainsAccessToken)
             {
@@ -237,6 +364,13 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
             if (!bodyInspection.Valid || bodyInspection.InstallationId is null)
             {
                 await DenyAsync(context, StatusCodes.Status400BadRequest, "body-invalid");
+                return;
+            }
+            if (refreshPath
+                && (bodyInspection.OperationId is null
+                    || !AndroidLinkedV2RequestProof.IsValidOperationId(bodyInspection.OperationId)))
+            {
+                await DenyAsync(context, StatusCodes.Status400BadRequest, "operation-invalid");
                 return;
             }
 
@@ -255,15 +389,56 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                 return;
             }
 
+            DateTimeOffset now = timeProvider.GetUtcNow();
+            DateTimeOffset replayExpiry;
+            try
+            {
+                replayExpiry = DateTimeOffset.FromUnixTimeSeconds(issuedAtUnixSeconds)
+                    + AndroidLinkedV2RequestProof.MaximumClockSkew;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                await DenyAsync(context, StatusCodes.Status401Unauthorized, "proof-invalid");
+                return;
+            }
+
+            string requestSha256 = AndroidLinkedV2RequestProof.CreateAuthorizedRequestSha256(
+                context.Request.Method,
+                path,
+                installationId,
+                grantId,
+                issuedAtUnixSeconds,
+                packetKey,
+                signature,
+                body);
+            string? operationSha256 = refreshPath
+                ? AndroidLinkedV2RequestProof.CreateStableOperationSha256(
+                    context.Request.Method,
+                    path,
+                    bodyInspection.OperationId!,
+                    body)
+                : null;
             AndroidLinkedV2GrantPrincipal? principal = installLinking.ResolveAndroidLinkedV2Grant(
                 installationId,
                 grantId,
                 accessToken);
-            DateTimeOffset now = timeProvider.GetUtcNow();
-            if (principal is null
-                || string.IsNullOrWhiteSpace(principal.Installation.PublicKey)
+            AndroidLinkedV2RefreshRetryAuthorization? refreshRetry = null;
+            if (principal is null && refreshPath)
+            {
+                refreshRetry = installLinking.ResolveAndroidLinkedV2RefreshRetry(
+                    installationId,
+                    grantId,
+                    accessToken,
+                    bodyInspection.OperationId!,
+                    operationSha256!,
+                    requestSha256,
+                    now);
+            }
+
+            string? proofPublicKey = principal?.Installation.PublicKey ?? refreshRetry?.ProofPublicKey;
+            if (string.IsNullOrWhiteSpace(proofPublicKey)
                 || !verifier.Verify(
-                    principal.Installation.PublicKey,
+                    proofPublicKey,
                     context.Request.Method,
                     path,
                     installationId,
@@ -278,17 +453,6 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                 return;
             }
 
-            DateTimeOffset replayExpiry;
-            try
-            {
-                replayExpiry = DateTimeOffset.FromUnixTimeSeconds(issuedAtUnixSeconds)
-                    + AndroidLinkedV2RequestProof.MaximumClockSkew;
-            }
-            catch (ArgumentOutOfRangeException)
-            {
-                await DenyAsync(context, StatusCodes.Status401Unauthorized, "proof-invalid");
-                return;
-            }
             bool acceptedReplayReceipt;
             try
             {
@@ -314,7 +478,30 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                 return;
             }
 
+            if (refreshRetry is not null)
+            {
+                AndroidLinkedV2RequestProof.SetRefreshRetryResult(context, refreshRetry.Result);
+                RemoveCredentialHeaders(context.Request.Headers);
+                await next(context);
+                return;
+            }
+
+            if (principal is null)
+            {
+                await DenyAsync(context, StatusCodes.Status401Unauthorized, "proof-invalid");
+                return;
+            }
+
             AndroidLinkedV2RequestProof.SetPrincipal(context, principal);
+            AndroidLinkedV2RequestProof.SetAuthorizedRequest(
+                context,
+                new AndroidLinkedV2AuthorizedRequest(
+                    requestSha256,
+                    InstallLinkingService.SecretSha256(accessToken),
+                    now + InstallLinkingService.AndroidLinkedV2ResponseRecoveryLifetime,
+                    bodyInspection.OperationId ?? string.Empty,
+                    operationSha256 ?? string.Empty,
+                    proofPublicKey));
             RemoveCredentialHeaders(context.Request.Headers);
             await next(context);
         }
@@ -378,13 +565,16 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
             using JsonDocument document = JsonDocument.Parse(body);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return new BodyInspection(false, false, null);
+                return new BodyInspection(false, false, null, null);
             }
 
             bool containsAccessToken = ContainsProperty(document.RootElement, "accessToken");
             string? installationId = null;
             int installationIdPropertyCount = 0;
             bool canonicalInstallationIdProperty = true;
+            string? operationId = null;
+            int operationIdPropertyCount = 0;
+            bool canonicalOperationIdProperty = true;
             foreach (JsonProperty property in document.RootElement.EnumerateObject())
             {
                 if (string.Equals(property.Name, "installationId", StringComparison.OrdinalIgnoreCase))
@@ -404,16 +594,39 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                         }
                     }
                 }
+                if (string.Equals(property.Name, "operationId", StringComparison.OrdinalIgnoreCase))
+                {
+                    operationIdPropertyCount++;
+                    canonicalOperationIdProperty &= string.Equals(
+                        property.Name,
+                        "operationId",
+                        StringComparison.Ordinal);
+                    if (property.Value.ValueKind == JsonValueKind.String)
+                    {
+                        string? observed = property.Value.GetString();
+                        if (observed is not null
+                            && string.Equals(observed, observed.Trim(), StringComparison.Ordinal))
+                        {
+                            operationId = observed;
+                        }
+                    }
+                }
             }
 
             bool validInstallation = installationIdPropertyCount == 1
                 && canonicalInstallationIdProperty
                 && installationId is { Length: > 0 and <= 64 };
-            return new BodyInspection(validInstallation, containsAccessToken, installationId);
+            bool validOperation = operationIdPropertyCount is 0
+                || operationIdPropertyCount == 1 && canonicalOperationIdProperty;
+            return new BodyInspection(
+                validInstallation && validOperation,
+                containsAccessToken,
+                installationId,
+                operationId);
         }
         catch (JsonException)
         {
-            return new BodyInspection(false, false, null);
+            return new BodyInspection(false, false, null, null);
         }
     }
 
@@ -514,7 +727,11 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
         headers["X-Content-Type-Options"] = "nosniff";
     }
 
-    private sealed record BodyInspection(bool Valid, bool ContainsAccessToken, string? InstallationId);
+    private sealed record BodyInspection(
+        bool Valid,
+        bool ContainsAccessToken,
+        string? InstallationId,
+        string? OperationId);
 }
 
 public sealed record AndroidLinkedV2GrantPrincipal(
@@ -522,3 +739,15 @@ public sealed record AndroidLinkedV2GrantPrincipal(
     string GrantId,
     DateTimeOffset IssuedAtUtc,
     DateTimeOffset ExpiresAtUtc);
+
+internal sealed record AndroidLinkedV2AuthorizedRequest(
+    string RequestSha256,
+    string AccessTokenSha256,
+    DateTimeOffset RecoveryExpiresAtUtc,
+    string OperationId,
+    string OperationSha256,
+    string ProofPublicKey);
+
+internal sealed record AndroidLinkedV2RefreshRetryAuthorization(
+    AndroidLinkedV2GrantRotationResult Result,
+    string ProofPublicKey);
