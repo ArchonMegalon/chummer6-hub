@@ -46,7 +46,8 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
 
     private static readonly JsonSerializerOptions ProviderSerializerOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = false,
+        UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow
     };
 
     private readonly IToughTongueBuildGhostTransport _transport;
@@ -373,15 +374,16 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         Require(answer.RequestId, request.RequestId, "provider-request-id-mismatch", failures);
         Require(answer.PacketDigest, request.PacketDigest, "provider-packet-digest-mismatch", failures);
         if (!string.Equals(answer.Locale, request.Locale, StringComparison.OrdinalIgnoreCase)) failures.Add("provider-locale-mismatch");
-        if (string.IsNullOrWhiteSpace(answer.Text)) failures.Add("provider-text-missing");
-        AddUnknown(failures, "fact", answer.ReferencedFactIds, authority.FactIds);
-        AddUnknown(failures, "strategy", answer.ReferencedStrategyIds, authority.StrategyIds);
-        AddUnknown(failures, "rule-explanation", answer.ReferencedRuleExplanationIds, authority.RuleExplanationIds);
-        AddUnknown(failures, "variant", answer.ReferencedVariantIds, authority.VariantIds);
-        AddUnknown(failures, "member", answer.ReferencedMemberRefs, authority.MemberRefs);
-        AddUnknown(failures, "source-anchor", answer.ReferencedSourceAnchorIds, authority.SourceAnchorIds);
-        AddUnknown(failures, "action", answer.SuggestedActionIds, authority.ActionIds);
-        AddUnknown(failures, "link", answer.Links, authority.Links);
+        if (string.IsNullOrWhiteSpace(answer.Text) || answer.Text.Length > 32_768) failures.Add("provider-text-invalid");
+        AddReferences(failures, "fact", answer.ReferencedFactIds, authority.FactIds);
+        AddReferences(failures, "strategy", answer.ReferencedStrategyIds, authority.StrategyIds);
+        AddReferences(failures, "rule-explanation", answer.ReferencedRuleExplanationIds, authority.RuleExplanationIds);
+        AddReferences(failures, "variant", answer.ReferencedVariantIds, authority.VariantIds);
+        AddReferences(failures, "member", answer.ReferencedMemberRefs, authority.MemberRefs);
+        AddReferences(failures, "source-anchor", answer.ReferencedSourceAnchorIds, authority.SourceAnchorIds);
+        AddReferences(failures, "action", answer.SuggestedActionIds, authority.ActionIds);
+        AddReferences(failures, "link", answer.Links, authority.Links);
+        if (!HasGroundingReference(answer)) failures.Add("provider-grounding-reference-missing");
         return failures.Distinct(StringComparer.Ordinal).OrderBy(static value => value, StringComparer.Ordinal).ToArray();
     }
 
@@ -517,16 +519,51 @@ public sealed class ToughTongueBuildGhostAdapter : IToughTongueBuildGhostAdapter
         return result;
     }
 
-    private static void AddUnknown(List<string> failures, string kind, IEnumerable<string>? supplied, IReadOnlySet<string> allowed)
+    private static void AddReferences(
+        List<string> failures,
+        string kind,
+        IReadOnlyList<string>? supplied,
+        IReadOnlySet<string> allowed)
     {
-        foreach (string value in supplied ?? [])
+        if (supplied is null)
         {
-            if (!string.IsNullOrWhiteSpace(value) && !allowed.Contains(value))
+            failures.Add($"provider-{kind}-references-missing");
+            return;
+        }
+        if (supplied.Count > 512)
+        {
+            failures.Add($"provider-{kind}-references-too-many");
+            return;
+        }
+
+        HashSet<string> observed = new(StringComparer.Ordinal);
+        foreach (string? value in supplied)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                failures.Add($"provider-{kind}-reference-invalid");
+            }
+            else if (!observed.Add(value))
+            {
+                failures.Add($"provider-{kind}-reference-duplicate:{value}");
+            }
+            else if (!allowed.Contains(value))
             {
                 failures.Add($"unsupported-{kind}:{value}");
             }
         }
     }
+
+    private static bool HasGroundingReference(ToughTongueBuildGhostProviderAnswer answer)
+        => HasAny(answer.ReferencedFactIds)
+            || HasAny(answer.ReferencedStrategyIds)
+            || HasAny(answer.ReferencedRuleExplanationIds)
+            || HasAny(answer.ReferencedVariantIds)
+            || HasAny(answer.ReferencedMemberRefs)
+            || HasAny(answer.ReferencedSourceAnchorIds);
+
+    private static bool HasAny(IReadOnlyList<string>? values)
+        => values is { Count: > 0 };
 
     private static void Require(string? actual, string expected, string reason, List<string> failures)
     {
