@@ -846,6 +846,11 @@ def make_fake_authority_source(
     inject_postdeploy_nested_secret_value: str | None = None,
 ) -> Path:
     source = tmp_path / "source"
+    (
+        tmp_path
+        / "core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781-input"
+    ).mkdir()
+    (tmp_path / "hub-package-feed-sh1852ea4eef6d-input").mkdir()
     (source / "scripts").mkdir(parents=True)
     (source / "Chummer.Run.Api").mkdir()
     (source / "docker-compose.public-edge.yml").write_text(

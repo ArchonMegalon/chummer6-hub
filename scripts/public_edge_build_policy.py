@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import re
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -24,9 +25,11 @@ PUBLIC_EDGE_BUILD_SERVICE_TARGETS = {
     ),
 }
 PUBLIC_EDGE_NAMED_CONTEXT_NAMES = (
+    "core-runtime-bundle",
     "design-product",
     "fleet-media-factory-contracts",
     "hub-registry-source",
+    "hub-package-feed-input",
     "run-services-source",
 )
 PUBLIC_EDGE_BUILD_ARG_NAMES = (
@@ -308,9 +311,19 @@ PUBLIC_EDGE_DOCKER_STAGE_ORDER = (
     "install-linking-postgres-tool-final",
     "final",
 )
+PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT = 44
+PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256 = (
+    "32e5233a0e849a1ca0532704feed4feef353d50d31fdeefa84b9cb043d7bed8c"
+)
 PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE = {
     "public-pwa-proof": frozenset({"run-services-source"}),
-    "hub-package-feed": frozenset({"run-services-source"}),
+    "hub-package-feed": frozenset(
+        {
+            "core-runtime-bundle",
+            "hub-package-feed-input",
+            "run-services-source",
+        }
+    ),
     "build": frozenset(
         {
             "fleet-media-factory-contracts",
@@ -359,6 +372,9 @@ PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
             "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
             "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
             "COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json",
+            "COPY --from=run-services-source eng/core-runtime-bundle/core-runtime-bundle-input.json eng/core-runtime-bundle/core-runtime-bundle-input.json",
+            "COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip",
+            "COPY --from=hub-package-feed-input . /opt/chummer-package-feed",
         }
     ),
     "build": frozenset(
@@ -493,6 +509,51 @@ def docker_logical_instructions(text: str) -> tuple[str, ...]:
     if malformed_continuations:
         raise ValueError("Dockerfile has a malformed or dangling continuation")
     return tuple(instruction for _line, instruction, _continued in records)
+
+
+def docker_stage_instruction_contract_matches(
+    text: str,
+    *,
+    stage: str,
+    expected_count: int,
+    expected_sha256: str,
+) -> bool:
+    """Bind every instruction in one exact Docker stage, including later RUNs."""
+
+    try:
+        instructions = docker_logical_instructions(text)
+    except ValueError:
+        return False
+    from_indexes = [
+        index
+        for index, instruction in enumerate(instructions)
+        if re.fullmatch(
+            rf"FROM\s+\S+\s+AS\s+{re.escape(stage)}",
+            instruction,
+            flags=re.IGNORECASE,
+        )
+    ]
+    if len(from_indexes) != 1:
+        return False
+    start = from_indexes[0]
+    end = next(
+        (
+            index
+            for index in range(start + 1, len(instructions))
+            if re.match(
+                r"FROM(?:\s|$)", instructions[index], flags=re.IGNORECASE
+            )
+        ),
+        len(instructions),
+    )
+    stage_instructions = instructions[start:end]
+    digest = hashlib.sha256(
+        ("\n".join(stage_instructions) + "\n").encode("utf-8")
+    ).hexdigest()
+    return (
+        len(stage_instructions) == expected_count
+        and digest == expected_sha256
+    )
 
 
 def docker_copy_from_reference(

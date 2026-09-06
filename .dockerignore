@@ -6,6 +6,8 @@
 !eng/
 !eng/package-plane.lock.json
 !eng/core-main-runtime-artifact-authority.json
+!eng/core-runtime-bundle/
+!eng/core-runtime-bundle/core-runtime-bundle-input.json
 !eng/NuGet.Container.Config
 !.codex-design/
 !.codex-design/**

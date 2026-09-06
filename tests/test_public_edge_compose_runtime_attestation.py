@@ -59,9 +59,16 @@ def rendered_compose(
             "context": str(build_context),
             "dockerfile": str(source_root / "Chummer.Run.Api" / "Dockerfile"),
             "additional_contexts": {
+                "core-runtime-bundle": str(
+                    source_root.parent
+                    / "core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781-input"
+                ),
                 "run-services-source": str(source_root),
                 "hub-registry-source": (
                     "/docker/chummercomplete/chummer-hub-registry"
+                ),
+                "hub-package-feed-input": str(
+                    source_root.parent / "hub-package-feed-sh1852ea4eef6d-input"
                 ),
                 "fleet-media-factory-contracts": (
                     "/docker/fleet/repos/chummer-media-factory/src/"

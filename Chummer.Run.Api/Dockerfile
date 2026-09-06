@@ -31,7 +31,10 @@ COPY --from=run-services-source global.json global.json
 COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py
 COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json
 COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json
-RUN ["/usr/local/bin/python3", "-I", "-S", "scripts/ai/bootstrap-hub-package-feed.py", "--repo-root", "/proof", "--feed", "/opt/chummer-package-feed", "--core-feed", "/opt/chummer-core-runtime-feed", "--download-core-runtime"]
+COPY --from=run-services-source eng/core-runtime-bundle/core-runtime-bundle-input.json eng/core-runtime-bundle/core-runtime-bundle-input.json
+COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip
+COPY --from=hub-package-feed-input . /opt/chummer-package-feed
+RUN ["/usr/local/bin/python3", "-I", "-S", "scripts/ai/bootstrap-hub-package-feed.py", "--repo-root", "/proof", "--feed", "/opt/chummer-package-feed", "--core-feed", "/opt/chummer-core-runtime-feed", "--core-runtime-bundle-input", "--prebuilt-hub-feed-input"]
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a AS build
 COPY --from=public-pwa-proof /proof/public-pwa-proof-authority.receipt.json /tmp/public-pwa-proof-authority.receipt.json
