@@ -29,6 +29,8 @@ try:
         PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
         PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
         PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE as SHARED_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
         PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE as SHARED_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
         PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE as SHARED_DOCKER_NAMED_CONTEXTS_BY_STAGE,
         PUBLIC_EDGE_DOCKER_STAGE_ORDER as SHARED_DOCKER_STAGE_ORDER,
@@ -44,6 +46,7 @@ try:
         docker_logical_instruction_records,
         docker_logical_instructions,
         dockerfile_parser_directive_findings,
+        docker_stage_instruction_contract_matches,
         public_edge_compose_build_syntax_failures,
         public_edge_rendered_compose_failures,
         rendered_build_contract_matches,
@@ -67,6 +70,8 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
         PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
         PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
         PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE as SHARED_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
         PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE as SHARED_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
         PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE as SHARED_DOCKER_NAMED_CONTEXTS_BY_STAGE,
         PUBLIC_EDGE_DOCKER_STAGE_ORDER as SHARED_DOCKER_STAGE_ORDER,
@@ -82,6 +87,7 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
         docker_logical_instruction_records,
         docker_logical_instructions,
         dockerfile_parser_directive_findings,
+        docker_stage_instruction_contract_matches,
         public_edge_compose_build_syntax_failures,
         public_edge_rendered_compose_failures,
         rendered_build_contract_matches,
@@ -785,7 +791,7 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN = (
     '"--repo-root", "/proof", '
     '"--feed", "/opt/chummer-package-feed", '
     '"--core-feed", "/opt/chummer-core-runtime-feed", '
-    '"--download-core-runtime"]'
+    '"--core-runtime-bundle-input", "--prebuilt-hub-feed-input"]'
 )
 PUBLIC_EDGE_DOCKER_PROOF_COPY_INPUTS = (
     "scripts/validate_public_pwa_proof_authority.py",
@@ -839,6 +845,9 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE_INSTRUCTIONS = (
     "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
     "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
     "COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json",
+    "COPY --from=run-services-source eng/core-runtime-bundle/core-runtime-bundle-input.json eng/core-runtime-bundle/core-runtime-bundle-input.json",
+    "COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip",
+    "COPY --from=hub-package-feed-input . /opt/chummer-package-feed",
     PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN,
 )
 PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = (
@@ -893,6 +902,14 @@ PUBLIC_EDGE_COMPOSE_DOCKERFILE = (
     "Chummer.Run.Api/Dockerfile"
 )
 PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS = {
+    "core-runtime-bundle": (
+        "${CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE:?"
+        "Set the sealed Core runtime bundle input}"
+    ),
+    "hub-package-feed-input": (
+        "${CHUMMER_HUB_PACKAGE_FEED_SOURCE:?"
+        "Set the sealed Hub package feed input}"
+    ),
     "run-services-source": (
         "${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}"
     ),
@@ -1379,6 +1396,16 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         failures.append(
             "hub-package-feed must match the exact proof-gated package-feed instruction whitelist"
         )
+    exact_build_stage_instructions = docker_stage_instruction_contract_matches(
+        text,
+        stage=PUBLIC_EDGE_DOCKER_BUILD_STAGE,
+        expected_count=PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+        expected_sha256=PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
+    )
+    if not exact_build_stage_instructions:
+        failures.append(
+            "build stage must match the exact immutable instruction digest"
+        )
 
     current_stage = -1
     current_alias = ""
@@ -1727,6 +1754,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "proofStageNotDerived": not derived_proof_stages and not proof_alias_redefinitions,
         "exactPackageFeedStageCount": package_feed_stage_count == 1,
         "exactBuildStage": build_stage_count == 1,
+        "exactBuildStageInstructions": exact_build_stage_instructions,
         "exactToolFinalStage": tool_final_stage_count == 1,
         "exactFinalStage": final_stage_count == 1,
         "exactStageSetAndOrder": exact_stage_set_and_order,

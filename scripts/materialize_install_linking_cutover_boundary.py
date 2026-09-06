@@ -720,10 +720,16 @@ BUILD_DEPENDENCY_PROVENANCE_KEYS = {
     "baseImages",
     "contextPolicies",
     "contractName",
+    "coreRuntimeBundleFileName",
+    "coreRuntimeBundlePathSha256",
+    "coreRuntimeBundleSha256",
+    "coreRuntimeBundleSizeBytes",
     "dockerfileFrontend",
     "dockerfileSha256",
     "externalMediaProjectSha256",
     "externalMediaRestoreIsSdkOnly",
+    "hubPackageFeedInputs",
+    "hubPackageFeedPathSha256",
     "loopbackProbeIsSdkOnly",
     "loopbackProbeProgramSha256",
     "loopbackProbeProjectSha256",
@@ -769,9 +775,11 @@ BUILD_CONTEXT_POLICY_KEYS = {
     "repositoryContained",
 }
 BUILD_CONTEXT_POLICY_STATIC_BOUNDARIES = {
+    "core-runtime-bundle": "sealed-external-artifact-input",
     "design-product": "exact-clean-repository",
     "fleet-media-factory-contracts": "exact-clean-repository-subtree",
     "hub-registry-source": "exact-clean-repository",
+    "hub-package-feed-input": "sealed-external-artifact-input",
     "run-services-source": "exact-clean-repository",
 }
 BUILD_CONTEXT_POLICY_BUILD_BOUNDARIES = {
@@ -780,7 +788,9 @@ BUILD_CONTEXT_POLICY_BUILD_BOUNDARIES = {
 }
 BUILD_CONTEXT_POLICY_NULL_DOCKERIGNORE_NAMES = frozenset(
     {
+        "core-runtime-bundle",
         "fleet-media-factory-contracts",
+        "hub-package-feed-input",
     }
 )
 BUILD_CONTEXT_POLICY_EXACT_DOCKERIGNORE_NAMES = frozenset(
@@ -795,6 +805,8 @@ RUN_SERVICES_PACKAGE_INPUTS = {
     "global.json",
     "eng/NuGet.Container.Config",
     "eng/package-plane.lock.json",
+    "eng/core-main-runtime-artifact-authority.json",
+    "eng/core-runtime-bundle/core-runtime-bundle-input.json",
     "scripts/ai/bootstrap-hub-package-feed.py",
     "scripts/public_edge_postdeploy_contract.py",
     "scripts/public_edge_postdeploy_gate.v1.schema.json",
@@ -815,7 +827,37 @@ RUN_SERVICES_PACKAGE_INPUTS = {
     "Chummer.World.Contracts/Chummer.World.Contracts.csproj",
     "Chummer.World.Contracts/packages.lock.json",
 }
-PACKAGE_PLANE_CONTRACT = "chummer-hub.package-plane-lock/v4"
+PACKAGE_PLANE_CONTRACT = "chummer-hub.package-plane-lock/v5"
+CORE_RUNTIME_BUNDLE_FILE_NAME = (
+    "chummer-core-runtime-package-plane-"
+    "c06f22c185c7b733637fdb76b3cf333f31716781.zip"
+)
+CORE_RUNTIME_BUNDLE_SHA256 = (
+    "0ed7f7ed701e65d49b3632843f81463e4ed2a99662f85648da5662bcdc54832f"
+)
+CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_090_207
+HUB_PACKAGE_FEED_INPUTS = {
+    "Chummer.Hub.Registry.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
+        "sha256": "89ca9f9f6069bdf1bbbb2aa9fc16a9c3b29e13f64a896be53027e42a682447d7",
+        "sizeBytes": 524_842,
+    },
+    "Chummer.Play.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
+        "sha256": "25cd5115e72572d5eea45ac615125e11d077d26986423a903da52e9175a58d9c",
+        "sizeBytes": 322_544,
+    },
+    "Chummer.Run.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
+        "sha256": "258d6dfbac12d65f15e32b1663cb6bdc267a5dc5916d047557274d2e06878ce8",
+        "sizeBytes": 1_838_984,
+    },
+    "Chummer.Run.Registry.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
+        "sha256": "da046c289f33fb3910db0fa2d54d7dd28e21862f9e81bdbcc0feba5a3ee9381c",
+        "sizeBytes": 345_296,
+    },
+    "chummer-hub-packages.inventory.json": {
+        "sha256": "cdd48d4e70dc38b6ac69d4091bf3718da4902ca17b9d1c4b809f38add04129fb",
+        "sizeBytes": 2_396,
+    },
+}
 CANONICAL_BUILD_SOURCE_ORIGIN_URL_SHA256 = {
     name: hashlib.sha256(url.encode("utf-8")).hexdigest()
     for name, url in {
@@ -2694,6 +2736,14 @@ def _valid_build_dependency_provenance(
         or provenance.get("dockerfileFrontend")
         != DOCKERFILE_FRONTEND_REFERENCE
         or provenance.get("baseImages") != DOCKER_BASE_IMAGE_REFERENCES
+        or provenance.get("coreRuntimeBundleFileName")
+        != CORE_RUNTIME_BUNDLE_FILE_NAME
+        or provenance.get("coreRuntimeBundleSha256")
+        != CORE_RUNTIME_BUNDLE_SHA256
+        or provenance.get("coreRuntimeBundleSizeBytes")
+        != CORE_RUNTIME_BUNDLE_SIZE_BYTES
+        or provenance.get("hubPackageFeedInputs")
+        != HUB_PACKAGE_FEED_INPUTS
         or provenance.get("externalMediaRestoreIsSdkOnly") is not True
         or provenance.get("loopbackProbeIsSdkOnly") is not True
         or provenance.get("runtimePackageManagerInvocationCount") != 0
@@ -2710,6 +2760,8 @@ def _valid_build_dependency_provenance(
         return False
     for field in (
         "dockerfileSha256",
+        "coreRuntimeBundlePathSha256",
+        "hubPackageFeedPathSha256",
         "externalMediaProjectSha256",
         "loopbackProbeProgramSha256",
         "loopbackProbeProjectSha256",
@@ -2767,7 +2819,11 @@ def _valid_build_dependency_provenance(
             not isinstance(policy, dict)
             or set(policy) != BUILD_CONTEXT_POLICY_KEYS
             or policy.get("contextBoundary") != expected_boundary
-            or policy.get("repositoryContained") is not True
+            or policy.get("repositoryContained")
+            is not (
+                name
+                not in {"core-runtime-bundle", "hub-package-feed-input"}
+            )
         ):
             return False
         dockerignore = policy.get("dockerignoreSha256")

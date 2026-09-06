@@ -47,7 +47,9 @@ def unseal_test_repository(repository: Path) -> None:
     for directory, _directory_names, file_names in os.walk(repository):
         Path(directory).chmod(0o755)
         for file_name in file_names:
-            (Path(directory) / file_name).chmod(0o644)
+            path = Path(directory) / file_name
+            if not path.is_symlink():
+                path.chmod(0o644)
 
 
 def seal_test_repository(repository: Path) -> None:
@@ -56,14 +58,67 @@ def seal_test_repository(repository: Path) -> None:
         topdown=False,
     ):
         for file_name in file_names:
-            (Path(directory) / file_name).chmod(0o444)
+            path = Path(directory) / file_name
+            if not path.is_symlink():
+                path.chmod(0o444)
         Path(directory).chmod(0o555)
+
+
+def make_release_shelf_symlink_fixture(module, tmp_path: Path) -> Path:
+    repository = tmp_path / "run-services"
+    (repository / ".git").mkdir(parents=True)
+    generation = (
+        repository
+        / "Chummer.Portal/downloads/.windows-installer-proof/generations/"
+        "generation-f51f0d99252bbe97f075587219b99a04"
+    )
+    visual_target = generation / "visual-audit/windows-installer"
+    visual_target.mkdir(parents=True)
+    (generation / "authority.json").write_text("{}\n", encoding="utf-8")
+    (visual_target / "screenshot.png").write_bytes(b"sealed screenshot")
+    visual_link_parent = repository / "Chummer.Portal/downloads/visual-audit"
+    visual_link_parent.mkdir(parents=True)
+    seal_test_repository(repository)
+    for relative_path, (target, _resolved) in (
+        module.APPROVED_RELEASE_SHELF_SYMLINKS.items()
+    ):
+        link = repository / relative_path
+        link.parent.chmod(0o755)
+        link.symlink_to(target, target_is_directory=True)
+        link.parent.chmod(0o555)
+    return repository
+
+
+def provision_test_core_runtime_bundle(module, source_root: Path) -> None:
+    payload = b"governed test Core runtime bundle"
+    module.CORE_RUNTIME_BUNDLE_SIZE_BYTES = len(payload)
+    module.CORE_RUNTIME_BUNDLE_SHA256 = module.sha256_bytes(payload)
+    bundle_root = source_root.parent / module.CORE_RUNTIME_BUNDLE_DIRECTORY_NAME
+    bundle_root.mkdir(exist_ok=True)
+    archive = bundle_root / module.CORE_RUNTIME_BUNDLE_FILE_NAME
+    archive.write_bytes(payload)
+    archive.chmod(0o444)
+    bundle_root.chmod(0o555)
+    hub_payload = b"governed test Hub package feed"
+    module.HUB_PACKAGE_FEED_INPUTS = {
+        "chummer-hub-packages.inventory.json": (
+            module.sha256_bytes(hub_payload),
+            len(hub_payload),
+        )
+    }
+    hub_root = source_root.parent / module.HUB_PACKAGE_FEED_DIRECTORY_NAME
+    hub_root.mkdir(exist_ok=True)
+    hub_input = hub_root / "chummer-hub-packages.inventory.json"
+    hub_input.write_bytes(hub_payload)
+    hub_input.chmod(0o444)
+    hub_root.chmod(0o555)
 
 
 def make_runner(module, tmp_path: Path, commands: FakeCommands):
     tmp_path.chmod(0o700)
     source = tmp_path / "source"
     source.mkdir()
+    provision_test_core_runtime_bundle(module, source)
     inputs = module.CutoverInputs(
         source_root=source,
         compose_file=source / "docker-compose.public-edge.yml",
@@ -224,6 +279,7 @@ def make_synthetic_runner(module, tmp_path: Path, commands: FakeCommands):
         expected_design_product_content_sha256="b" * 64,
         expected_fleet_media_factory_content_sha256="c" * 64,
     )
+    provision_test_core_runtime_bundle(module, source)
     return module.GovernedCutoverRunner(
         inputs,
         command_runner=commands,
@@ -351,6 +407,96 @@ def test_synthetic_workspace_rejects_symlinked_dependency(
 
     with pytest.raises(module.CutoverError, match="non-symlinked"):
         runner._validate_build_workspace_paths()
+
+
+def test_sealed_repository_accepts_only_exact_release_shelf_symlinks(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    repository = make_release_shelf_symlink_fixture(module, tmp_path)
+
+    module.validate_sealed_standalone_repository(repository)
+
+    records = [
+        module._source_file_record(repository, relative_path)
+        for relative_path in sorted(module.APPROVED_RELEASE_SHELF_SYMLINKS)
+    ]
+    assert [record["mode"] for record in records] == ["120000", "120000"]
+    for record in records:
+        target = module.APPROVED_RELEASE_SHELF_SYMLINKS[record["path"]][0]
+        target_bytes = target.encode("utf-8")
+        assert record["size"] == len(target_bytes)
+        assert record["sha256"] == module.sha256_bytes(target_bytes)
+    first = module.source_content_sha256(
+        repository,
+        module.APPROVED_RELEASE_SHELF_SYMLINKS,
+    )
+    second = module.source_content_sha256(
+        repository,
+        reversed(tuple(module.APPROVED_RELEASE_SHELF_SYMLINKS)),
+    )
+    assert first == second
+
+
+@pytest.mark.parametrize(
+    "hostile_target",
+    (
+        "generations/generation-f51f0d99252bbe97f075587219b99a05",
+        "../../../../outside",
+        "/tmp/outside",
+        "generations",
+    ),
+)
+def test_sealed_repository_rejects_release_shelf_symlink_target_drift(
+    tmp_path: Path,
+    hostile_target: str,
+) -> None:
+    module = load_module()
+    repository = make_release_shelf_symlink_fixture(module, tmp_path)
+    relative_path = next(iter(module.APPROVED_RELEASE_SHELF_SYMLINKS))
+    link = repository / relative_path
+    link.parent.chmod(0o755)
+    link.unlink()
+    link.symlink_to(hostile_target, target_is_directory=True)
+    link.parent.chmod(0o555)
+
+    with pytest.raises(
+        module.CutoverError,
+        match="release-shelf symlink|unavailable",
+    ):
+        module.validate_sealed_standalone_repository(repository)
+
+
+def test_sealed_repository_rejects_unapproved_extra_symlink(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    repository = make_release_shelf_symlink_fixture(module, tmp_path)
+    extra = repository / "Chummer.Portal/downloads/current"
+    extra.parent.chmod(0o755)
+    extra.symlink_to(
+        ".windows-installer-proof/current",
+        target_is_directory=True,
+    )
+    extra.parent.chmod(0o555)
+
+    with pytest.raises(module.CutoverError, match="unapproved symlink"):
+        module.validate_sealed_standalone_repository(repository)
+
+
+def test_sealed_repository_rejects_approved_link_to_unsealed_target(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    repository = make_release_shelf_symlink_fixture(module, tmp_path)
+    target = (
+        repository
+        / next(iter(module.APPROVED_RELEASE_SHELF_SYMLINKS.values()))[1]
+    )
+    target.chmod(0o755)
+
+    with pytest.raises(module.CutoverError, match="source (directories|entries).*sealed"):
+        module.validate_sealed_standalone_repository(repository)
 
 
 def test_synthetic_workspace_requires_exact_private_root_mode(
@@ -519,6 +665,9 @@ def test_synthetic_routing_environment_closes_every_build_source(
     )
     assert environment["CHUMMER_DESIGN_PRODUCT_SOURCE"] == str(
         runner.inputs.design_product_root
+    )
+    assert environment["CHUMMER_HUB_PACKAGE_FEED_SOURCE"] == str(
+        module.hub_package_feed_root(runner.inputs)
     )
     assert environment[
         "CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE"

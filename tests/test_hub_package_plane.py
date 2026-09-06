@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ElementTree
@@ -19,6 +20,22 @@ SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 VERIFY_SCRIPT_PATH = ROOT / "scripts" / "ai" / "verify-hub-package-plane.py"
 PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
+CORE_RUNTIME_BUNDLE_INPUT = (
+    ROOT / "eng/core-runtime-bundle/core-runtime-bundle-input.json"
+)
+CORE_RUNTIME_BUNDLE = (
+    Path(
+        os.environ.get(
+            "CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE",
+            str(
+                ROOT.parent
+                / "core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781-input"
+            ),
+        )
+    )
+    /
+    "chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip"
+)
 PACKAGE_VERSION = "0.1.0-packageplane.candidate.sh1852ea4eef6d"
 OWNER_PACKAGE_VERSIONS = {
     "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh60112dccb6a3f",
@@ -177,6 +194,126 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
         payload["packages"][0][key] = value
         with pytest.raises(module.PackagePlaneError, match="immutable authority mismatch"):
             module.validate_lock_payload(payload)
+
+
+def _copy_core_runtime_bundle_input(tmp_path: Path) -> Path:
+    if not CORE_RUNTIME_BUNDLE.is_file():
+        pytest.skip("governed external Core runtime bundle is not provisioned")
+    repo_root = tmp_path / "repo"
+    target = repo_root / "eng/core-runtime-bundle"
+    target.mkdir(parents=True)
+    shutil.copyfile(CORE_RUNTIME_BUNDLE_INPUT, target / CORE_RUNTIME_BUNDLE_INPUT.name)
+    shutil.copyfile(CORE_RUNTIME_BUNDLE, target / CORE_RUNTIME_BUNDLE.name)
+    return repo_root
+
+
+def test_core_runtime_bundle_input_is_exact_offline_authority(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+
+    assert not (
+        ROOT / "eng/core-runtime-bundle" / CORE_RUNTIME_BUNDLE.name
+    ).exists()
+    repo_root = _copy_core_runtime_bundle_input(tmp_path)
+    bundle = module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+    assert bundle == (
+        repo_root / "eng/core-runtime-bundle" / CORE_RUNTIME_BUNDLE.name
+    )
+    assert bundle.stat().st_size == lock.core_runtime.bundle_size_bytes
+    assert hashlib.sha256(bundle.read_bytes()).hexdigest() == (
+        lock.core_runtime.bundle_sha256
+    )
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
+    assert "urllib" not in source
+    assert "urlopen" not in source
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    (
+        ("url", "https://example.invalid/core.zip"),
+        ("sha256", "0" * 64),
+        ("size_bytes", 1),
+        ("file_name", "other.zip"),
+        ("contract", "chummer-hub.core-runtime-bundle-input/v0"),
+        ("Url", "https://github.com/ArchonMegalon/chummer6-core.git"),
+    ),
+)
+def test_core_runtime_bundle_input_rejects_receipt_authority_drift(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    repo_root = _copy_core_runtime_bundle_input(tmp_path)
+    receipt = repo_root / module.CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    payload[field] = replacement
+    receipt.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(module.PackagePlaneError, match="exact authority"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+
+def test_core_runtime_bundle_input_rejects_duplicate_or_noncanonical_receipt(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    repo_root = _copy_core_runtime_bundle_input(tmp_path)
+    receipt = repo_root / module.CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH
+    canonical = receipt.read_text(encoding="utf-8")
+    duplicate = canonical.replace(
+        '  "contract":',
+        '  "contract": "chummer-hub.core-runtime-bundle-input/v1",\n  "contract":',
+        1,
+    )
+    receipt.write_text(duplicate, encoding="utf-8")
+    with pytest.raises(module.PackagePlaneError, match="duplicate"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+    receipt.write_text(canonical.rstrip("\n"), encoding="utf-8")
+    with pytest.raises(module.PackagePlaneError, match="exact authority"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+
+def test_core_runtime_bundle_input_rejects_symlink_or_changed_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    repo_root = _copy_core_runtime_bundle_input(tmp_path)
+    receipt = repo_root / module.CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH
+    bundle = receipt.parent / lock.core_runtime.bundle_file_name
+    outside = tmp_path / "outside.zip"
+    shutil.copyfile(bundle, outside)
+    bundle.unlink()
+    bundle.symlink_to(outside)
+    with pytest.raises(module.PackagePlaneError, match="bytes"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+    second_root = _copy_core_runtime_bundle_input(tmp_path / "second")
+    bundle_root = second_root / "eng/core-runtime-bundle"
+    outside_root = tmp_path / "outside-root"
+    bundle_root.rename(outside_root)
+    bundle_root.symlink_to(outside_root, target_is_directory=True)
+    with pytest.raises(module.PackagePlaneError, match="receipt"):
+        module.load_core_runtime_bundle_input(second_root, lock.core_runtime)
+
+    bundle.unlink()
+    shutil.copyfile(outside, bundle)
+    with bundle.open("r+b") as stream:
+        stream.seek(0)
+        stream.write(b"hostile")
+    with pytest.raises(module.PackagePlaneError, match="bytes"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
 
 
 def test_repository_sdk_policy_disables_roll_forward() -> None:
@@ -696,6 +833,8 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         "!global.json",
         "!eng/package-plane.lock.json",
         "!eng/core-main-runtime-artifact-authority.json",
+        "!eng/core-runtime-bundle/",
+        "!eng/core-runtime-bundle/core-runtime-bundle-input.json",
         "!eng/NuGet.Container.Config",
         "!scripts/ai/bootstrap-hub-package-feed.py",
         "**/bin/**",
@@ -712,7 +851,7 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         "\"scripts/ai/bootstrap-hub-package-feed.py\", \"--repo-root\", "
         "\"/proof\", \"--feed\", \"/opt/chummer-package-feed\", "
         "\"--core-feed\", \"/opt/chummer-core-runtime-feed\", "
-        "\"--download-core-runtime\"]"
+        "\"--core-runtime-bundle-input\", \"--prebuilt-hub-feed-input\"]"
     ) in dockerfile
     assert (
         "COPY --from=public-pwa-proof "
@@ -720,6 +859,24 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         "/tmp/hub-package-feed-public-pwa-proof.receipt.json"
     ) in dockerfile
     assert "COPY --from=public-pwa-proof /usr/local/ /usr/local/" in dockerfile
+    assert "--download-core-runtime" not in dockerfile
+    assert "urllib" not in dockerfile
+    assert (
+        "COPY --from=run-services-source "
+        "eng/core-runtime-bundle/core-runtime-bundle-input.json "
+        "eng/core-runtime-bundle/core-runtime-bundle-input.json"
+    ) in dockerfile
+    assert (
+        "COPY --from=core-runtime-bundle "
+        "chummer-core-runtime-package-plane-"
+        "c06f22c185c7b733637fdb76b3cf333f31716781.zip "
+        "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
+        "c06f22c185c7b733637fdb76b3cf333f31716781.zip"
+    ) in dockerfile
+    assert (
+        "COPY --from=hub-package-feed-input . /opt/chummer-package-feed"
+        in dockerfile
+    )
     assert "apt-get install -y --no-install-recommends python3" not in dockerfile
     assert (
         "COPY --from=hub-package-feed /opt/chummer-package-feed "
@@ -809,6 +966,53 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert contract["checks"]["buildDependsOnPackageFeed"] is True
     assert contract["checks"]["exactCoreRuntimeFeedConsumption"] is True
     assert contract["checks"]["receiptIsFirstBuildInstruction"] is True
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda text: text.replace(
+            '"--core-runtime-bundle-input", "--prebuilt-hub-feed-input"]',
+            '"--download-core-runtime", "--prebuilt-hub-feed-input"]',
+            1,
+        ),
+        lambda text: text.replace(
+            "COPY --from=run-services-source "
+            "eng/core-runtime-bundle/core-runtime-bundle-input.json "
+            "eng/core-runtime-bundle/core-runtime-bundle-input.json\n",
+            "",
+            1,
+        ),
+        lambda text: text.replace(
+            "COPY --from=core-runtime-bundle "
+            "chummer-core-runtime-package-plane-"
+            "c06f22c185c7b733637fdb76b3cf333f31716781.zip "
+            "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
+            "c06f22c185c7b733637fdb76b3cf333f31716781.zip\n",
+            "",
+            1,
+        ),
+        lambda text: text.replace(
+            "COPY --from=public-pwa-proof /usr/local/ /usr/local/\nWORKDIR /proof\n",
+            "COPY --from=public-pwa-proof /usr/local/ /usr/local/\n"
+            "WORKDIR /proof\nRUN curl https://example.invalid/core.zip\n",
+            1,
+        ),
+    ),
+)
+def test_container_package_feed_rejects_network_or_offline_input_bypass(
+    tmp_path: Path,
+    mutation,
+) -> None:
+    module = load_public_edge_preflight_module()
+    dockerfile = tmp_path / "Dockerfile"
+    canonical = (ROOT / "Chummer.Run.Api/Dockerfile").read_text(encoding="utf-8")
+    dockerfile.write_text(mutation(canonical), encoding="utf-8")
+
+    contract = module.validate_public_pwa_docker_build_contract(dockerfile)
+
+    assert contract["status"] == "fail"
+    assert contract["checks"]["exactPackageFeedStage"] is False
 
 
 def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> None:

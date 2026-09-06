@@ -14,12 +14,10 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass
@@ -121,6 +119,14 @@ RELATIONSHIPS_NAMESPACE = (
 )
 CANONICAL_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 CANONICAL_ZIP_EXTERNAL_ATTR = 0o100644 << 16
+CORE_RUNTIME_BUNDLE_INPUT_CONTRACT = (
+    "chummer-hub.core-runtime-bundle-input/v1"
+)
+CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH = Path(
+    "eng/core-runtime-bundle/core-runtime-bundle-input.json"
+)
+
+
 class PackagePlaneError(RuntimeError):
     """Raised when immutable package-plane authority cannot be proven."""
 
@@ -1290,73 +1296,124 @@ def materialize_core_runtime_feed(
     validate_core_runtime_feed(feed, authority)
 
 
-def download_core_runtime_bundle(
+def load_core_runtime_bundle_input(
+    repo_root: Path,
     authority: CoreRuntimeAuthority,
-    destination: Path,
-) -> None:
-    """Download only the digest-bound public Core bundle into a new file."""
+) -> Path:
+    """Bind a staged Core bundle to its exact reviewed release authority."""
 
-    if destination.exists() or destination.is_symlink():
-        raise PackagePlaneError("Core runtime bundle destination must start absent")
-    parsed = urllib.parse.urlparse(authority.bundle_url)
-    if parsed.scheme != "https" or parsed.hostname != "github.com":
-        raise PackagePlaneError("Core runtime bundle URL must use approved HTTPS GitHub")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=f".{destination.name}.", dir=destination.parent
-    )
-    temporary_path = Path(temporary)
+    repo_root = repo_root.resolve()
+    bundle_root = repo_root / "eng/core-runtime-bundle"
+    receipt = repo_root / CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH
     try:
-        request = urllib.request.Request(
-            authority.bundle_url,
-            headers={
-                "Accept": "application/octet-stream",
-                "User-Agent": "chummer-hub-package-plane/1",
-            },
+        bundle_root_metadata = bundle_root.lstat()
+        receipt_metadata = receipt.lstat()
+        raw = receipt.read_bytes()
+    except OSError as exc:
+        raise PackagePlaneError("Core runtime bundle input receipt is unavailable") from exc
+    if (
+        bundle_root.is_symlink()
+        or not bundle_root.is_dir()
+        or bundle_root.resolve() != bundle_root
+        or not stat.S_ISDIR(bundle_root_metadata.st_mode)
+        or receipt.is_symlink()
+        or not receipt.is_file()
+        or receipt.resolve().parent != bundle_root
+        or receipt_metadata.st_nlink != 1
+        or len(raw) > 16 * 1024
+    ):
+        raise PackagePlaneError(
+            "Core runtime bundle input receipt must be one contained regular file"
         )
-        try:
-            with urllib.request.urlopen(request, timeout=120) as response:
-                if getattr(response, "status", 200) != 200:
-                    raise PackagePlaneError("Core runtime bundle download did not return HTTP 200")
-                final_url = urllib.parse.urlparse(response.geturl())
-                if final_url.scheme != "https":
-                    raise PackagePlaneError("Core runtime bundle redirect left HTTPS")
-                declared_size = response.headers.get("Content-Length")
-                if declared_size is not None:
-                    try:
-                        if int(declared_size) != authority.bundle_size_bytes:
-                            raise PackagePlaneError(
-                                "Core runtime bundle Content-Length does not match authority"
-                            )
-                    except ValueError as exc:
-                        raise PackagePlaneError(
-                            "Core runtime bundle Content-Length is not canonical"
-                        ) from exc
-                remaining = authority.bundle_size_bytes + 1
-                with os.fdopen(descriptor, "wb", closefd=True) as stream:
-                    descriptor = -1
-                    while remaining > 0:
-                        chunk = response.read(min(1024 * 1024, remaining))
-                        if not chunk:
-                            break
-                        stream.write(chunk)
-                        remaining -= len(chunk)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-        except (OSError, urllib.error.URLError) as exc:
-            raise PackagePlaneError(f"Core runtime bundle download failed: {exc}") from exc
-        if (
-            temporary_path.stat().st_size != authority.bundle_size_bytes
-            or _sha256(temporary_path) != authority.bundle_sha256
-        ):
-            raise PackagePlaneError("downloaded Core runtime bundle bytes do not match authority")
-        os.replace(temporary_path, destination)
-        destination.chmod(0o600)
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        if temporary_path.exists():
-            temporary_path.unlink()
+    receipt_after = receipt.lstat()
+    if (
+        receipt_metadata.st_dev,
+        receipt_metadata.st_ino,
+        receipt_metadata.st_mode,
+        receipt_metadata.st_nlink,
+        receipt_metadata.st_size,
+        receipt_metadata.st_mtime_ns,
+        receipt_metadata.st_ctime_ns,
+    ) != (
+        receipt_after.st_dev,
+        receipt_after.st_ino,
+        receipt_after.st_mode,
+        receipt_after.st_nlink,
+        receipt_after.st_size,
+        receipt_after.st_mtime_ns,
+        receipt_after.st_ctime_ns,
+    ):
+        raise PackagePlaneError("Core runtime bundle input receipt changed while read")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise PackagePlaneError(
+                    "Core runtime bundle input receipt contains duplicate fields"
+                )
+            result[key] = value
+        return result
+
+    try:
+        payload = json.loads(
+            raw.decode("utf-8", "strict"),
+            object_pairs_hook=reject_duplicate_keys,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PackagePlaneError(
+            "Core runtime bundle input receipt is not strict JSON"
+        ) from exc
+    expected = {
+        "contract": CORE_RUNTIME_BUNDLE_INPUT_CONTRACT,
+        "file_name": authority.bundle_file_name,
+        "sha256": authority.bundle_sha256,
+        "size_bytes": authority.bundle_size_bytes,
+        "url": authority.bundle_url,
+    }
+    canonical = (json.dumps(expected, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+    if payload != expected or raw != canonical:
+        raise PackagePlaneError(
+            "Core runtime bundle input receipt does not match exact authority"
+        )
+    bundle = receipt.parent / authority.bundle_file_name
+    try:
+        metadata = bundle.lstat()
+    except OSError as exc:
+        raise PackagePlaneError("Core runtime bundle input is unavailable") from exc
+    if (
+        bundle.is_symlink()
+        or not bundle.is_file()
+        or bundle.resolve().parent != bundle_root
+        or metadata.st_nlink != 1
+        or metadata.st_size != authority.bundle_size_bytes
+        or _sha256(bundle) != authority.bundle_sha256
+    ):
+        raise PackagePlaneError(
+            "Core runtime bundle input bytes do not match exact authority"
+        )
+    bundle_after = bundle.lstat()
+    if (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    ) != (
+        bundle_after.st_dev,
+        bundle_after.st_ino,
+        bundle_after.st_mode,
+        bundle_after.st_nlink,
+        bundle_after.st_size,
+        bundle_after.st_mtime_ns,
+        bundle_after.st_ctime_ns,
+    ):
+        raise PackagePlaneError("Core runtime bundle input changed while hashed")
+    return bundle
 
 
 def build_feed(
@@ -1536,7 +1593,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--print-version", action="store_true")
     parser.add_argument("--observe-package-authority", action="store_true")
-    parser.add_argument("--download-core-runtime", action="store_true")
+    parser.add_argument("--core-runtime-bundle-input", action="store_true")
+    parser.add_argument("--prebuilt-hub-feed-input", action="store_true")
     return parser.parse_args()
 
 
@@ -1554,21 +1612,28 @@ def main() -> int:
         raise PackagePlaneError("--feed is required unless --print-version is used")
     feed = args.feed.resolve()
     if args.validate_only:
-        if args.download_core_runtime:
-            raise PackagePlaneError("--download-core-runtime is valid only while building")
+        if args.core_runtime_bundle_input or args.prebuilt_hub_feed_input:
+            raise PackagePlaneError(
+                "build-input flags are invalid with --validate-only"
+            )
         digest = validate_feed_inventory(feed, lock, lock_sha256)
+    elif args.prebuilt_hub_feed_input:
+        if not args.core_runtime_bundle_input or args.core_feed is None:
+            raise PackagePlaneError(
+                "prebuilt Hub feed input requires the exact Core bundle input"
+            )
+        core_feed = args.core_feed.resolve()
+        bundle = load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+        materialize_core_runtime_feed(bundle, core_feed, lock.core_runtime)
+        digest = validate_feed_inventory(feed, lock, lock_sha256)
+        validate_core_runtime_feed(core_feed, lock.core_runtime)
     else:
         if args.core_feed is None:
             raise PackagePlaneError("--core-feed is required when building the Hub feed")
         core_feed = args.core_feed.resolve()
-        if args.download_core_runtime:
-            core_feed.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.TemporaryDirectory(
-                prefix="hub-core-runtime-download-", dir=core_feed.parent
-            ) as temporary:
-                bundle = Path(temporary) / lock.core_runtime.bundle_file_name
-                download_core_runtime_bundle(lock.core_runtime, bundle)
-                materialize_core_runtime_feed(bundle, core_feed, lock.core_runtime)
+        if args.core_runtime_bundle_input:
+            bundle = load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+            materialize_core_runtime_feed(bundle, core_feed, lock.core_runtime)
         digest = build_feed(
             lock,
             lock_sha256=lock_sha256,
