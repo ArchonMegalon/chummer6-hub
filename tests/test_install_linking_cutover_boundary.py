@@ -239,11 +239,11 @@ def build_info(tmp_path: Path) -> Path:
                         "sizeBytes": 524842,
                     },
                     "Chummer.Play.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
-                        "sha256": "25cd5115e72572d5eea45ac615125e11d077d26986423a903da52e9175a58d9c",
+                        "sha256": "5203d7fb49d435c61ef81695d147e21472cf15e39595a78fa6db44f9fc876ba4",
                         "sizeBytes": 322544,
                     },
                     "Chummer.Run.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
-                        "sha256": "258d6dfbac12d65f15e32b1663cb6bdc267a5dc5916d047557274d2e06878ce8",
+                        "sha256": "50b7307ea03ecc4f203e7fdd223cd3c699548baf3cc51d7bf1314e7d422b0813",
                         "sizeBytes": 1838984,
                     },
                     "Chummer.Run.Registry.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
@@ -251,7 +251,7 @@ def build_info(tmp_path: Path) -> Path:
                         "sizeBytes": 345296,
                     },
                     "chummer-hub-packages.inventory.json": {
-                        "sha256": "cdd48d4e70dc38b6ac69d4091bf3718da4902ca17b9d1c4b809f38add04129fb",
+                        "sha256": "18a9dc73d8a150d3d9d8fa900b3b819bf0a7269351e8fcc3274b9bb73f65b30d",
                         "sizeBytes": 2396,
                     },
                 },
