@@ -263,7 +263,7 @@ PACKAGE_PLANE_CONTRACT = "chummer-hub.package-plane-lock/v5"
 PACKAGE_PLANE_BUILD_RECIPE = "scripts/ai/bootstrap-hub-package-feed.py"
 PACKAGE_PLANE_DOTNET_SDK = "10.0.103"
 CORE_RUNTIME_PACKAGE_RECIPE_COMMIT = (
-    "c06f22c185c7b733637fdb76b3cf333f31716781"
+    "1d8cf694d0412b3bd9f4a241fb95244fad341160"
 )
 CORE_RUNTIME_BUNDLE_FILE_NAME = (
     "chummer-core-runtime-package-plane-"
@@ -273,9 +273,9 @@ CORE_RUNTIME_BUNDLE_DIRECTORY_NAME = (
     f"core-runtime-package-plane-{CORE_RUNTIME_PACKAGE_RECIPE_COMMIT}-input"
 )
 CORE_RUNTIME_BUNDLE_SHA256 = (
-    "0ed7f7ed701e65d49b3632843f81463e4ed2a99662f85648da5662bcdc54832f"
+    "40b257a9f9ac0abcb6508914eafb370d17bc1a208cde783ce088cb338d41d21b"
 )
-CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_090_207
+CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_228_507
 CORE_RUNTIME_PACKAGE_IDS = (
     "Chummer.Engine.Contracts",
     "Chummer.Application",
@@ -293,11 +293,11 @@ HUB_PACKAGE_FEED_INPUTS = {
         524_842,
     ),
     "Chummer.Play.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": (
-        "25cd5115e72572d5eea45ac615125e11d077d26986423a903da52e9175a58d9c",
+        "5203d7fb49d435c61ef81695d147e21472cf15e39595a78fa6db44f9fc876ba4",
         322_544,
     ),
     "Chummer.Run.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": (
-        "258d6dfbac12d65f15e32b1663cb6bdc267a5dc5916d047557274d2e06878ce8",
+        "50b7307ea03ecc4f203e7fdd223cd3c699548baf3cc51d7bf1314e7d422b0813",
         1_838_984,
     ),
     "Chummer.Run.Registry.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": (
@@ -305,7 +305,7 @@ HUB_PACKAGE_FEED_INPUTS = {
         345_296,
     ),
     "chummer-hub-packages.inventory.json": (
-        "cdd48d4e70dc38b6ac69d4091bf3718da4902ca17b9d1c4b809f38add04129fb",
+        "18a9dc73d8a150d3d9d8fa900b3b819bf0a7269351e8fcc3274b9bb73f65b30d",
         2_396,
     ),
 }
