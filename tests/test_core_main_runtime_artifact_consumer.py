@@ -382,7 +382,7 @@ def test_workflow_is_anonymous_pinned_bounded_and_one_shot() -> None:
     assert lifecycle["env"] == {"PYTHONDONTWRITEBYTECODE": "1"}
     script = lifecycle["run"]
     for value in (
-            "releases/384491344",
+        "releases/384491344",
         "git/ref/tags/${tag}",
         "core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160",
         "--max-filesize 65536",
@@ -402,6 +402,17 @@ def test_workflow_is_anonymous_pinned_bounded_and_one_shot() -> None:
     assert "Authorization:" not in script
     assert "/latest" not in script
     assert "/actions/artifacts/" not in script
+    assert "--retry 0" in script
+    assert script.count("--write-out ") == 4
+    for label in ("release", "tag", "receipt", "bundle"):
+        assert (
+            "--write-out 'core-public-input " + label
+            + " http=%{http_code} bytes=%{size_download}\\n'"
+        ) in script
+    # Error diagnostics identify the request, not headers, signed redirect
+    # URLs, or response bodies. One-shot fail-closed download policy remains.
+    for forbidden in ("%{url", "%{header", "%{json}", "--verbose", "--trace"):
+        assert forbidden not in script
     after_finalize = script.split('"${consumer}" finalize', 1)[1]
     assert "export_root" not in after_finalize
     assert steps[2]["with"]["path"] == (

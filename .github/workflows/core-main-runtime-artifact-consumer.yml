@@ -84,18 +84,22 @@ jobs:
             ulimit -f 4096
             curl "${curl_common[@]}" --max-filesize 2097152 \
               --output "${snapshot_dir}/release.json" \
+              --write-out 'core-public-input release http=%{http_code} bytes=%{size_download}\n' \
               "${api_root}/releases/384491344"
             curl "${curl_common[@]}" --max-filesize 2097152 \
               --output "${snapshot_dir}/tag.json" \
+              --write-out 'core-public-input tag http=%{http_code} bytes=%{size_download}\n' \
               "${api_root}/git/ref/tags/${tag}"
             curl "${curl_common[@]}" --max-filesize 65536 \
               --output "${snapshot_dir}/receipt.json" \
+              --write-out 'core-public-input receipt http=%{http_code} bytes=%{size_download}\n' \
               "${download_root}/${receipt_name}"
           )
           (
             ulimit -f 32768
             curl "${curl_common[@]}" --max-filesize 16777216 \
               --output "${snapshot_dir}/bundle.zip" \
+              --write-out 'core-public-input bundle http=%{http_code} bytes=%{size_download}\n' \
               "${download_root}/${bundle_name}"
           )
           chmod 0600 \
