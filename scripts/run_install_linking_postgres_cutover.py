@@ -263,7 +263,7 @@ PACKAGE_PLANE_CONTRACT = "chummer-hub.package-plane-lock/v5"
 PACKAGE_PLANE_BUILD_RECIPE = "scripts/ai/bootstrap-hub-package-feed.py"
 PACKAGE_PLANE_DOTNET_SDK = "10.0.103"
 CORE_RUNTIME_PACKAGE_RECIPE_COMMIT = (
-    "c06f22c185c7b733637fdb76b3cf333f31716781"
+    "1d8cf694d0412b3bd9f4a241fb95244fad341160"
 )
 CORE_RUNTIME_BUNDLE_FILE_NAME = (
     "chummer-core-runtime-package-plane-"
@@ -273,9 +273,9 @@ CORE_RUNTIME_BUNDLE_DIRECTORY_NAME = (
     f"core-runtime-package-plane-{CORE_RUNTIME_PACKAGE_RECIPE_COMMIT}-input"
 )
 CORE_RUNTIME_BUNDLE_SHA256 = (
-    "0ed7f7ed701e65d49b3632843f81463e4ed2a99662f85648da5662bcdc54832f"
+    "40b257a9f9ac0abcb6508914eafb370d17bc1a208cde783ce088cb338d41d21b"
 )
-CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_090_207
+CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_228_507
 CORE_RUNTIME_PACKAGE_IDS = (
     "Chummer.Engine.Contracts",
     "Chummer.Application",

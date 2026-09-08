@@ -830,12 +830,12 @@ RUN_SERVICES_PACKAGE_INPUTS = {
 PACKAGE_PLANE_CONTRACT = "chummer-hub.package-plane-lock/v5"
 CORE_RUNTIME_BUNDLE_FILE_NAME = (
     "chummer-core-runtime-package-plane-"
-    "c06f22c185c7b733637fdb76b3cf333f31716781.zip"
+    "1d8cf694d0412b3bd9f4a241fb95244fad341160.zip"
 )
 CORE_RUNTIME_BUNDLE_SHA256 = (
-    "0ed7f7ed701e65d49b3632843f81463e4ed2a99662f85648da5662bcdc54832f"
+    "40b257a9f9ac0abcb6508914eafb370d17bc1a208cde783ce088cb338d41d21b"
 )
-CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_090_207
+CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_228_507
 HUB_PACKAGE_FEED_INPUTS = {
     "Chummer.Hub.Registry.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
         "sha256": "89ca9f9f6069bdf1bbbb2aa9fc16a9c3b29e13f64a896be53027e42a682447d7",

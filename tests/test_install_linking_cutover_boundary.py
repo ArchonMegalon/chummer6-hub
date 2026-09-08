@@ -224,13 +224,13 @@ def build_info(tmp_path: Path) -> Path:
                 "dockerfileSha256": "e" * 64,
                 "coreRuntimeBundleFileName": (
                     "chummer-core-runtime-package-plane-"
-                    "c06f22c185c7b733637fdb76b3cf333f31716781.zip"
+                    "1d8cf694d0412b3bd9f4a241fb95244fad341160.zip"
                 ),
                 "coreRuntimeBundlePathSha256": "1" * 64,
                 "coreRuntimeBundleSha256": (
-                    "0ed7f7ed701e65d49b3632843f81463e4ed2a99662f85648da5662bcdc54832f"
+                    "40b257a9f9ac0abcb6508914eafb370d17bc1a208cde783ce088cb338d41d21b"
                 ),
-                "coreRuntimeBundleSizeBytes": 3090207,
+                "coreRuntimeBundleSizeBytes": 3228507,
                 "externalMediaProjectSha256": "f" * 64,
                 "externalMediaRestoreIsSdkOnly": True,
                 "hubPackageFeedInputs": {

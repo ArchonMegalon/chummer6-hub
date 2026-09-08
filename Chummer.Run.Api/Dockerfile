@@ -32,7 +32,7 @@ COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts
 COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json
 COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json
 COPY --from=run-services-source eng/core-runtime-bundle/core-runtime-bundle-input.json eng/core-runtime-bundle/core-runtime-bundle-input.json
-COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-c06f22c185c7b733637fdb76b3cf333f31716781.zip
+COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160.zip
 COPY --from=hub-package-feed-input . /opt/chummer-package-feed
 RUN ["/usr/local/bin/python3", "-I", "-S", "scripts/ai/bootstrap-hub-package-feed.py", "--repo-root", "/proof", "--feed", "/opt/chummer-package-feed", "--core-feed", "/opt/chummer-core-runtime-feed", "--core-runtime-bundle-input", "--prebuilt-hub-feed-input"]
 
