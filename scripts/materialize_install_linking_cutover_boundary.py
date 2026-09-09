@@ -830,26 +830,26 @@ RUN_SERVICES_PACKAGE_INPUTS = {
 PACKAGE_PLANE_CONTRACT = "chummer-hub.package-plane-lock/v5"
 CORE_RUNTIME_BUNDLE_FILE_NAME = (
     "chummer-core-runtime-package-plane-"
-    "1d8cf694d0412b3bd9f4a241fb95244fad341160.zip"
+    "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip"
 )
 CORE_RUNTIME_BUNDLE_SHA256 = (
-    "40b257a9f9ac0abcb6508914eafb370d17bc1a208cde783ce088cb338d41d21b"
+    "07c001d96084038cc241584c57242eaa5db6c70105e05d237e7a2b0e79fb0ade"
 )
-CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_228_507
+CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_313_094
 HUB_PACKAGE_FEED_INPUTS = {
-    "Chummer.Hub.Registry.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
+    "Chummer.Hub.Registry.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": {
         "sha256": "89ca9f9f6069bdf1bbbb2aa9fc16a9c3b29e13f64a896be53027e42a682447d7",
         "sizeBytes": 524_842,
     },
-    "Chummer.Play.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
+    "Chummer.Play.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": {
         "sha256": "5203d7fb49d435c61ef81695d147e21472cf15e39595a78fa6db44f9fc876ba4",
         "sizeBytes": 322_544,
     },
-    "Chummer.Run.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
+    "Chummer.Run.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": {
         "sha256": "50b7307ea03ecc4f203e7fdd223cd3c699548baf3cc51d7bf1314e7d422b0813",
         "sizeBytes": 1_838_984,
     },
-    "Chummer.Run.Registry.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
+    "Chummer.Run.Registry.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": {
         "sha256": "da046c289f33fb3910db0fa2d54d7dd28e21862f9e81bdbcc0feba5a3ee9381c",
         "sizeBytes": 345_296,
     },

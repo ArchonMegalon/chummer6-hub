@@ -7,7 +7,10 @@ public sealed class InstallLinkedWorkspaceSnapshotStore
     private readonly string _storagePath;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
-        WriteIndented = true
+        WriteIndented = true,
+        // Core's bounded continuation envelope permits depth 128. Account for
+        // this store's root/array/row wrappers without truncating opaque history.
+        MaxDepth = 132
     };
 
     public InstallLinkedWorkspaceSnapshotStore(IConfiguration configuration)
@@ -36,7 +39,7 @@ public sealed class InstallLinkedWorkspaceSnapshotStore
     public static string ComposeKey(string ownerKey, string workspaceId)
         // Keys are internal only; persisted rows retain their original typed
         // components. JSON framing avoids delimiter collisions on reload too.
-        => JsonSerializer.Serialize(new[] { ownerKey.Trim(), workspaceId.Trim() });
+        => JsonSerializer.Serialize(new[] { ownerKey, workspaceId.Trim() });
 
     private void Load()
     {
@@ -97,4 +100,6 @@ public sealed record InstallLinkedWorkspaceSnapshotRecord(
     long RemoteRevision = 0,
     string? ServerToken = null,
     JsonElement? WorkspaceSnapshot = null,
-    string? WorkspaceSnapshotDigest = null);
+    string? WorkspaceSnapshotDigest = null,
+    JsonElement? WorkspaceContinuation = null,
+    string? WorkspaceContinuationDigest = null);

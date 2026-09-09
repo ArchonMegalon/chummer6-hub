@@ -15,6 +15,7 @@ public static class InstallLinkedWorkspaceSnapshotTransfer
 {
     public const string DigestSemantics = "canonical-core-workspace-snapshot-json-sha256-v1";
     public const int MaxSnapshotBytes = 512 * 1024;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = false,
@@ -25,6 +26,20 @@ public static class InstallLinkedWorkspaceSnapshotTransfer
 
     public static JsonElement Encode(WorkspaceDocumentSnapshot snapshot)
         => JsonSerializer.SerializeToElement(snapshot, Options);
+
+    /// <summary>
+    /// Versioned carrier binding shared with Android's account-owner authority.
+    /// The exact authenticated subject is neither trimmed nor case-folded. This
+    /// derives a storage identity, not a credential or a local restore admission.
+    /// Legacy desktop owner identifiers require explicit migration, not relabeling.
+    /// </summary>
+    public static string ComputeContinuationOwnerId(string subjectId)
+    {
+        if (string.IsNullOrEmpty(subjectId))
+            throw new ArgumentException("A full continuation requires an exact authenticated subject.", nameof(subjectId));
+        return "install-account-v1:" + Convert.ToHexStringLower(SHA256.HashData(
+            StrictUtf8.GetBytes("chummer-install-account-owner-v1\0" + subjectId)));
+    }
 
     public static string ComputeDigest(JsonElement snapshot)
     {
@@ -70,8 +85,11 @@ public static class InstallLinkedWorkspaceSnapshotTransfer
             json.GetProperty("savedRevision").GetInt64());
     }
 
-    public static InstallLinkedWorkspaceSnapshotRecord Validate(InstallLinkedWorkspaceSnapshotRecord record, bool stored = false)
+    public static InstallLinkedWorkspaceSnapshotRecord Validate(InstallLinkedWorkspaceSnapshotRecord record,
+        bool stored = false, string? expectedContinuationOwnerId = null)
     {
+        if (record.WorkspaceContinuation is not null || record.WorkspaceContinuationDigest is not null)
+            return ValidateContinuation(record, stored, expectedContinuationOwnerId);
         if (record.WorkspaceSnapshot is null && record.WorkspaceSnapshotDigest is null) return record;
         try
         {
@@ -111,6 +129,121 @@ public static class InstallLinkedWorkspaceSnapshotTransfer
                 stored ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status400BadRequest,
                 stored ? "The stored complete workspace snapshot is invalid."
                     : "The complete workspace snapshot is unsupported, inconsistent, or exceeds its bounds.");
+        }
+    }
+
+    private static InstallLinkedWorkspaceSnapshotRecord ValidateContinuation(
+        InstallLinkedWorkspaceSnapshotRecord record, bool stored, string? expectedOwnerId)
+    {
+        try
+        {
+            if (record.WorkspaceContinuation is not { ValueKind: JsonValueKind.Object } json
+                || !IsDigest(record.WorkspaceContinuationDigest) || string.IsNullOrWhiteSpace(expectedOwnerId))
+                throw new JsonException("Full continuation and its authenticated owner are required.");
+
+            // Stored JsonElements acquire indentation. Only incoming requests
+            // have a raw byte cap; cold reads still enforce the same compact and
+            // Core-canonical caps before exposing any saved history.
+            byte[] bytes;
+            if (stored)
+                bytes = CompactContinuation(json);
+            else
+            {
+                string raw = json.GetRawText();
+                if (Encoding.UTF8.GetByteCount(raw) > MaxSnapshotBytes
+                    || !WithinCombinedBounds(record, json))
+                    throw new JsonException("Raw continuation exceeds transport bounds.");
+                bytes = Encoding.UTF8.GetBytes(raw);
+            }
+            if (!WorkspaceContinuationCodec.TryDecodeCandidate(bytes, MaxSnapshotBytes, out var decoded)
+                || !string.Equals(decoded.SnapshotDigest, record.WorkspaceContinuationDigest, StringComparison.Ordinal)
+                || !string.Equals(decoded.Snapshot.OwnerId, expectedOwnerId, StringComparison.Ordinal))
+                throw new JsonException("Core continuation or authenticated owner binding is invalid.");
+
+            WorkspaceDocumentSnapshot workspace = decoded.Snapshot.Workspace;
+            if (!string.Equals(workspace.Id.Value, record.WorkspaceId, StringComparison.Ordinal)
+                || !string.Equals(workspace.Document.RulesetId, record.RulesetId, StringComparison.Ordinal)
+                || workspace.Document.SchemaVersion != record.SchemaVersion
+                || !string.Equals(workspace.Document.PayloadKind, record.PayloadKind, StringComparison.Ordinal)
+                || !string.Equals(workspace.Document.Content, record.Payload, StringComparison.Ordinal)
+                || !Enum.TryParse(record.Format, out WorkspaceDocumentFormat format)
+                || workspace.Document.Format != format
+                || workspace.LastUpdatedUtc == default || !workspace.LastUpdatedUtc.EqualsExact(record.UpdatedAtUtc))
+                throw new JsonException("Continuation and public workspace projection disagree.");
+
+            InstallLinkedWorkspaceSnapshotRecord validated = Validate(record with
+            {
+                WorkspaceContinuation = null,
+                WorkspaceContinuationDigest = null
+            }, stored);
+            if (validated.WorkspaceSnapshot is { } projection
+                && !JsonElement.DeepEquals(Encode(workspace), projection))
+                throw new JsonException("The legacy projection does not exactly match the full continuation.");
+
+            byte[] canonical = WorkspaceContinuationCodec.Encode(decoded, MaxSnapshotBytes);
+            using JsonDocument captured = JsonDocument.Parse(canonical, new JsonDocumentOptions { MaxDepth = 128 });
+            JsonElement owned = captured.RootElement.Clone();
+            if (!WithinCombinedBounds(validated, owned))
+                throw new JsonException("Canonical continuation exceeds combined transport bounds.");
+            // Clone the actual full Core envelope. No receipt/history filtering,
+            // source validation, local restore admission or replay grant occurs.
+            return validated with
+            {
+                WorkspaceContinuation = owned,
+                WorkspaceContinuationDigest = decoded.SnapshotDigest
+            };
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException
+            or OverflowException or KeyNotFoundException or ArgumentException or NotSupportedException)
+        {
+            throw new InstallLinkingOperationException(
+                stored ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status400BadRequest,
+                stored ? "The stored full workspace continuation is invalid."
+                    : "The full workspace continuation is unsupported, inconsistent, or exceeds its bounds.");
+        }
+    }
+
+    private static bool WithinCombinedBounds(InstallLinkedWorkspaceSnapshotRecord record, JsonElement continuation)
+    {
+        long count = Encoding.UTF8.GetByteCount(record.Payload)
+            + (long)Encoding.UTF8.GetByteCount(continuation.GetRawText());
+        if (record.WorkspaceSnapshot is { } projection)
+            count += Encoding.UTF8.GetByteCount(projection.GetRawText());
+        return count <= InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes;
+    }
+
+    private static byte[] CompactContinuation(JsonElement json)
+    {
+        using BoundedContinuationBuffer buffer = new();
+        using (Utf8JsonWriter writer = new(buffer, new JsonWriterOptions { MaxDepth = 128 }))
+            json.WriteTo(writer);
+        return buffer.ToArray();
+    }
+
+    private sealed class BoundedContinuationBuffer : MemoryStream
+    {
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            RequireCapacity(count);
+            base.Write(buffer, offset, count);
+        }
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            RequireCapacity(buffer.Length);
+            base.Write(buffer);
+        }
+
+        public override void WriteByte(byte value)
+        {
+            RequireCapacity(1);
+            base.WriteByte(value);
+        }
+
+        private void RequireCapacity(int additionalBytes)
+        {
+            if (additionalBytes > MaxSnapshotBytes - Position)
+                throw new JsonException("Compact continuation exceeds transport bounds.");
         }
     }
 

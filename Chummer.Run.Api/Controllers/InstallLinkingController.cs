@@ -791,7 +791,9 @@ public sealed class InstallLinkingController : ControllerBase
                     Nuyen: request.Nuyen,
                     Created: request.Created,
                     WorkspaceSnapshot: request.WorkspaceSnapshot,
-                    WorkspaceSnapshotDigest: request.WorkspaceSnapshotDigest),
+                    WorkspaceSnapshotDigest: request.WorkspaceSnapshotDigest,
+                    WorkspaceContinuation: request.WorkspaceContinuation,
+                    WorkspaceContinuationDigest: request.WorkspaceContinuationDigest),
                 request.ExpectedRemoteRevision,
                 request.ExpectedServerToken);
             return Ok(new InstallLinkedWorkspaceSnapshotUpsertResponse(ToSnapshotDto(stored)));
@@ -2597,7 +2599,9 @@ public sealed class InstallLinkingController : ControllerBase
             RemoteRevision: snapshot.RemoteRevision,
             ServerToken: snapshot.ServerToken,
             WorkspaceSnapshot: snapshot.WorkspaceSnapshot,
-            WorkspaceSnapshotDigest: snapshot.WorkspaceSnapshotDigest);
+            WorkspaceSnapshotDigest: snapshot.WorkspaceSnapshotDigest,
+            WorkspaceContinuation: snapshot.WorkspaceContinuation,
+            WorkspaceContinuationDigest: snapshot.WorkspaceContinuationDigest);
 
 }
 
@@ -2805,7 +2809,9 @@ public sealed record InstallLinkedWorkspaceSnapshotUpsertRequest(
     long? ExpectedRemoteRevision = null,
     string? ExpectedServerToken = null,
     JsonElement? WorkspaceSnapshot = null,
-    string? WorkspaceSnapshotDigest = null);
+    string? WorkspaceSnapshotDigest = null,
+    JsonElement? WorkspaceContinuation = null,
+    string? WorkspaceContinuationDigest = null);
 
 public sealed record InstallLinkedWorkspaceSnapshotUpsertResponse(
     InstallLinkedWorkspaceSnapshotDto Snapshot);
@@ -2823,4 +2829,6 @@ public sealed record InstallLinkedWorkspaceSnapshotDto(
     long RemoteRevision = 0,
     string? ServerToken = null,
     JsonElement? WorkspaceSnapshot = null,
-    string? WorkspaceSnapshotDigest = null);
+    string? WorkspaceSnapshotDigest = null,
+    JsonElement? WorkspaceContinuation = null,
+    string? WorkspaceContinuationDigest = null);

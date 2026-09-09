@@ -248,7 +248,9 @@ public sealed class InstallLinkingV2Controller : ControllerBase
                     Nuyen: request.Nuyen,
                     Created: request.Created,
                     WorkspaceSnapshot: request.WorkspaceSnapshot,
-                    WorkspaceSnapshotDigest: request.WorkspaceSnapshotDigest),
+                    WorkspaceSnapshotDigest: request.WorkspaceSnapshotDigest,
+                    WorkspaceContinuation: request.WorkspaceContinuation,
+                    WorkspaceContinuationDigest: request.WorkspaceContinuationDigest),
                 request.ExpectedRemoteRevision,
                 request.ExpectedServerToken);
             return Ok(new InstallLinkedWorkspaceSnapshotUpsertResponse(ToSnapshotDto(stored)));
@@ -310,7 +312,9 @@ public sealed class InstallLinkingV2Controller : ControllerBase
             RemoteRevision: snapshot.RemoteRevision,
             ServerToken: snapshot.ServerToken,
             WorkspaceSnapshot: snapshot.WorkspaceSnapshot,
-            WorkspaceSnapshotDigest: snapshot.WorkspaceSnapshotDigest);
+            WorkspaceSnapshotDigest: snapshot.WorkspaceSnapshotDigest,
+            WorkspaceContinuation: snapshot.WorkspaceContinuation,
+            WorkspaceContinuationDigest: snapshot.WorkspaceContinuationDigest);
 
     private void ApplyPrivateResponseHeaders()
         => AndroidLinkedV2RequestProofMiddleware.ApplyPrivateResponseHeaders(Response.Headers);
@@ -376,4 +380,6 @@ public sealed record AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
     long? ExpectedRemoteRevision = null,
     string? ExpectedServerToken = null,
     JsonElement? WorkspaceSnapshot = null,
-    string? WorkspaceSnapshotDigest = null) : AndroidLinkedV2GrantRequest(InstallationId);
+    string? WorkspaceSnapshotDigest = null,
+    JsonElement? WorkspaceContinuation = null,
+    string? WorkspaceContinuationDigest = null) : AndroidLinkedV2GrantRequest(InstallationId);

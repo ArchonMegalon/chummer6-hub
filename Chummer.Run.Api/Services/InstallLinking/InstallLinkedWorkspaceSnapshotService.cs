@@ -32,7 +32,7 @@ public sealed class InstallLinkedWorkspaceSnapshotService
             return _store.SnapshotsByKey.Values
                 .Where(item => string.Equals(item.OwnerKey, ownerKey, StringComparison.Ordinal))
                 .OrderByDescending(static item => item.UpdatedAtUtc)
-                .Select(WithAuthority)
+                .Select(item => WithAuthority(item, installation))
                 .ToArray();
         }
     }
@@ -71,13 +71,14 @@ public sealed class InstallLinkedWorkspaceSnapshotService
             CreatedVersion = NormalizeOptional(snapshot.CreatedVersion, "created version", MaxTraitLength),
             AppVersion = NormalizeOptional(snapshot.AppVersion, "app version", MaxTraitLength)
         };
-        normalized = InstallLinkedWorkspaceSnapshotTransfer.Validate(normalized);
+        normalized = InstallLinkedWorkspaceSnapshotTransfer.Validate(normalized,
+            expectedContinuationOwnerId: ResolveContinuationOwnerId(installation, normalized));
 
         lock (_store.Gate)
         {
             string key = InstallLinkedWorkspaceSnapshotStore.ComposeKey(ownerKey, normalized.WorkspaceId);
             _store.SnapshotsByKey.TryGetValue(key, out InstallLinkedWorkspaceSnapshotRecord? existing);
-            InstallLinkedWorkspaceSnapshotRecord? observed = existing is null ? null : WithAuthority(existing);
+            InstallLinkedWorkspaceSnapshotRecord? observed = existing is null ? null : WithAuthority(existing, installation);
             if (expectedRemoteRevision is { } expected
                 && (expected != (observed?.RemoteRevision ?? 0)
                     || !string.Equals(expectedServerToken, observed?.ServerToken, StringComparison.Ordinal)))
@@ -88,14 +89,19 @@ public sealed class InstallLinkedWorkspaceSnapshotService
 
             if (existing is not null)
             {
-                if (existing.WorkspaceSnapshot is not null && normalized.WorkspaceSnapshot is null)
+                if (existing.WorkspaceContinuation is not null && normalized.WorkspaceContinuation is null)
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict,
+                        "A complete workspace continuation cannot be replaced by a projection-only or payload-only client.");
+                if (existing.WorkspaceSnapshot is not null && normalized.WorkspaceSnapshot is null
+                    && normalized.WorkspaceContinuation is null)
                     throw new InstallLinkingOperationException(StatusCodes.Status409Conflict,
                         "A complete workspace snapshot cannot be replaced by a payload-only client.");
                 // An exact no-op is safe for older clients, but a newer clock is
                 // never permission to overwrite. A supplied stale precondition
                 // was already rejected above, including byte-identical ABA.
                 if ((normalized with { RemoteRevision = existing.RemoteRevision, ServerToken = existing.ServerToken,
-                        WorkspaceSnapshot = null }) == (existing with { WorkspaceSnapshot = null }))
+                        WorkspaceSnapshot = null, WorkspaceContinuation = null })
+                    == (existing with { WorkspaceSnapshot = null, WorkspaceContinuation = null }))
                     return observed!;
                 if (expectedRemoteRevision is null)
                     throw new InstallLinkingOperationException(StatusCodes.Status428PreconditionRequired,
@@ -131,9 +137,11 @@ public sealed class InstallLinkedWorkspaceSnapshotService
     private static bool IsServerToken(string? token)
         => token is { Length: 64 } && token.All(static c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
 
-    private static InstallLinkedWorkspaceSnapshotRecord WithAuthority(InstallLinkedWorkspaceSnapshotRecord record)
+    private static InstallLinkedWorkspaceSnapshotRecord WithAuthority(InstallLinkedWorkspaceSnapshotRecord record,
+        ClaimedInstallationDto installation)
     {
-        record = InstallLinkedWorkspaceSnapshotTransfer.Validate(record, stored: true);
+        record = InstallLinkedWorkspaceSnapshotTransfer.Validate(record, stored: true,
+            expectedContinuationOwnerId: ResolveContinuationOwnerId(installation, record, stored: true));
         if (record.RemoteRevision == 0 && record.ServerToken is null)
         {
             // An older persisted row still needs an exact read-before-write
@@ -152,9 +160,11 @@ public sealed class InstallLinkedWorkspaceSnapshotService
 
     private static string ResolveOwnerKey(ClaimedInstallationDto installation)
     {
-        string? subjectId = string.IsNullOrWhiteSpace(installation.SubjectId) ? null : installation.SubjectId.Trim();
-        if (!string.IsNullOrWhiteSpace(subjectId))
+        string? subjectId = installation.SubjectId;
+        if (!string.IsNullOrEmpty(subjectId))
         {
+            // Opaque authenticated subjects retain exact case and whitespace.
+            // Ambiguous historically trimmed rows are never guessed/remapped.
             return $"subject:{subjectId}";
         }
 
@@ -165,6 +175,23 @@ public sealed class InstallLinkedWorkspaceSnapshotService
         }
 
         throw new InvalidOperationException("claimed installation has no user or subject identity.");
+    }
+
+    private static string? ResolveContinuationOwnerId(ClaimedInstallationDto installation,
+        InstallLinkedWorkspaceSnapshotRecord record, bool stored = false)
+    {
+        if (record.WorkspaceContinuation is null && record.WorkspaceContinuationDigest is null)
+            return null;
+        try
+        {
+            return InstallLinkedWorkspaceSnapshotTransfer.ComputeContinuationOwnerId(installation.SubjectId!);
+        }
+        catch (ArgumentException)
+        {
+            throw new InstallLinkingOperationException(
+                stored ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status400BadRequest,
+                "Full workspace continuation requires a valid exact authenticated subject identity.");
+        }
     }
 
     private static string NormalizeRequired(string? value, string label, int maxLength)

@@ -1,7 +1,7 @@
 {
   "contract": "chummer-hub.core-runtime-bundle-input/v1",
-  "file_name": "chummer-core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160.zip",
-  "sha256": "40b257a9f9ac0abcb6508914eafb370d17bc1a208cde783ce088cb338d41d21b",
-  "size_bytes": 3228507,
-  "url": "https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160/chummer-core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160.zip"
+  "file_name": "chummer-core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip",
+  "sha256": "07c001d96084038cc241584c57242eaa5db6c70105e05d237e7a2b0e79fb0ade",
+  "size_bytes": 3313094,
+  "url": "https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a/chummer-core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip"
 }
