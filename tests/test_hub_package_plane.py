@@ -741,6 +741,58 @@ def test_pr_ci_installs_digest_locked_private_sdk() -> None:
     assert "${RUNNER_TEMP}/chummer-hub-dotnet" in workflow
 
 
+def test_hosted_rook_rollback_checks_require_hash_locked_system_pyyaml() -> None:
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(encoding="utf-8")
+    job = workflow.split("  no-siblings:\n", 1)[1].split("\n  release-fallback-macos:", 1)[0]
+    install_name = "Install hash-locked system PyYAML for isolated Rook checks"
+    checks_name = "Verify Rook rollback authority without Docker or providers"
+    assert install_name in job
+    assert checks_name in job
+    assert job.index("Verify source policy") < job.index(install_name) < job.index(checks_name)
+    assert job.index(checks_name) < job.index("Build and test C# projection contracts")
+    install = job.split(f"      - name: {install_name}\n", 1)[1].split("      - name:", 1)[0]
+    for required in (
+        'sudo -- "$(command -v python3)" -I -m pip --python /usr/bin/python3',
+        "--isolated install", "--ignore-installed", "--break-system-packages",
+        "--no-deps", "--only-binary=:all:", "--require-hashes", "--no-cache-dir",
+        "--index-url https://pypi.org/simple",
+        "--requirement eng/ci-rook-system-python-requirements.txt",
+        "/usr/bin/python3 -I -c", 'yaml.__version__ == "6.0.3"',
+        'hasattr(yaml, "SafeLoader")',
+    ):
+        assert required in install
+    checks = job.split(f"      - name: {checks_name}\n", 1)[1].split("      - name:", 1)[0]
+    assert "bash -n ops/build-ghost-private-nonprod/deploy-first-provider-disabled-rook-lane.sh" in checks
+    assert "/usr/bin/python3 -I -m py_compile" in checks
+    assert "ops/build-ghost-private-nonprod/verify-prior-rollout-authority.py" in checks
+    assert "python3 -m pytest -q" in checks
+    assert {line.strip().rstrip(" \\") for line in checks.splitlines() if line.strip().startswith("tests/")} == {
+        "tests/test_build_ghost_first_provider_disabled_rollout.py",
+        "tests/test_build_ghost_private_nonprod_attestation.py",
+        "tests/test_build_ghost_local_canary_environment.py",
+    }
+    commands = "\n".join(line for line in (install + checks).splitlines() if not line.strip().startswith("#"))
+    for forbidden in ("continue-on-error", "|| true", "--user", "--target", "PYTHONPATH", "docker compose", "run-local-canary.sh"):
+        assert forbidden not in commands
+
+
+def test_rook_system_python_requirement_is_closed_official_wheel_set() -> None:
+    requirement = ROOT / "eng/ci-rook-system-python-requirements.txt"
+    assert requirement.is_file()
+    source = requirement.read_text(encoding="utf-8")
+    assert "https://pypi.org/pypi/PyYAML/6.0.3/json" in source
+    lines = [line.strip().rstrip(" \\") for line in source.splitlines() if line.strip() and not line.startswith("#")]
+    assert lines[0] == "PyYAML==6.0.3"
+    assert len(lines) == 6
+    assert set(lines[1:]) == {
+        "--hash=sha256:9c7708761fccb9397fe64bbc0395abcae8c4bf7b0eac081e12b809bf47700d0b",
+        "--hash=sha256:b8bb0864c5a28024fac8a632c443c87c5aa6f215c0b126c449ae1a150412f31d",
+        "--hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+        "--hash=sha256:0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6",
+        "--hash=sha256:c458b6d084f9b935061bc36216e8a69a7e293a2f1e68bf956dcd9e6cbcd143f5",
+    }
+
+
 def test_build_feed_rejects_any_existing_destination(tmp_path: Path) -> None:
     module = load_module()
     feed = tmp_path / "feed"

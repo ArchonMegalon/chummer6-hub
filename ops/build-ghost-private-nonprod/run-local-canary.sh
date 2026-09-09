@@ -53,6 +53,26 @@ container_id() {
     printf '%s' "$resolved"
 }
 
+canary_provider_gates_false() {
+    local container="$1" required_false prefix_length markers
+    for required_false in \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED \
+        CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED; do
+        prefix_length="$((${#required_false} + 1))"
+        # Docker emits assignment/match markers only, never environment values.
+        # Require one exact false assignment and a successful inspect: duplicate
+        # or conflicting assignments and matching partial output must fail closed.
+        if ! markers="$(docker inspect "$container" --format "{{range .Config.Env}}{{if eq (printf \"%.${prefix_length}s\" .) \"$required_false=\"}}entry{{if eq . \"$required_false=false\"}}match{{end}}{{end}}{{end}}" 2>/dev/null)" \
+            || [ "$markers" != entrymatch ]; then
+            printf 'positive_canary=failed stage=provider-gates gate=%s\n' "$required_false"
+            exit 1
+        fi
+    done
+}
+
 securely_remove_temp() {
     local path
     while IFS= read -r -d '' path; do
@@ -145,6 +165,7 @@ fi
 edge_id="$(container_id build-ghost-private-edge)"
 presentation_id="$(container_id chummer-build-ghost-presentation)"
 ai_id="$(container_id chummer-build-ghost-ai)"
+canary_provider_gates_false "$ai_id"
 
 docker cp "$edge_id:/data/caddy/pki/authorities/local/root.crt" "$canary_tmp/root.crt" >/dev/null
 chmod 0600 "$canary_tmp/root.crt"
@@ -555,17 +576,7 @@ if [ "${presentation_leaks:-0}" != "0" ] || [ "${ai_leaks:-0}" != "0" ] \
     exit 1
 fi
 
-for required_false in \
-    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED \
-    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED \
-    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED \
-    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED; do
-    if ! docker inspect "$ai_id" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-        | rg --fixed-strings --line-regexp "${required_false}=false" >/dev/null; then
-        printf 'positive_canary=failed stage=provider-gates gate=%s\n' "$required_false"
-        exit 1
-    fi
-done
+canary_provider_gates_false "$ai_id"
 
 closed_status="$(curl --silent --show-error \
     --output "$canary_tmp/closed-response.json" \
