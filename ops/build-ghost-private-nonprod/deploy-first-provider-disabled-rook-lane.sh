@@ -51,6 +51,12 @@ ai_rollback_ref=""
 edge_rollback_ref=""
 candidate_presentation_image=""
 candidate_ai_image=""
+readonly rollback_attestation_file="${CHUMMER_BUILD_GHOST_ROLLBACK_ATTESTATION_FILE:-}"
+readonly rollback_attestation_sha256="${CHUMMER_BUILD_GHOST_ROLLBACK_ATTESTATION_SHA256:-}"
+readonly rollback_project_directory="${CHUMMER_BUILD_GHOST_ROLLBACK_PROJECT_DIRECTORY:-}"
+readonly rollback_compose_file="${CHUMMER_BUILD_GHOST_ROLLBACK_COMPOSE_FILE:-}"
+rollback_input_binding=""
+rollback_runtime_binding=""
 
 required_empty_provider_variables=(
     CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS
@@ -104,6 +110,18 @@ compose() {
         --project-directory "$repo_root" \
         --file "$compose_file" \
         "$@"
+}
+
+prior_authority() {
+    [ -x /usr/bin/python3 ] || { printf 'rook_prior_authority=system-python-missing\n' >&2; return 1; }
+    /usr/bin/python3 -I -c 'import yaml; assert hasattr(yaml, "SafeLoader")' >/dev/null 2>&1 \
+        || { printf 'rook_prior_authority=system-pyyaml-missing\n' >&2; return 1; }
+    CHUMMER_BUILD_GHOST_ROLLBACK_ATTESTATION_FILE="$rollback_attestation_file" \
+    CHUMMER_BUILD_GHOST_ROLLBACK_ATTESTATION_SHA256="$rollback_attestation_sha256" \
+    CHUMMER_BUILD_GHOST_ROLLBACK_PROJECT_DIRECTORY="$rollback_project_directory" \
+    CHUMMER_BUILD_GHOST_ROLLBACK_COMPOSE_FILE="$rollback_compose_file" \
+        /usr/bin/python3 -I "$script_root/verify-prior-rollout-authority.py" --mode "$1" \
+        --expected-inputs "$rollback_input_binding" --expected-runtime "$rollback_runtime_binding"
 }
 
 image_id() {
@@ -317,6 +335,7 @@ assert_loopback_edge() {
 }
 
 snapshot_runtime_authority() {
+    local bindings
     old_presentation_id="$(running_container_id "$presentation_service")"
     old_ai_id="$(running_container_id "$ai_service")"
     old_edge_id="$(running_container_id "$edge_service")"
@@ -335,6 +354,13 @@ snapshot_runtime_authority() {
     if docker volume inspect "$live_volume" >/dev/null 2>&1; then
         fail "live-support-volume-must-be-new-and-absent"
     fi
+    # A newly hashed candidate file is not historical rollback authority.
+    # Bind retained attestation-v1 and exact prior public recipe before tags/build.
+    bindings="$(prior_authority prior)" || fail "prior-recipe-authority-unavailable"
+    read -r rollback_input_binding rollback_runtime_binding <<< "$bindings"
+    [[ "$rollback_input_binding" =~ ^[0-9a-f]{64}$ ]] \
+        && [[ "$rollback_runtime_binding" =~ ^[0-9a-f]{64}$ ]] \
+        || fail "prior-recipe-authority-invalid"
 }
 
 create_rollback_refs() {
@@ -411,6 +437,7 @@ verify_preactivation_authority() {
         || fail "preactivation-volume-drift"
     ! docker volume inspect "$live_volume" >/dev/null 2>&1 \
         || fail "preactivation-live-support-volume-not-new"
+    prior_authority prior >/dev/null || fail "preactivation-prior-recipe-drift"
 }
 
 wait_for_health() {
@@ -426,21 +453,30 @@ wait_for_health() {
     return 1
 }
 
+environment_literal_matches() {
+    local container="$1" variable="$2" expected="$3" prefix_length
+    prefix_length="$((${#variable} + 1))"
+    # Count every assignment to the allowlisted name, not just correct values.
+    # A false+true or duplicate-false pair must not pass as a single match.
+    [ "$(docker inspect "$container" --format "{{range .Config.Env}}{{if eq (printf \"%.${prefix_length}s\" .) \"$variable=\"}}entry{{if eq . \"$variable=$expected\"}}match{{end}}{{end}}{{end}}")" = entrymatch ]
+}
+
 assert_provider_disabled_runtime() {
-    local ai_id environment variable
+    local ai_id variable
     ai_id="$(running_container_id "$ai_service")"
-    environment="$(docker inspect "$ai_id" --format '{{range .Config.Env}}{{println .}}{{end}}')"
     for variable in \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED \
         CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED \
         CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED; do
-        [ "$(printf '%s\n' "$environment" | awk -v expected="$variable=false" '$0==expected{n++} END{print n+0}')" -eq 1 ] \
+        # Docker examines Config.Env, but returns only literal allowlist matches.
+        # No credentials or unrelated environment values enter the host shell.
+        environment_literal_matches "$ai_id" "$variable" false \
             || fail "postcheck-provider-gate-$variable"
     done
     for variable in "${required_empty_provider_variables[@]}" "${required_literal_empty_live_variables[@]}"; do
-        [ "$(printf '%s\n' "$environment" | awk -v expected="$variable=" '$0==expected{n++} END{print n+0}')" -eq 1 ] \
+        environment_literal_matches "$ai_id" "$variable" '' \
             || fail "postcheck-provider-input-$variable"
     done
 }
@@ -503,17 +539,21 @@ rollback_if_needed() {
         && [ "$rollback_started" != true ] || return 0
     rollback_started="true"
     printf 'rook_first_rollout=rollback-started volumes=preserved\n' >&2
+    prior_authority inputs >/dev/null || return 1
     [ "$(image_id "$presentation_rollback_ref" 2>/dev/null)" = "$old_presentation_image" ] \
         && [ "$(image_id "$ai_rollback_ref" 2>/dev/null)" = "$old_ai_image" ] \
         && [ "$(image_id "$edge_rollback_ref" 2>/dev/null)" = "$old_edge_image" ] \
         || return 1
-    docker image tag "$presentation_rollback_ref" "$presentation_image"
-    docker image tag "$ai_rollback_ref" "$ai_image"
-    docker image tag "$edge_rollback_ref" "$edge_image"
+    docker image tag "$old_presentation_image" "$presentation_image" || return 1
+    docker image tag "$old_ai_image" "$ai_image" || return 1
+    docker image tag "$old_edge_image" "$edge_image" || return 1
     timeout --signal=TERM --kill-after=30 "$up_timeout_seconds" \
-        docker compose --project-name "$project_name" --project-directory "$repo_root" \
-        --file "$compose_file" up -d --no-deps --no-build --force-recreate \
-        "$presentation_service" "$edge_service" "$ai_service" >/dev/null || return 1
+        env -u COMPOSE_FILE -u COMPOSE_ENV_FILES COMPOSE_PROFILES='' COMPOSE_DISABLE_ENV_FILE=true \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE="$rollback_project_directory/ops/build-ghost-private-nonprod/tough-tongue-read-only-binding-contract.unconfigured.json" \
+        docker compose --env-file /dev/null --project-name "$project_name" \
+        --project-directory "$rollback_project_directory" --file "$rollback_compose_file" \
+        up -d --no-deps --no-build --force-recreate \
+        "$presentation_service" "$edge_service" "$ai_service" >/dev/null 2>&1 || return 1
     restored_presentation="$(running_container_id "$presentation_service")"
     restored_ai="$(running_container_id "$ai_service")"
     restored_edge="$(running_container_id "$edge_service")"
@@ -527,14 +567,25 @@ rollback_if_needed() {
         && [ "$(volume_for_mount "$restored_edge" /config)" = "$old_caddy_config_volume" ] \
         || return 1
     assert_loopback_edge "$restored_edge"
+    prior_authority restored >/dev/null || return 1
     printf 'rook_first_rollout=rollback-restored volumes=preserved\n' >&2
 }
 
 restore_mutable_tags_after_failure() {
     [ "$deploy_succeeded" != true ] || return 0
-    [ -z "$presentation_rollback_ref" ] || docker image tag "$presentation_rollback_ref" "$presentation_image"
-    [ -z "$ai_rollback_ref" ] || docker image tag "$ai_rollback_ref" "$ai_image"
-    [ -z "$edge_rollback_ref" ] || docker image tag "$edge_rollback_ref" "$edge_image"
+    # The failure handler must not copy a ref that rollback itself rejected.
+    if [ -n "$presentation_rollback_ref" ]; then
+        [ "$(image_id "$presentation_rollback_ref" 2>/dev/null)" = "$old_presentation_image" ] || return 1
+        docker image tag "$old_presentation_image" "$presentation_image" || return 1
+    fi
+    if [ -n "$ai_rollback_ref" ]; then
+        [ "$(image_id "$ai_rollback_ref" 2>/dev/null)" = "$old_ai_image" ] || return 1
+        docker image tag "$old_ai_image" "$ai_image" || return 1
+    fi
+    if [ -n "$edge_rollback_ref" ]; then
+        [ "$(image_id "$edge_rollback_ref" 2>/dev/null)" = "$old_edge_image" ] || return 1
+        docker image tag "$old_edge_image" "$edge_image" || return 1
+    fi
 }
 
 validate_receipt_target() {
@@ -617,7 +668,7 @@ main() {
     trap 'exit 129' HUP
     trap 'exit 130' INT
     trap 'exit 143' TERM
-    for required in awk base64 bash chmod date df dirname docker find flock git id jq kill ln mktemp realpath rg rmdir sed seq setsid shred sleep stat timeout unlink wc; do
+    for required in awk base64 bash chmod date df dirname docker env find flock git id jq kill ln mktemp realpath rg rmdir sed seq setsid shred sleep stat timeout unlink wc; do
         require_command "$required"
     done
     validate_control_values
