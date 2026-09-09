@@ -1,6 +1,7 @@
 """Execute canary preflight with fake Docker; never contact a daemon/provider."""
 
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -23,7 +24,16 @@ GATES = (
 
 
 def run_preflight(fixture):
-    return subprocess.run(
+    # These tests stop before cp and must not depend on an installed ripgrep
+    # or allow an accidental real HTTP call. Advertise the later-phase tools
+    # for require_command/type -P, but fail loudly if either is ever executed.
+    # This is not proof that the deployment host has those runtime tools.
+    binary_root = Path(fixture["env"]["PATH"].split(":", 1)[0])
+    for name in ("rg", "curl"):
+        executable = binary_root / name
+        executable.write_text("#!/bin/sh\nprintf 'unexpected-canary-auxiliary-execution\\n' >&2\nexit 88\n")
+        executable.chmod(0o700)
+    result = subprocess.run(
         ["bash", str(CANARY)],
         env=fixture["env"],
         capture_output=True,
@@ -31,6 +41,8 @@ def run_preflight(fixture):
         timeout=15,
         check=False,
     )
+    assert "unexpected-canary-auxiliary-execution" not in result.stdout + result.stderr
+    return result
 
 
 @pytest.mark.parametrize("gate", GATES)
