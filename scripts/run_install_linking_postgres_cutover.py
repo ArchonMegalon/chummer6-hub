@@ -289,23 +289,23 @@ CORE_RUNTIME_PACKAGE_IDS = (
 HUB_PACKAGE_FEED_DIRECTORY_NAME = "hub-package-feed-shfe4b2706c44d-input"
 HUB_PACKAGE_FEED_INPUTS = {
     "Chummer.Hub.Registry.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": (
-        "89ca9f9f6069bdf1bbbb2aa9fc16a9c3b29e13f64a896be53027e42a682447d7",
+        "d92b67f9095a0c979746bc36abe60e9aae1b7335f97b456292e77269df366446",
         524_842,
     ),
     "Chummer.Play.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": (
-        "5203d7fb49d435c61ef81695d147e21472cf15e39595a78fa6db44f9fc876ba4",
+        "595a1a942e62160aa9d4f0cdc353e5488dcbdfeb1f715077a1359cf47e00f60f",
         322_544,
     ),
     "Chummer.Run.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": (
-        "50b7307ea03ecc4f203e7fdd223cd3c699548baf3cc51d7bf1314e7d422b0813",
+        "238a9a07b457fc436a4549f42470198cd5b85c3e5a5e8912208c0751defa0976",
         1_838_984,
     ),
     "Chummer.Run.Registry.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": (
-        "da046c289f33fb3910db0fa2d54d7dd28e21862f9e81bdbcc0feba5a3ee9381c",
+        "903c8f40b82d0f3a2445c296b5245ed8b03b342eb3e695d480446b29bf91e5e7",
         345_296,
     ),
     "chummer-hub-packages.inventory.json": (
-        "18a9dc73d8a150d3d9d8fa900b3b819bf0a7269351e8fcc3274b9bb73f65b30d",
+        "4ea0741fdefdecec00646a6af3d030fb0e38bbffa66a5fbbe4df8c6e6082e1af",
         2_396,
     ),
 }

@@ -112,7 +112,7 @@
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "89ca9f9f6069bdf1bbbb2aa9fc16a9c3b29e13f64a896be53027e42a682447d7",
+      "nupkg_sha256": "d92b67f9095a0c979746bc36abe60e9aae1b7335f97b456292e77269df366446",
       "nupkg_size_bytes": 524842
     },
     {
@@ -125,33 +125,33 @@
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "da046c289f33fb3910db0fa2d54d7dd28e21862f9e81bdbcc0feba5a3ee9381c",
+      "nupkg_sha256": "903c8f40b82d0f3a2445c296b5245ed8b03b342eb3e695d480446b29bf91e5e7",
       "nupkg_size_bytes": 345296
     },
     {
       "id": "Chummer.Play.Contracts",
       "version": "0.1.0-packageplane.candidate.shfe4b2706c44d",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
-      "commit": "586aa84bd616779ccb84529a76b75dfcc39189ba",
+      "commit": "104275ad751cbd0006cac993ac71f1c2b428c3d0",
       "checkout_directory": "chummer-run-services",
       "project": "Chummer.Play.Contracts/Chummer.Play.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "5203d7fb49d435c61ef81695d147e21472cf15e39595a78fa6db44f9fc876ba4",
+      "nupkg_sha256": "595a1a942e62160aa9d4f0cdc353e5488dcbdfeb1f715077a1359cf47e00f60f",
       "nupkg_size_bytes": 322544
     },
     {
       "id": "Chummer.Run.Contracts",
       "version": "0.1.0-packageplane.candidate.shfe4b2706c44d",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
-      "commit": "586aa84bd616779ccb84529a76b75dfcc39189ba",
+      "commit": "104275ad751cbd0006cac993ac71f1c2b428c3d0",
       "checkout_directory": "chummer-run-services",
       "project": "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "50b7307ea03ecc4f203e7fdd223cd3c699548baf3cc51d7bf1314e7d422b0813",
+      "nupkg_sha256": "238a9a07b457fc436a4549f42470198cd5b85c3e5a5e8912208c0751defa0976",
       "nupkg_size_bytes": 1838984
     }
   ]
