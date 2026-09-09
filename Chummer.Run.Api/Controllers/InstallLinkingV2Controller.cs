@@ -81,7 +81,7 @@ public sealed class InstallLinkingV2Controller : ControllerBase
         [FromBody] AndroidLinkedV2GrantRequest? request)
     {
         ApplyPrivateResponseHeaders();
-        if (!TryResolvePrincipal(request, out AndroidLinkedV2GrantPrincipal? principal, out _, out ObjectResult? denied))
+        if (!TryResolvePrincipal(request, out AndroidLinkedV2GrantPrincipal? principal, out ClaimedInstallationDto? installation, out ObjectResult? denied))
         {
             return denied!;
         }
@@ -92,7 +92,8 @@ public sealed class InstallLinkingV2Controller : ControllerBase
             principal.Installation.Status,
             principal.IssuedAtUtc,
             principal.ExpiresAtUtc,
-            _timeProvider.GetUtcNow()));
+            _timeProvider.GetUtcNow(),
+            installation!.SubjectId));
     }
 
     [HttpPost("grants/refresh")]
@@ -323,7 +324,8 @@ public sealed record AndroidLinkedV2GrantStatusResponse(
     string Status,
     DateTimeOffset IssuedAtUtc,
     DateTimeOffset ExpiresAtUtc,
-    DateTimeOffset ObservedAtUtc);
+    DateTimeOffset ObservedAtUtc,
+    string? SubjectId = null);
 
 public sealed record AndroidLinkedV2GrantRefreshResponse(
     ClaimedInstallationDto Installation,

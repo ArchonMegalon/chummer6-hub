@@ -606,6 +606,8 @@ public sealed class InstallLinkingService
                 out ClaimedInstallationDto? installation,
                 out InstallationGrantDto? grant)
                 && GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
+                && string.Equals(installation!.SubjectId, principal.Installation.SubjectId, StringComparison.Ordinal)
+                && string.Equals(installation.UserId, principal.Installation.UserId, StringComparison.Ordinal)
                 ? installation
                 : null;
         }
@@ -1653,6 +1655,8 @@ public sealed class InstallLinkingService
             || !string.Equals(installation.GrantId, grantId, StringComparison.Ordinal)
             || !_store.GrantsById.TryGetValue(grantId, out grant)
             || !string.Equals(grant.InstallationId, installationId, StringComparison.Ordinal)
+            || !string.Equals(grant.SubjectId, installation.SubjectId, StringComparison.Ordinal)
+            || !string.Equals(grant.UserId, installation.UserId, StringComparison.Ordinal)
             || !string.Equals(grant.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase)
             || grant.ExpiresAtUtc <= now)
         {
