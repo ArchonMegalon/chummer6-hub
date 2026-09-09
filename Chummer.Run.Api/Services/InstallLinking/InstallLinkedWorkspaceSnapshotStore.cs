@@ -90,4 +90,6 @@ public sealed record InstallLinkedWorkspaceSnapshotRecord(
     string? AppVersion,
     decimal Karma,
     decimal Nuyen,
-    bool Created);
+    bool Created,
+    long RemoteRevision = 0,
+    string? ServerToken = null);

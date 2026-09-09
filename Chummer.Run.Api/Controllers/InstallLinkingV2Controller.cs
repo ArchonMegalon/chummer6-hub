@@ -198,10 +198,17 @@ public sealed class InstallLinkingV2Controller : ControllerBase
             return denied!;
         }
 
-        InstallLinkedWorkspaceSnapshotDto[] snapshots = _workspaceSnapshots.ListForInstallation(installation!)
-            .Select(static snapshot => ToSnapshotDto(snapshot))
-            .ToArray();
-        return Ok(new InstallLinkedWorkspaceSnapshotListResponse(snapshots));
+        try
+        {
+            InstallLinkedWorkspaceSnapshotDto[] snapshots = _workspaceSnapshots.ListForInstallation(installation!)
+                .Select(static snapshot => ToSnapshotDto(snapshot))
+                .ToArray();
+            return Ok(new InstallLinkedWorkspaceSnapshotListResponse(snapshots));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost("continuation/workspaces/upsert")]
@@ -238,7 +245,9 @@ public sealed class InstallLinkingV2Controller : ControllerBase
                     AppVersion: request.AppVersion,
                     Karma: request.Karma,
                     Nuyen: request.Nuyen,
-                    Created: request.Created));
+                    Created: request.Created),
+                request.ExpectedRemoteRevision,
+                request.ExpectedServerToken);
             return Ok(new InstallLinkedWorkspaceSnapshotUpsertResponse(ToSnapshotDto(stored)));
         }
         catch (InstallLinkingOperationException ex)
@@ -294,7 +303,9 @@ public sealed class InstallLinkingV2Controller : ControllerBase
                 AppVersion: snapshot.AppVersion ?? snapshot.RulesetId,
                 Karma: snapshot.Karma,
                 Nuyen: snapshot.Nuyen,
-                Created: snapshot.Created));
+                Created: snapshot.Created),
+            RemoteRevision: snapshot.RemoteRevision,
+            ServerToken: snapshot.ServerToken);
 
     private void ApplyPrivateResponseHeaders()
         => AndroidLinkedV2RequestProofMiddleware.ApplyPrivateResponseHeaders(Response.Headers);
@@ -356,4 +367,6 @@ public sealed record AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
     string? AppVersion,
     decimal Karma,
     decimal Nuyen,
-    bool Created) : AndroidLinkedV2GrantRequest(InstallationId);
+    bool Created,
+    long? ExpectedRemoteRevision = null,
+    string? ExpectedServerToken = null) : AndroidLinkedV2GrantRequest(InstallationId);

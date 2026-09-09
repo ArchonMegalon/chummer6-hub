@@ -204,6 +204,45 @@ redacted for both Preview 10 and v2 grants; owner-authorized unlink uses the
 authenticated owner plus installation identity and does not depend on a bearer
 from the page model.
 
+## Workspace snapshot concurrency boundary
+
+Workspace list/upsert responses include `remoteRevision` and `serverToken` on
+each snapshot. The token is an opaque concurrency value, not a grant or access
+credential. Every update to an existing snapshot must send both
+`expectedRemoteRevision` and `expectedServerToken` from the remote baseline that
+the user actually reviewed. A changed baseline returns `409`; a differing
+snapshot without a precondition returns `428`. A newer device timestamp never
+authorizes replacement. The same rule applies to the retained v1 upsert route,
+so a legacy caller cannot bypass v2 conflict protection.
+
+`expectedRemoteRevision: 0` with a null token means create only if missing.
+Existing historical rows are readable with revision zero and a deterministic
+token derived from their complete legacy record; reading does not rewrite them.
+Updating a reviewed legacy row requires that exact non-null token. New commits
+increment the server revision and generate a fresh token, persisted with the
+snapshot. Equal data after intervening updates does not revive an old token.
+An exact unchanged snapshot without a precondition may return the current row
+as a no-op; a supplied stale precondition is rejected even for identical data.
+
+The in-memory row is restored if the file commit fails. This is a bounded
+single-store-instance commit guarantee, not multi-replica, cross-process,
+power-cut or PostgreSQL snapshot-store proof. Grant/proof admission retains its
+own separate existing persistence authority.
+
+**Coordinated client rollout required:** existing clients that write without
+these preconditions must be updated before this server change is deployed.
+They may still read and create missing snapshots, but cannot replace an existing
+one. Clients must not fetch the newest token immediately before writing merely
+to bypass a real conflict. Preserve the reviewed baseline and present explicit
+compare/branch/stay-local choices. A lost write response requires fresh readback,
+not an automatic stale-write retry or an invented success receipt.
+
+This boundary does not yet transfer Core workspace auxiliary state, preserve
+all wizard recovery receipts across devices, or authorize generic import of
+that state. Complete typed transfer and a Core-owned restore capability remain
+required before enabling the new Android owner-bound roaming composition.
+No Android, package publication or production deployment readiness is implied.
+
 ## Version boundary
 
 Every newly issued grant has durable transport authority: `legacy-v1` or

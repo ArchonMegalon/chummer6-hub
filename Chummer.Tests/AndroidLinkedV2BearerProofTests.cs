@@ -17,6 +17,59 @@ namespace Chummer.Tests;
 public sealed class AndroidLinkedV2BearerProofTests
 {
     [Theory]
+    [InlineData("missing")]
+    [InlineData("stale")]
+    [InlineData("wrong-token")]
+    public async Task Authenticated_workspace_updates_require_exact_remote_authority(string conflict)
+    {
+        using Fixture fixture = new();
+        var request = new AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
+            "android-v2", "ws-http-cas", "sr5", "NativeXml", 1, "workspace", "<character/>",
+            fixture.TimeProvider.GetUtcNow(), "android-v2", "Runner", "Runner", "Human", "Priority",
+            "5", "6", 0, 0, false, ExpectedRemoteRevision: 0);
+        async Task<InstallLinkedWorkspaceSnapshotDto?> Send(AndroidLinkedV2WorkspaceSnapshotUpsertRequest value, int status)
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            string body = JsonSerializer.Serialize(value, options);
+            var signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body, Guid.NewGuid().ToString("N"));
+            var context = signed.CreateContext();
+            InstallLinkedWorkspaceSnapshotDto? snapshot = null;
+            bool dispatched = false;
+            await fixture.InvokeAsync(context, httpContext =>
+            {
+                dispatched = true;
+                var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+                { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+                var action = controller.UpsertClaimedInstallWorkspace(
+                    JsonSerializer.Deserialize<AndroidLinkedV2WorkspaceSnapshotUpsertRequest>(body, options));
+                var response = Assert.IsAssignableFrom<ObjectResult>(action.Result);
+                Assert.Equal(status, response.StatusCode);
+                if (status == StatusCodes.Status200OK)
+                    snapshot = Assert.IsType<InstallLinkedWorkspaceSnapshotUpsertResponse>(response.Value).Snapshot;
+            });
+            Assert.True(dispatched);
+            Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+            return snapshot;
+        }
+        var first = (await Send(request, StatusCodes.Status200OK))!;
+        Assert.Equal(1, first.RemoteRevision);
+        Assert.Matches("^[0-9a-f]{64}$", first.ServerToken!);
+        request = request with { Payload = "<character><name>reviewed</name></character>",
+            ExpectedRemoteRevision = first.RemoteRevision, ExpectedServerToken = first.ServerToken };
+        var second = (await Send(request, StatusCodes.Status200OK))!;
+        Assert.Equal(2, second.RemoteRevision);
+        Assert.NotEqual(first.ServerToken, second.ServerToken);
+        var denied = request with { Payload = "<character><name>not reviewed</name></character>",
+            UpdatedAtUtc = request.UpdatedAtUtc.AddDays(1) };
+        if (conflict == "missing") denied = denied with { ExpectedRemoteRevision = null, ExpectedServerToken = null };
+        if (conflict == "wrong-token") denied = denied with
+            { ExpectedRemoteRevision = second.RemoteRevision, ExpectedServerToken = new string('0', 64) };
+        await Send(denied, conflict == "missing" ? StatusCodes.Status428PreconditionRequired : StatusCodes.Status409Conflict);
+        Assert.Equal(second.Payload, Assert.Single(fixture.WorkspaceSnapshots.ListForInstallation(
+            fixture.Store.InstallationsById["android-v2"])).Payload);
+    }
+
+    [Theory]
     [InlineData("subject", false)]
     [InlineData("user", false)]
     [InlineData("subject", true)]
@@ -1261,7 +1314,7 @@ public sealed class AndroidLinkedV2BearerProofTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking-store.json"),
-                    ["CHUMMER_INSTALL_LINKED_WORKSPACE_STORE_PATH"] = Path.Combine(_root, "workspace-store.json")
+                    ["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"] = Path.Combine(_root, "workspace-store.json")
                 })
                 .Build();
             _protection = DataProtectionProvider.Create(Path.Combine(_root, "keys"));
