@@ -17,6 +17,91 @@ namespace Chummer.Tests;
 public sealed class AndroidLinkedV2BearerProofTests
 {
     [Theory]
+    [InlineData("subject", false)]
+    [InlineData("user", false)]
+    [InlineData("subject", true)]
+    [InlineData("user", true)]
+    [InlineData("both-subject", true)]
+    [InlineData("both-user", true)]
+    public async Task Grant_cannot_authorize_a_reassigned_installation_owner(string field, bool afterProof)
+    {
+        using Fixture fixture = new();
+        void Reassign()
+        {
+            lock (fixture.Store.Gate)
+            {
+                var original = fixture.Store.InstallationsById["android-v2"];
+                fixture.Store.InstallationsById["android-v2"] = field.EndsWith("subject", StringComparison.Ordinal)
+                    ? original with { SubjectId = "other-subject" }
+                    : original with { UserId = "other-user" };
+                if (field.StartsWith("both-", StringComparison.Ordinal))
+                {
+                    var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                    fixture.Store.GrantsById[Fixture.GrantId] = field == "both-subject"
+                        ? grant with { SubjectId = "other-subject" }
+                        : grant with { UserId = "other-user" };
+                }
+                fixture.Store.PersistLocked();
+            }
+        }
+        var signed = fixture.Sign("/api/v2/install-linking/grants/status", "{\"installationId\":\"android-v2\"}");
+        DefaultHttpContext context = signed.CreateContext();
+        if (!afterProof) Reassign();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            if (afterProof) Reassign();
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var result = controller.GetGrantStatus(new AndroidLinkedV2GrantRequest("android-v2"));
+            Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsAssignableFrom<ObjectResult>(result.Result).StatusCode);
+        });
+        Assert.Equal(afterProof, dispatched);
+        if (!afterProof) Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Grant_status_exposes_subject_only_for_the_revalidated_exact_principal(bool revokeBeforeController)
+    {
+        using Fixture fixture = new();
+        var signed = fixture.Sign("/api/v2/install-linking/grants/status", "{\"installationId\":\"android-v2\"}");
+        DefaultHttpContext context = signed.CreateContext();
+        AndroidLinkedV2GrantStatusResponse? response = null;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            if (revokeBeforeController)
+            {
+                lock (fixture.Store.Gate)
+                {
+                    fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                        with { Status = InstallationGrantStates.Revoked };
+                    fixture.Store.PersistLocked();
+                }
+            }
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var result = controller.GetGrantStatus(new AndroidLinkedV2GrantRequest("android-v2"));
+            if (revokeBeforeController)
+                Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsAssignableFrom<ObjectResult>(result.Result).StatusCode);
+            else
+                response = Assert.IsType<AndroidLinkedV2GrantStatusResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        });
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        if (revokeBeforeController) Assert.Null(response);
+        else
+        {
+            Assert.Equal("subject-v2", response!.SubjectId);
+            Assert.Equal("android-v2", response.InstallationId);
+            Assert.Equal(Fixture.GrantId, response.GrantId);
+            Assert.Equal(fixture.TimeProvider.GetUtcNow(), response.ObservedAtUtc);
+            Assert.DoesNotContain(Fixture.AccessToken, JsonSerializer.Serialize(response), StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("Basic token-android-v2")]
