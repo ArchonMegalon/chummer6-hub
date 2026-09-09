@@ -60,6 +60,33 @@ jobs:
           python3 -m pytest -q \
             tests/test_hub_package_plane.py \
             tests/test_public_edge_deploy_preflight.py::test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_dependency
+      - name: Install hash-locked system PyYAML for isolated Rook checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${RUNNER_OS}" = Linux
+          test "${RUNNER_ARCH}" = X64
+          # The production validator intentionally uses /usr/bin/python3 -I,
+          # not setup-python's interpreter, user site-packages, or PYTHONPATH.
+          # This privileged install is only for the disposable hosted runner.
+          # Ignore ambient packages so matching versions cannot skip hash checks;
+          # do not uninstall the distribution-managed package (PEP 668).
+          sudo -- "$(command -v python3)" -I -m pip --python /usr/bin/python3 \
+            --isolated install --disable-pip-version-check --no-input --no-cache-dir \
+            --ignore-installed --break-system-packages --no-deps \
+            --only-binary=:all: --require-hashes --index-url https://pypi.org/simple \
+            --requirement eng/ci-rook-system-python-requirements.txt
+          /usr/bin/python3 -I -c 'import yaml; assert yaml.__version__ == "6.0.3"; assert hasattr(yaml, "SafeLoader")'
+      - name: Verify Rook rollback authority without Docker or providers
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ops/build-ghost-private-nonprod/deploy-first-provider-disabled-rook-lane.sh
+          /usr/bin/python3 -I -m py_compile \
+            ops/build-ghost-private-nonprod/verify-prior-rollout-authority.py
+          python3 -m pytest -q \
+            tests/test_build_ghost_first_provider_disabled_rollout.py \
+            tests/test_build_ghost_private_nonprod_attestation.py
       - name: Verify release fallback trust boundaries
         shell: bash
         run: |
