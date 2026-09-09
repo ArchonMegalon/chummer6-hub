@@ -130,6 +130,29 @@ def _parent_map(root: ElementTree.Element) -> dict[ElementTree.Element, ElementT
     return {child: parent for parent in root.iter() for child in parent}
 
 
+def test_hosted_api_suite_includes_every_focused_android_linked_test() -> None:
+    focused_path = ROOT / "Chummer.Tests/Chummer.Tests.csproj"
+    focused = ElementTree.parse(focused_path).getroot()
+    focused_groups = [
+        group for group in focused.findall("ItemGroup")
+        if group.attrib.get("Condition") == "'$(RunAndroidLinkedV2BearerProofTestsOnly)' == 'true'"
+    ]
+    assert len(focused_groups) == 1
+    expected = {
+        (focused_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for item in focused_groups[0].findall("Compile")
+    }
+    assert expected
+    hosted_path = ROOT / "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj"
+    hosted = ElementTree.parse(hosted_path).getroot()
+    included = {
+        (hosted_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for group in hosted.findall("ItemGroup") if "Condition" not in group.attrib
+        for item in group.findall("Compile") if "Condition" not in item.attrib
+    }
+    assert expected <= included, f"Focused linked tests missing from hosted suite: {expected - included}"
+
+
 def test_lock_pins_exact_owner_commits_and_package_version() -> None:
     module = load_module()
     lock = module.load_lock(LOCK_PATH)

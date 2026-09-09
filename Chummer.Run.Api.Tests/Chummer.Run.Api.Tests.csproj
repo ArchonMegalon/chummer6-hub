@@ -45,6 +45,11 @@
   <ItemGroup>
     <Compile Include="ReleaseBuildProvenanceValidatorTests.cs" />
     <Compile Include="..\Chummer.Tests\AccountAuxiliaryDataErasureServiceTests.cs" Link="AccountAuxiliaryDataErasureServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\AndroidLinkedV2BearerProofTests.cs" Link="AndroidLinkedV2BearerProofTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkedWorkspaceSnapshotTests.cs" Link="InstallLinkedWorkspaceSnapshotTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkedWorkspaceSnapshotTransferTests.cs" Link="InstallLinkedWorkspaceSnapshotTransferTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingBrowserCallbackTests.cs" Link="InstallLinkingBrowserCallbackTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingStoreSecurityTests.cs" Link="InstallLinkingStoreSecurityTests.cs" />
     <Compile Include="..\Chummer.Tests\RepoPaths.cs" Link="RepoPaths.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerFactionOnboardingTests.cs" Link="BlackLedgerFactionOnboardingTests.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerTickNewsTests.cs" Link="BlackLedgerTickNewsTests.cs" />
