@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Reflection;
 using Chummer.Contracts.Characters;
 using Chummer.Contracts.Workspaces;
@@ -153,6 +155,99 @@ public sealed class InstallLinkedWorkspaceSnapshotTransferTests
     }
 
     [Fact]
+    public void Near_limit_compact_snapshot_survives_indented_store_cold_reload()
+    {
+        using Fixture fixture = new();
+        var empty = ToRecord(SnapshotWithFoundationTransportText(string.Empty));
+        int overhead = Encoding.UTF8.GetByteCount(empty.WorkspaceSnapshot!.Value.GetRawText());
+        string story = new('x', InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes - 64 - overhead);
+        var core = SnapshotWithFoundationTransportText(story);
+        var request = ToRecord(core);
+        int compactBytes = Encoding.UTF8.GetByteCount(request.WorkspaceSnapshot!.Value.GetRawText());
+        Assert.Equal(InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes - 64, compactBytes);
+        Assert.True(compactBytes + Encoding.UTF8.GetByteCount(request.Payload)
+            < InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes);
+
+        var committed = fixture.Service.UpsertForInstallation(fixture.Installation, request, 0);
+        Assert.Equal(committed.WorkspaceSnapshotDigest,
+            Assert.Single(fixture.Service.ListForInstallation(fixture.Installation)).WorkspaceSnapshotDigest);
+        string path = fixture.Configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"]!;
+        using (JsonDocument persisted = JsonDocument.Parse(File.ReadAllText(path)))
+        {
+            JsonElement stored = persisted.RootElement.GetProperty("snapshots")[0].GetProperty("workspaceSnapshot");
+            Assert.True(Encoding.UTF8.GetByteCount(stored.GetRawText())
+                > InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes,
+                "The fixture must cross the raw snapshot bound through persisted indentation alone.");
+        }
+
+        var reloaded = new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(fixture.Configuration));
+        var read = Assert.Single(reloaded.ListForInstallation(fixture.Installation));
+        var restored = InstallLinkedWorkspaceSnapshotTransfer.Decode(read.WorkspaceSnapshot!.Value);
+        Assert.Equal(story, restored.Document.AuxiliaryState.CharacterCreationFoundationDraft!.FollowUpValues["story"]);
+        Assert.Equal(core.Document.AuxiliaryStateDigest, restored.Document.AuxiliaryStateDigest);
+        Assert.Equal(committed.RemoteRevision, read.RemoteRevision);
+        Assert.Equal(committed.ServerToken, read.ServerToken);
+        Assert.Equal(committed.WorkspaceSnapshotDigest, read.WorkspaceSnapshotDigest);
+    }
+
+    [Fact]
+    public void Oversized_incoming_whitespace_is_rejected_even_when_canonical_snapshot_is_small()
+    {
+        using Fixture fixture = new();
+        var request = ToRecord(SampleSnapshot());
+        var before = fixture.Service.UpsertForInstallation(fixture.Installation, request, 0);
+        string path = fixture.Configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"]!;
+        byte[] originalBytes = File.ReadAllBytes(path);
+        string compact = request.WorkspaceSnapshot!.Value.GetRawText();
+        using JsonDocument padded = JsonDocument.Parse("{" +
+            new string(' ', InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes) + compact[1..]);
+        int rawBytes = Encoding.UTF8.GetByteCount(padded.RootElement.GetRawText());
+        Assert.True(rawBytes > InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes);
+        Assert.True(rawBytes + Encoding.UTF8.GetByteCount(request.Payload)
+            < InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes);
+        request = request with { WorkspaceSnapshot = padded.RootElement.Clone() };
+
+        Assert.Equal(StatusCodes.Status400BadRequest, Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.UpsertForInstallation(fixture.Installation, request,
+                before.RemoteRevision, before.ServerToken)).StatusCode);
+        Assert.Equal(originalBytes, File.ReadAllBytes(path));
+        Assert.Equal(before.ServerToken,
+            Assert.Single(fixture.Service.ListForInstallation(fixture.Installation)).ServerToken);
+    }
+
+    [Fact]
+    public void Compact_unicode_input_exceeding_canonical_snapshot_bound_is_rejected_before_write()
+    {
+        using Fixture fixture = new();
+        var before = fixture.Service.UpsertForInstallation(fixture.Installation, ToRecord(SampleSnapshot()), 0);
+        string path = fixture.Configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"]!;
+        byte[] persistedBefore = File.ReadAllBytes(path);
+        var request = ToRecord(SnapshotWithFoundationTransportText(
+            new string('ä', InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes / 3)));
+        Assert.True(Encoding.UTF8.GetByteCount(request.WorkspaceSnapshot!.Value.GetRawText())
+            > InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes);
+        // The caller sends literal UTF-8; Core's transport encoder emits six-byte
+        // Unicode escapes. Both JSON forms represent the same transport fixture.
+        string compact = JsonSerializer.Serialize(request.WorkspaceSnapshot!.Value,
+            new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+        using JsonDocument incoming = JsonDocument.Parse(compact);
+        int incomingBytes = Encoding.UTF8.GetByteCount(incoming.RootElement.GetRawText());
+        Assert.True(incomingBytes < InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes);
+        Assert.True(incomingBytes + Encoding.UTF8.GetByteCount(request.Payload)
+            < InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes);
+        request = request with { WorkspaceSnapshot = incoming.RootElement.Clone() };
+
+        Assert.Equal(StatusCodes.Status400BadRequest, Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.UpsertForInstallation(fixture.Installation, request,
+                before.RemoteRevision, before.ServerToken)).StatusCode);
+        Assert.Equal(persistedBefore, File.ReadAllBytes(path));
+        var unchanged = Assert.Single(fixture.Service.ListForInstallation(fixture.Installation));
+        Assert.Equal(before.RemoteRevision, unchanged.RemoteRevision);
+        Assert.Equal(before.ServerToken, unchanged.ServerToken);
+        Assert.Equal(before.WorkspaceSnapshotDigest, unchanged.WorkspaceSnapshotDigest);
+    }
+
+    [Fact]
     public void Caller_json_lifetime_does_not_own_stored_snapshot_bytes()
     {
         using Fixture fixture = new();
@@ -301,6 +396,17 @@ public sealed class InstallLinkedWorkspaceSnapshotTransferTests
             CharacterCreationFinalizationArchive: new(new(CharacterCreationFoundationDraft: draft)));
         return new(id, new WorkspaceDocument(new WorkspaceDocumentState("sr5", 1, "workspace", "<character><name>Runner</name></character>")
             { AuxiliaryState = auxiliary }), new DateTimeOffset(2026, 9, 9, 12, 0, 0, TimeSpan.Zero), 7, 5);
+    }
+
+    // Large text only exercises transport bounds; it is not a rule-valid draft.
+    private static WorkspaceDocumentSnapshot SnapshotWithFoundationTransportText(string story)
+    {
+        var core = SampleSnapshot();
+        var draft = core.Document.AuxiliaryState.CharacterCreationFoundationDraft!;
+        var values = new Dictionary<string, string>(draft.FollowUpValues, StringComparer.Ordinal) { ["story"] = story };
+        return core with { Document = core.Document with { State = core.Document.State with
+            { AuxiliaryState = core.Document.AuxiliaryState with
+                { CharacterCreationFoundationDraft = draft with { FollowUpValues = values } } } } };
     }
 
     internal static InstallLinkedWorkspaceSnapshotRecord ToRecord(WorkspaceDocumentSnapshot core)

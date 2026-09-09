@@ -77,9 +77,7 @@ public static class InstallLinkedWorkspaceSnapshotTransfer
         {
             if (record.WorkspaceSnapshot is not { } json || !IsDigest(record.WorkspaceSnapshotDigest)
                 || json.ValueKind != JsonValueKind.Object
-                || Encoding.UTF8.GetByteCount(json.GetRawText()) > MaxSnapshotBytes
-                || Encoding.UTF8.GetByteCount(record.Payload) + Encoding.UTF8.GetByteCount(json.GetRawText())
-                    > InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes)
+                || (!stored && !IsWithinTransportBounds(record.Payload, json)))
                 throw new JsonException("Invalid or oversized snapshot transport.");
             WorkspaceDocumentSnapshot snapshot = Decode(json);
             if (!string.Equals(snapshot.Id.Value, record.WorkspaceId, StringComparison.Ordinal)
@@ -94,6 +92,13 @@ public static class InstallLinkedWorkspaceSnapshotTransfer
                 || snapshot.SavedRevision > snapshot.ContentRevision)
                 throw new JsonException("Snapshot identity or revisions disagree with the transport.");
             JsonElement encoded = Encode(snapshot);
+            // Persistence adds indentation to JsonElement values. That whitespace
+            // must not invalidate an already accepted snapshot after restart.
+            // Conversely, a compact Unicode/sparse request may expand during our
+            // canonical encoding. Check that stable representation before writing
+            // and on every cold read; request-byte limits remain independent.
+            if (!IsWithinTransportBounds(record.Payload, encoded))
+                throw new JsonException("Canonical snapshot exceeds transport bounds.");
             if (!string.Equals(ComputeDigest(encoded), record.WorkspaceSnapshotDigest, StringComparison.Ordinal))
                 throw new JsonException("Snapshot digest does not match.");
             // Own the bytes independently of the caller's JsonDocument lifetime.
@@ -107,6 +112,14 @@ public static class InstallLinkedWorkspaceSnapshotTransfer
                 stored ? "The stored complete workspace snapshot is invalid."
                     : "The complete workspace snapshot is unsupported, inconsistent, or exceeds its bounds.");
         }
+    }
+
+    private static bool IsWithinTransportBounds(string payload, JsonElement json)
+    {
+        int snapshotBytes = Encoding.UTF8.GetByteCount(json.GetRawText());
+        return snapshotBytes <= MaxSnapshotBytes
+            && (long)Encoding.UTF8.GetByteCount(payload) + snapshotBytes
+                <= InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes;
     }
 
     private static bool IsDigest(string? value)

@@ -239,6 +239,13 @@ not an automatic stale-write retry or an invented success receipt.
 
 ## Complete Core snapshot transport (not restore authority)
 
+The snapshot size bound is checked against both incoming JSON and its stable
+Core-encoded representation before persistence. Cold reads apply the same bound
+to the re-encoded representation, not storage-only indentation. Compact Unicode
+or omitted default members cannot expand past the bound after an accepted write;
+pretty-printing on disk cannot make an accepted snapshot unreadable. The HTTP
+request-body cap remains an independent ingress limit.
+
 Both snapshot routes accept and return optional `workspaceSnapshot` and
 `workspaceSnapshotDigest`. They must either both be absent (a historical
 payload-only row) or both be present. The snapshot is Core's existing
