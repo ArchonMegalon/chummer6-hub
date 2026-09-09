@@ -83,11 +83,13 @@ jobs:
           set -euo pipefail
           bash -n ops/build-ghost-private-nonprod/deploy-first-provider-disabled-rook-lane.sh
           /usr/bin/python3 -I -m py_compile \
-            ops/build-ghost-private-nonprod/verify-prior-rollout-authority.py
+            ops/build-ghost-private-nonprod/verify-prior-rollout-authority.py \
+            ops/build-ghost-private-nonprod/preflight-provider-disabled-rook-bootstrap.py
           python3 -m pytest -q \
             tests/test_build_ghost_first_provider_disabled_rollout.py \
             tests/test_build_ghost_private_nonprod_attestation.py \
-            tests/test_build_ghost_local_canary_environment.py
+            tests/test_build_ghost_local_canary_environment.py \
+            tests/test_build_ghost_partial_bootstrap_preflight.py
       - name: Verify release fallback trust boundaries
         shell: bash
         run: |
