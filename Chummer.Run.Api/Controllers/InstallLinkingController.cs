@@ -789,7 +789,9 @@ public sealed class InstallLinkingController : ControllerBase
                     AppVersion: request.AppVersion,
                     Karma: request.Karma,
                     Nuyen: request.Nuyen,
-                    Created: request.Created),
+                    Created: request.Created,
+                    WorkspaceSnapshot: request.WorkspaceSnapshot,
+                    WorkspaceSnapshotDigest: request.WorkspaceSnapshotDigest),
                 request.ExpectedRemoteRevision,
                 request.ExpectedServerToken);
             return Ok(new InstallLinkedWorkspaceSnapshotUpsertResponse(ToSnapshotDto(stored)));
@@ -2593,7 +2595,9 @@ public sealed class InstallLinkingController : ControllerBase
                 Nuyen: snapshot.Nuyen,
                 Created: snapshot.Created),
             RemoteRevision: snapshot.RemoteRevision,
-            ServerToken: snapshot.ServerToken);
+            ServerToken: snapshot.ServerToken,
+            WorkspaceSnapshot: snapshot.WorkspaceSnapshot,
+            WorkspaceSnapshotDigest: snapshot.WorkspaceSnapshotDigest);
 
 }
 
@@ -2799,7 +2803,9 @@ public sealed record InstallLinkedWorkspaceSnapshotUpsertRequest(
     decimal Nuyen,
     bool Created,
     long? ExpectedRemoteRevision = null,
-    string? ExpectedServerToken = null);
+    string? ExpectedServerToken = null,
+    JsonElement? WorkspaceSnapshot = null,
+    string? WorkspaceSnapshotDigest = null);
 
 public sealed record InstallLinkedWorkspaceSnapshotUpsertResponse(
     InstallLinkedWorkspaceSnapshotDto Snapshot);
@@ -2815,4 +2821,6 @@ public sealed record InstallLinkedWorkspaceSnapshotDto(
     string? OriginInstallationId,
     CharacterFileSummary Summary,
     long RemoteRevision = 0,
-    string? ServerToken = null);
+    string? ServerToken = null,
+    JsonElement? WorkspaceSnapshot = null,
+    string? WorkspaceSnapshotDigest = null);

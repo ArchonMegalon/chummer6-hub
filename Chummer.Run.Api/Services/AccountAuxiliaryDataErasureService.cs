@@ -162,8 +162,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             {
                 int removed = RemoveDictionaryWhere(
                     _installSnapshots.SnapshotsByKey,
-                    pair => IdEquals(pair.Value.OwnerKey, subjectOwner)
-                            || IdEquals(pair.Value.OwnerKey, userOwner));
+                    pair => string.Equals(pair.Value.OwnerKey, subjectOwner, StringComparison.Ordinal)
+                            || (userOwner is not null && string.Equals(pair.Value.OwnerKey, userOwner, StringComparison.Ordinal)));
                 PersistIfChanged(removed, _installSnapshots.PersistLocked);
                 return removed;
             }

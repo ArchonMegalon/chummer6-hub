@@ -237,11 +237,68 @@ to bypass a real conflict. Preserve the reviewed baseline and present explicit
 compare/branch/stay-local choices. A lost write response requires fresh readback,
 not an automatic stale-write retry or an invented success receipt.
 
-This boundary does not yet transfer Core workspace auxiliary state, preserve
-all wizard recovery receipts across devices, or authorize generic import of
-that state. Complete typed transfer and a Core-owned restore capability remain
-required before enabling the new Android owner-bound roaming composition.
-No Android, package publication or production deployment readiness is implied.
+## Complete Core snapshot transport (not restore authority)
+
+Both snapshot routes accept and return optional `workspaceSnapshot` and
+`workspaceSnapshotDigest`. They must either both be absent (a historical
+payload-only row) or both be present. The snapshot is Core's existing
+`WorkspaceDocumentSnapshot`: exact workspace ID, `WorkspaceDocument.State`,
+format, update time, content revision and saved revision. State includes the
+complete typed `WorkspaceDocumentAuxiliaryState`, including current Creation
+drafts, receipt ledgers and finalization history. It is never injected into
+character XML or a downloadable character payload.
+
+The wire representation includes primary stored properties only, using
+case-sensitive camel-case JSON and numeric enum values. Computed read-only
+properties are excluded (`IgnoreReadOnlyProperties=true`). The snapshot and
+its document/state require their exact fields; auxiliary state is deserialized
+through the current Core contracts with unknown fields disallowed. Unknown,
+duplicate, lossy or unsupported fields fail closed rather than disappear on a
+round trip. Dictionary keys that differ only by case remain distinct.
+
+Digest semantics are `canonical-core-workspace-snapshot-json-sha256-v1`:
+SHA256 of the UTF-8 JSON object with `contract` set to that semantics string and
+`snapshot` set to the encoded Core snapshot. Object properties within the
+snapshot are ordered ordinally; array order is unchanged; compact JSON uses
+the standard System.Text.Json UTF-8 writer (default encoder, including `+`
+escaped as `\u002B` and uppercase Unicode escape hex). This is a named .NET
+wire encoding, not an RFC8785/JCS or JavaScript `JSON.stringify` claim. The
+digest is lowercase hex, with
+no prefix. `InstallLinkedWorkspaceSnapshotTransfer.Encode/ComputeDigest` is
+the server reference implementation; a separate golden vector and every
+current auxiliary member are exercised in transport tests.
+
+The full snapshot must agree with the outer workspace ID, ruleset, schema,
+payload kind, format, payload and timestamp. Content revision must be positive
+and saved revision must be between zero and content revision. Snapshots are
+bounded at512KiB UTF-8, depth32, within the existing768KiB request limit; oversized
+state is rejected, never truncated. These are capacity limits, not a claim of
+unlimited history. Broader large-workspace transfer needs an explicit bounded
+protocol/capacity update and matching client response handling.
+
+Auxiliary-only changes are real CAS writes. Once a row carries a complete
+snapshot, a payload-only update is rejected with409 even with the correct
+precondition: an older client must not discard wizard state. Exact retries use
+the full snapshot digest, not JsonElement reference identity. A corrupt stored
+snapshot returns503, not a successful payload-only projection. Failed writes
+retain the prior full snapshot and concurrency token in memory and on disk.
+
+Opaque owner IDs and workspace IDs use ordinal equality and collision-free
+framed internal keys. Reload preserves the original components; duplicate
+persisted identities fail closed. Snapshot erasure uses the same exact owner
+comparison so differently cased accounts are not conflated. This changes only
+the snapshot owner boundary, not every other account-keyed store in Hub.
+
+**Still required:** Core-owned semantic validation and atomic restore, Android
+reviewed-baseline roaming, normal account-switch composition and appropriate
+bounded list/fetch handling. Hub validates transport integrity, not the rule
+legality or provenance of receipt claims. A digest is not authentication or
+permission to mutate local Core state. Transport fixtures are not mechanically
+validated characters. Core's private delegated-GM idempotency/audit ledger is
+outside `WorkspaceDocumentSnapshot`; it also needs an explicit preservation or
+conflict policy before a full roaming restore can be claimed. No generic
+auxiliary-state write, Android readiness, package publication or production
+deployment is authorized here.
 
 ## Version boundary
 

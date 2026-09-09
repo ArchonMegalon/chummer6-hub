@@ -17,6 +17,49 @@ namespace Chummer.Tests;
 public sealed class AndroidLinkedV2BearerProofTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_route_preserves_full_workspace_or_rejects_bad_digest(bool corrupt)
+    {
+        using Fixture fixture = new();
+        var core = InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot();
+        var transfer = InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(core);
+        var request = new AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
+            "android-v2", transfer.WorkspaceId, transfer.RulesetId, transfer.Format, transfer.SchemaVersion,
+            transfer.PayloadKind, transfer.Payload, transfer.UpdatedAtUtc, "android-v2", "Runner", "Runner",
+            "Human", "Priority", "5", "6", 0, 0, false, ExpectedRemoteRevision: 0,
+            WorkspaceSnapshot: transfer.WorkspaceSnapshot,
+            WorkspaceSnapshotDigest: corrupt ? new string('f', 64) : transfer.WorkspaceSnapshotDigest);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        string body = JsonSerializer.Serialize(request, options);
+        var context = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body).CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var result = Assert.IsAssignableFrom<ObjectResult>(controller.UpsertClaimedInstallWorkspace(
+                JsonSerializer.Deserialize<AndroidLinkedV2WorkspaceSnapshotUpsertRequest>(body, options)).Result);
+            Assert.Equal(corrupt ? StatusCodes.Status400BadRequest : StatusCodes.Status200OK, result.StatusCode);
+            if (!corrupt)
+            {
+                var wire = JsonSerializer.Deserialize<InstallLinkedWorkspaceSnapshotUpsertResponse>(
+                    JsonSerializer.Serialize(result.Value, options), options)!.Snapshot;
+                Assert.Equal(transfer.WorkspaceSnapshotDigest, wire.WorkspaceSnapshotDigest);
+                Assert.Equal(core.Document.AuxiliaryStateDigest,
+                    InstallLinkedWorkspaceSnapshotTransfer.Decode(wire.WorkspaceSnapshot!.Value).Document.AuxiliaryStateDigest);
+                Assert.Equal(1, wire.RemoteRevision);
+            }
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        var visible = fixture.WorkspaceSnapshots.ListForInstallation(fixture.Store.InstallationsById["android-v2"]);
+        if (corrupt) Assert.Empty(visible);
+        else Assert.Equal(transfer.WorkspaceSnapshotDigest, Assert.Single(visible).WorkspaceSnapshotDigest);
+    }
+
+    [Theory]
     [InlineData("missing")]
     [InlineData("stale")]
     [InlineData("wrong-token")]

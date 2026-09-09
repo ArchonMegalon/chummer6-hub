@@ -30,7 +30,7 @@ public sealed class InstallLinkedWorkspaceSnapshotService
         lock (_store.Gate)
         {
             return _store.SnapshotsByKey.Values
-                .Where(item => string.Equals(item.OwnerKey, ownerKey, StringComparison.OrdinalIgnoreCase))
+                .Where(item => string.Equals(item.OwnerKey, ownerKey, StringComparison.Ordinal))
                 .OrderByDescending(static item => item.UpdatedAtUtc)
                 .Select(WithAuthority)
                 .ToArray();
@@ -71,6 +71,7 @@ public sealed class InstallLinkedWorkspaceSnapshotService
             CreatedVersion = NormalizeOptional(snapshot.CreatedVersion, "created version", MaxTraitLength),
             AppVersion = NormalizeOptional(snapshot.AppVersion, "app version", MaxTraitLength)
         };
+        normalized = InstallLinkedWorkspaceSnapshotTransfer.Validate(normalized);
 
         lock (_store.Gate)
         {
@@ -87,10 +88,14 @@ public sealed class InstallLinkedWorkspaceSnapshotService
 
             if (existing is not null)
             {
+                if (existing.WorkspaceSnapshot is not null && normalized.WorkspaceSnapshot is null)
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict,
+                        "A complete workspace snapshot cannot be replaced by a payload-only client.");
                 // An exact no-op is safe for older clients, but a newer clock is
                 // never permission to overwrite. A supplied stale precondition
                 // was already rejected above, including byte-identical ABA.
-                if ((normalized with { RemoteRevision = existing.RemoteRevision, ServerToken = existing.ServerToken }) == existing)
+                if ((normalized with { RemoteRevision = existing.RemoteRevision, ServerToken = existing.ServerToken,
+                        WorkspaceSnapshot = null }) == (existing with { WorkspaceSnapshot = null }))
                     return observed!;
                 if (expectedRemoteRevision is null)
                     throw new InstallLinkingOperationException(StatusCodes.Status428PreconditionRequired,
@@ -128,6 +133,7 @@ public sealed class InstallLinkedWorkspaceSnapshotService
 
     private static InstallLinkedWorkspaceSnapshotRecord WithAuthority(InstallLinkedWorkspaceSnapshotRecord record)
     {
+        record = InstallLinkedWorkspaceSnapshotTransfer.Validate(record, stored: true);
         if (record.RemoteRevision == 0 && record.ServerToken is null)
         {
             // An older persisted row still needs an exact read-before-write

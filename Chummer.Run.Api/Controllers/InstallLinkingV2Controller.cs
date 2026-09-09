@@ -2,6 +2,7 @@ using Chummer.Contracts.Characters;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -245,7 +246,9 @@ public sealed class InstallLinkingV2Controller : ControllerBase
                     AppVersion: request.AppVersion,
                     Karma: request.Karma,
                     Nuyen: request.Nuyen,
-                    Created: request.Created),
+                    Created: request.Created,
+                    WorkspaceSnapshot: request.WorkspaceSnapshot,
+                    WorkspaceSnapshotDigest: request.WorkspaceSnapshotDigest),
                 request.ExpectedRemoteRevision,
                 request.ExpectedServerToken);
             return Ok(new InstallLinkedWorkspaceSnapshotUpsertResponse(ToSnapshotDto(stored)));
@@ -305,7 +308,9 @@ public sealed class InstallLinkingV2Controller : ControllerBase
                 Nuyen: snapshot.Nuyen,
                 Created: snapshot.Created),
             RemoteRevision: snapshot.RemoteRevision,
-            ServerToken: snapshot.ServerToken);
+            ServerToken: snapshot.ServerToken,
+            WorkspaceSnapshot: snapshot.WorkspaceSnapshot,
+            WorkspaceSnapshotDigest: snapshot.WorkspaceSnapshotDigest);
 
     private void ApplyPrivateResponseHeaders()
         => AndroidLinkedV2RequestProofMiddleware.ApplyPrivateResponseHeaders(Response.Headers);
@@ -369,4 +374,6 @@ public sealed record AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
     decimal Nuyen,
     bool Created,
     long? ExpectedRemoteRevision = null,
-    string? ExpectedServerToken = null) : AndroidLinkedV2GrantRequest(InstallationId);
+    string? ExpectedServerToken = null,
+    JsonElement? WorkspaceSnapshot = null,
+    string? WorkspaceSnapshotDigest = null) : AndroidLinkedV2GrantRequest(InstallationId);

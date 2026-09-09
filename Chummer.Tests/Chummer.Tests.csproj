@@ -82,6 +82,8 @@
   <ItemGroup Condition="'$(RunAndroidLinkedV2BearerProofTestsOnly)' == 'true'">
     <Compile Include="AndroidLinkedV2BearerProofTests.cs" />
     <Compile Include="InstallLinkedWorkspaceSnapshotTests.cs" />
+    <Compile Include="InstallLinkedWorkspaceSnapshotTransferTests.cs" />
+    <Compile Include="AccountAuxiliaryDataErasureServiceTests.cs" />
     <Compile Include="InstallLinkingBrowserCallbackTests.cs" />
     <Compile Include="InstallLinkingStoreSecurityTests.cs" />
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />

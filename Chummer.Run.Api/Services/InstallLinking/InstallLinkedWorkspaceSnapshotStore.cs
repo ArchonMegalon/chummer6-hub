@@ -18,7 +18,7 @@ public sealed class InstallLinkedWorkspaceSnapshotStore
 
     public object Gate { get; } = new();
 
-    public Dictionary<string, InstallLinkedWorkspaceSnapshotRecord> SnapshotsByKey { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, InstallLinkedWorkspaceSnapshotRecord> SnapshotsByKey { get; } = new(StringComparer.Ordinal);
 
     public void PersistLocked()
     {
@@ -26,15 +26,17 @@ public sealed class InstallLinkedWorkspaceSnapshotStore
         string tempPath = $"{_storagePath}.tmp";
         Snapshot snapshot = new(
             SnapshotsByKey.Values
-                .OrderBy(static item => item.OwnerKey, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(static item => item.WorkspaceId, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static item => item.OwnerKey, StringComparer.Ordinal)
+                .ThenBy(static item => item.WorkspaceId, StringComparer.Ordinal)
                 .ToArray());
         File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions));
         File.Move(tempPath, _storagePath, true);
     }
 
     public static string ComposeKey(string ownerKey, string workspaceId)
-        => $"{ownerKey.Trim()}|{workspaceId.Trim()}";
+        // Keys are internal only; persisted rows retain their original typed
+        // components. JSON framing avoids delimiter collisions on reload too.
+        => JsonSerializer.Serialize(new[] { ownerKey.Trim(), workspaceId.Trim() });
 
     private void Load()
     {
@@ -54,7 +56,8 @@ public sealed class InstallLinkedWorkspaceSnapshotStore
             SnapshotsByKey.Clear();
             foreach (InstallLinkedWorkspaceSnapshotRecord record in snapshot.Snapshots ?? Array.Empty<InstallLinkedWorkspaceSnapshotRecord>())
             {
-                SnapshotsByKey[ComposeKey(record.OwnerKey, record.WorkspaceId)] = record;
+                if (!SnapshotsByKey.TryAdd(ComposeKey(record.OwnerKey, record.WorkspaceId), record))
+                    throw new InvalidDataException("The workspace snapshot store contains duplicate identities.");
             }
         }
     }
@@ -92,4 +95,6 @@ public sealed record InstallLinkedWorkspaceSnapshotRecord(
     decimal Nuyen,
     bool Created,
     long RemoteRevision = 0,
-    string? ServerToken = null);
+    string? ServerToken = null,
+    JsonElement? WorkspaceSnapshot = null,
+    string? WorkspaceSnapshotDigest = null);

@@ -20,6 +20,30 @@ namespace Chummer.Tests;
 public sealed class InstallLinkedWorkspaceSnapshotTests
 {
     [Fact]
+    public void Legacy_route_carries_complete_snapshot_and_cannot_downgrade_it()
+    {
+        using Fixture fixture = new();
+        var grant = fixture.SeedClaimedInstall("ins-a", "user", "subject");
+        var transfer = InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(
+            InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot());
+        var request = new InstallLinkedWorkspaceSnapshotUpsertRequest("ins-a", grant.AccessToken,
+            transfer.WorkspaceId, transfer.RulesetId, transfer.Format, transfer.SchemaVersion,
+            transfer.PayloadKind, transfer.Payload, transfer.UpdatedAtUtc, "ins-a", "Runner", "Runner",
+            "Human", "Priority", "5", "6", 0, 0, false, ExpectedRemoteRevision: 0,
+            WorkspaceSnapshot: transfer.WorkspaceSnapshot, WorkspaceSnapshotDigest: transfer.WorkspaceSnapshotDigest);
+        var response = Assert.IsType<InstallLinkedWorkspaceSnapshotUpsertResponse>(
+            Assert.IsType<OkObjectResult>(fixture.Controller.UpsertClaimedInstallWorkspace(request).Result).Value).Snapshot;
+        Assert.Equal(transfer.WorkspaceSnapshotDigest, response.WorkspaceSnapshotDigest);
+        var list = Assert.IsType<InstallLinkedWorkspaceSnapshotListResponse>(Assert.IsType<OkObjectResult>(
+            fixture.Controller.ListClaimedInstallWorkspaces(new("ins-a", grant.AccessToken)).Result).Value);
+        Assert.Equal(transfer.WorkspaceSnapshotDigest, Assert.Single(list.Snapshots).WorkspaceSnapshotDigest);
+        var downgraded = request with { WorkspaceSnapshot = null, WorkspaceSnapshotDigest = null,
+            ExpectedRemoteRevision = response.RemoteRevision, ExpectedServerToken = response.ServerToken };
+        Assert.Equal(StatusCodes.Status409Conflict,
+            Assert.IsType<ObjectResult>(fixture.Controller.UpsertClaimedInstallWorkspace(downgraded).Result).StatusCode);
+    }
+
+    [Fact]
     public void Later_device_clock_cannot_overwrite_an_unreviewed_remote_snapshot()
     {
         using Fixture fixture = new();
