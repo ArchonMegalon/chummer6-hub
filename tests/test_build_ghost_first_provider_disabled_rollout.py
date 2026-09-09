@@ -181,8 +181,11 @@ elif a[:1] == ['inspect']:
         match=re.fullmatch(r'\{\{range \.Config.Env\}\}\{\{if eq \(printf "%\.(\d+)s" \.\) "([A-Z_]+)="\}\}entry\{\{if eq \. "\2=(false)?"\}\}match\{\{end\}\}\{\{end\}\}\{\{end\}\}',fmt)
         if not match or int(match[1])!=len(match[2])+1: die()
         variable=match[2]; expected=variable+'='+(match[3] or '')
-        values=s.get('gate_values',[expected])
+        values=s.get('gate_values_by_name',{}).get(variable,s.get('gate_values',[expected]))
         print(''.join('entry'+('match' if value==expected else '') for value in values if value.startswith(variable+'=')))
+        if s.get('environment_inspect_exit'):
+            print('synthetic-do-not-print',file=sys.stderr)
+            raise SystemExit(s['environment_inspect_exit'])
     else: die() # No Config.Env values or whole-container dump.
 elif a[:3] == ['compose','version','--short']:
     if s.get('oversized'):
@@ -484,6 +487,14 @@ def test_runtime_provider_inspection_returns_only_allowlisted_matches(tmp_path, 
         assert '}}entry{{if eq . ' in call[-1]
         assert '{{println .}}' not in call[-1]
     assert 'synthetic-do-not-print' not in result.stdout+result.stderr+fixture['log'].read_text()
+
+
+def test_runtime_provider_inspection_rejects_failed_inspect_with_matching_output(tmp_path):
+    fixture=rollback_fixture(tmp_path)
+    patch_state(fixture,environment_inspect_exit=42)
+    result=subprocess.run(['bash','-c','source "$1"\nassert_provider_disabled_runtime','fixture',str(SCRIPT_PATH)],env=fixture['env'],capture_output=True,text=True,timeout=15)
+    assert result.returncode != 0
+    assert 'synthetic-do-not-print' not in result.stdout+result.stderr
 
 
 def test_validator_ignores_ambient_python_wrapper_and_host_interpreter_selector(tmp_path):

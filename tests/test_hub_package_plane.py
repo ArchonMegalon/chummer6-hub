@@ -769,6 +769,7 @@ def test_hosted_rook_rollback_checks_require_hash_locked_system_pyyaml() -> None
     assert {line.strip().rstrip(" \\") for line in checks.splitlines() if line.strip().startswith("tests/")} == {
         "tests/test_build_ghost_first_provider_disabled_rollout.py",
         "tests/test_build_ghost_private_nonprod_attestation.py",
+        "tests/test_build_ghost_local_canary_environment.py",
     }
     commands = "\n".join(line for line in (install + checks).splitlines() if not line.strip().startswith("#"))
     for forbidden in ("continue-on-error", "|| true", "--user", "--target", "PYTHONPATH", "docker compose", "run-local-canary.sh"):

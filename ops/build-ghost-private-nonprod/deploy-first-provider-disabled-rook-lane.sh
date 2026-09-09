@@ -454,11 +454,12 @@ wait_for_health() {
 }
 
 environment_literal_matches() {
-    local container="$1" variable="$2" expected="$3" prefix_length
+    local container="$1" variable="$2" expected="$3" prefix_length markers
     prefix_length="$((${#variable} + 1))"
     # Count every assignment to the allowlisted name, not just correct values.
     # A false+true or duplicate-false pair must not pass as a single match.
-    [ "$(docker inspect "$container" --format "{{range .Config.Env}}{{if eq (printf \"%.${prefix_length}s\" .) \"$variable=\"}}entry{{if eq . \"$variable=$expected\"}}match{{end}}{{end}}{{end}}")" = entrymatch ]
+    markers="$(docker inspect "$container" --format "{{range .Config.Env}}{{if eq (printf \"%.${prefix_length}s\" .) \"$variable=\"}}entry{{if eq . \"$variable=$expected\"}}match{{end}}{{end}}{{end}}" 2>/dev/null)" || return 1
+    [ "$markers" = entrymatch ]
 }
 
 assert_provider_disabled_runtime() {

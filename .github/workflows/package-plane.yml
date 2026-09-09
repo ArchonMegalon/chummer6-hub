@@ -86,7 +86,8 @@ jobs:
             ops/build-ghost-private-nonprod/verify-prior-rollout-authority.py
           python3 -m pytest -q \
             tests/test_build_ghost_first_provider_disabled_rollout.py \
-            tests/test_build_ghost_private_nonprod_attestation.py
+            tests/test_build_ghost_private_nonprod_attestation.py \
+            tests/test_build_ghost_local_canary_environment.py
       - name: Verify release fallback trust boundaries
         shell: bash
         run: |
