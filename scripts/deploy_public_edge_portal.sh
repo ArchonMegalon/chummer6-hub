@@ -103,7 +103,7 @@ if ! SOURCE_ROOT="$("$TRUSTED_REALPATH" -e -- "$SOURCE_ROOT_INPUT")"; then
   echo "selected public edge source does not exist: $SOURCE_ROOT_INPUT" >&2
   exit 2
 fi
-CORE_RUNTIME_BUNDLE_SOURCE_INPUT="$("$TRUSTED_DIRNAME" -- "$SOURCE_ROOT")/core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a-input"
+CORE_RUNTIME_BUNDLE_SOURCE_INPUT="$("$TRUSTED_DIRNAME" -- "$SOURCE_ROOT")/core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input"
 if ! CORE_RUNTIME_BUNDLE_SOURCE="$(
   "$TRUSTED_REALPATH" -e -- "$CORE_RUNTIME_BUNDLE_SOURCE_INPUT"
 )" \
@@ -111,7 +111,7 @@ if ! CORE_RUNTIME_BUNDLE_SOURCE="$(
   echo "sealed Core runtime bundle input is missing or path-aliased" >&2
   exit 2
 fi
-HUB_PACKAGE_FEED_SOURCE_INPUT="$("$TRUSTED_DIRNAME" -- "$SOURCE_ROOT")/hub-package-feed-shfe4b2706c44d-input"
+HUB_PACKAGE_FEED_SOURCE_INPUT="$("$TRUSTED_DIRNAME" -- "$SOURCE_ROOT")/hub-package-feed-0.1.1-packageplane.20260910.1-input"
 if ! HUB_PACKAGE_FEED_SOURCE="$(
   "$TRUSTED_REALPATH" -e -- "$HUB_PACKAGE_FEED_SOURCE_INPUT"
 )" \

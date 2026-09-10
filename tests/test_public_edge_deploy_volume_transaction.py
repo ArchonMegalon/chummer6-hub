@@ -332,9 +332,9 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     for variable, directory in (
         (
             "CORE_RUNTIME_BUNDLE_SOURCE_INPUT",
-            "core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a-input",
+            "core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input",
         ),
-        ("HUB_PACKAGE_FEED_SOURCE_INPUT", "hub-package-feed-shfe4b2706c44d-input"),
+        ("HUB_PACKAGE_FEED_SOURCE_INPUT", "hub-package-feed-0.1.1-packageplane.20260910.1-input"),
     ):
         input_root = tmp_path / "default-authority-inputs" / directory
         input_root.mkdir(parents=True)
@@ -867,9 +867,9 @@ def make_fake_authority_source(
     source = tmp_path / "source"
     (
         tmp_path
-        / "core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a-input"
+        / "core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input"
     ).mkdir()
-    (tmp_path / "hub-package-feed-shfe4b2706c44d-input").mkdir()
+    (tmp_path / "hub-package-feed-0.1.1-packageplane.20260910.1-input").mkdir()
     (source / "scripts").mkdir(parents=True)
     (source / "Chummer.Run.Api").mkdir()
     (source / "docker-compose.public-edge.yml").write_text(
@@ -1305,11 +1305,11 @@ def test_fake_daemon_rejects_restart_policy_for_auto_remove_candidate(
     ("directory", "message"),
     (
         (
-            "core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a-input",
+            "core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input",
             "sealed Core runtime bundle input is missing or path-aliased",
         ),
         (
-            "hub-package-feed-shfe4b2706c44d-input",
+            "hub-package-feed-0.1.1-packageplane.20260910.1-input",
             "sealed Hub package feed input is missing or path-aliased",
         ),
     ),
