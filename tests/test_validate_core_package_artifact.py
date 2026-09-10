@@ -19,12 +19,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "validate-core-package-artifact.py"
-SELECTED_CORE_COMMIT = "f7500ef8c2f597bac67bc3f53620d50b7a17d00a"
+SELECTED_CORE_COMMIT = "b32ee7d37b539cf21a51e9220ff76bffe37a67a4"
 SELECTED_CORE_LOCK_PATH = (
     ROOT / "tests" / "fixtures" / f"core-runtime-package-plane.{SELECTED_CORE_COMMIT[:12]}.lock.json"
 )
 SELECTED_CORE_LOCK_SHA256 = (
-    "570caae0fb9f376fa8afb420fb7357bbb01f4a13cbb29e8510a29cd65b49708e"
+    "bf3bafeb730d3ac327ba80edbf6e224fcfc1601394611f8a1a4a7ce5b036a9a7"
 )
 SELECTED_CORE_LOCK_BYTES = SELECTED_CORE_LOCK_PATH.read_bytes()
 if hashlib.sha256(SELECTED_CORE_LOCK_BYTES).hexdigest() != SELECTED_CORE_LOCK_SHA256:
@@ -469,6 +469,10 @@ def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> N
     fixture = build_fixture(tmp_path)
 
     assert fixture.lock == SELECTED_CORE_LOCK
+    assert SOURCE_COMMIT == module.RUNTIME_SOURCE_COMMIT == SELECTED_CORE_COMMIT
+    assert PACKAGE_VERSION == module.RUNTIME_PACKAGE_VERSION == (
+        "0.0.0-packageplane.candidate.shb32ee7d37b539"
+    )
     assert SELECTED_CORE_LOCK_SHA256 == digest(SELECTED_CORE_LOCK_BYTES)
     assert tuple(SELECTED_CORE_LOCK["allowed_recipe_delta"]) == (
         module.EXPECTED_ALLOWED_RECIPE_DELTA
@@ -565,7 +569,7 @@ def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> N
 def test_sealed_public_handoff_recipe_has_no_additive_policy_profile() -> None:
     module = load_module()
     assert module.PUBLIC_HANDOFF_RECIPE_COMMIT == (
-        "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a"
+        "b0fbae73f952bb417f9b790cd743c59db1b9ad7f"
     )
     assert module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA == (
         module.EXPECTED_ALLOWED_RECIPE_DELTA
@@ -573,6 +577,25 @@ def test_sealed_public_handoff_recipe_has_no_additive_policy_profile() -> None:
     assert module.PUBLIC_HANDOFF_BUILD_AUTHORITY_PATHS == (
         module.EXPECTED_BUILD_AUTHORITY_PATHS
     )
+
+
+@pytest.mark.parametrize(
+    ("field", "historical_value"),
+    [
+        ("runtime_source_commit", "f7500ef8c2f597bac67bc3f53620d50b7a17d00a"),
+        ("runtime_package_version", "0.0.0-packageplane.candidate.shf7500ef8c2f59"),
+    ],
+)
+def test_historical_runtime_authority_cannot_replace_current_policy(
+    tmp_path: Path, field: str, historical_value: str
+) -> None:
+    module = load_module()
+    fixture = build_fixture(tmp_path)
+    fixture.authority[field] = historical_value
+    write_json(fixture.authority_path, fixture.authority)
+
+    with pytest.raises(module.ArtifactValidationError, match=field + " differs"):
+        module.load_authority(fixture.authority_path)
 
 
 @pytest.mark.parametrize(

@@ -29,21 +29,21 @@ CORE_RUNTIME_BUNDLE = (
             "CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE",
             str(
                 ROOT.parent
-                / "core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a-input"
+                / "core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input"
             ),
         )
     )
     /
-    "chummer-core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip"
+    "chummer-core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f.zip"
 )
-PACKAGE_VERSION = "0.1.0-packageplane.candidate.shfe4b2706c44d"
+PACKAGE_VERSION = "0.1.1-packageplane.20260910.1"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shf7500ef8c2f59",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shb32ee7d37b539",
     "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
     "Chummer.Run.Registry": PACKAGE_VERSION,
     "Chummer.Play.Contracts": PACKAGE_VERSION,
     "Chummer.Run.Contracts": PACKAGE_VERSION,
-    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shf7500ef8c2f59",
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shb32ee7d37b539",
 }
 CORE_RUNTIME_PACKAGE_IDS = {
     "Chummer.Engine.Contracts",
@@ -174,13 +174,13 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
         "Chummer.Engine.GmCharacterEdits",
     ]
     assert lock.core_runtime.package_version == (
-        "0.0.0-packageplane.candidate.shf7500ef8c2f59"
+        "0.0.0-packageplane.candidate.shb32ee7d37b539"
     )
     assert lock.core_runtime.runtime_source_commit == (
-        "f7500ef8c2f597bac67bc3f53620d50b7a17d00a"
+        "b32ee7d37b539cf21a51e9220ff76bffe37a67a4"
     )
     assert lock.core_runtime.package_recipe_commit == (
-        "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a"
+        "b0fbae73f952bb417f9b790cd743c59db1b9ad7f"
     )
     assert all(len(spec.commit) == 40 for spec in lock.packages)
     assert {spec.package_id: spec.version for spec in lock.packages} == {
@@ -948,9 +948,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert (
         "COPY --from=core-runtime-bundle "
         "chummer-core-runtime-package-plane-"
-        "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip "
+        "b0fbae73f952bb417f9b790cd743c59db1b9ad7f.zip "
         "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
-        "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip"
+        "b0fbae73f952bb417f9b790cd743c59db1b9ad7f.zip"
     ) in dockerfile
     assert (
         "COPY --from=hub-package-feed-input . /opt/chummer-package-feed"
@@ -1065,9 +1065,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         lambda text: text.replace(
             "COPY --from=core-runtime-bundle "
             "chummer-core-runtime-package-plane-"
-            "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip "
+            "b0fbae73f952bb417f9b790cd743c59db1b9ad7f.zip "
             "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
-            "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip\n",
+            "b0fbae73f952bb417f9b790cd743c59db1b9ad7f.zip\n",
             "",
             1,
         ),
