@@ -737,10 +737,17 @@ public sealed class InstallLinkingController : ControllerBase
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "installation grant is unknown or expired.");
         }
 
-        InstallLinkedWorkspaceSnapshotDto[] snapshots = _workspaceSnapshots.ListForInstallation(installation)
-            .Select(static snapshot => ToSnapshotDto(snapshot))
-            .ToArray();
-        return Ok(new InstallLinkedWorkspaceSnapshotListResponse(snapshots));
+        try
+        {
+            InstallLinkedWorkspaceSnapshotDto[] snapshots = _workspaceSnapshots.ListForInstallation(installation)
+                .Select(static snapshot => ToSnapshotDto(snapshot))
+                .ToArray();
+            return Ok(new InstallLinkedWorkspaceSnapshotListResponse(snapshots));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost("continuation/workspaces/upsert")]
@@ -782,7 +789,13 @@ public sealed class InstallLinkingController : ControllerBase
                     AppVersion: request.AppVersion,
                     Karma: request.Karma,
                     Nuyen: request.Nuyen,
-                    Created: request.Created));
+                    Created: request.Created,
+                    WorkspaceSnapshot: request.WorkspaceSnapshot,
+                    WorkspaceSnapshotDigest: request.WorkspaceSnapshotDigest,
+                    WorkspaceContinuation: request.WorkspaceContinuation,
+                    WorkspaceContinuationDigest: request.WorkspaceContinuationDigest),
+                request.ExpectedRemoteRevision,
+                request.ExpectedServerToken);
             return Ok(new InstallLinkedWorkspaceSnapshotUpsertResponse(ToSnapshotDto(stored)));
         }
         catch (InstallLinkingOperationException ex)
@@ -2582,7 +2595,13 @@ public sealed class InstallLinkingController : ControllerBase
                 AppVersion: snapshot.AppVersion ?? snapshot.RulesetId,
                 Karma: snapshot.Karma,
                 Nuyen: snapshot.Nuyen,
-                Created: snapshot.Created));
+                Created: snapshot.Created),
+            RemoteRevision: snapshot.RemoteRevision,
+            ServerToken: snapshot.ServerToken,
+            WorkspaceSnapshot: snapshot.WorkspaceSnapshot,
+            WorkspaceSnapshotDigest: snapshot.WorkspaceSnapshotDigest,
+            WorkspaceContinuation: snapshot.WorkspaceContinuation,
+            WorkspaceContinuationDigest: snapshot.WorkspaceContinuationDigest);
 
 }
 
@@ -2786,7 +2805,13 @@ public sealed record InstallLinkedWorkspaceSnapshotUpsertRequest(
     string? AppVersion,
     decimal Karma,
     decimal Nuyen,
-    bool Created);
+    bool Created,
+    long? ExpectedRemoteRevision = null,
+    string? ExpectedServerToken = null,
+    JsonElement? WorkspaceSnapshot = null,
+    string? WorkspaceSnapshotDigest = null,
+    JsonElement? WorkspaceContinuation = null,
+    string? WorkspaceContinuationDigest = null);
 
 public sealed record InstallLinkedWorkspaceSnapshotUpsertResponse(
     InstallLinkedWorkspaceSnapshotDto Snapshot);
@@ -2800,4 +2825,10 @@ public sealed record InstallLinkedWorkspaceSnapshotDto(
     string Payload,
     DateTimeOffset UpdatedAtUtc,
     string? OriginInstallationId,
-    CharacterFileSummary Summary);
+    CharacterFileSummary Summary,
+    long RemoteRevision = 0,
+    string? ServerToken = null,
+    JsonElement? WorkspaceSnapshot = null,
+    string? WorkspaceSnapshotDigest = null,
+    JsonElement? WorkspaceContinuation = null,
+    string? WorkspaceContinuationDigest = null);

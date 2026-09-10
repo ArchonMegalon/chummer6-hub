@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Chummer.Contracts.Workspaces;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -16,6 +18,308 @@ namespace Chummer.Tests;
 
 public sealed class AndroidLinkedV2BearerProofTests
 {
+    private static readonly JsonSerializerOptions ContinuationWebJson = new(JsonSerializerDefaults.Web);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_route_preserves_full_workspace_or_rejects_bad_digest(bool corrupt)
+    {
+        using Fixture fixture = new();
+        var core = InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot();
+        var transfer = InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(core);
+        var request = new AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
+            "android-v2", transfer.WorkspaceId, transfer.RulesetId, transfer.Format, transfer.SchemaVersion,
+            transfer.PayloadKind, transfer.Payload, transfer.UpdatedAtUtc, "android-v2", "Runner", "Runner",
+            "Human", "Priority", "5", "6", 0, 0, false, ExpectedRemoteRevision: 0,
+            WorkspaceSnapshot: transfer.WorkspaceSnapshot,
+            WorkspaceSnapshotDigest: corrupt ? new string('f', 64) : transfer.WorkspaceSnapshotDigest);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        string body = JsonSerializer.Serialize(request, options);
+        var context = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body).CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var result = Assert.IsAssignableFrom<ObjectResult>(controller.UpsertClaimedInstallWorkspace(
+                JsonSerializer.Deserialize<AndroidLinkedV2WorkspaceSnapshotUpsertRequest>(body, options)).Result);
+            Assert.Equal(corrupt ? StatusCodes.Status400BadRequest : StatusCodes.Status200OK, result.StatusCode);
+            if (!corrupt)
+            {
+                var wire = JsonSerializer.Deserialize<InstallLinkedWorkspaceSnapshotUpsertResponse>(
+                    JsonSerializer.Serialize(result.Value, options), options)!.Snapshot;
+                Assert.Equal(transfer.WorkspaceSnapshotDigest, wire.WorkspaceSnapshotDigest);
+                Assert.Equal(core.Document.AuxiliaryStateDigest,
+                    InstallLinkedWorkspaceSnapshotTransfer.Decode(wire.WorkspaceSnapshot!.Value).Document.AuxiliaryStateDigest);
+                Assert.Equal(1, wire.RemoteRevision);
+            }
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        var visible = fixture.WorkspaceSnapshots.ListForInstallation(fixture.Store.InstallationsById["android-v2"]);
+        if (corrupt) Assert.Empty(visible);
+        else Assert.Equal(transfer.WorkspaceSnapshotDigest, Assert.Single(visible).WorkspaceSnapshotDigest);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_full_continuation_survives_upsert_and_authenticated_cold_list(bool includeProjection)
+    {
+        using Fixture fixture = new();
+        // These are complete transport claims, not proof of mechanically valid
+        // creation/GM history or permission to restore them into a Core store.
+        var full = InstallLinkedWorkspaceSnapshotTransferTests.SampleContinuation("subject-v2");
+        Assert.Equal("install-account-v1:" + Convert.ToHexStringLower(SHA256.HashData(
+            new UTF8Encoding(false, true).GetBytes("chummer-install-account-owner-v1\0subject-v2"))), full.OwnerId);
+        Assert.Equal(2, full.DelegatedGmCharacterEdits.Count);
+        Assert.Equal(new[] { 1 }, full.DelegatedGmHistorySegmentStarts);
+        Assert.NotNull(full.Workspace.Document.AuxiliaryState.CharacterCreationFinalizationArchive);
+        var request = ContinuationRequest(full, includeProjection);
+
+        var stored = (await SendContinuationUpsertAsync(fixture, request, StatusCodes.Status200OK))!;
+        Assert.Equal(1, stored.RemoteRevision);
+        Assert.Matches("^[0-9a-f]{64}$", stored.ServerToken!);
+        Assert.Equal(includeProjection, stored.WorkspaceSnapshot is not null);
+        AssertFullContinuation(full, stored);
+
+        string body = JsonSerializer.Serialize(new AndroidLinkedV2GrantRequest("android-v2"), ContinuationWebJson);
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/list", body);
+        var context = signed.CreateContext();
+        bool dispatched = false;
+        InstallLinkedWorkspaceSnapshotDto? listed = null;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            // A fresh workspace store forces the controller projection through
+            // the actual durable full-envelope decode, not an in-memory echo.
+            var controller = new InstallLinkingV2Controller(fixture.Service,
+                fixture.CreateColdWorkspaceSnapshots(), fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var action = controller.ListClaimedInstallWorkspaces(
+                JsonSerializer.Deserialize<AndroidLinkedV2GrantRequest>(signed.Body, ContinuationWebJson));
+            var response = Assert.IsType<OkObjectResult>(action.Result);
+            string json = JsonSerializer.Serialize(response.Value, ContinuationWebJson);
+            AssertNoProofMaterial(json, signed);
+            var wire = JsonSerializer.Deserialize<InstallLinkedWorkspaceSnapshotListResponse>(json, ContinuationWebJson)!;
+            listed = Assert.Single(wire.Snapshots);
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        Assert.NotNull(listed);
+        Assert.Equal(stored.RemoteRevision, listed.RemoteRevision);
+        Assert.Equal(stored.ServerToken, listed.ServerToken);
+        AssertFullContinuation(full, listed);
+        Assert.True(JsonElement.DeepEquals(request.WorkspaceContinuation!.Value, listed.WorkspaceContinuation!.Value));
+    }
+
+    [Theory]
+    [InlineData("foreign-subject")]
+    [InlineData("subject-case")]
+    [InlineData("outer-digest")]
+    [InlineData("envelope-digest")]
+    public async Task Signed_v2_full_continuation_rejects_wrong_owner_or_digest_without_storing(string corruption)
+    {
+        using Fixture fixture = new();
+        var full = InstallLinkedWorkspaceSnapshotTransferTests.SampleContinuation(corruption switch
+        {
+            "foreign-subject" => "foreign-subject",
+            "subject-case" => "Subject-v2",
+            _ => "subject-v2"
+        });
+        var request = ContinuationRequest(full);
+        if (corruption == "outer-digest") request = request with { WorkspaceContinuationDigest = new string('f', 64) };
+        if (corruption == "envelope-digest")
+        {
+            JsonNode envelope = JsonNode.Parse(request.WorkspaceContinuation!.Value.GetRawText())!;
+            envelope["SnapshotDigest"] = new string('f', 64);
+            request = request with { WorkspaceContinuation = JsonSerializer.SerializeToElement(envelope) };
+        }
+
+        Assert.Null(await SendContinuationUpsertAsync(fixture, request, StatusCodes.Status400BadRequest));
+
+        var installation = fixture.Store.InstallationsById["android-v2"];
+        Assert.Empty(fixture.WorkspaceSnapshots.ListForInstallation(installation));
+        Assert.Empty(fixture.CreateColdWorkspaceSnapshots().ListForInstallation(installation));
+    }
+
+    [Fact]
+    public async Task V2_proof_rejects_a_resealed_full_continuation_body_with_the_original_signature()
+    {
+        using Fixture fixture = new();
+        var original = InstallLinkedWorkspaceSnapshotTransferTests.SampleContinuation("subject-v2");
+        string body = JsonSerializer.Serialize(ContinuationRequest(original), ContinuationWebJson);
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body);
+        var changed = original with { Workspace = original.Workspace with
+        {
+            LastUpdatedUtc = original.Workspace.LastUpdatedUtc.AddSeconds(1)
+        } };
+        var changedRequest = ContinuationRequest(changed);
+        string changedBody = JsonSerializer.Serialize(changedRequest, ContinuationWebJson);
+        Assert.NotEqual(body, changedBody);
+        // The tampered envelope has a correct NEW Core digest and matching
+        // metadata. Only the old device signature is invalid for these bytes.
+        var context = (signed with { Body = Encoding.UTF8.GetBytes(changedBody) }).CreateContext();
+        bool dispatched = false;
+
+        await fixture.InvokeAsync(context, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        AssertNoProofMaterial(await ReadResponseAsync(context), signed);
+        AssertNoProofMaterial(changedBody, signed);
+        Assert.Empty(fixture.CreateColdWorkspaceSnapshots().ListForInstallation(
+            fixture.Store.InstallationsById["android-v2"]));
+        // A fresh valid proof admits the otherwise unchanged replacement body.
+        var accepted = (await SendContinuationUpsertAsync(fixture, changedRequest, StatusCodes.Status200OK))!;
+        AssertFullContinuation(changed, accepted);
+    }
+
+    private static AndroidLinkedV2WorkspaceSnapshotUpsertRequest ContinuationRequest(
+        WorkspaceContinuationSnapshot full, bool includeProjection = false)
+    {
+        var transfer = InstallLinkedWorkspaceSnapshotTransferTests.ToContinuationRecord(full, includeProjection);
+        return new("android-v2", transfer.WorkspaceId, transfer.RulesetId, transfer.Format, transfer.SchemaVersion,
+            transfer.PayloadKind, transfer.Payload, transfer.UpdatedAtUtc, "android-v2", transfer.Name, transfer.Alias,
+            transfer.Metatype, transfer.BuildMethod, transfer.CreatedVersion, transfer.AppVersion,
+            transfer.Karma, transfer.Nuyen, transfer.Created, ExpectedRemoteRevision: 0,
+            WorkspaceSnapshot: transfer.WorkspaceSnapshot, WorkspaceSnapshotDigest: transfer.WorkspaceSnapshotDigest,
+            WorkspaceContinuation: transfer.WorkspaceContinuation, WorkspaceContinuationDigest: transfer.WorkspaceContinuationDigest);
+    }
+
+    private static async Task<InstallLinkedWorkspaceSnapshotDto?> SendContinuationUpsertAsync(
+        Fixture fixture, AndroidLinkedV2WorkspaceSnapshotUpsertRequest request, int expectedStatus)
+    {
+        string body = JsonSerializer.Serialize(request, ContinuationWebJson);
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body);
+        AssertNoProofMaterial(body, signed);
+        var context = signed.CreateContext();
+        bool dispatched = false;
+        InstallLinkedWorkspaceSnapshotDto? stored = null;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var action = controller.UpsertClaimedInstallWorkspace(
+                JsonSerializer.Deserialize<AndroidLinkedV2WorkspaceSnapshotUpsertRequest>(signed.Body, ContinuationWebJson));
+            var result = Assert.IsAssignableFrom<ObjectResult>(action.Result);
+            Assert.Equal(expectedStatus, result.StatusCode);
+            string json = JsonSerializer.Serialize(result.Value, ContinuationWebJson);
+            AssertNoProofMaterial(json, signed);
+            if (expectedStatus == StatusCodes.Status200OK)
+                stored = JsonSerializer.Deserialize<InstallLinkedWorkspaceSnapshotUpsertResponse>(json, ContinuationWebJson)!.Snapshot;
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        return stored;
+    }
+
+    private static void AssertFullContinuation(WorkspaceContinuationSnapshot expected, InstallLinkedWorkspaceSnapshotDto wire)
+    {
+        Assert.NotNull(wire.WorkspaceContinuation);
+        Assert.Equal(WorkspaceContinuationSnapshotDigest.Compute(expected), wire.WorkspaceContinuationDigest);
+        Assert.True(WorkspaceContinuationCodec.TryDecodeCandidate(
+            Encoding.UTF8.GetBytes(wire.WorkspaceContinuation!.Value.GetRawText()),
+            InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes, out var decoded));
+        Assert.Equal(wire.WorkspaceContinuationDigest, decoded!.SnapshotDigest);
+        Assert.Equal(expected.OwnerId, decoded.Snapshot.OwnerId);
+        Assert.Equal(expected.Workspace.ContentRevision, decoded.Snapshot.Workspace.ContentRevision);
+        Assert.Equal(expected.Workspace.SavedRevision, decoded.Snapshot.Workspace.SavedRevision);
+        Assert.Equal(expected.DelegatedGmHistorySegmentStarts, decoded.Snapshot.DelegatedGmHistorySegmentStarts);
+        Assert.Equal(JsonSerializer.Serialize(expected.DelegatedGmCharacterEdits),
+            JsonSerializer.Serialize(decoded.Snapshot.DelegatedGmCharacterEdits));
+        Assert.Equal(expected.Workspace.Document.AuxiliaryStateDigest, decoded.Snapshot.Workspace.Document.AuxiliaryStateDigest);
+        // Compare the complete typed content, not dictionary insertion order:
+        // the Core wire codec canonicalizes object properties before transport.
+        Assert.True(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(expected),
+            JsonSerializer.SerializeToElement(decoded.Snapshot)));
+    }
+
+    private static void AssertNoProofMaterial(string json, SignedRequest signed)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        Visit(document.RootElement);
+        void Visit(JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                foreach (JsonProperty property in element.EnumerateObject())
+                {
+                    Assert.False(property.Name.Equals("accessToken", StringComparison.OrdinalIgnoreCase)
+                        || property.Name.Equals("authorization", StringComparison.OrdinalIgnoreCase)
+                        || property.Name.Equals("signature", StringComparison.OrdinalIgnoreCase)
+                        || property.Name.Equals("packetKey", StringComparison.OrdinalIgnoreCase));
+                    Visit(property.Value);
+                }
+            }
+            else if (element.ValueKind == JsonValueKind.Array)
+                foreach (JsonElement value in element.EnumerateArray()) Visit(value);
+            else if (element.ValueKind == JsonValueKind.String)
+            {
+                string value = element.GetString()!;
+                Assert.DoesNotContain(signed.AccessToken, value, StringComparison.Ordinal);
+                Assert.DoesNotContain(signed.Signature, value, StringComparison.Ordinal);
+                Assert.DoesNotContain(signed.PacketKey, value, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("stale")]
+    [InlineData("wrong-token")]
+    public async Task Authenticated_workspace_updates_require_exact_remote_authority(string conflict)
+    {
+        using Fixture fixture = new();
+        var request = new AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
+            "android-v2", "ws-http-cas", "sr5", "NativeXml", 1, "workspace", "<character/>",
+            fixture.TimeProvider.GetUtcNow(), "android-v2", "Runner", "Runner", "Human", "Priority",
+            "5", "6", 0, 0, false, ExpectedRemoteRevision: 0);
+        async Task<InstallLinkedWorkspaceSnapshotDto?> Send(AndroidLinkedV2WorkspaceSnapshotUpsertRequest value, int status)
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            string body = JsonSerializer.Serialize(value, options);
+            var signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body, Guid.NewGuid().ToString("N"));
+            var context = signed.CreateContext();
+            InstallLinkedWorkspaceSnapshotDto? snapshot = null;
+            bool dispatched = false;
+            await fixture.InvokeAsync(context, httpContext =>
+            {
+                dispatched = true;
+                var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+                { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+                var action = controller.UpsertClaimedInstallWorkspace(
+                    JsonSerializer.Deserialize<AndroidLinkedV2WorkspaceSnapshotUpsertRequest>(body, options));
+                var response = Assert.IsAssignableFrom<ObjectResult>(action.Result);
+                Assert.Equal(status, response.StatusCode);
+                if (status == StatusCodes.Status200OK)
+                    snapshot = Assert.IsType<InstallLinkedWorkspaceSnapshotUpsertResponse>(response.Value).Snapshot;
+            });
+            Assert.True(dispatched);
+            Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+            return snapshot;
+        }
+        var first = (await Send(request, StatusCodes.Status200OK))!;
+        Assert.Equal(1, first.RemoteRevision);
+        Assert.Matches("^[0-9a-f]{64}$", first.ServerToken!);
+        request = request with { Payload = "<character><name>reviewed</name></character>",
+            ExpectedRemoteRevision = first.RemoteRevision, ExpectedServerToken = first.ServerToken };
+        var second = (await Send(request, StatusCodes.Status200OK))!;
+        Assert.Equal(2, second.RemoteRevision);
+        Assert.NotEqual(first.ServerToken, second.ServerToken);
+        var denied = request with { Payload = "<character><name>not reviewed</name></character>",
+            UpdatedAtUtc = request.UpdatedAtUtc.AddDays(1) };
+        if (conflict == "missing") denied = denied with { ExpectedRemoteRevision = null, ExpectedServerToken = null };
+        if (conflict == "wrong-token") denied = denied with
+            { ExpectedRemoteRevision = second.RemoteRevision, ExpectedServerToken = new string('0', 64) };
+        await Send(denied, conflict == "missing" ? StatusCodes.Status428PreconditionRequired : StatusCodes.Status409Conflict);
+        Assert.Equal(second.Payload, Assert.Single(fixture.WorkspaceSnapshots.ListForInstallation(
+            fixture.Store.InstallationsById["android-v2"])).Payload);
+    }
+
     [Theory]
     [InlineData("subject", false)]
     [InlineData("user", false)]
@@ -1261,7 +1565,7 @@ public sealed class AndroidLinkedV2BearerProofTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking-store.json"),
-                    ["CHUMMER_INSTALL_LINKED_WORKSPACE_STORE_PATH"] = Path.Combine(_root, "workspace-store.json")
+                    ["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"] = Path.Combine(_root, "workspace-store.json")
                 })
                 .Build();
             _protection = DataProtectionProvider.Create(Path.Combine(_root, "keys"));
@@ -1327,6 +1631,9 @@ public sealed class AndroidLinkedV2BearerProofTests
 
         public InstallLinkingService CreateSharedService()
             => new(_store, _configuration);
+
+        public InstallLinkedWorkspaceSnapshotService CreateColdWorkspaceSnapshots()
+            => new(new InstallLinkedWorkspaceSnapshotStore(_configuration));
 
         public SignedRequest Sign(
             string path,

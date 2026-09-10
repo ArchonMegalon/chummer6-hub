@@ -61,14 +61,14 @@ def rendered_compose(
             "additional_contexts": {
                 "core-runtime-bundle": str(
                     source_root.parent
-                    / "core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160-input"
+                    / "core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a-input"
                 ),
                 "run-services-source": str(source_root),
                 "hub-registry-source": (
                     "/docker/chummercomplete/chummer-hub-registry"
                 ),
                 "hub-package-feed-input": str(
-                    source_root.parent / "hub-package-feed-sh1852ea4eef6d-input"
+                    source_root.parent / "hub-package-feed-shfe4b2706c44d-input"
                 ),
                 "fleet-media-factory-contracts": (
                     "/docker/fleet/repos/chummer-media-factory/src/"

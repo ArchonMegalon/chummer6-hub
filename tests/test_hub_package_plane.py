@@ -29,21 +29,21 @@ CORE_RUNTIME_BUNDLE = (
             "CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE",
             str(
                 ROOT.parent
-                / "core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160-input"
+                / "core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a-input"
             ),
         )
     )
     /
-    "chummer-core-runtime-package-plane-1d8cf694d0412b3bd9f4a241fb95244fad341160.zip"
+    "chummer-core-runtime-package-plane-2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip"
 )
-PACKAGE_VERSION = "0.1.0-packageplane.candidate.sh1852ea4eef6d"
+PACKAGE_VERSION = "0.1.0-packageplane.candidate.shfe4b2706c44d"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh880e5df8ace98",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.shf7500ef8c2f59",
     "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
     "Chummer.Run.Registry": PACKAGE_VERSION,
     "Chummer.Play.Contracts": PACKAGE_VERSION,
     "Chummer.Run.Contracts": PACKAGE_VERSION,
-    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sh880e5df8ace98",
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.shf7500ef8c2f59",
 }
 CORE_RUNTIME_PACKAGE_IDS = {
     "Chummer.Engine.Contracts",
@@ -130,6 +130,29 @@ def _parent_map(root: ElementTree.Element) -> dict[ElementTree.Element, ElementT
     return {child: parent for parent in root.iter() for child in parent}
 
 
+def test_hosted_api_suite_includes_every_focused_android_linked_test() -> None:
+    focused_path = ROOT / "Chummer.Tests/Chummer.Tests.csproj"
+    focused = ElementTree.parse(focused_path).getroot()
+    focused_groups = [
+        group for group in focused.findall("ItemGroup")
+        if group.attrib.get("Condition") == "'$(RunAndroidLinkedV2BearerProofTestsOnly)' == 'true'"
+    ]
+    assert len(focused_groups) == 1
+    expected = {
+        (focused_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for item in focused_groups[0].findall("Compile")
+    }
+    assert expected
+    hosted_path = ROOT / "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj"
+    hosted = ElementTree.parse(hosted_path).getroot()
+    included = {
+        (hosted_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for group in hosted.findall("ItemGroup") if "Condition" not in group.attrib
+        for item in group.findall("Compile") if "Condition" not in item.attrib
+    }
+    assert expected <= included, f"Focused linked tests missing from hosted suite: {expected - included}"
+
+
 def test_lock_pins_exact_owner_commits_and_package_version() -> None:
     module = load_module()
     lock = module.load_lock(LOCK_PATH)
@@ -151,13 +174,13 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
         "Chummer.Engine.GmCharacterEdits",
     ]
     assert lock.core_runtime.package_version == (
-        "0.0.0-packageplane.candidate.sh880e5df8ace98"
+        "0.0.0-packageplane.candidate.shf7500ef8c2f59"
     )
     assert lock.core_runtime.runtime_source_commit == (
-        "880e5df8ace981e9a60264d835329dd32f54a158"
+        "f7500ef8c2f597bac67bc3f53620d50b7a17d00a"
     )
     assert lock.core_runtime.package_recipe_commit == (
-        "1d8cf694d0412b3bd9f4a241fb95244fad341160"
+        "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a"
     )
     assert all(len(spec.commit) == 40 for spec in lock.packages)
     assert {spec.package_id: spec.version for spec in lock.packages} == {
@@ -925,9 +948,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert (
         "COPY --from=core-runtime-bundle "
         "chummer-core-runtime-package-plane-"
-        "1d8cf694d0412b3bd9f4a241fb95244fad341160.zip "
+        "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip "
         "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
-        "1d8cf694d0412b3bd9f4a241fb95244fad341160.zip"
+        "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip"
     ) in dockerfile
     assert (
         "COPY --from=hub-package-feed-input . /opt/chummer-package-feed"
@@ -1042,9 +1065,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         lambda text: text.replace(
             "COPY --from=core-runtime-bundle "
             "chummer-core-runtime-package-plane-"
-            "1d8cf694d0412b3bd9f4a241fb95244fad341160.zip "
+            "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip "
             "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
-            "1d8cf694d0412b3bd9f4a241fb95244fad341160.zip\n",
+            "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip\n",
             "",
             1,
         ),

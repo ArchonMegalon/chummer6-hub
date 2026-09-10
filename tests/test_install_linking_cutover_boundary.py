@@ -224,34 +224,34 @@ def build_info(tmp_path: Path) -> Path:
                 "dockerfileSha256": "e" * 64,
                 "coreRuntimeBundleFileName": (
                     "chummer-core-runtime-package-plane-"
-                    "1d8cf694d0412b3bd9f4a241fb95244fad341160.zip"
+                    "2c7f566dfbedddaa4e4b15c975b1e17e6f14990a.zip"
                 ),
                 "coreRuntimeBundlePathSha256": "1" * 64,
                 "coreRuntimeBundleSha256": (
-                    "40b257a9f9ac0abcb6508914eafb370d17bc1a208cde783ce088cb338d41d21b"
+                    "07c001d96084038cc241584c57242eaa5db6c70105e05d237e7a2b0e79fb0ade"
                 ),
-                "coreRuntimeBundleSizeBytes": 3228507,
+                "coreRuntimeBundleSizeBytes": 3313094,
                 "externalMediaProjectSha256": "f" * 64,
                 "externalMediaRestoreIsSdkOnly": True,
                 "hubPackageFeedInputs": {
-                    "Chummer.Hub.Registry.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
-                        "sha256": "89ca9f9f6069bdf1bbbb2aa9fc16a9c3b29e13f64a896be53027e42a682447d7",
+                    "Chummer.Hub.Registry.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": {
+                        "sha256": "d92b67f9095a0c979746bc36abe60e9aae1b7335f97b456292e77269df366446",
                         "sizeBytes": 524842,
                     },
-                    "Chummer.Play.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
-                        "sha256": "5203d7fb49d435c61ef81695d147e21472cf15e39595a78fa6db44f9fc876ba4",
+                    "Chummer.Play.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": {
+                        "sha256": "595a1a942e62160aa9d4f0cdc353e5488dcbdfeb1f715077a1359cf47e00f60f",
                         "sizeBytes": 322544,
                     },
-                    "Chummer.Run.Contracts.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
-                        "sha256": "50b7307ea03ecc4f203e7fdd223cd3c699548baf3cc51d7bf1314e7d422b0813",
+                    "Chummer.Run.Contracts.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": {
+                        "sha256": "238a9a07b457fc436a4549f42470198cd5b85c3e5a5e8912208c0751defa0976",
                         "sizeBytes": 1838984,
                     },
-                    "Chummer.Run.Registry.0.1.0-packageplane.candidate.sh1852ea4eef6d.nupkg": {
-                        "sha256": "da046c289f33fb3910db0fa2d54d7dd28e21862f9e81bdbcc0feba5a3ee9381c",
+                    "Chummer.Run.Registry.0.1.0-packageplane.candidate.shfe4b2706c44d.nupkg": {
+                        "sha256": "903c8f40b82d0f3a2445c296b5245ed8b03b342eb3e695d480446b29bf91e5e7",
                         "sizeBytes": 345296,
                     },
                     "chummer-hub-packages.inventory.json": {
-                        "sha256": "18a9dc73d8a150d3d9d8fa900b3b819bf0a7269351e8fcc3274b9bb73f65b30d",
+                        "sha256": "4ea0741fdefdecec00646a6af3d030fb0e38bbffa66a5fbbe4df8c6e6082e1af",
                         "sizeBytes": 2396,
                     },
                 },

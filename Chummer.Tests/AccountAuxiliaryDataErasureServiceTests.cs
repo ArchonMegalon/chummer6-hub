@@ -16,6 +16,27 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
     private static readonly DateTimeOffset Baseline = new(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Workspace_erasure_preserves_differently_cased_opaque_account_ids()
+    {
+        using Fixture fixture = new();
+        foreach (string owner in new[] { "subject:Subject", "subject:subject", "user:User", "user:user" })
+        {
+            var record = InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(
+                InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot()) with { OwnerKey = owner };
+            fixture.InstallSnapshots.SnapshotsByKey.Add(
+                InstallLinkedWorkspaceSnapshotStore.ComposeKey(owner, record.WorkspaceId), record);
+        }
+        fixture.InstallSnapshots.PersistLocked();
+        var result = fixture.Service.Erase("User", "Subject");
+        Assert.Equal(2, result.RecordsRemovedByComponent["install_workspace_snapshots"]);
+        Assert.Equal(new[] { "subject:subject", "user:user" }, fixture.InstallSnapshots.SnapshotsByKey.Values
+            .Select(static r => r.OwnerKey).OrderBy(static id => id, StringComparer.Ordinal));
+        var reloaded = new InstallLinkedWorkspaceSnapshotStore(fixture.Configuration);
+        Assert.Equal(2, reloaded.SnapshotsByKey.Count);
+        Assert.Equal(0, fixture.Service.Erase("User", "Subject").RecordsRemovedByComponent["install_workspace_snapshots"]);
+    }
+
+    [Fact]
     public void Erase_removes_account_data_from_auxiliary_first_party_stores()
     {
         using Fixture fixture = new();
@@ -31,7 +52,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             "user-delete", "private", true, [], Baseline, true));
         fixture.PayFunnels.Intents.Add(new PaymentIntentDto(
             "intent-1", "user-delete", "supporter", 1000, "EUR", "created", true, "https://example.invalid", Baseline));
-        fixture.InstallSnapshots.SnapshotsByKey["subject:subject-delete|workspace-1"] =
+        fixture.InstallSnapshots.SnapshotsByKey[InstallLinkedWorkspaceSnapshotStore.ComposeKey("subject:subject-delete", "workspace-1")] =
             new InstallLinkedWorkspaceSnapshotRecord(
                 "subject:subject-delete", "workspace-1", "sr5", "chummer", 1, "character", "private payload",
                 Baseline, "installation-1", "Name", "Alias", "Human", "priority", "6", "6", 0, 0, true);
