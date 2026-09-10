@@ -345,6 +345,7 @@ public static class AvatarRuleAnswerValidator
             if (!AvatarGatewayInput.IsIdentifier(anchor.AnchorId, 128) || !anchorIds.Add(anchor.AnchorId)) failures.Add("source-anchor-id-invalid");
             if (!AvatarGatewayInput.IsIdentifier(anchor.SourceId, 128)) failures.Add("source-id-invalid");
             if (!AvatarGatewayInput.IsBoundedText(anchor.LocalizedSourceName, 1, 256)) failures.Add("source-name-invalid");
+            if (answer.Status == AvatarGatewayStatuses.Resolved && anchor.Page is null) failures.Add("source-page-required");
             if (anchor.Page is <= 0 or > 20_000) failures.Add("source-page-invalid");
             if (!AvatarGatewayInput.IsIdentifier(anchor.RuleId, 256)) failures.Add("rule-id-invalid");
             if (!IsLocalSourceRoute(anchor)) failures.Add("source-route-invalid");

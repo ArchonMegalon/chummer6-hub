@@ -124,6 +124,80 @@ public sealed class AvatarRuleAnswerValidatorTests
     }
 
     [TestMethod]
+    public void Resolved_answer_rejects_unpaged_anchor_with_matching_route_and_recomputed_digest()
+    {
+        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAnswerEnvelope answer = ValidAnswer(request);
+        AvatarSourceAnchor unpaged = answer.SourceAnchors[0] with
+        {
+            Page = null,
+            LocalSourceRoute = "chummer://sources/sr5-core"
+        };
+        answer = answer with
+        {
+            SourceAnchors = [unpaged],
+            AllowedActions = [answer.AllowedActions[0] with { Route = unpaged.LocalSourceRoute }]
+        };
+        answer = answer with { AnswerDigest = AvatarRuleAnswerDigest.Compute(answer) };
+
+        IReadOnlyList<string> failures = AvatarRuleAnswerValidator.Validate(answer, request);
+
+        CollectionAssert.AreEqual(new[] { "source-page-required" }, failures.ToArray());
+    }
+
+    [TestMethod]
+    public void Paged_anchor_cannot_cover_an_unpaged_resolved_step()
+    {
+        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAnswerEnvelope answer = ValidAnswer(request);
+        AvatarSourceAnchor unpaged = answer.SourceAnchors[0] with
+        {
+            AnchorId = "anchor-unpaged",
+            Page = null,
+            LocalSourceRoute = "chummer://sources/sr5-core"
+        };
+        answer = answer with
+        {
+            SourceAnchors = [answer.SourceAnchors[0], unpaged],
+            CalculationSteps = [answer.CalculationSteps[0] with { SourceAnchorIds = [unpaged.AnchorId] }],
+            AllowedActions = [answer.AllowedActions[0] with { Route = unpaged.LocalSourceRoute }]
+        };
+        answer = answer with { AnswerDigest = AvatarRuleAnswerDigest.Compute(answer) };
+
+        IReadOnlyList<string> failures = AvatarRuleAnswerValidator.Validate(answer, request);
+
+        CollectionAssert.AreEqual(new[] { "source-page-required" }, failures.ToArray());
+    }
+
+    [TestMethod]
+    public void Unresolved_answer_retains_nonpaged_diagnostic_anchor()
+    {
+        AvatarRuleAuthorityRequest request = Request();
+        AvatarRuleAnswerEnvelope answer = ValidAnswer(request);
+        AvatarSourceAnchor unpaged = answer.SourceAnchors[0] with
+        {
+            Page = null,
+            LocalSourceRoute = "chummer://sources/sr5-core"
+        };
+        answer = answer with
+        {
+            Status = AvatarGatewayStatuses.Unresolved,
+            SpokenAnswer = "A page-backed answer is unavailable for the current context.",
+            ShortAnswer = "Rule answer unresolved.",
+            CalculationSteps = [],
+            AppliesToCurrentCharacter = false,
+            SourceAnchors = [unpaged],
+            AllowedActions = [answer.AllowedActions[0] with { Route = unpaged.LocalSourceRoute }],
+            UncertaintyReason = "No page-backed source is available."
+        };
+        answer = answer with { AnswerDigest = AvatarRuleAnswerDigest.Compute(answer) };
+
+        IReadOnlyList<string> failures = AvatarRuleAnswerValidator.Validate(answer, request);
+
+        Assert.IsEmpty(failures, string.Join(',', failures));
+    }
+
+    [TestMethod]
     public void Open_source_action_must_reference_an_exact_current_anchor()
     {
         AvatarRuleAuthorityRequest request = Request();
