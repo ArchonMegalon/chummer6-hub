@@ -224,13 +224,13 @@ def build_info(tmp_path: Path) -> Path:
                 "dockerfileSha256": "e" * 64,
                 "coreRuntimeBundleFileName": (
                     "chummer-core-runtime-package-plane-"
-                    "b0fbae73f952bb417f9b790cd743c59db1b9ad7f.zip"
+                    "b8cb7dcba5a704948a6eb994c99bb3525b935845.zip"
                 ),
                 "coreRuntimeBundlePathSha256": "1" * 64,
                 "coreRuntimeBundleSha256": (
-                    "538e1276fc1a1d140f0d8f9e1af823756014e5e6ea2f342ac842ee074cac7474"
+                    "6006a99d40ea63323b19c3e629c8b3c0810b0f599909071110409e742e5a3a12"
                 ),
-                "coreRuntimeBundleSizeBytes": 3316410,
+                "coreRuntimeBundleSizeBytes": 3324929,
                 "externalMediaProjectSha256": "f" * 64,
                 "externalMediaRestoreIsSdkOnly": True,
                 "hubPackageFeedInputs": {
@@ -243,7 +243,7 @@ def build_info(tmp_path: Path) -> Path:
                         "sizeBytes": 322516,
                     },
                     "Chummer.Run.Contracts.0.1.1-packageplane.20260910.1.nupkg": {
-                        "sha256": "ecbeb8dd915b3fed2aaeb7e16e7406490c1266055eb20171aeff85020b60dd4e",
+                        "sha256": "bf7ac452e17a75cc7f2ac96ebaf58b30c9a2359561c1da48a64f04df6820d6e6",
                         "sizeBytes": 1838928,
                     },
                     "Chummer.Run.Registry.0.1.1-packageplane.20260910.1.nupkg": {
@@ -251,7 +251,7 @@ def build_info(tmp_path: Path) -> Path:
                         "sizeBytes": 345254,
                     },
                     "chummer-hub-packages.inventory.json": {
-                        "sha256": "cf9091fde03fcc312294faa7bab1b9962a55ad684c37ab26b9845314e00d6286",
+                        "sha256": "fc1825ed1cc94ae7a5d923238387a6f61a732994a383254ab7f709523da46106",
                         "sizeBytes": 2270,
                     },
                 },

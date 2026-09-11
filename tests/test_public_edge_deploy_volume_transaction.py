@@ -332,7 +332,7 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     for variable, directory in (
         (
             "CORE_RUNTIME_BUNDLE_SOURCE_INPUT",
-            "core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input",
+            "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input",
         ),
         ("HUB_PACKAGE_FEED_SOURCE_INPUT", "hub-package-feed-0.1.1-packageplane.20260910.1-input"),
     ):
@@ -867,7 +867,7 @@ def make_fake_authority_source(
     source = tmp_path / "source"
     (
         tmp_path
-        / "core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input"
+        / "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input"
     ).mkdir()
     (tmp_path / "hub-package-feed-0.1.1-packageplane.20260910.1-input").mkdir()
     (source / "scripts").mkdir(parents=True)
@@ -1305,7 +1305,7 @@ def test_fake_daemon_rejects_restart_policy_for_auto_remove_candidate(
     ("directory", "message"),
     (
         (
-            "core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input",
+            "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input",
             "sealed Core runtime bundle input is missing or path-aliased",
         ),
         (

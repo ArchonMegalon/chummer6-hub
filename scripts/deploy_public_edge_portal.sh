@@ -103,7 +103,7 @@ if ! SOURCE_ROOT="$("$TRUSTED_REALPATH" -e -- "$SOURCE_ROOT_INPUT")"; then
   echo "selected public edge source does not exist: $SOURCE_ROOT_INPUT" >&2
   exit 2
 fi
-CORE_RUNTIME_BUNDLE_SOURCE_INPUT="$("$TRUSTED_DIRNAME" -- "$SOURCE_ROOT")/core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input"
+CORE_RUNTIME_BUNDLE_SOURCE_INPUT="$("$TRUSTED_DIRNAME" -- "$SOURCE_ROOT")/core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input"
 if ! CORE_RUNTIME_BUNDLE_SOURCE="$(
   "$TRUSTED_REALPATH" -e -- "$CORE_RUNTIME_BUNDLE_SOURCE_INPUT"
 )" \

@@ -61,7 +61,7 @@ def rendered_compose(
             "additional_contexts": {
                 "core-runtime-bundle": str(
                     source_root.parent
-                    / "core-runtime-package-plane-b0fbae73f952bb417f9b790cd743c59db1b9ad7f-input"
+                    / "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input"
                 ),
                 "run-services-source": str(source_root),
                 "hub-registry-source": (
