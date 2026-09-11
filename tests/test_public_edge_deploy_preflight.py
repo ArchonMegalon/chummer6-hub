@@ -2737,6 +2737,38 @@ def test_cutover_accepts_exact_current_v5_package_plane_and_rejects_open_core_sc
 
 
 @pytest.mark.parametrize(
+    ("field", "stale_value"),
+    (
+        ("package_recipe_commit", "b0fbae73f952bb417f9b790cd743c59db1b9ad7f"),
+        ("package_recipe_commit", "2d97ba450de0cb2b558984cc4637f2678a75d26a"),
+        ("sha256", "538e1276fc1a1d140f0d8f9e1af823756014e5e6ea2f342ac842ee074cac7474"),
+        ("size_bytes", 3_316_410),
+    ),
+)
+def test_cutover_rejects_stale_core_recipe_and_bundle_bytes(
+    field: str,
+    stale_value: str | int,
+) -> None:
+    module = load_cutover_module()
+    payload = json.loads((REPO_ROOT / "eng/package-plane.lock.json").read_text(encoding="utf-8"))
+    if field == "package_recipe_commit":
+        payload["core_runtime"][field] = stale_value
+    else:
+        payload["core_runtime"]["bundle"][field] = stale_value
+
+    with pytest.raises(module.CutoverError, match="Core runtime (package|bundle) authority"):
+        module.GovernedCutoverRunner._validate_package_plane(
+            payload,
+            recipe_sha256=hashlib.sha256(
+                (REPO_ROOT / "scripts/ai/bootstrap-hub-package-feed.py").read_bytes()
+            ).hexdigest(),
+            core_authority_sha256=hashlib.sha256(
+                (REPO_ROOT / "eng/core-main-runtime-artifact-authority.json").read_bytes()
+            ).hexdigest(),
+        )
+
+
+@pytest.mark.parametrize(
     "mutation",
     ("extra-entry", "mutable-directory", "mutable-file", "symlink"),
 )

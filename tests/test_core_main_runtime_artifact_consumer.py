@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = ROOT / "eng/core-main-runtime-artifact-authority.json"
 WORKFLOW_PATH = ROOT / ".github/workflows/core-main-runtime-artifact-consumer.yml"
 SCRIPT_PATH = ROOT / "scripts/ai/consume-core-main-runtime-artifact.py"
-AUTHORITY_SHA256 = "095f652e4ebf5a8e58cba591846f4c008ee01d28353dbb0506ac564078ee70e1"
+AUTHORITY_SHA256 = "31d8d8930aba701c0cb2d06aaa43b2f59b436a8ec6868de08cd43a756552059b"
 
 
 def load_module():
@@ -281,36 +281,36 @@ def test_committed_authority_is_the_exact_public_main_snapshot() -> None:
         "workflow_id": 315904519,
         "workflow_name": "Core package-plane",
         "workflow_path": ".github/workflows/package-plane.yml",
-        "run_id": 34598797513,
+        "run_id": 34649188929,
         "run_attempt": 1,
         "event": "push",
         "branch": "main",
-        "head_commit": "2d97ba450de0cb2b558984cc4637f2678a75d26a",
-        "recipe_tree": "9ab4b85d8dd9c1d5b13a97d2656ab0f7f235ad0d",
-        "artifact_id": 10264594567,
+        "head_commit": "b8cb7dcba5a704948a6eb994c99bb3525b935845",
+        "recipe_tree": "671c21389e84dc78fa63311eebde145f1c9d9a92",
+        "artifact_id": 10283868757,
         "artifact_name": (
             "chummer-core-runtime-package-plane-"
-            "2d97ba450de0cb2b558984cc4637f2678a75d26a"
+            "b8cb7dcba5a704948a6eb994c99bb3525b935845"
         ),
         "artifact_sha256": (
-            "31711f5ca73dbc65a00fec622509b6f4dbabbbb252e9b8b6434e1ec667882bb6"
+            "4af1345a5d7446d8d72919ee089e298b719741bff637d18572d4447911632fb2"
         ),
-        "artifact_size_bytes": 3323730,
+        "artifact_size_bytes": 3325105,
     }
     release = authority["public_release"]
-    assert release["release_id"] == 387045108
+    assert release["release_id"] == 387358765
     assert release["target_commit"] == producer["head_commit"]
     assert release["immutable"] is False
     assert (release["receipt_asset"]["id"], release["receipt_asset"]["sha256"]) == (
-        557270426,
-        "0a3403ae7a6a3b1ddba4aa87b8929eb5cdac978842f38009af29c3525cb40f22",
+        558089286,
+        "430aa9ebd8943dbe35322f9b0abc103814389b7415941b0b670bfc3cd0033836",
     )
     assert (release["bundle_asset"]["id"], release["bundle_asset"]["sha256"]) == (
-        557270427,
-        "0712c6631913b37fdffc8d11854da1dcea7249af124f64984fa8511162834230",
+        558089285,
+        "6006a99d40ea63323b19c3e629c8b3c0810b0f599909071110409e742e5a3a12",
     )
     assert authority["archive"]["member_count"] == 11
-    assert authority["archive"]["uncompressed_size_bytes"] == 3321172
+    assert authority["archive"]["uncompressed_size_bytes"] == 3322547
     assert len(authority["archive"]["members"]) == 11
     assert len(
         [
@@ -321,10 +321,10 @@ def test_committed_authority_is_the_exact_public_main_snapshot() -> None:
     ) == 8
     validator = authority["validator_authority"]
     assert validator["runtime_source_commit"] == (
-        "181faa98a540294b72e6fe177751fd4308590fae"
+        "3bc5fe725fd2bbbad0333c5c7a3f849e53808c4f"
     )
     assert validator["runtime_package_version"] == (
-        "0.0.0-packageplane.candidate.sh181faa98a5402"
+        "0.0.0-packageplane.candidate.sh3bc5fe725fd2b"
     )
     assert validator["package_recipe_commit"] == producer["head_commit"]
 
@@ -390,9 +390,9 @@ def test_workflow_is_anonymous_pinned_bounded_and_one_shot() -> None:
     assert lifecycle["env"] == {"PYTHONDONTWRITEBYTECODE": "1"}
     script = lifecycle["run"]
     for value in (
-        "releases/387045108",
+        "releases/387358765",
         "git/ref/tags/${tag}",
-        "core-runtime-package-plane-2d97ba450de0cb2b558984cc4637f2678a75d26a",
+        "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845",
         "--max-filesize 65536",
         "--max-filesize 16777216",
         "ulimit -f 32768",
@@ -611,7 +611,7 @@ def test_verdict_rejects_v2_and_requires_v3_snapshot() -> None:
     v3 = module.validation_summary(authority, v3_result)
     assert v3["artifact_byte_snapshot"] == {
         "contract": "chummer-hub.core-runtime-package-byte-snapshot/v1",
-        "sha256": "cd918a9bda466cd70e9d71504e06e414d12f35c455dc040cc7b87a748f03aed0",
+        "sha256": "636bbe1604f85763850590c00c7e8e90d207b91d97822eb26dc72f7eac74d75f",
         "member_count": 11,
         "source_path_posture": "not_attested_after_snapshot_capture",
     }
