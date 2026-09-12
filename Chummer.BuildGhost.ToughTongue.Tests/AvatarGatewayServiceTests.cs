@@ -224,6 +224,82 @@ public sealed class AvatarGatewayServiceTests
     }
 
     [TestMethod]
+    [DataRow("live")]
+    [DataRow("revoked")]
+    [DataRow("expired")]
+    public async Task Late_rule_completion_is_fenced_by_current_context(string transition)
+    {
+        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
+        CancellationIgnoringAuthority authority = new();
+        AvatarGatewayService service = CreateService(time, authority);
+        AvatarSessionContextProjection context = Mint(service);
+        AvatarRuleQuestionRequest question = Question(context.ContextRef, "nonce-1", "idem-late");
+        Task<AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope>> pending =
+            service.ResolveRuleAsync(question, CancellationToken.None);
+        await authority.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Task<AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope>> pendingReplay =
+            service.ResolveRuleAsync(question with { Nonce = "nonce-2" }, CancellationToken.None);
+        Assert.IsFalse(pending.IsCompleted);
+        Assert.IsFalse(pendingReplay.IsCompleted);
+        Assert.AreEqual(1, authority.Calls);
+
+        if (transition == "revoked")
+        {
+            AvatarGatewayOperationResult<AvatarContextRevocationReceipt> revoked = service.Revoke(
+                new AvatarContextRevocationRequest(
+                    AvatarGatewayContractVersions.RevocationV1,
+                    context.ContextRef,
+                    "owner-1",
+                    "workspace-1"));
+            Assert.IsTrue(revoked.Succeeded);
+        }
+        else
+        {
+            // No intervening request/sweep: exact expiry must be checked when
+            // the pending answer completes, not merely at initial admission.
+            TimeSpan advance = context.ExpiresAt - time.GetUtcNow();
+            time.Advance(transition == "live" ? advance - TimeSpan.FromTicks(1) : advance);
+        }
+
+        Assert.AreEqual(transition == "revoked", authority.CapturedCancellation.IsCancellationRequested);
+        Assert.IsFalse(pending.IsCompleted);
+        Assert.IsFalse(pendingReplay.IsCompleted);
+        AvatarRuleAnswerEnvelope completed = await authority.CompleteAsync();
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> result =
+            await pending.WaitAsync(TimeSpan.FromSeconds(2));
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> replayResult =
+            await pendingReplay.WaitAsync(TimeSpan.FromSeconds(2));
+        AvatarGatewayOperationResult<AvatarRuleAnswerEnvelope> laterReplay =
+            await service.ResolveRuleAsync(question with { Nonce = "nonce-3" }, CancellationToken.None);
+
+        if (transition == "live")
+        {
+            Assert.AreEqual(AvatarGatewayCallStatus.Granted, result.Status);
+            Assert.AreEqual(AvatarGatewayCallStatus.IdempotentReplay, replayResult.Status);
+            Assert.AreEqual(AvatarGatewayCallStatus.IdempotentReplay, laterReplay.Status);
+            Assert.IsTrue(result.Succeeded);
+            Assert.IsTrue(replayResult.Succeeded);
+            Assert.IsTrue(laterReplay.Succeeded);
+            Assert.AreSame(completed, result.Value);
+            Assert.AreSame(completed, replayResult.Value);
+            Assert.AreSame(completed, laterReplay.Value);
+        }
+        else
+        {
+            Assert.AreEqual(AvatarGatewayCallStatus.Expired, result.Status);
+            Assert.AreEqual(AvatarGatewayCallStatus.Expired, replayResult.Status);
+            Assert.AreEqual(AvatarGatewayCallStatus.NotFound, laterReplay.Status);
+            Assert.IsFalse(result.Succeeded);
+            Assert.IsFalse(replayResult.Succeeded);
+            Assert.IsFalse(laterReplay.Succeeded);
+            Assert.IsNull(result.Value);
+            Assert.IsNull(replayResult.Value);
+            Assert.IsNull(laterReplay.Value);
+        }
+        Assert.AreEqual(1, authority.Calls);
+    }
+
+    [TestMethod]
     public void Full_cache_preserves_validation_status_without_consuming_nonce_or_idempotency_state()
     {
         ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
@@ -377,8 +453,58 @@ public sealed class AvatarGatewayServiceTests
         }
     }
 
+    private sealed class CancellationIgnoringAuthority : IAvatarRuleAuthorityClient
+    {
+        private readonly TaskCompletionSource<AvatarRuleAnswerEnvelope> _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private AvatarRuleAuthorityRequest? _request;
+
+        public AvatarRuleAuthorityBinding? Binding => CoreBinding;
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int Calls { get; private set; }
+
+        public CancellationToken CapturedCancellation { get; private set; }
+
+        public Task<AvatarRuleAnswerEnvelope> ResolveAsync(
+            AvatarRuleAuthorityRequest request,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            _request = request;
+            CapturedCancellation = cancellationToken;
+            Started.TrySetResult();
+            // Deliberately model an upstream that ignores cancellation. The
+            // real service must fence its otherwise valid completed answer.
+            return _completion.Task;
+        }
+
+        public async Task<AvatarRuleAnswerEnvelope> CompleteAsync()
+        {
+            Assert.IsNotNull(_request);
+            // Reuse the existing synthetic answer fixture, not a live Core or
+            // provider claim, and validate it through the actual validator.
+            AvatarRuleAnswerEnvelope answer = await new FakeAuthority().ResolveAsync(
+                _request, CancellationToken.None);
+            Assert.AreEqual(AvatarGatewayStatuses.Resolved, answer.Status);
+            IReadOnlyList<string> failures = AvatarRuleAnswerValidator.Validate(answer, _request);
+            Assert.IsEmpty(failures, string.Join(',', failures));
+            Assert.IsTrue(_completion.TrySetResult(answer));
+            return answer;
+        }
+    }
+
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => now;
+        private DateTimeOffset _now = now;
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void Advance(TimeSpan duration)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(duration, TimeSpan.Zero);
+            _now += duration;
+        }
     }
 }
