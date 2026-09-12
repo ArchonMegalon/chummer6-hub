@@ -9,6 +9,12 @@
     <RestoreLockedMode Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true' and '$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Chummer.Run.Contracts/Avatar/AvatarGatewayContracts.cs" Link="AvatarGatewayContracts.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/Avatar/AvatarContextStore.cs" Link="AvatarContextStore.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/Avatar/AvatarGatewayCredentialPolicy.cs" Link="AvatarGatewayCredentialPolicy.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/Avatar/AvatarGatewayService.cs" Link="AvatarGatewayService.cs" />
+    <Compile Include="../Chummer.Run.AI/Services/Avatar/AvatarRuleAuthorityClient.cs" Link="AvatarRuleAuthorityClient.cs" />
+    <Compile Include="../Chummer.Run.AI/Controllers/AvatarGatewayController.cs" Link="AvatarGatewayController.cs" />
     <Compile Include="../Chummer.Run.Contracts/BuildGhost/ToughTongueBuildGhostContracts.cs" Link="ToughTongueBuildGhostContracts.cs" />
     <Compile Include="../Chummer.Run.AI/Services/BuildGhost/ToughTongueBuildGhostAdapter.cs" Link="ToughTongueBuildGhostAdapter.cs" />
     <Compile Include="../Chummer.Run.AI/Services/BuildGhost/ToughTongueBuildGhostHttpTransport.cs" Link="ToughTongueBuildGhostHttpTransport.cs" />
