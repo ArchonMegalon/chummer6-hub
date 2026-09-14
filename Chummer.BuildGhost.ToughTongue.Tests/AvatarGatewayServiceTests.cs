@@ -181,6 +181,89 @@ public sealed class AvatarGatewayServiceTests
     }
 
     [TestMethod]
+    [DataRow("de-AT", "Regelfragen sind derzeit nicht verfügbar.", "Regelfragen sind bereit.")]
+    [DataRow("en-US", "Rule questions are currently unavailable.", "Rule questions are ready.")]
+    public void Projections_do_not_advertise_rule_questions_without_a_bound_authority(
+        string locale,
+        string unavailableText,
+        string readyText)
+    {
+        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
+        FakeAuthority authority = new() { Binding = null };
+        AvatarGatewayService service = CreateService(time, authority);
+        AvatarSessionContextProjection minted = Mint(service, locale: locale);
+
+        Assert.IsEmpty(minted.AvailableModes);
+        StringAssert.Contains(minted.SpokenSummary, unavailableText);
+        Assert.IsFalse(minted.SpokenSummary.Contains(readyText, StringComparison.Ordinal));
+
+        AvatarGatewayOperationResult<AvatarSessionContextProjection> fetched = service.GetContext(
+            ContextRequest(minted.ContextRef, "nonce-projection", "idem-projection"));
+
+        Assert.IsTrue(fetched.Succeeded);
+        Assert.IsNotNull(fetched.Value);
+        Assert.IsEmpty(fetched.Value.AvailableModes);
+        StringAssert.Contains(fetched.Value.SpokenSummary, unavailableText);
+        Assert.IsFalse(fetched.Value.SpokenSummary.Contains(readyText, StringComparison.Ordinal));
+        Assert.AreEqual(0, authority.Calls);
+    }
+
+    [TestMethod]
+    [DataRow("de-AT", "Chummer-Validierung")]
+    [DataRow("en-US", "Chummer validation")]
+    public void Bound_rule_authority_projection_requires_Chummer_validation_without_claiming_ready(
+        string locale,
+        string validationText)
+    {
+        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
+        FakeAuthority authority = new();
+        AvatarGatewayService service = CreateService(time, authority);
+        AvatarSessionContextProjection minted = Mint(service, locale: locale);
+
+        CollectionAssert.AreEqual(new[] { "rule-question" }, minted.AvailableModes.ToArray());
+        StringAssert.Contains(minted.SpokenSummary, validationText);
+        Assert.IsFalse(minted.SpokenSummary.Contains("ready", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(minted.SpokenSummary.Contains("bereit", StringComparison.Ordinal));
+
+        AvatarGatewayOperationResult<AvatarSessionContextProjection> fetched = service.GetContext(
+            ContextRequest(minted.ContextRef, "nonce-bound-projection", "idem-bound-projection"));
+
+        Assert.IsTrue(fetched.Succeeded);
+        Assert.IsNotNull(fetched.Value);
+        CollectionAssert.AreEqual(new[] { "rule-question" }, fetched.Value.AvailableModes.ToArray());
+        StringAssert.Contains(fetched.Value.SpokenSummary, validationText);
+        Assert.AreEqual(0, authority.Calls);
+    }
+
+    [TestMethod]
+    [DataRow("de-AT", "dieser Kontext erlaubt keine charakterbezogenen Regelfragen")]
+    [DataRow("en-US", "this context does not permit character-bound rule questions")]
+    public void Projections_with_missing_rule_scopes_stay_unavailable_without_upstream_calls(
+        string locale,
+        string unavailableText)
+    {
+        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
+        FakeAuthority authority = new();
+        AvatarGatewayService service = CreateService(time, authority);
+        AvatarSessionContextProjection minted = Mint(
+            service,
+            [AvatarGatewayScopes.RulesRead],
+            locale);
+
+        Assert.IsEmpty(minted.AvailableModes);
+        StringAssert.Contains(minted.SpokenSummary, unavailableText);
+
+        AvatarGatewayOperationResult<AvatarSessionContextProjection> fetched = service.GetContext(
+            ContextRequest(minted.ContextRef, "nonce-scope-projection", "idem-scope-projection"));
+
+        Assert.IsTrue(fetched.Succeeded);
+        Assert.IsNotNull(fetched.Value);
+        Assert.IsEmpty(fetched.Value.AvailableModes);
+        StringAssert.Contains(fetched.Value.SpokenSummary, unavailableText);
+        Assert.AreEqual(0, authority.Calls);
+    }
+
+    [TestMethod]
     public async Task Authority_failure_is_spoken_only_as_the_validated_safe_unavailable_fallback()
     {
         ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 25, 6, 0, 0, TimeSpan.Zero));
@@ -429,7 +512,8 @@ public sealed class AvatarGatewayServiceTests
 
     private static AvatarSessionContextProjection Mint(
         AvatarGatewayService service,
-        IReadOnlyList<string>? scopes = null)
+        IReadOnlyList<string>? scopes = null,
+        string locale = "de-AT")
     {
         AvatarGatewayOperationResult<AvatarSessionContextProjection> result = service.Mint(new AvatarContextMintRequest(
             AvatarGatewayContractVersions.SessionContextV1,
@@ -446,7 +530,7 @@ public sealed class AvatarGatewayServiceTests
             DigestA,
             "rook-private",
             "Nightshade",
-            "de-AT",
+            locale,
             "career",
             scopes ?? [AvatarGatewayScopes.RulesRead, AvatarGatewayScopes.CharacterRead],
             300));

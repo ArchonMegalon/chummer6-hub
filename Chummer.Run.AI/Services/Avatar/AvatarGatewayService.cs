@@ -361,18 +361,27 @@ internal sealed class AvatarGatewayService(
         };
     }
 
-    private static AvatarSessionContextProjection Project(AvatarContextSnapshot context)
+    private AvatarSessionContextProjection Project(AvatarContextSnapshot context)
     {
-        bool ruleQuestions = HasRuleCharacterScopes(context);
+        bool hasRuleCharacterScopes = HasRuleCharacterScopes(context);
+        bool ruleQuestions = hasRuleCharacterScopes && ruleAuthorityClient.Binding is not null;
         IReadOnlyList<string> modes = ruleQuestions ? ["rule-question"] : [];
         bool german = context.Locale.StartsWith("de", StringComparison.OrdinalIgnoreCase);
         string summary = ruleQuestions
             ? german
-                ? $"Ich habe {context.DisplayName} in {context.RulesetId} geladen. Regelfragen sind bereit."
-                : $"I loaded {context.DisplayName} in {context.RulesetId}. Rule questions are ready."
-            : german
-                ? $"Ich habe {context.DisplayName} geladen, aber dieser Kontext erlaubt keine charakterbezogenen Regelfragen."
-                : $"I loaded {context.DisplayName}, but this context does not permit character-bound rule questions.";
+                ? $"Ich habe {context.DisplayName} in {context.RulesetId} geladen. Regelfragen erfordern eine Chummer-Validierung."
+                : $"I loaded {context.DisplayName} in {context.RulesetId}. Rule questions require Chummer validation."
+            : hasRuleCharacterScopes
+                ? german
+                    ? $"Ich habe {context.DisplayName} geladen, aber Regelfragen sind derzeit nicht verfügbar."
+                    : $"I loaded {context.DisplayName}. Rule questions are currently unavailable."
+                : german
+                    ? $"Ich habe {context.DisplayName} geladen, aber dieser Kontext erlaubt keine charakterbezogenen Regelfragen."
+                    : $"I loaded {context.DisplayName}, but this context does not permit character-bound rule questions.";
+        // This is a cached capability snapshot from the original projection
+        // request, not live resolver health. New rule operations read the
+        // binding and validate upstream answers; idempotent replays reuse
+        // their validated result while still checking current context lifetime.
         return new AvatarSessionContextProjection(
             AvatarGatewayContractVersions.ContextResponseV1,
             context.ContextRef,

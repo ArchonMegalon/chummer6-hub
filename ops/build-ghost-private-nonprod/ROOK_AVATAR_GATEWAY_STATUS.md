@@ -45,10 +45,17 @@ Core implementation. A resolved request is not dispatched unless all four
 Core authority bindings are present and exact: the typed-authority contract,
 package identity, package version, and canonical package SHA-256 digest. Those
 values are included in the authority request digest which every answer must
-echo. They are absent from checked-in runtime configuration. Consequently the
-current source always returns the deterministic `unavailable` envelope for a
-rule question, with no anchors or actions, even if an endpoint and service
-token were supplied independently.
+echo. They are absent from checked-in runtime configuration.
+For read-authorized questions in this configuration, the current source always returns the deterministic `unavailable` envelope, with no anchors or actions.
+The Mint/GetContext
+projection advertises `rule-question` only when the context scopes and the
+authority client's binding are both present; without that binding it says the
+mode is currently unavailable. With a binding it says Chummer validation is
+required, not that a live answer is ready. A cached projection is a capability
+snapshot from its original request, not live resolver health. New rule operations
+read the binding and validate upstream answers. Idempotent replays reuse their
+validated result and retain the current-context/lifetime fence. Unavailable or
+failing responses carry no anchors or actions.
 
 ## Remaining blockers
 
