@@ -1,0 +1,104 @@
+name: Hub package authority observation (non-promoting)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/package-authority-observation.yml
+      - eng/package-plane.lock.json
+      - eng/core-main-runtime-artifact-authority.json
+      - scripts/ai/bootstrap-hub-package-feed.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hub-package-observation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact observation source without credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Install the existing digest-locked private SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          hub_observer_script="${RUNNER_TEMP}/hub-observer-dotnet-install.sh"
+          hub_observer_sdk="${RUNNER_TEMP}/hub-observer-dotnet"
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --fail --location --max-redirs 3 --connect-timeout 15 --max-time 120 \
+            --silent --show-error --max-filesize 1048576 \
+            https://dot.net/v1/dotnet-install.sh --output "${hub_observer_script}"
+          echo "082f7685e156738a1b2e2ed8381a621870d4ce8e8c59278034556f05c186eb2e  ${hub_observer_script}" \
+            | sha256sum --check --strict
+          bash "${hub_observer_script}" --version 10.0.103 --install-dir "${hub_observer_sdk}" --no-path
+          echo "${hub_observer_sdk}" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=${hub_observer_sdk}" >> "${GITHUB_ENV}"
+
+      - name: Fetch the exact public Core input
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --fail --location --max-redirs 3 --connect-timeout 15 --max-time 120 \
+            --silent --show-error --max-filesize 16777216 \
+            https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6/chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip \
+            --output "${RUNNER_TEMP}/hub-observer-core.zip"
+          echo "d45350886940a3323ed72a9f7b72ad539e0383e13a55063dcf10c90d491dac1b  ${RUNNER_TEMP}/hub-observer-core.zip" \
+            | sha256sum --check --strict
+          python3 -I - <<'PY'
+          import importlib.util
+          import os
+          from pathlib import Path
+          import sys
+          root = Path(os.environ["GITHUB_WORKSPACE"])
+          spec = importlib.util.spec_from_file_location("hub_bootstrap", root / "scripts/ai/bootstrap-hub-package-feed.py")
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = module
+          spec.loader.exec_module(module)
+          lock = module.load_lock(root / "eng/package-plane.lock.json")
+          module.validate_build_recipe(root, lock)
+          temporary = Path(os.environ["RUNNER_TEMP"])
+          module.materialize_core_runtime_feed(
+              temporary / "hub-observer-core.zip", temporary / "hub-observer-core-feed", lock.core_runtime)
+          PY
+
+      - name: Observe four actual package bytes without sealing or publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(dotnet --version)" = "10.0.103"
+          python3 -I scripts/ai/bootstrap-hub-package-feed.py \
+            --repo-root "${GITHUB_WORKSPACE}" \
+            --core-feed "${RUNNER_TEMP}/hub-observer-core-feed" \
+            --feed "${RUNNER_TEMP}/hub-observer-feed" \
+            --observe-package-authority
+          test ! -e "${RUNNER_TEMP}/hub-observer-feed/chummer-hub-packages.inventory.json"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      # These are observations, never a locked consumer receipt. A reviewed
+      # reseal and the unchanged required no-siblings check must follow.
+      - name: Retain observed package bytes and exact input authorities
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hub-package-observation-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/hub-observer-feed/
+            eng/package-plane.lock.json
+            eng/core-main-runtime-artifact-authority.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false

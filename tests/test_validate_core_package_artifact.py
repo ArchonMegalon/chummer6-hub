@@ -19,12 +19,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "validate-core-package-artifact.py"
-SELECTED_CORE_COMMIT = "3bc5fe725fd2bbbad0333c5c7a3f849e53808c4f"
+SELECTED_CORE_COMMIT = "54398fa0dfe60b4f00aac40d333882b7f7cc2886"
 SELECTED_CORE_LOCK_PATH = (
     ROOT / "tests" / "fixtures" / f"core-runtime-package-plane.{SELECTED_CORE_COMMIT[:12]}.lock.json"
 )
 SELECTED_CORE_LOCK_SHA256 = (
-    "ed62c7b27c11b748e0780257b8df8a6f205933e1258d5c2288df0060b2edad79"
+    "497b5eed9499726042ab04db3a9161ce3e69eacb4958388c4c880c9931ad5a5c"
 )
 SELECTED_CORE_LOCK_BYTES = SELECTED_CORE_LOCK_PATH.read_bytes()
 if hashlib.sha256(SELECTED_CORE_LOCK_BYTES).hexdigest() != SELECTED_CORE_LOCK_SHA256:
@@ -471,7 +471,7 @@ def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> N
     assert fixture.lock == SELECTED_CORE_LOCK
     assert SOURCE_COMMIT == module.RUNTIME_SOURCE_COMMIT == SELECTED_CORE_COMMIT
     assert PACKAGE_VERSION == module.RUNTIME_PACKAGE_VERSION == (
-        "0.0.0-packageplane.candidate.sh3bc5fe725fd2b"
+        "0.0.0-packageplane.candidate.sh54398fa0dfe60"
     )
     assert SELECTED_CORE_LOCK_SHA256 == digest(SELECTED_CORE_LOCK_BYTES)
     assert tuple(SELECTED_CORE_LOCK["allowed_recipe_delta"]) == (
@@ -569,7 +569,7 @@ def test_fixture_mirrors_current_producer_receipt_semantics(tmp_path: Path) -> N
 def test_sealed_public_handoff_recipe_has_no_additive_policy_profile() -> None:
     module = load_module()
     assert module.PUBLIC_HANDOFF_RECIPE_COMMIT == (
-        "b8cb7dcba5a704948a6eb994c99bb3525b935845"
+        "fe642d59a2899e1f1298271a0ffb80e91355aaf6"
     )
     assert module.PUBLIC_HANDOFF_ALLOWED_RECIPE_DELTA == (
         module.EXPECTED_ALLOWED_RECIPE_DELTA
@@ -588,6 +588,8 @@ def test_sealed_public_handoff_recipe_has_no_additive_policy_profile() -> None:
         ("runtime_package_version", "0.0.0-packageplane.candidate.shaeeb4717633e3"),
         ("runtime_source_commit", "181faa98a540294b72e6fe177751fd4308590fae"),
         ("runtime_package_version", "0.0.0-packageplane.candidate.sh181faa98a5402"),
+        ("runtime_source_commit", "3bc5fe725fd2bbbad0333c5c7a3f849e53808c4f"),
+        ("runtime_package_version", "0.0.0-packageplane.candidate.sh3bc5fe725fd2b"),
     ],
 )
 def test_historical_runtime_authority_cannot_replace_current_policy(

@@ -11,6 +11,7 @@ internal static class LinuxSecureFile
     private const int OpenCloseOnExec = 0x80000;
     private const int OpenNoFollow = 0x20000;
     private const int OpenDirectory = 0x10000;
+    private const int OpenNonBlocking = 0x800;
     private const int LockExclusive = 2;
     private const int LockNonBlocking = 4;
     private const uint FileTypeMask = 0xF000;
@@ -21,6 +22,56 @@ internal static class LinuxSecureFile
     public static bool IsSupportedPlatform
         => OperatingSystem.IsLinux()
             && RuntimeInformation.ProcessArchitecture == Architecture.X64;
+
+    // Inspection only: private runtime composition must not provision, chmod,
+    // read carrier bytes, or acquire a writer lease while checking its inputs.
+    internal static void ValidateExistingPrivateFile(string path)
+    {
+        ValidateExistingDirectory(Path.GetDirectoryName(path)!, ownerOnly: true, readOnlyFileSystem: false);
+        using SafeFileHandle handle = OpenExisting(path, directory: false);
+        LinuxStat metadata = ValidateDescriptor(handle.DangerousGetHandle().ToInt32(), long.MaxValue);
+        if ((metadata.Mode & 0xFFF) != OwnerReadWriteMode)
+            throw new UnauthorizedAccessException("Private file permissions are invalid.");
+    }
+
+    internal static void ValidateExistingDirectory(string path, bool ownerOnly, bool readOnlyFileSystem)
+    {
+        if (!IsSupportedPlatform)
+            throw new PlatformNotSupportedException("Private runtime storage validation requires Linux x64.");
+        DirectoryInfo? current = new(path);
+        while (current is not null)
+        {
+            current.Refresh();
+            if (!current.Exists || current.LinkTarget is not null
+                || (current.Attributes & FileAttributes.ReparsePoint) != 0)
+                throw new IOException("Private runtime directory ancestry is invalid.");
+            current = current.Parent;
+        }
+
+        using SafeFileHandle handle = OpenExisting(path, directory: true);
+        int descriptor = handle.DangerousGetHandle().ToInt32();
+        if (NativeFstat(descriptor, out LinuxStat metadata) != 0
+            || (metadata.Mode & FileTypeMask) != DirectoryFile
+            || (ownerOnly
+                ? metadata.UserId != NativeGetEffectiveUserId() || (metadata.Mode & 0xFFF) != 0x1C0
+                : metadata.UserId != 0 && metadata.UserId != NativeGetEffectiveUserId()
+                    || (metadata.Mode & 0x12) != 0))
+            throw new UnauthorizedAccessException("Private runtime directory metadata is invalid.");
+        if (readOnlyFileSystem
+            && (NativeFstatvfs(descriptor, out LinuxStatVfs filesystem) != 0 || (filesystem.Flags & 1) == 0))
+            throw new UnauthorizedAccessException("Private runtime source storage must be mounted read-only.");
+    }
+
+    private static SafeFileHandle OpenExisting(string path, bool directory)
+    {
+        if (!IsSupportedPlatform)
+            throw new PlatformNotSupportedException("Private runtime storage validation requires Linux x64.");
+        int descriptor = NativeOpen(path,
+            OpenReadOnly | OpenCloseOnExec | OpenNoFollow | OpenNonBlocking | (directory ? OpenDirectory : 0));
+        if (descriptor < 0)
+            throw new IOException("Private runtime storage could not be opened.");
+        return new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
+    }
 
     public static byte[] ReadOwnerOnlyRegularFile(string path, int maximumBytes, bool repairOwnerMode)
     {
@@ -126,7 +177,7 @@ internal static class LinuxSecureFile
         }
     }
 
-    private static LinuxStat ValidateDescriptor(int descriptor, int maximumBytes)
+    private static LinuxStat ValidateDescriptor(int descriptor, long maximumBytes)
     {
         if (NativeFstat(descriptor, out LinuxStat metadata) != 0
             || (metadata.Mode & FileTypeMask) != RegularFile
@@ -166,6 +217,16 @@ internal static class LinuxSecureFile
         public long Reserved2;
     }
 
+    // glibc Linux x64 statvfs ABI; guarded by IsSupportedPlatform above.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LinuxStatVfs
+    {
+        public ulong BlockSize, FragmentSize, Blocks, FreeBlocks, AvailableBlocks;
+        public ulong Files, FreeFiles, AvailableFiles, FileSystemId, Flags, NameMaximum;
+        public uint FileSystemType;
+        public int Spare0, Spare1, Spare2, Spare3, Spare4;
+    }
+
     [DllImport("libc", EntryPoint = "open", SetLastError = true)]
     private static extern int NativeOpen(string path, int flags);
 
@@ -174,6 +235,9 @@ internal static class LinuxSecureFile
 
     [DllImport("libc", EntryPoint = "fstat", SetLastError = true)]
     private static extern int NativeFstat(int descriptor, out LinuxStat metadata);
+
+    [DllImport("libc", EntryPoint = "fstatvfs", SetLastError = true)]
+    private static extern int NativeFstatvfs(int descriptor, out LinuxStatVfs metadata);
 
     [DllImport("libc", EntryPoint = "fchmod", SetLastError = true)]
     private static extern int NativeFchmod(int descriptor, uint mode);
