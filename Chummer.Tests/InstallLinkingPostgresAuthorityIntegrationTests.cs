@@ -13,15 +13,23 @@ using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Infrastructure.Owners;
 using Chummer.Infrastructure.Workspaces;
 using Chummer.Rulesets.Sr5;
+using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Chummer.Run.Contracts.Identity;
 using Docker.DotNet.Models;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -2509,6 +2517,398 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
         scenario.AssertPrivateWorkCleanedAndInputsUnchanged();
     }
 
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task Rook_private_HTTP_owner_grants_reads_and_revokes_actual_Core_consent()
+    {
+        Assert.True(OperatingSystem.IsLinux());
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        // Do not abandon a synchronous constructor with Task.Run/WaitAsync: it
+        // owns real file and database work until it returns or throws.
+        using RookRuntimeScenario scenario = new(stores);
+        await using RookRuntimeHttpHost host = await RookRuntimeHttpHost.StartAsync(scenario, stores.Root, deadline.Token);
+        byte[] originalAccount = File.ReadAllBytes(scenario.AccountPath);
+        byte[] originalSnapshot = File.ReadAllBytes(scenario.SnapshotPath);
+        InstallLinkingRookReadConsent consent = await host.GrantAsync(scenario, deadline.Token);
+        Assert.Equal(1, scenario.Identity.Calls);
+        using (InstallLinkingAuthoritativeEnvelope before = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token))
+        {
+            RookHttpReadOnlyImage image = await CaptureRookHttpImageAsync(scenario);
+            using HttpResponseMessage response = await host.ReadAsync(scenario, consent, deadline.Token);
+            JsonElement body = await ReadRookHttpJsonAsync(response, scenario, deadline.Token);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            AssertResolvedRookHttpProjection(body, scenario);
+            Assert.Equal(3, scenario.Identity.Calls);
+            Assert.True(scenario.RuntimeClock.SawOwnedScratch);
+            await AssertRookHttpReadOnlyAsync(scenario, before, image, deadline.Token);
+        }
+
+        using (HttpResponseMessage response = await host.SendAsync("consents/revoke",
+            new { consentId = consent.ConsentId, expectedVersion = consent.Version }, deadline.Token))
+        {
+            JsonElement body = await ReadRookHttpJsonAsync(response, scenario, deadline.Token);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            AssertRookHttpConsentProjection(body, scenario.Reader.Store.RookReadConsentsById[consent.ConsentId]);
+        }
+        InstallLinkingRookReadConsent revoked = scenario.Reader.Store.RookReadConsentsById[consent.ConsentId];
+        Assert.Equal(consent.Version + 1, revoked.Version);
+        Assert.NotNull(revoked.RevokedAtUtc);
+        Assert.Equal(4, scenario.Identity.Calls);
+        using (InstallLinkingAuthoritativeEnvelope before = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token))
+        {
+            RookHttpReadOnlyImage image = await CaptureRookHttpImageAsync(scenario);
+            // Even the current revoked version cannot become a fresh read grant.
+            using HttpResponseMessage response = await host.ReadAsync(scenario, revoked, deadline.Token);
+            JsonElement body = await ReadRookHttpJsonAsync(response, scenario, deadline.Token);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            AssertRookHttpFailure(body);
+            Assert.Equal(5, scenario.Identity.Calls);
+            await AssertRookHttpReadOnlyAsync(scenario, before, image, deadline.Token);
+        }
+        Assert.Equal(originalAccount, File.ReadAllBytes(scenario.AccountPath));
+        Assert.Equal(originalSnapshot, File.ReadAllBytes(scenario.SnapshotPath));
+    }
+
+    [Theory]
+    [InlineData("unchanged")]
+    [InlineData("revoked_consent")]
+    [InlineData("new_session")]
+    [InlineData("expired_session")]
+    [InlineData("snapshot_generation")]
+    [SupportedOSPlatform("linux")]
+    public async Task Rook_private_HTTP_releases_no_headers_before_fresh_revalidation_after_Core_disposal(string change)
+    {
+        Assert.True(OperatingSystem.IsLinux());
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        using RookRuntimeScenario scenario = new(stores);
+        await using RookRuntimeHttpHost host = await RookRuntimeHttpHost.StartAsync(scenario, stores.Root, deadline.Token);
+        InstallLinkingRookReadConsent consent = await host.GrantAsync(scenario, deadline.Token);
+        using InstallLinkingAuthoritativeEnvelope granted = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+        RookHttpReadOnlyImage grantedImage = await CaptureRookHttpImageAsync(scenario);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        scenario.Identity.BeforeResponse = async (call, ct) =>
+        {
+            if (call != 3) return;
+            entered.TrySetResult();
+            await release.Task.WaitAsync(ct);
+        };
+        Task<HttpResponseMessage> pending = host.ReadAsync(scenario, consent, requestCancellation.Token);
+        try
+        {
+            await entered.Task.WaitAsync(deadline.Token);
+            // ReadAsync uses ResponseHeadersRead: incompletion means no HTTP
+            // headers escaped, not merely that the client is buffering a body.
+            Assert.False(pending.IsCompleted);
+            Assert.Equal(3, scenario.Identity.Calls);
+            Assert.True(scenario.RuntimeClock.SawOwnedScratch);
+            await AssertRookHttpReadOnlyAsync(scenario, granted, grantedImage, deadline.Token);
+
+            if (change == "revoked_consent")
+            {
+                // Independent actual PostgreSQL writer, as in the service-level
+                // fence test. The reader's still-active local mirror is unchanged.
+                var writer = stores.OpenStore();
+                InstallLinkingRookReadConsent revoked = writer.Service.RevokeRookReadConsent(
+                    scenario.UserId, RookConsentPostgresStores.SubjectId, consent.ConsentId, consent.Version, deadline.Token);
+                Assert.NotNull(revoked.RevokedAtUtc);
+                Assert.Equal(grantedImage.Mirror, File.ReadAllBytes(scenario.Reader.Store.StoragePath));
+                Assert.Equal(consent, scenario.Reader.Store.RookReadConsentsById[consent.ConsentId]);
+            }
+            else if (change == "snapshot_generation")
+            {
+                InstallLinkedWorkspaceSnapshotRecord changed = scenario.Snapshots.UpsertForInstallation(
+                    scenario.Installation, scenario.Selected with { Name = "Explicit concurrent HTTP fixture update" },
+                    scenario.Selected.RemoteRevision, scenario.Selected.ServerToken);
+                Assert.Equal(scenario.Selected.RemoteRevision + 1, changed.RemoteRevision);
+                Assert.Equal(scenario.Selected.WorkspaceContinuationDigest, changed.WorkspaceContinuationDigest);
+            }
+            else if (change == "new_session") scenario.Identity.SessionId = "another-active-http-owner-session";
+            else if (change == "expired_session") scenario.Identity.ExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(-1);
+
+            using InstallLinkingAuthoritativeEnvelope beforeRelease = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+            RookHttpReadOnlyImage releaseImage = await CaptureRookHttpImageAsync(scenario);
+            Assert.False(pending.IsCompleted);
+            release.TrySetResult();
+            using HttpResponseMessage response = await pending.WaitAsync(deadline.Token);
+            JsonElement body = await ReadRookHttpJsonAsync(response, scenario, deadline.Token);
+            if (change == "unchanged")
+            {
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                AssertResolvedRookHttpProjection(body, scenario);
+            }
+            else
+            {
+                Assert.Equal(change switch
+                {
+                    "expired_session" => HttpStatusCode.Unauthorized,
+                    "snapshot_generation" => HttpStatusCode.Conflict,
+                    _ => HttpStatusCode.Forbidden
+                }, response.StatusCode);
+                AssertRookHttpFailure(body);
+            }
+            Assert.Equal(3, scenario.Identity.Calls);
+            Assert.Equal(grantedImage.Account, File.ReadAllBytes(scenario.AccountPath));
+            await AssertRookHttpReadOnlyAsync(scenario, beforeRelease, releaseImage, deadline.Token);
+        }
+        finally
+        {
+            release.TrySetResult();
+            requestCancellation.Cancel();
+            // The cleanup bound is independent of the request's expired token.
+            // Host shutdown subsequently drains server requests before stores close.
+            try { using HttpResponseMessage drained = await pending.WaitAsync(TimeSpan.FromSeconds(5)); }
+            catch (Exception) when (pending.IsFaulted || pending.IsCanceled) { }
+        }
+    }
+
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task Rook_private_HTTP_unsupported_intent_returns_actual_unbound_Core_result()
+    {
+        Assert.True(OperatingSystem.IsLinux());
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        using RookRuntimeScenario scenario = new(stores);
+        await using RookRuntimeHttpHost host = await RookRuntimeHttpHost.StartAsync(scenario, stores.Root, deadline.Token);
+        InstallLinkingRookReadConsent consent = await host.GrantAsync(scenario, deadline.Token);
+        using InstallLinkingAuthoritativeEnvelope before = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+        RookHttpReadOnlyImage image = await CaptureRookHttpImageAsync(scenario);
+        using HttpResponseMessage response = await host.ReadAsync(scenario, consent, deadline.Token, "unsupported-read-intent");
+        JsonElement body = await ReadRookHttpJsonAsync(response, scenario, deadline.Token);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        AssertRookHttpResultFields(body);
+        Assert.Equal(WorkspaceRuleQuestionStatuses.Unresolved, body.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("ruleContext").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("level").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("maximumLevel").ValueKind);
+        Assert.Empty(body.GetProperty("sourceAnchors").EnumerateArray());
+        Assert.Empty(body.GetProperty("explanation").GetProperty("sourceAnchorIds").EnumerateArray());
+        Assert.Equal(3, scenario.Identity.Calls);
+        Assert.True(scenario.RuntimeClock.SawOwnedScratch);
+        await AssertRookHttpReadOnlyAsync(scenario, before, image, deadline.Token);
+    }
+
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task Rook_private_HTTP_complete_invalid_character_returns_only_safe_unavailable()
+    {
+        Assert.True(OperatingSystem.IsLinux());
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        using RookRuntimeScenario scenario = new(stores, malformed: true);
+        await using RookRuntimeHttpHost host = await RookRuntimeHttpHost.StartAsync(scenario, stores.Root, deadline.Token);
+        InstallLinkingRookReadConsent consent = await host.GrantAsync(scenario, deadline.Token);
+        using InstallLinkingAuthoritativeEnvelope before = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+        RookHttpReadOnlyImage image = await CaptureRookHttpImageAsync(scenario);
+        using HttpResponseMessage response = await host.ReadAsync(scenario, consent, deadline.Token);
+        JsonElement body = await ReadRookHttpJsonAsync(response, scenario, deadline.Token);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        AssertRookHttpFailure(body);
+        Assert.Equal(2, scenario.Identity.Calls); // Grant and capture, no result to revalidate.
+        await AssertRookHttpReadOnlyAsync(scenario, before, image, deadline.Token);
+    }
+
+    private sealed record RookHttpReadOnlyImage(byte[] Account, byte[] Snapshot, byte[] Mirror, long Commits);
+
+    [SupportedOSPlatform("linux")]
+    private async Task<RookHttpReadOnlyImage> CaptureRookHttpImageAsync(RookRuntimeScenario scenario)
+        => new(File.ReadAllBytes(scenario.AccountPath), File.ReadAllBytes(scenario.SnapshotPath),
+            File.ReadAllBytes(scenario.Reader.Store.StoragePath),
+            await _fixture.ScalarLongAsync("SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+
+    [SupportedOSPlatform("linux")]
+    private async Task AssertRookHttpReadOnlyAsync(RookRuntimeScenario scenario, InstallLinkingAuthoritativeEnvelope expected,
+        RookHttpReadOnlyImage image, CancellationToken ct)
+    {
+        using InstallLinkingAuthoritativeEnvelope current = await scenario.Reader.Authority.ReadCurrentAsync(ct);
+        AssertSameHead(expected, current);
+        Assert.Equal(image.Commits, await _fixture.ScalarLongAsync("SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+        Assert.Equal(image.Account, File.ReadAllBytes(scenario.AccountPath));
+        Assert.Equal(image.Snapshot, File.ReadAllBytes(scenario.SnapshotPath));
+        Assert.Equal(image.Mirror, File.ReadAllBytes(scenario.Reader.Store.StoragePath));
+        scenario.AssertPrivateWorkCleanedAndInputsUnchanged();
+    }
+
+    private static void AssertRookHttpResultFields(JsonElement body)
+        => Assert.Equal(new[] { "explanation", "failureReason", "level", "maximumLevel", "ruleContext", "sourceAnchors", "status" },
+            body.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal).ToArray());
+
+    [SupportedOSPlatform("linux")]
+    private static void AssertResolvedRookHttpProjection(JsonElement body, RookRuntimeScenario scenario)
+    {
+        AssertRookHttpResultFields(body);
+        Assert.Equal(WorkspaceRuleQuestionStatuses.Resolved, body.GetProperty("status").GetString());
+        Assert.Equal(1, body.GetProperty("level").GetInt32());
+        Assert.Equal(4, body.GetProperty("maximumLevel").GetInt32());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("failureReason").ValueKind);
+        JsonElement context = body.GetProperty("ruleContext");
+        Assert.Equal(new[] { "contentRevision", "engineFingerprint", "engineIdentityKind", "executingModules", "intent", "locale",
+            "rulesetId", "savedRevision", "settingsProfileId", "sourceNodeDigest", "sourceProfileDigest", "subjectId",
+            "workspaceDocumentDigest", "workspaceId" },
+            context.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(scenario.Exported.Snapshot.Workspace.Id.Value, context.GetProperty("workspaceId").GetString());
+        Assert.Equal("sr5", context.GetProperty("rulesetId").GetString());
+        Assert.Equal(2, context.GetProperty("contentRevision").GetInt64());
+        Assert.Equal(1, context.GetProperty("savedRevision").GetInt64());
+        Assert.NotEqual(scenario.Selected.RemoteRevision, context.GetProperty("contentRevision").GetInt64());
+        Assert.Equal(WorkspaceRuleQuestionIntents.QualityLevel, context.GetProperty("intent").GetString());
+        Assert.Equal(RookRuntimeScenario.SavedQualityId, context.GetProperty("subjectId").GetString());
+        Assert.Equal("en", context.GetProperty("locale").GetString());
+        Assert.NotEmpty(context.GetProperty("executingModules").EnumerateArray());
+        Assert.False(string.IsNullOrWhiteSpace(context.GetProperty("engineFingerprint").GetString()));
+        JsonElement anchor = Assert.Single(body.GetProperty("sourceAnchors").EnumerateArray());
+        Assert.Equal("HUBTEST", anchor.GetProperty("sourceBook").GetString());
+        Assert.Equal(12, anchor.GetProperty("page").GetInt32());
+        Assert.Equal(RookRuntimeScenario.QualitySourceId, anchor.GetProperty("qualitySourceId").GetString());
+        Assert.NotEmpty(anchor.GetProperty("calculationTrace").EnumerateArray());
+        Assert.Equal(context.GetProperty("sourceNodeDigest").GetString(), anchor.GetProperty("sourceNodeDigest").GetString());
+        Assert.Equal(context.GetProperty("sourceProfileDigest").GetString(), anchor.GetProperty("sourceProfileDigest").GetString());
+        Assert.Contains(anchor.GetProperty("anchorId").GetString(), body.GetProperty("explanation")
+            .GetProperty("sourceAnchorIds").EnumerateArray().Select(item => item.GetString()));
+    }
+
+    private static void AssertRookHttpConsentProjection(JsonElement body, InstallLinkingRookReadConsent consent)
+    {
+        Assert.Equal(new[] { "consentId", "expiresAtUtc", "issuedAtUtc", "purpose", "revokedAtUtc", "version", "workspaceId" },
+            body.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(consent.ConsentId, body.GetProperty("consentId").GetString());
+        Assert.Equal(consent.Version, body.GetProperty("version").GetInt64());
+        Assert.Equal(consent.WorkspaceId, body.GetProperty("workspaceId").GetString());
+        Assert.Equal(consent.Purpose, body.GetProperty("purpose").GetString());
+        Assert.Equal(consent.IssuedAtUtc, body.GetProperty("issuedAtUtc").GetDateTimeOffset());
+        Assert.Equal(consent.ExpiresAtUtc, body.GetProperty("expiresAtUtc").GetDateTimeOffset());
+        Assert.Equal(consent.RevokedAtUtc, body.GetProperty("revokedAtUtc").ValueKind == JsonValueKind.Null
+            ? (DateTimeOffset?)null : body.GetProperty("revokedAtUtc").GetDateTimeOffset());
+    }
+
+    private static void AssertRookHttpFailure(JsonElement body)
+    {
+        Assert.Equal(new[] { "error" }, body.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal("The private Rook workspace operation could not be completed.", body.GetProperty("error").GetString());
+    }
+
+    [SupportedOSPlatform("linux")]
+    private static async Task<JsonElement> ReadRookHttpJsonAsync(HttpResponseMessage response, RookRuntimeScenario scenario,
+        CancellationToken ct)
+    {
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.True(response.Headers.CacheControl?.Private);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        byte[] bytes = new byte[RookWorkspaceToolController.MaxResponseBytes + 1];
+        int length = 0;
+        using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+        while (length < bytes.Length)
+        {
+            int count = await stream.ReadAsync(bytes.AsMemory(length), ct);
+            if (count == 0) break;
+            length += count;
+        }
+        Assert.InRange(length, 1, RookWorkspaceToolController.MaxResponseBytes);
+        string wire = Encoding.UTF8.GetString(bytes, 0, length);
+        foreach (string forbidden in new[] { RookRuntimeScenario.PrivateNotes, scenario.Owner.Value, scenario.UserId,
+            scenario.ExportIssuerId, scenario.Selected.ServerToken!, scenario.Selected.WorkspaceContinuationDigest!,
+            "rook-runtime-test-session", "ownerId", "trustedLocalOwner", "ownerAuthorityInstanceId", "ownerTransitionRevision",
+            "rawBinding", "resultDigest", "rawResultDigest", "workspaceContinuation", "continuationDigest", "serverToken", "carrier" })
+            Assert.DoesNotContain(forbidden, wire, StringComparison.OrdinalIgnoreCase);
+        using JsonDocument document = JsonDocument.Parse(bytes.AsMemory(0, length));
+        return document.RootElement.Clone();
+    }
+
+    [SupportedOSPlatform("linux")]
+    private sealed class RookRuntimeHttpHost(WebApplication application, HttpClient client) : IAsyncDisposable
+    {
+        private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+        public static async Task<RookRuntimeHttpHost> StartAsync(RookRuntimeScenario scenario, string root, CancellationToken ct)
+        {
+            WebApplication? app = null;
+            try
+            {
+                var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+                {
+                    EnvironmentName = Environments.Production, ContentRootPath = root
+                });
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_ROOK_PRIVATE_RUNTIME_ENABLED"] = "true", ["CHUMMER_PUBLIC_DOWNLOAD_ONLY"] = "false"
+                });
+                builder.Logging.ClearProviders();
+                builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
+                builder.Services.AddControllers().AddApplicationPart(typeof(RookWorkspaceToolController).Assembly);
+                // Actual PG/Core instances, not a substitute activation or green
+                // authority. This test does not qualify Production host activation.
+                scenario.RegisterHttpServices(builder.Services);
+                app = builder.Build();
+                app.MapControllers();
+                using var startup = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                startup.CancelAfter(TimeSpan.FromSeconds(10));
+                await app.StartAsync(startup.Token);
+                IServerAddressesFeature addresses = app.Services.GetRequiredService<IServer>().Features
+                    .Get<IServerAddressesFeature>() ?? throw new InvalidOperationException("No loopback test listener.");
+                var client = new HttpClient(new HttpClientHandler { UseCookies = false, UseProxy = false, AllowAutoRedirect = false })
+                {
+                    BaseAddress = new Uri(Assert.Single(addresses.Addresses)), Timeout = TimeSpan.FromSeconds(10)
+                };
+                return new(app, client);
+            }
+            catch
+            {
+                if (app is not null) await app.DisposeAsync();
+                throw;
+            }
+        }
+
+        public async Task<InstallLinkingRookReadConsent> GrantAsync(RookRuntimeScenario scenario, CancellationToken ct)
+        {
+            using HttpResponseMessage response = await SendAsync("consents", new
+            {
+                installationId = scenario.Installation.InstallationId, grantId = scenario.Installation.GrantId,
+                workspaceId = scenario.Selected.WorkspaceId, remoteRevision = scenario.Selected.RemoteRevision,
+                serverToken = scenario.Selected.ServerToken, continuationDigest = scenario.Selected.WorkspaceContinuationDigest,
+                explicitConfirmation = true, expiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(2)
+            }, ct);
+            JsonElement body = await ReadRookHttpJsonAsync(response, scenario, ct);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            InstallLinkingRookReadConsent consent = Assert.Single(scenario.Reader.Store.RookReadConsentsById).Value;
+            AssertRookHttpConsentProjection(body, consent);
+            return consent;
+        }
+
+        public Task<HttpResponseMessage> ReadAsync(RookRuntimeScenario scenario, InstallLinkingRookReadConsent consent,
+            CancellationToken ct, string intent = WorkspaceRuleQuestionIntents.QualityLevel)
+            => SendAsync("read", new
+            {
+                installationId = scenario.Installation.InstallationId, grantId = scenario.Installation.GrantId,
+                consentId = consent.ConsentId, expectedVersion = consent.Version,
+                intent, savedSubjectId = RookRuntimeScenario.SavedQualityId, locale = "en"
+            }, ct);
+
+        public async Task<HttpResponseMessage> SendAsync(string action, object body, CancellationToken ct)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/internal/rook/workspace/" + action)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(body, Json), Encoding.UTF8, "application/json")
+            };
+            request.Headers.Authorization = new("Bearer", "rook-runtime-test-session");
+            return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            client.Dispose();
+            try
+            {
+                using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await application.StopAsync(shutdown.Token);
+            }
+            finally { await application.DisposeAsync(); }
+        }
+    }
+
     [SupportedOSPlatform("linux")]
     private sealed class RookRuntimeScenario : IDisposable
     {
@@ -2535,16 +2935,18 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
         public InstallLinkedWorkspaceSnapshotRecord Selected { get; }
         public InstallLinkedWorkspaceSnapshotService Snapshots { get; }
         public string SnapshotPath { get; }
+        public string AccountPath { get; }
 
         public RookRuntimeScenario(RookConsentPostgresStores stores, bool malformed = false)
         {
             Reader = stores.OpenStore();
             SnapshotPath = Path.Combine(stores.Root, "rook-runtime-snapshots.json");
+            AccountPath = Path.Combine(stores.Root, "rook-runtime-community.json");
             IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ASPNETCORE_ENVIRONMENT"] = "Testing",
                 ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.example.invalid",
-                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(stores.Root, "rook-runtime-community.json"),
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = AccountPath,
                 ["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"] = SnapshotPath
             }).Build();
             var accounts = new AccountService(new CommunityStore(configuration, NullLogger<CommunityStore>.Instance));
@@ -2630,6 +3032,12 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
         public Task<InstallLinkingRookReadConsent> GrantAsync(CancellationToken ct) => _admission.GrantAsync(_request,
             Installation.InstallationId, Installation.GrantId!, Selected.WorkspaceId, Selected.RemoteRevision,
             Selected.ServerToken!, Selected.WorkspaceContinuationDigest!, true, DateTimeOffset.UtcNow.AddMinutes(2), ct);
+
+        public void RegisterHttpServices(IServiceCollection services)
+        {
+            services.AddSingleton(_admission);
+            services.AddSingleton(_reads);
+        }
 
         public Task<WorkspaceRuleQuestionResult> ResolveAsync(InstallLinkingRookReadConsent consent, CancellationToken ct,
             string intent = WorkspaceRuleQuestionIntents.QualityLevel)

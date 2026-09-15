@@ -51,6 +51,7 @@
     <Compile Include="..\Chummer.Tests\InstallLinkingRookConsentJsonTests.cs" Link="InstallLinkingRookConsentJsonTests.cs" />
     <Compile Include="..\Chummer.Tests\RookWorkspaceReadAdmissionServiceTests.cs" Link="RookWorkspaceReadAdmissionServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\RookPrivateRuntimeCompositionTests.cs" Link="RookPrivateRuntimeCompositionTests.cs" />
+    <Compile Include="..\Chummer.Tests\RookWorkspaceToolEndpointTests.cs" Link="RookWorkspaceToolEndpointTests.cs" />
     <Compile Include="..\Chummer.Tests\HubIdentityClientFreshAuthorizationTests.cs" Link="HubIdentityClientFreshAuthorizationTests.cs" />
     <Compile Include="..\Chummer.Tests\AccountAuxiliaryDataErasureServiceTests.cs" Link="AccountAuxiliaryDataErasureServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\AndroidLinkedV2BearerProofTests.cs" Link="AndroidLinkedV2BearerProofTests.cs" />
