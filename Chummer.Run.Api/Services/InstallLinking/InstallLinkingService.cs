@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace Chummer.Run.Api.Services.InstallLinking;
 
-public sealed class InstallLinkingService
+public sealed partial class InstallLinkingService
 {
     public const int MaxRequestBodyBytes = 16 * 1024;
     public const string AndroidLinkedV2GrantTransport = InstallationGrantTransports.AndroidLinkedV2;

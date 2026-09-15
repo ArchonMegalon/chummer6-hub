@@ -45,6 +45,11 @@
   <ItemGroup>
     <Compile Include="ReleaseBuildProvenanceValidatorTests.cs" />
     <Compile Include="..\Chummer.Tests\HubSessionAccountAdmissionServiceTests.cs" Link="HubSessionAccountAdmissionServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\AccountCanonicalCaptureTests.cs" Link="AccountCanonicalCaptureTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallSelectedContinuationCaptureTests.cs" Link="InstallSelectedContinuationCaptureTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingRookConsentTests.cs" Link="InstallLinkingRookConsentTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingRookConsentJsonTests.cs" Link="InstallLinkingRookConsentJsonTests.cs" />
+    <Compile Include="..\Chummer.Tests\RookWorkspaceReadAdmissionServiceTests.cs" Link="RookWorkspaceReadAdmissionServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\HubIdentityClientFreshAuthorizationTests.cs" Link="HubIdentityClientFreshAuthorizationTests.cs" />
     <Compile Include="..\Chummer.Tests\AccountAuxiliaryDataErasureServiceTests.cs" Link="AccountAuxiliaryDataErasureServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\AndroidLinkedV2BearerProofTests.cs" Link="AndroidLinkedV2BearerProofTests.cs" />

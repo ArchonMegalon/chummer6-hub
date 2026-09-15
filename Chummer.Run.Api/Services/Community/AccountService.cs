@@ -11,6 +11,7 @@ public sealed record HubUserEnsureResult(
 
 public sealed class AccountService
 {
+    private static readonly UTF8Encoding ExactIdentityEncoding = new(false, true);
     private readonly CommunityStore _store;
     private readonly TeableUserProjectionService? _teableUsers;
     private readonly ILogger<AccountService> _logger;
@@ -222,6 +223,59 @@ public sealed class AccountService
                     NormalizeOptional(principal), normalized, StringComparison.OrdinalIgnoreCase)) == true;
             return belongsToUser ? user.UserId : null;
         }
+    }
+
+    /// <summary>
+    /// Guards an already authenticated, exact subject's existing canonical account for a
+    /// bounded synchronous capture. This does not authenticate, create, or grant consent.
+    /// The caller must enter this guard before any installation/authority/snapshot gate.
+    /// A synchronous capture may wait for a fenced worker, but that worker must never
+    /// reacquire this thread-owned account gate. No account mutations, provider HTTP,
+    /// async callbacks or nested fire-and-forget work are permitted. A separately
+    /// authorized installation-consent CAS may run here; synchronous work cannot be preempted.
+    /// </summary>
+    internal bool CaptureExistingCanonicalAccount(
+        string exactSubjectId,
+        string expectedUserId,
+        Action capture)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        foreach (Delegate callback in capture.GetInvocationList())
+        {
+            if (callback.Method.IsDefined(
+                    typeof(System.Runtime.CompilerServices.AsyncStateMachineAttribute), inherit: false))
+                throw new ArgumentException("An account capture callback must be synchronous.", nameof(capture));
+        }
+        if (!IsExactAccountIdentity(exactSubjectId) || !IsExactAccountIdentity(expectedUserId))
+            return false;
+
+        lock (_store.Gate)
+        {
+            if (!_store.UserIdBySubjectId.TryGetValue(exactSubjectId, out string? indexedUserId)
+                || indexedUserId is null
+                || !string.Equals(indexedUserId, expectedUserId, StringComparison.Ordinal)
+                || !_store.UsersById.TryGetValue(indexedUserId, out HubUserDto? user)
+                || user is null
+                || !string.Equals(user.UserId, expectedUserId, StringComparison.Ordinal)
+                || !(string.Equals(user.SubjectId, exactSubjectId, StringComparison.Ordinal)
+                    || user.LinkedPrincipals?.Any(principal =>
+                        string.Equals(principal, exactSubjectId, StringComparison.Ordinal)) == true))
+                return false;
+
+            capture();
+            return true;
+        }
+    }
+
+    private static bool IsExactAccountIdentity(string? value)
+    {
+        // Match the fresh-session identifier bound without trimming, folding, or replacing
+        // malformed UTF-16. Legacy account lookups deliberately retain their old behavior.
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 128
+            || value.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
+            return false;
+        try { return ExactIdentityEncoding.GetByteCount(value) <= 128; }
+        catch (EncoderFallbackException) { return false; }
     }
 
     public HubUserDto UpdateGroupMemberships(string userId, IReadOnlyList<string> groupIds)

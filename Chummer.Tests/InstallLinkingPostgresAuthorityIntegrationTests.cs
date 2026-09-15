@@ -1,8 +1,20 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using Chummer.Contracts.Characters;
+using Chummer.Contracts.Workspaces;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
+using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
+using Chummer.Run.Contracts.Identity;
 using Docker.DotNet.Models;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -1820,6 +1832,652 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
             """;
         await command.ExecuteScalarAsync();
         await transaction.RollbackAsync();
+    }
+
+    [Theory]
+    [InlineData("grant")]
+    [InlineData("consent")]
+    public async Task Rook_service_capture_excludes_external_revocation_and_rejects_its_stale_mirror(
+        string revokedAuthority)
+    {
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        var reader = await Task.Run(stores.OpenStore);
+        await Task.Run(() => RookConsentPostgresStores.SeedInstallation(reader.Store));
+        InstallLinkingRookReadConsent consent = await Task.Run(() => GrantRookConsent(reader.Service));
+        var writer = await Task.Run(stores.OpenStore);
+        using InstallLinkingAuthoritativeEnvelope before = await reader.Authority.ReadCurrentAsync();
+        long commitsBefore = await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits");
+        using var releaseCapture = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int captures = 0;
+        Task<bool> captureTask = Task.Run(() => CaptureRookConsent(reader.Service, consent,
+            (current, installation) =>
+            {
+                AssertRookConsentSelection(consent, current, installation);
+                Interlocked.Increment(ref captures);
+                entered.TrySetResult();
+                if (!releaseCapture.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    throw new TimeoutException("The test did not release the Rook capture.");
+                }
+            }));
+        Task? revokeTask = null;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            revokeTask = Task.Run(() =>
+            {
+                if (revokedAuthority == "grant")
+                {
+                    writer.Service.RevokeGrantForOwner(RookConsentPostgresStores.InstallationId,
+                        RookConsentPostgresStores.UserId, RookConsentPostgresStores.SubjectId);
+                }
+                else
+                {
+                    InstallLinkingRookReadConsent revoked = writer.Service.RevokeRookReadConsent(
+                        RookConsentPostgresStores.UserId, RookConsentPostgresStores.SubjectId,
+                        consent.ConsentId, consent.Version);
+                    Assert.Equal(consent.Version + 1, revoked.Version);
+                    Assert.NotNull(revoked.RevokedAtUtc);
+                }
+            });
+            await AssertDatabaseBlockedByAsync(writer.ApplicationName, reader.ApplicationName);
+            Assert.False(captureTask.IsCompleted);
+            Assert.False(revokeTask.IsCompleted);
+            Assert.Equal(commitsBefore, await _fixture.ScalarLongAsync(
+                "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+
+            releaseCapture.Set();
+            Assert.True(await captureTask.WaitAsync(TimeSpan.FromSeconds(10)));
+            await revokeTask.WaitAsync(TimeSpan.FromSeconds(10));
+            using InstallLinkingAuthoritativeEnvelope after = await reader.Authority.ReadCurrentAsync();
+            Assert.Equal(before.Generation + 1, after.Generation);
+            Assert.NotEqual(before.CommitId, after.CommitId);
+            Assert.Equal(commitsBefore + 1, await _fixture.ScalarLongAsync(
+                "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+
+            // This process still holds the once-valid consent and active grant. Only the
+            // real service's database-bound mirror check can prevent their stale reuse.
+            Assert.Equal(consent, reader.Store.RookReadConsentsById[consent.ConsentId]);
+            Assert.Equal(InstallationGrantStates.Active,
+                reader.Store.GrantsById[RookConsentPostgresStores.GrantId].Status);
+            Assert.False(CaptureRookConsent(reader.Service, consent,
+                (_, _) => Interlocked.Increment(ref captures)));
+            Assert.Equal(1, Volatile.Read(ref captures));
+
+            var reloaded = await Task.Run(stores.OpenStore);
+            Assert.False(CaptureRookConsent(reloaded.Service, consent,
+                (_, _) => Interlocked.Increment(ref captures)));
+            Assert.Equal(1, Volatile.Read(ref captures));
+            if (revokedAuthority == "grant")
+            {
+                Assert.Equal(InstallationGrantStates.Revoked,
+                    reloaded.Store.GrantsById[RookConsentPostgresStores.GrantId].Status);
+            }
+            else
+            {
+                InstallLinkingRookReadConsent revoked =
+                    reloaded.Store.RookReadConsentsById[consent.ConsentId];
+                Assert.Equal(consent.Version + 1, revoked.Version);
+                Assert.NotNull(revoked.RevokedAtUtc);
+                Assert.False(CaptureRookConsent(reloaded.Service, revoked,
+                    (_, _) => Interlocked.Increment(ref captures)));
+                Assert.Equal(1, Volatile.Read(ref captures));
+            }
+        }
+        finally
+        {
+            releaseCapture.Set();
+            await captureTask.WaitAsync(TimeSpan.FromSeconds(15));
+            if (revokeTask is not null)
+            {
+                await revokeTask.WaitAsync(TimeSpan.FromSeconds(15));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Rook_service_rejects_byte_identical_authority_generation_advance_before_capture()
+    {
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        var reader = await Task.Run(stores.OpenStore);
+        await Task.Run(() => RookConsentPostgresStores.SeedInstallation(reader.Store));
+        InstallLinkingRookReadConsent consent = await Task.Run(() => GrantRookConsent(reader.Service));
+        var writer = await Task.Run(stores.OpenStore);
+        using InstallLinkingAuthoritativeEnvelope before = await reader.Authority.ReadCurrentAsync();
+        long commitsBefore = await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits");
+        int captures = 0;
+        Assert.True(CaptureRookConsent(reader.Service, consent, (_, _) => captures++));
+        var next = new InstallLinkingEnvelopeCompareExchangeRequest(
+            ExpectedGeneration: before.Generation,
+            ExpectedCommitId: before.CommitId,
+            ExpectedEnvelopeSha256: before.EnvelopeSha256!.ToArray(),
+            NextGeneration: before.Generation + 1,
+            CommitId: Guid.NewGuid(),
+            EnvelopeVersion: before.EnvelopeVersion!.Value,
+            SnapshotSha256: before.SnapshotSha256!.ToArray(),
+            EnvelopeSha256: before.EnvelopeSha256!.ToArray(),
+            ProtectedEnvelope: before.ProtectedEnvelope!.ToArray());
+        try
+        {
+            using InstallLinkingEnvelopeCompareExchangeResult committed =
+                await writer.Authority.CompareExchangeAsync(next);
+            Assert.True(committed.Committed, committed.Code);
+            using InstallLinkingAuthoritativeEnvelope after = await reader.Authority.ReadCurrentAsync();
+            Assert.Equal(before.ProtectedEnvelope, after.ProtectedEnvelope);
+            Assert.Equal(before.SnapshotSha256, after.SnapshotSha256);
+            Assert.Equal(before.EnvelopeSha256, after.EnvelopeSha256);
+            Assert.Equal(before.Generation + 1, after.Generation);
+            Assert.NotEqual(before.CommitId, after.CommitId);
+
+            Assert.False(CaptureRookConsent(reader.Service, consent, (_, _) => captures++));
+            Assert.Equal(1, captures);
+            using InstallLinkingAuthoritativeEnvelope afterRejectedRead = await reader.Authority.ReadCurrentAsync();
+            AssertSameHead(after, afterRejectedRead);
+            Assert.Equal(commitsBefore + 1, await _fixture.ScalarLongAsync(
+                "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(next.ExpectedEnvelopeSha256!);
+            CryptographicOperations.ZeroMemory(next.SnapshotSha256);
+            CryptographicOperations.ZeroMemory(next.EnvelopeSha256);
+            CryptographicOperations.ZeroMemory(next.ProtectedEnvelope);
+        }
+    }
+
+    [Theory]
+    [InlineData("throw")]
+    [InlineData("cancel")]
+    public async Task Rook_service_never_accepts_failed_or_canceled_capture_and_releases_the_real_row(
+        string callbackExit)
+    {
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        var reader = await Task.Run(stores.OpenStore);
+        await Task.Run(() => RookConsentPostgresStores.SeedInstallation(reader.Store));
+        InstallLinkingRookReadConsent consent = await Task.Run(() => GrantRookConsent(reader.Service));
+        var writer = await Task.Run(stores.OpenStore);
+        using InstallLinkingAuthoritativeEnvelope before = await reader.Authority.ReadCurrentAsync();
+        long commitsBefore = await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits");
+        using var releaseCapture = new ManualResetEventSlim();
+        using var cancellation = new CancellationTokenSource();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool? accepted = null;
+        int captures = 0;
+        Task<Exception?> captureCompletion = Record.ExceptionAsync(() => Task.Run(() =>
+        {
+            accepted = CaptureRookConsent(reader.Service, consent, (current, installation) =>
+            {
+                AssertRookConsentSelection(consent, current, installation);
+                Interlocked.Increment(ref captures);
+                entered.TrySetResult();
+                if (!releaseCapture.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    throw new TimeoutException("The test did not release the failing Rook capture.");
+                }
+
+                if (callbackExit == "throw")
+                {
+                    throw new InvalidOperationException("The consent selection capture failed.");
+                }
+
+                cancellation.Cancel();
+            }, cancellation.Token);
+        }));
+        Task? revokeTask = null;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            revokeTask = Task.Run(() => writer.Service.RevokeGrantForOwner(
+                RookConsentPostgresStores.InstallationId,
+                RookConsentPostgresStores.UserId, RookConsentPostgresStores.SubjectId));
+            await AssertDatabaseBlockedByAsync(writer.ApplicationName, reader.ApplicationName);
+            Assert.False(revokeTask.IsCompleted);
+            Assert.False(captureCompletion.IsCompleted);
+            Assert.Equal(commitsBefore, await _fixture.ScalarLongAsync(
+                "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+
+            releaseCapture.Set();
+            Exception? failure = await captureCompletion.WaitAsync(TimeSpan.FromSeconds(10));
+            if (callbackExit == "cancel")
+            {
+                Assert.IsAssignableFrom<OperationCanceledException>(failure);
+                Assert.Null(accepted);
+            }
+            else
+            {
+                Assert.Null(failure);
+                Assert.Equal(false, accepted);
+            }
+
+            Assert.Equal(1, Volatile.Read(ref captures));
+            await revokeTask.WaitAsync(TimeSpan.FromSeconds(10));
+            using InstallLinkingAuthoritativeEnvelope after = await reader.Authority.ReadCurrentAsync();
+            Assert.Equal(before.Generation + 1, after.Generation);
+            Assert.Equal(commitsBefore + 1, await _fixture.ScalarLongAsync(
+                "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+            var reloaded = await Task.Run(stores.OpenStore);
+            Assert.False(CaptureRookConsent(reloaded.Service, consent,
+                (_, _) => Interlocked.Increment(ref captures)));
+            Assert.Equal(1, Volatile.Read(ref captures));
+        }
+        finally
+        {
+            releaseCapture.Set();
+            await captureCompletion.WaitAsync(TimeSpan.FromSeconds(15));
+            if (revokeTask is not null)
+            {
+                await revokeTask.WaitAsync(TimeSpan.FromSeconds(15));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Rook_service_captures_exact_consent_selection_without_mutating_authority_or_mirror()
+    {
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        var reader = await Task.Run(stores.OpenStore);
+        await Task.Run(() => RookConsentPostgresStores.SeedInstallation(reader.Store));
+        InstallLinkingRookReadConsent consent = await Task.Run(() => GrantRookConsent(reader.Service));
+        using InstallLinkingAuthoritativeEnvelope before = await reader.Authority.ReadCurrentAsync();
+        long commitsBefore = await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits");
+        long persistenceAttempts = reader.Store.PersistenceAttempts;
+        byte[] mirrorBefore = File.ReadAllBytes(reader.Store.StoragePath);
+        int captures = 0;
+
+        Assert.True(CaptureRookConsent(reader.Service, consent, (current, installation) =>
+        {
+            AssertRookConsentSelection(consent, current, installation);
+            captures++;
+        }));
+
+        using InstallLinkingAuthoritativeEnvelope after = await reader.Authority.ReadCurrentAsync();
+        Assert.Equal(1, captures);
+        AssertSameHead(before, after);
+        Assert.Equal(commitsBefore, await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+        Assert.Equal(persistenceAttempts, reader.Store.PersistenceAttempts);
+        Assert.Equal(mirrorBefore, File.ReadAllBytes(reader.Store.StoragePath));
+        Assert.Equal(consent, Assert.Single(reader.Store.RookReadConsentsById.Values));
+    }
+
+    [Theory]
+    [InlineData("new_session")]
+    [InlineData("revoked_consent")]
+    public async Task Rook_orchestrator_captures_and_revalidates_the_exact_persisted_selection_then_denies_changed_authority(
+        string change)
+    {
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        var reader = await Task.Run(stores.OpenStore);
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Testing",
+                ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.example.invalid",
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(stores.Root, "community.json"),
+                ["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"] =
+                    Path.Combine(stores.Root, "selected-workspace.json")
+            })
+            .Build();
+        var community = new CommunityStore(configuration, NullLogger<CommunityStore>.Instance);
+        var accounts = new AccountService(community);
+        var user = accounts.EnsureUser(RookConsentPostgresStores.SubjectId,
+            "Rook PostgreSQL owner", "rook-postgres@example.invalid");
+        await Task.Run(() => RookConsentPostgresStores.SeedInstallation(reader.Store, user.UserId));
+        ClaimedInstallationDto installation = reader.Store.InstallationsById[RookConsentPostgresStores.InstallationId];
+        string owner = InstallLinkedWorkspaceSnapshotTransfer.ComputeContinuationOwnerId(user.SubjectId);
+        var workspace = new WorkspaceDocumentSnapshot(
+            new CharacterWorkspaceId("rook-postgres-selected-workspace"),
+            new WorkspaceDocument(new WorkspaceDocumentState("sr5", 1, "workspace",
+                "<character><name>Selected Rook transport fixture</name></character>")),
+            DateTimeOffset.UtcNow, 1, 0);
+        // A minimal Core transport document, with no claimed rules execution or GM history.
+        var continuation = new WorkspaceContinuationSnapshot(owner, workspace, []);
+        string digest = WorkspaceContinuationSnapshotDigest.Compute(continuation);
+        using JsonDocument encoded = JsonDocument.Parse(WorkspaceContinuationCodec.Encode(
+            new(continuation, digest), InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes));
+        var incoming = new InstallLinkedWorkspaceSnapshotRecord(
+            "", workspace.Id.Value, workspace.Document.RulesetId, "NativeXml",
+            workspace.Document.SchemaVersion, workspace.Document.PayloadKind, workspace.Document.Content,
+            workspace.LastUpdatedUtc, installation.InstallationId, "Selected Rook transport fixture",
+            null, null, null, null, null, 0, 0, false,
+            WorkspaceContinuation: encoded.RootElement.Clone(), WorkspaceContinuationDigest: digest);
+        var snapshotWriter = new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(configuration));
+        InstallLinkedWorkspaceSnapshotRecord selected = snapshotWriter.UpsertForInstallation(installation, incoming, 0);
+        Assert.Equal(1, selected.RemoteRevision);
+        Assert.Equal(digest, selected.WorkspaceContinuationDigest);
+        // Exercise the on-disk row through a fresh actual snapshot store.
+        var snapshotStore = new InstallLinkedWorkspaceSnapshotStore(configuration);
+        Assert.Single(snapshotStore.SnapshotsByKey);
+        var snapshots = new InstallLinkedWorkspaceSnapshotService(snapshotStore);
+        using var identity = new RookPostgresIdentityTransport(DateTimeOffset.UtcNow.AddMinutes(10));
+        using var http = new HttpClient(identity);
+        var sessions = new HubSessionAccountAdmissionService(http, configuration, accounts, TimeProvider.System);
+        var admission = new RookWorkspaceReadAdmissionService(
+            sessions, accounts, reader.Service, snapshots, TimeProvider.System);
+        HttpRequest request = new DefaultHttpContext().Request;
+        request.Headers.Authorization = "Bearer " + RookPostgresIdentityTransport.Bearer;
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
+        InstallLinkingRookReadConsent consent = await Task.Run(() => admission.GrantAsync(request,
+            installation.InstallationId, installation.GrantId!, selected.WorkspaceId,
+            selected.RemoteRevision, selected.ServerToken!, selected.WorkspaceContinuationDigest!,
+            explicitConfirmation: true, expiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(2), ct: deadline.Token))
+            .WaitAsync(deadline.Token);
+        Assert.Equal(1, identity.Calls);
+        Assert.Equal(consent, Assert.Single(reader.Store.RookReadConsentsById.Values));
+        using InstallLinkingAuthoritativeEnvelope grantedHead = await reader.Authority.ReadCurrentAsync(deadline.Token);
+        long commitsAfterGrant = await _fixture.ScalarLongAsync("SELECT COUNT(*) FROM install_linking.snapshot_commits");
+        byte[] persistedSnapshot = File.ReadAllBytes(configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"]!);
+
+        string blockerName = $"rook_orchestrator_blocker_{Guid.NewGuid():N}";
+        await using NpgsqlDataSource blockerSource = CreateNamedDataSource(blockerName);
+        await using NpgsqlConnection blocker = await blockerSource.OpenConnectionAsync(deadline.Token);
+        await using NpgsqlTransaction transaction = await blocker.BeginTransactionAsync(deadline.Token);
+        await using (NpgsqlCommand holdHead = blocker.CreateCommand())
+        {
+            holdHead.Transaction = transaction;
+            holdHead.CommandText = "SELECT generation FROM install_linking.snapshot_head WHERE singleton = true FOR UPDATE";
+            Assert.Equal(grantedHead.Generation, Convert.ToInt64(await holdHead.ExecuteScalarAsync(deadline.Token)));
+        }
+
+        Task<RookWorkspaceReadCapture> captureTask = Task.Run(() => admission.CaptureAsync(request,
+            installation.InstallationId, installation.GrantId!, consent.ConsentId, consent.Version, deadline.Token));
+        try
+        {
+            await AssertDatabaseBlockedByAsync(reader.ApplicationName, blockerName);
+            Assert.Equal(2, identity.Calls);
+            Assert.False(captureTask.IsCompleted);
+        }
+        finally
+        {
+            // Force an actual awaited PostgreSQL continuation while account/install gates
+            // belong to the caller. The capture must then reach the actual snapshot gate.
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await transaction.RollbackAsync(cleanup.Token);
+        }
+
+        RookWorkspaceReadCapture captured = await captureTask.WaitAsync(deadline.Token);
+        Assert.Equal(2, identity.Calls);
+        Assert.Equal(user.UserId, captured.Account.UserId);
+        Assert.Equal(user.SubjectId, captured.Account.SubjectId);
+        Assert.Equal(RookPostgresIdentityTransport.InitialSessionId, captured.Account.SessionId);
+        Assert.Equal(consent, captured.Consent);
+        Assert.Equal(user.UserId, captured.Consent.UserId);
+        Assert.Equal(selected.OwnerKey, captured.Snapshot.OwnerKey);
+        Assert.Equal(selected.WorkspaceId, captured.Snapshot.WorkspaceId);
+        Assert.Equal(selected.RemoteRevision, captured.Snapshot.RemoteRevision);
+        Assert.Equal(selected.ServerToken, captured.Snapshot.ServerToken);
+        Assert.Equal(digest, captured.Snapshot.WorkspaceContinuationDigest);
+        Assert.Equal(workspace.Document.Content, captured.Snapshot.Payload);
+        Assert.True(WorkspaceContinuationCodec.TryDecodeCandidate(
+            Encoding.UTF8.GetBytes(captured.Snapshot.WorkspaceContinuation!.Value.GetRawText()),
+            InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes, out WorkspaceContinuationExport? decoded));
+        Assert.Equal(owner, decoded!.Snapshot.OwnerId);
+        Assert.Equal(workspace.Id, decoded.Snapshot.Workspace.Id);
+        Assert.Equal(digest, decoded.SnapshotDigest);
+        Assert.Empty(decoded.Snapshot.DelegatedGmCharacterEdits);
+        Assert.Empty(decoded.Snapshot.DelegatedGmHistorySegmentStarts);
+        Assert.Single(snapshotStore.SnapshotsByKey);
+
+        await Task.Yield();
+        await Task.Run(() => admission.RevalidateAsync(request, captured, deadline.Token)).WaitAsync(deadline.Token);
+        Assert.Equal(3, identity.Calls);
+        using (InstallLinkingAuthoritativeEnvelope afterRevalidation = await reader.Authority.ReadCurrentAsync(deadline.Token))
+        {
+            AssertSameHead(grantedHead, afterRevalidation);
+        }
+        Assert.Equal(commitsAfterGrant, await _fixture.ScalarLongAsync("SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+        Assert.Equal(persistedSnapshot,
+            File.ReadAllBytes(configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"]!));
+
+        if (change == "new_session")
+        {
+            identity.SessionId = "rook-postgres-another-active-session";
+        }
+        else
+        {
+            InstallLinkingRookReadConsent revoked = await Task.Run(() => admission.RevokeAsync(
+                request, consent.ConsentId, consent.Version, deadline.Token)).WaitAsync(deadline.Token);
+            Assert.Equal(4, identity.Calls);
+            Assert.Equal(consent.Version + 1, revoked.Version);
+            Assert.NotNull(revoked.RevokedAtUtc);
+            Assert.Equal(InstallationGrantStates.Active, reader.Store.GrantsById[installation.GrantId!].Status);
+        }
+
+        using InstallLinkingAuthoritativeEnvelope beforeDeniedRevalidation = await reader.Authority.ReadCurrentAsync(deadline.Token);
+        InstallLinkingOperationException denied = await Assert.ThrowsAsync<InstallLinkingOperationException>(
+            () => Task.Run(() => admission.RevalidateAsync(request, captured, deadline.Token)).WaitAsync(deadline.Token));
+        Assert.Equal(StatusCodes.Status403Forbidden, denied.StatusCode);
+        Assert.Equal(change == "new_session" ? 4 : 5, identity.Calls);
+        Assert.Equal(user.SubjectId, identity.SubjectId);
+        using InstallLinkingAuthoritativeEnvelope afterDeniedRevalidation = await reader.Authority.ReadCurrentAsync(deadline.Token);
+        AssertSameHead(beforeDeniedRevalidation, afterDeniedRevalidation);
+        Assert.Equal(persistedSnapshot,
+            File.ReadAllBytes(configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"]!));
+    }
+
+    private sealed class RookPostgresIdentityTransport(DateTimeOffset expiresAtUtc) : HttpMessageHandler
+    {
+        public const string Bearer = "rook-postgres-explicit-session-token";
+        public const string InitialSessionId = "rook-postgres-initial-session";
+        private int _calls;
+        public int Calls => Volatile.Read(ref _calls);
+        public string SessionId { get; set; } = InitialSessionId;
+        public string SubjectId => RookConsentPostgresStores.SubjectId;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Interlocked.Increment(ref _calls);
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("https://identity.example.invalid/api/v1/identity/introspect", request.RequestUri?.AbsoluteUri);
+            IdentityIntrospectionRequest? input = JsonSerializer.Deserialize<IdentityIntrospectionRequest>(
+                await request.Content!.ReadAsStringAsync(ct), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            Assert.Equal(Bearer, Assert.IsType<IdentityIntrospectionRequest>(input).AccessToken);
+            await Task.Yield();
+            ct.ThrowIfCancellationRequested();
+            string response = JsonSerializer.Serialize(new IdentityIntrospectionResponse(
+                true, SessionId, SubjectId, ["player"], expiresAtUtc), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(response, Encoding.UTF8, "application/json")
+            };
+        }
+    }
+
+    private static InstallLinkingRookReadConsent GrantRookConsent(InstallLinkingService service)
+        => service.GrantRookReadConsent(
+            RookConsentPostgresStores.UserId, RookConsentPostgresStores.SubjectId,
+            RookConsentPostgresStores.InstallationId, RookConsentPostgresStores.GrantId,
+            RookConsentPostgresStores.WorkspaceId, RookConsentPostgresStores.RemoteRevision,
+            RookConsentPostgresStores.ServerToken, RookConsentPostgresStores.ContinuationDigest,
+            explicitConfirmation: true, expiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(2),
+            validateSelection: installation =>
+            {
+                Assert.Equal(RookConsentPostgresStores.InstallationId, installation.InstallationId);
+                Assert.Equal(RookConsentPostgresStores.UserId, installation.UserId);
+                Assert.Equal(RookConsentPostgresStores.SubjectId, installation.SubjectId);
+                Assert.Equal(RookConsentPostgresStores.GrantId, installation.GrantId);
+            });
+
+    private static bool CaptureRookConsent(InstallLinkingService service,
+        InstallLinkingRookReadConsent consent,
+        Action<InstallLinkingRookReadConsent, ClaimedInstallationDto> capture,
+        CancellationToken cancellationToken = default)
+        => service.CaptureRookReadConsent(
+            RookConsentPostgresStores.UserId, RookConsentPostgresStores.SubjectId,
+            RookConsentPostgresStores.InstallationId, RookConsentPostgresStores.GrantId,
+            consent.ConsentId, consent.Version, capture, cancellationToken);
+
+    private static void AssertRookConsentSelection(InstallLinkingRookReadConsent expected,
+        InstallLinkingRookReadConsent current, ClaimedInstallationDto installation)
+    {
+        Assert.Equal(expected, current);
+        Assert.Equal(RookConsentPostgresStores.UserId, current.UserId);
+        Assert.Equal(RookConsentPostgresStores.SubjectId, current.SubjectId);
+        Assert.Equal(RookConsentPostgresStores.InstallationId, current.InstallationId);
+        Assert.Equal(RookConsentPostgresStores.GrantId, current.GrantId);
+        Assert.Equal(RookConsentPostgresStores.WorkspaceId, current.WorkspaceId);
+        Assert.Equal(RookConsentPostgresStores.RemoteRevision, current.RemoteRevision);
+        Assert.Equal(RookConsentPostgresStores.ServerToken, current.ServerToken);
+        Assert.Equal(RookConsentPostgresStores.ContinuationDigest, current.ContinuationDigest);
+        Assert.Equal(InstallLinkingRookReadConsent.RequiredPurpose, current.Purpose);
+        Assert.Null(current.RevokedAtUtc);
+        Assert.Equal(current.InstallationId, installation.InstallationId);
+        Assert.Equal(current.GrantId, installation.GrantId);
+        Assert.Equal(current.UserId, installation.UserId);
+        Assert.Equal(current.SubjectId, installation.SubjectId);
+    }
+
+    private sealed class RookConsentPostgresStores : IAsyncDisposable
+    {
+        public const string UserId = "rook-postgres-user";
+        public const string SubjectId = "rook-postgres-subject";
+        public const string InstallationId = "rook-postgres-android";
+        public const string GrantId = "rook-postgres-grant";
+        public const string WorkspaceId = "rook-postgres-workspace";
+        public const long RemoteRevision = 7;
+        public static readonly string ServerToken = new('a', 64);
+        public static readonly string ContinuationDigest = new('b', 64);
+
+        private readonly InstallLinkingPostgresAuthorityFixture _fixture;
+        private readonly string _root;
+        private readonly string _role = $"install_link_runtime_{Guid.NewGuid():N}";
+        private readonly string _password = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        private readonly IDataProtectionProvider _provider;
+        private readonly List<InstallLinkingStore> _stores = [];
+        private readonly List<NpgsqlDataSource> _dataSources = [];
+        private bool _roleCreated;
+
+        public string Root => _root;
+
+        private RookConsentPostgresStores(InstallLinkingPostgresAuthorityFixture fixture)
+        {
+            _fixture = fixture;
+            _root = Directory.CreateTempSubdirectory("chummer-rook-consent-postgres-").FullName;
+            _provider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
+        }
+
+        public static async Task<RookConsentPostgresStores> CreateAsync(
+            InstallLinkingPostgresAuthorityFixture fixture)
+        {
+            await fixture.ResetAsync();
+            var stores = new RookConsentPostgresStores(fixture);
+            try
+            {
+                await fixture.CreateLoginRoleAsync(stores._role, stores._password);
+                stores._roleCreated = true;
+                await new InstallLinkingPostgresMigrator(fixture.AdminDataSource)
+                    .GrantRuntimePrivilegesAsync(stores._role);
+                return stores;
+            }
+            catch
+            {
+                await stores.DisposeAsync();
+                throw;
+            }
+        }
+
+        public (InstallLinkingStore Store, InstallLinkingService Service,
+            NpgsqlInstallLinkingSnapshotAuthority Authority, string ApplicationName) OpenStore()
+        {
+            string applicationName = $"rook_consent_{Guid.NewGuid():N}";
+            var connection = new NpgsqlConnectionStringBuilder(_fixture.ConnectionString)
+            {
+                Username = _role,
+                Password = _password,
+                ApplicationName = applicationName,
+                Pooling = false
+            };
+            NpgsqlDataSource dataSource = NpgsqlDataSource.Create(connection.ConnectionString);
+            _dataSources.Add(dataSource);
+            var authority = new NpgsqlInstallLinkingSnapshotAuthority(
+                dataSource, expectedRuntimeRole: _role);
+            var coordinator = new InstallLinkingPostgresAuthorityCoordinator(authority);
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_INSTALL_LINKING_STORE_PATH"] =
+                        Path.Combine(_root, applicationName, "install-linking-store.json"),
+                    ["ASPNETCORE_ENVIRONMENT"] = "Testing"
+                })
+                .Build();
+            var store = new InstallLinkingStore(configuration, _provider,
+                NullLogger<InstallLinkingStore>.Instance, coordinator);
+            _stores.Add(store);
+            return (store, new InstallLinkingService(store, configuration), authority, applicationName);
+        }
+
+        public static void SeedInstallation(InstallLinkingStore store, string? ownerUserId = null)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            using RSA key = RSA.Create(2048);
+            var installation = new ClaimedInstallationDto(
+                InstallationId: InstallationId,
+                ArtifactId: "android-play-app",
+                Channel: "internal",
+                Version: "0.1.0-preview.12",
+                InstallAccessClass: InstallAccessClasses.AccountRequired,
+                Status: ClaimedInstallationStates.Active,
+                CreatedAtUtc: now.AddMinutes(-2),
+                UpdatedAtUtc: now.AddMinutes(-1),
+                UserId: ownerUserId ?? UserId,
+                SubjectId: SubjectId,
+                PublicKey: Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()),
+                ClaimTicketId: null,
+                HeadId: "android",
+                Platform: "android",
+                Arch: "arm64",
+                HostLabel: "PostgreSQL consent test",
+                GrantId: GrantId);
+            var grant = new InstallationGrantDto(
+                GrantId, InstallationId, InstallationGrantStates.Active,
+                "rook-postgres-installation-token", now.AddMinutes(-1), now.AddHours(1),
+                ownerUserId ?? UserId, SubjectId);
+            lock (store.Gate)
+            {
+                store.InstallationsById[InstallationId] = installation;
+                store.GrantsById[GrantId] = grant;
+                store.GrantTransportAuthoritiesByGrantId[GrantId] =
+                    new InstallationGrantTransportAuthority(GrantId, InstallationGrantTransports.AndroidLinkedV2);
+                store.PersistLocked();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                foreach (InstallLinkingStore store in _stores)
+                {
+                    store.Dispose();
+                }
+
+                foreach (NpgsqlDataSource dataSource in _dataSources)
+                {
+                    await dataSource.DisposeAsync();
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (_roleCreated)
+                    {
+                        await _fixture.DropRoleAsync(_role);
+                    }
+                }
+                finally
+                {
+                    (_provider as IDisposable)?.Dispose();
+                    Directory.Delete(_root, recursive: true);
+                }
+            }
+        }
     }
 
     private NpgsqlDataSource CreateNamedDataSource(string applicationName)

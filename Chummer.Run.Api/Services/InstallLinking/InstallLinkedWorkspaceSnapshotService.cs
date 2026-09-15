@@ -1,5 +1,6 @@
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace Chummer.Run.Api.Services.InstallLinking;
@@ -36,6 +37,73 @@ public sealed class InstallLinkedWorkspaceSnapshotService
                 .ToArray();
         }
     }
+
+    /// <summary>
+    /// Captures only one exact, full persisted continuation from an actual admitted stored
+    /// installation. The caller owns account/install/consent admission and the PostgreSQL
+    /// read fence before this snapshot gate; this helper neither authenticates a DTO nor
+    /// impersonates device proof. The detached result proves transport custody only, not
+    /// Core restore/source authority or continuing consent after the outer fence ends.
+    /// </summary>
+    internal InstallLinkedWorkspaceSnapshotRecord CaptureSelectedContinuation(
+        ClaimedInstallationDto installation,
+        string workspaceId,
+        long expectedRemoteRevision,
+        string expectedServerToken,
+        string expectedContinuationDigest)
+    {
+        ArgumentNullException.ThrowIfNull(installation);
+        if (string.IsNullOrWhiteSpace(installation.SubjectId)
+            || installation.SubjectId.Length > 128
+            || installation.SubjectId.Any(character => char.IsWhiteSpace(character) || char.IsControl(character))
+            || string.IsNullOrWhiteSpace(workspaceId) || workspaceId.Length > MaxWorkspaceIdLength
+            || !string.Equals(workspaceId, workspaceId.Trim(), StringComparison.Ordinal)
+            || workspaceId.Any(char.IsControl)
+            || expectedRemoteRevision <= 0
+            || !IsServerToken(expectedServerToken) || !IsServerToken(expectedContinuationDigest))
+            throw InvalidSelectedCapture();
+
+        try
+        {
+            var encoding = new UTF8Encoding(false, true);
+            if (encoding.GetByteCount(installation.SubjectId) > 128)
+                throw InvalidSelectedCapture();
+            _ = encoding.GetByteCount(workspaceId);
+        }
+        catch (EncoderFallbackException) { throw InvalidSelectedCapture(); }
+
+        string ownerKey = ResolveOwnerKey(installation);
+        // ComposeKey trims legacy callers. The exact check above makes that a no-op here.
+        string key = InstallLinkedWorkspaceSnapshotStore.ComposeKey(ownerKey, workspaceId);
+        lock (_store.Gate)
+        {
+            if (!_store.SnapshotsByKey.TryGetValue(key, out InstallLinkedWorkspaceSnapshotRecord? stored))
+                throw new InstallLinkingOperationException(StatusCodes.Status404NotFound,
+                    "The selected workspace is unavailable.");
+            if (stored is null || !string.Equals(stored.OwnerKey, ownerKey, StringComparison.Ordinal)
+                || !string.Equals(stored.WorkspaceId, workspaceId, StringComparison.Ordinal))
+                throw new InstallLinkingOperationException(StatusCodes.Status503ServiceUnavailable,
+                    "The selected workspace authority is invalid.");
+            if (stored.RemoteRevision != expectedRemoteRevision
+                || !string.Equals(stored.ServerToken, expectedServerToken, StringComparison.Ordinal)
+                || !string.Equals(stored.WorkspaceContinuationDigest, expectedContinuationDigest, StringComparison.Ordinal))
+                throw new InstallLinkingOperationException(StatusCodes.Status409Conflict,
+                    "The selected workspace authority changed.");
+
+            InstallLinkedWorkspaceSnapshotRecord validated = WithAuthority(stored, installation);
+            if (validated.WorkspaceContinuation is not { ValueKind: JsonValueKind.Object } continuation)
+                throw new InstallLinkingOperationException(StatusCodes.Status409Conflict,
+                    "A complete selected workspace continuation is required.");
+            return validated with
+            {
+                WorkspaceContinuation = continuation.Clone(),
+                WorkspaceSnapshot = validated.WorkspaceSnapshot?.Clone()
+            };
+        }
+    }
+
+    private static InstallLinkingOperationException InvalidSelectedCapture()
+        => new(StatusCodes.Status400BadRequest, "The selected workspace capture inputs are invalid.");
 
     public InstallLinkedWorkspaceSnapshotRecord UpsertForInstallation(
         ClaimedInstallationDto installation,
