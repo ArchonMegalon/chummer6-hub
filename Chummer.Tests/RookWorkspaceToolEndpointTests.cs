@@ -64,13 +64,15 @@ public sealed class RookWorkspaceToolEndpointTests
     {
         await using TestApp app = await TestApp.StartAsync(enabled, environment, publicOnly, registerRead);
         StoreImage before = app.Fixture.Image();
+        int requestOrdinal = 0;
         foreach (string action in Actions)
         {
             foreach (string mediaType in new[] { "application/json", "application/x-www-form-urlencoded", "multipart/form-data" })
             {
                 // Both malformed and over-limit: neither MVC's form value provider
                 // nor this controller may consume a hidden feature's request body.
-                using HttpResponseMessage response = await app.SendAsync(action, new string('x', 8193), mediaType: mediaType);
+                using HttpResponseMessage response = await app.SendWithTransportDiagnosticsAsync(
+                    ++requestOrdinal, action, mediaType, new string('x', 8193));
                 Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
                 await AssertSafeResponse(response);
             }
@@ -78,6 +80,59 @@ public sealed class RookWorkspaceToolEndpointTests
         Assert.Equal(0, app.Fixture.ReadResolutions);
         Assert.Equal(0, app.Fixture.Identity.Calls);
         app.Fixture.AssertUnchanged(before);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(8192)]
+    [InlineData(8193)]
+    [InlineData(8194)]
+    [InlineData(65536)]
+    public async Task Disabled_gate_closes_http11_after_each_bounded_body_size(int bodyLength)
+    {
+        await using TestApp app = await TestApp.StartAsync(" true ", "Production", null, true);
+        StoreImage before = app.Fixture.Image();
+        for (int pass = 0; pass < 2; pass++)
+        {
+            foreach (string action in Actions)
+            {
+                using HttpResponseMessage response = await app.SendAsync(action, new string('x', bodyLength));
+                Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+                Assert.True(response.Headers.ConnectionClose);
+                await AssertSafeResponse(response);
+            }
+        }
+        Assert.Equal(0, app.Fixture.ReadResolutions);
+        Assert.Equal(0, app.Fixture.Identity.Calls);
+        app.Fixture.AssertUnchanged(before);
+    }
+
+    [Theory]
+    [InlineData("HTTP/1.0", true)]
+    [InlineData("HTTP/1.1", true)]
+    [InlineData("HTTP/2", false)]
+    [InlineData("HTTP/3", false)]
+    public async Task Disabled_gate_emits_connection_close_only_for_http1(string protocol, bool closes)
+    {
+        using ServiceProvider services = new ServiceCollection().BuildServiceProvider();
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.Protocol = protocol;
+        context.Response.Body = new MemoryStream();
+        var controller = new RookWorkspaceToolController(
+            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [PrivateRookRuntimeConfiguration.EnabledKey] = "false"
+            }).Build(), new TestEnvironment(), services)
+        {
+            ControllerContext = new ControllerContext { HttpContext = context }
+        };
+
+        ObjectResult result = Assert.IsType<ObjectResult>(await controller.Grant());
+        Assert.Equal(StatusCodes.Status404NotFound, result.StatusCode);
+        if (closes)
+            Assert.Equal("close", context.Response.Headers.Connection.ToString());
+        else
+            Assert.False(context.Response.Headers.ContainsKey("Connection"));
     }
 
     [Theory]
@@ -749,6 +804,7 @@ public sealed class RookWorkspaceToolEndpointTests
             string? publicOnly = null, bool registerRead = true)
         {
             Fixture fixture = new();
+            TransportDiagnosticCollector diagnostics = new();
             WebApplication? app = null;
             try
             {
@@ -762,6 +818,8 @@ public sealed class RookWorkspaceToolEndpointTests
                     ["CHUMMER_PUBLIC_DOWNLOAD_ONLY"] = publicOnly
                 });
                 builder.Logging.ClearProviders();
+                builder.Logging.AddProvider(diagnostics);
+                builder.Logging.AddFilter<TransportDiagnosticCollector>(static level => level >= LogLevel.Debug);
                 builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
                 builder.Services.AddControllers().AddApplicationPart(typeof(RookWorkspaceToolController).Assembly);
                 builder.Services.AddSingleton(fixture.Admission);
@@ -782,13 +840,30 @@ public sealed class RookWorkspaceToolEndpointTests
                 {
                     BaseAddress = new Uri(Assert.Single(addresses.Addresses)), Timeout = TimeSpan.FromSeconds(10)
                 };
-                return new(app, fixture, client);
+                return new(app, fixture, client) { Diagnostics = diagnostics };
             }
             catch
             {
                 try { if (app is not null) await app.DisposeAsync(); }
                 finally { fixture.Dispose(); }
                 throw;
+            }
+        }
+
+        private TransportDiagnosticCollector Diagnostics { get; init; } = new();
+
+        public async Task<HttpResponseMessage> SendWithTransportDiagnosticsAsync(
+            int requestOrdinal, string action, string mediaType, string body,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return await SendAsync(action, body, mediaType: mediaType, cancellationToken: cancellationToken);
+            }
+            catch (HttpRequestException exception)
+            {
+                string events = Diagnostics.Format(requestOrdinal, action, mediaType, exception);
+                throw new Xunit.Sdk.XunitException(events);
             }
         }
 
@@ -863,5 +938,149 @@ public sealed class RookWorkspaceToolEndpointTests
                     Active, Session, SubjectId, ["player"], ExpiresAtUtc), Json), Encoding.UTF8, "application/json")
             };
         }
+    }
+
+    private sealed class TransportDiagnosticCollector : ILoggerProvider, ISupportExternalScope
+    {
+        private const int MaxEntries = 32;
+        private const int MaxCorrelationLength = 96;
+        private readonly object gate = new();
+        private readonly Queue<Entry> entries = new();
+        private IExternalScopeProvider scopes = new LoggerExternalScopeProvider();
+
+        public ILogger CreateLogger(string categoryName) => new CollectorLogger(this, categoryName);
+
+        public void Dispose() { }
+
+        public void SetScopeProvider(IExternalScopeProvider scopeProvider) => scopes = scopeProvider;
+
+        public string Format(int requestOrdinal, string action, string mediaType, HttpRequestException exception)
+        {
+            Entry[] snapshot;
+            lock (gate) snapshot = entries.ToArray();
+            string events = snapshot.Length == 0
+                ? "none"
+                : string.Join(",", snapshot.Select(entry =>
+                    $"{entry.Category}:{entry.EventId}:{entry.Name ?? "-"}:{entry.Connection ?? "-"}:" +
+                    $"{entry.RejectedType ?? "-"}:{entry.RejectedStatus?.ToString() ?? "-"}"));
+            return $"Transport diagnostic request={requestOrdinal}; action={action}; media={mediaType}; " +
+                $"exception={exception.GetType().Name}; error={exception.HttpRequestError}; " +
+                $"inner={exception.InnerException?.GetType().Name ?? "-"}; " +
+                $"kestrel={events}";
+        }
+
+        private void Add(string category, EventId eventId, object? state, Exception? exception)
+        {
+            if (!category.StartsWith("Microsoft.AspNetCore.Server.Kestrel", StringComparison.Ordinal)) return;
+            string? connection = ReadConnection(state);
+            scopes.ForEachScope((scope, _) => connection ??= ReadConnection(scope), (object?)null);
+            lock (gate)
+            {
+                if (entries.Count == MaxEntries) entries.Dequeue();
+                string? rejectedType = exception is BadHttpRequestException ? exception.GetType().Name : null;
+                int? rejectedStatus = exception is BadHttpRequestException badRequest ? badRequest.StatusCode : null;
+                entries.Enqueue(new(SanitizeText(category) ?? "Kestrel", eventId.Id,
+                    SanitizeText(eventId.Name), connection, rejectedType, rejectedStatus));
+            }
+        }
+
+        private static string? ReadConnection(object? state)
+        {
+            if (state is not IEnumerable<KeyValuePair<string, object?>> values) return null;
+            KeyValuePair<string, object?> pair = values.FirstOrDefault(value =>
+                value.Key is "ConnectionId" or "connectionId");
+            return pair.Value is string text ? SanitizeConnection(text) : null;
+        }
+
+        private static string? SanitizeConnection(string value)
+            => SanitizeText(value);
+
+        private static string? SanitizeText(string? value)
+            => string.IsNullOrEmpty(value) || value.Length > MaxCorrelationLength ||
+                value.Any(character => character > 0x7f ||
+                    !(char.IsLetterOrDigit(character) || character is '-' or '_' or ':' or '.'))
+                ? null : value;
+
+        public int EntryCount
+        {
+            get { lock (gate) return entries.Count; }
+        }
+
+        private sealed record Entry(string Category, int EventId, string? Name, string? Connection,
+            string? RejectedType, int? RejectedStatus);
+
+        private sealed class CollectorLogger(TransportDiagnosticCollector owner, string category) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+                => owner.scopes.Push(state);
+
+            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Debug;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+                Exception? exception, Func<TState, Exception?, string> formatter)
+                => owner.Add(category, eventId, state, exception);
+        }
+    }
+
+    [Fact]
+    public void Transport_diagnostics_are_bounded_and_redacted()
+    {
+        var collector = new TransportDiagnosticCollector();
+        ILogger logger = collector.CreateLogger("Microsoft.AspNetCore.Server.Kestrel.Core");
+        bool formatterCalled = false;
+        var state = new List<KeyValuePair<string, object?>>
+        {
+            new("ConnectionId", new ThrowingToString()),
+            new("RequestBody", PrivateMarker),
+            new("Unrelated", "do-not-retain")
+        };
+
+        using (logger.BeginScope(new[] { new KeyValuePair<string, object?>("ConnectionId", "scope-safe") }))
+        {
+            logger.Log(LogLevel.Debug, new EventId(1, "SafeEvent"), state, null, (_, _) =>
+            {
+                formatterCalled = true;
+                return PrivateMarker;
+            });
+            logger.Log(LogLevel.Debug, new EventId(3, "RejectedEvent"), state,
+                new BadHttpRequestException(PrivateMarker, StatusCodes.Status413PayloadTooLarge),
+                (_, _) => PrivateMarker);
+        }
+        logger.Log(LogLevel.Debug, new EventId(2, "MalformedStringEvent"),
+            new[] { new KeyValuePair<string, object?>("ConnectionId", "bad correlation value") }, null,
+            (_, _) => PrivateMarker);
+
+        string initialDiagnostic = collector.Format(1, "consents", "application/json",
+            new HttpRequestException(PrivateMarker));
+        Assert.False(formatterCalled);
+        Assert.DoesNotContain(PrivateMarker, initialDiagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain("RequestBody", initialDiagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain("do-not-retain", initialDiagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain("bad correlation", initialDiagnostic, StringComparison.Ordinal);
+        Assert.Contains("scope-safe", initialDiagnostic, StringComparison.Ordinal);
+        Assert.Contains("BadHttpRequestException", initialDiagnostic, StringComparison.Ordinal);
+        Assert.Contains(":413", initialDiagnostic, StringComparison.Ordinal);
+
+        for (int index = 0; index < 40; index++)
+            logger.Log(LogLevel.Debug, new EventId(index, "BoundedEvent"),
+                new[] { new KeyValuePair<string, object?>("ConnectionId", "safe-connection") }, null,
+                (_, _) => PrivateMarker);
+        ILogger unrelatedLogger = collector.CreateLogger("Test.Unrelated");
+        unrelatedLogger.Log(LogLevel.Debug, new EventId(99, "Ignored"),
+            new[] { new KeyValuePair<string, object?>("ConnectionId", "safe-connection") }, null,
+            (_, _) => PrivateMarker);
+
+        string diagnostic = collector.Format(1, "consents", "application/json",
+            new HttpRequestException(PrivateMarker));
+        Assert.False(formatterCalled);
+        Assert.Equal(32, collector.EntryCount);
+        Assert.DoesNotContain(PrivateMarker, diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ignored", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("safe-connection", diagnostic, StringComparison.Ordinal);
+    }
+
+    private sealed class ThrowingToString
+    {
+        public override string ToString() => throw new InvalidOperationException("must not be formatted");
     }
 }

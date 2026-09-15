@@ -77,7 +77,11 @@ public sealed class RookWorkspaceToolController(
             || !environment.IsProduction()
             || configuration["CHUMMER_PUBLIC_DOWNLOAD_ONLY"] is not (null or "false")
             || services.GetService<IServiceProviderIsService>()?.IsService(typeof(RookWorkspaceRuleReadService)) != true)
+        {
+            if (Request.Protocol is "HTTP/1.0" or "HTTP/1.1")
+                Response.Headers.Connection = "close";
             return Failure(StatusCodes.Status404NotFound);
+        }
 
         try
         {
