@@ -3243,6 +3243,8 @@ public sealed class InstallLinkingPostgresAuthorityFixture : IAsyncLifetime
                 };
                 hostConfig.NanoCPUs = 1_000_000_000L;
                 hostConfig.Memory = 512L * 1024 * 1024;
+                hostConfig.MemorySwap = hostConfig.Memory;
+                hostConfig.PidsLimit = 128;
             })
             .Build();
     }
