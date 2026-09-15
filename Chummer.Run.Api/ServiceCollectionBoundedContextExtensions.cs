@@ -102,6 +102,16 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHostedService<TeableImportantWorkSyncWorker>();
         services.AddHttpClient();
         services.AddSingleton<AccountService>();
+        services.AddHttpClient<HubSessionAccountAdmissionService>(client =>
+            client.Timeout = HubSessionAccountAdmissionService.RequestTimeout)
+            .ConfigurePrimaryHttpMessageHandler(static () => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false,
+                ConnectTimeout = TimeSpan.FromSeconds(5),
+                MaxResponseHeadersLength = 16
+            })
+            .RemoveAllLoggers();
         services.AddSingleton<CommunityAccountErasureService>();
         services.AddSingleton<IdentityLinkService>();
         services.AddSingleton<UserExperienceService>();
