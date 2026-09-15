@@ -276,9 +276,10 @@ internal static class ServiceCollectionBoundedContextExtensions
                 UnavailableInstallLinkingRollbackAuthorityReadinessProbe>();
         }
 
-        return AddHubInstallAndOrchestrationAdapterCore(
+        AddHubInstallAndOrchestrationAdapterCore(
             services,
             deferAuthorityActivation: environment.IsProduction());
+        return services.AddHubPrivateRookRuntime(configuration, environment);
     }
 
     private static IServiceCollection AddHubInstallAndOrchestrationAdapterCore(
