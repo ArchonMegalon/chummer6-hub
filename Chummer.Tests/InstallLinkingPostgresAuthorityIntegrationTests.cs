@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
+using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
+using Docker.DotNet.Models;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -1384,6 +1386,574 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
             stored.AsSpan().IndexOf(Encoding.UTF8.GetBytes(plaintextMarker)));
     }
 
+    [Theory]
+    [InlineData("success")]
+    [InlineData("throw")]
+    [InlineData("cancel")]
+    public async Task Read_fence_blocks_real_CAS_until_callback_exit_and_clears_borrowed_bytes(
+        string callbackExit)
+    {
+        await _fixture.ResetAsync();
+        var seedAuthority = new NpgsqlInstallLinkingSnapshotAuthority(_fixture.AdminDataSource);
+        InstallLinkingEnvelopeCompareExchangeRequest seed = RequestForEmptyHead("fenced-parent");
+        using InstallLinkingEnvelopeCompareExchangeResult seeded =
+            await seedAuthority.CompareExchangeAsync(seed);
+        Assert.True(seeded.Committed, seeded.Code);
+        InstallLinkingEnvelopeCompareExchangeRequest next = RequestAfter(seed, "fenced-next");
+        string readerName = $"fence_reader_{Guid.NewGuid():N}";
+        string writerName = $"fence_writer_{Guid.NewGuid():N}";
+        await using NpgsqlDataSource readerSource = CreateNamedDataSource(readerName);
+        await using NpgsqlDataSource writerSource = CreateNamedDataSource(writerName);
+        var reader = new NpgsqlInstallLinkingSnapshotAuthority(readerSource);
+        var writer = new NpgsqlInstallLinkingSnapshotAuthority(writerSource);
+        using var callbackEntered = new ManualResetEventSlim();
+        using var releaseCallback = new ManualResetEventSlim();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        InstallLinkingAuthoritativeEnvelope? borrowed = null;
+        var callbackFailure = new InvalidOperationException("test callback failed");
+        Task<Exception?> readCompletion = Record.ExceptionAsync(() => Task.Run(() =>
+            reader.ReadFencedAsync(envelope =>
+            {
+                borrowed = envelope;
+                Assert.Equal(seed.ProtectedEnvelope, envelope.ProtectedEnvelope);
+                callbackEntered.Set();
+                entered.TrySetResult();
+                if (!releaseCallback.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    throw new TimeoutException("The test did not release the read callback.");
+                }
+
+                if (callbackExit == "throw")
+                {
+                    throw callbackFailure;
+                }
+
+                if (callbackExit == "cancel")
+                {
+                    cancellation.Cancel();
+                }
+            }, cancellation.Token)));
+        Task<InstallLinkingEnvelopeCompareExchangeResult>? writeTask = null;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(callbackEntered.IsSet);
+            writeTask = writer.CompareExchangeAsync(next, cancellationToken: CancellationToken.None);
+            await AssertDatabaseBlockedByAsync(writerName, readerName);
+            Assert.False(writeTask.IsCompleted);
+            Assert.Equal(1, await _fixture.ScalarLongAsync(
+                "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+
+            releaseCallback.Set();
+            Exception? failure = await readCompletion.WaitAsync(TimeSpan.FromSeconds(10));
+            if (callbackExit == "throw")
+            {
+                Assert.Same(callbackFailure, failure);
+            }
+            else if (callbackExit == "cancel")
+            {
+                Assert.IsAssignableFrom<OperationCanceledException>(failure);
+            }
+            else
+            {
+                Assert.Null(failure);
+            }
+
+            AssertCleared(borrowed);
+            InstallLinkingEnvelopeCompareExchangeResult written =
+                await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(InstallLinkingEnvelopeCommitDisposition.Applied, written.Disposition);
+            using InstallLinkingAuthoritativeEnvelope head = await seedAuthority.ReadCurrentAsync();
+            Assert.Equal(next.CommitId, head.CommitId);
+            Assert.Equal(2, head.Generation);
+            Assert.Equal(2, await _fixture.ScalarLongAsync(
+                "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+        }
+        finally
+        {
+            releaseCallback.Set();
+            await readCompletion.WaitAsync(TimeSpan.FromSeconds(15));
+            if (writeTask is not null)
+            {
+                using InstallLinkingEnvelopeCompareExchangeResult drained =
+                    await writeTask.WaitAsync(TimeSpan.FromSeconds(15));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Read_fence_waits_for_actual_earlier_CAS_and_captures_its_committed_head()
+    {
+        await _fixture.ResetAsync();
+        string readerName = $"fence_reader_{Guid.NewGuid():N}";
+        string writerName = $"fence_writer_{Guid.NewGuid():N}";
+        await using NpgsqlDataSource readerSource = CreateNamedDataSource(readerName);
+        await using NpgsqlDataSource writerSource = CreateNamedDataSource(writerName);
+        var pausedCommit = new PausedCommitUnitOfWorkFactory(writerSource);
+        var writer = new NpgsqlInstallLinkingSnapshotAuthority(writerSource, pausedCommit);
+        var reader = new NpgsqlInstallLinkingSnapshotAuthority(readerSource);
+        InstallLinkingEnvelopeCompareExchangeRequest request = RequestForEmptyHead("earlier-writer");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        Task<InstallLinkingEnvelopeCompareExchangeResult> writeTask =
+            writer.CompareExchangeAsync(request, cancellation.Token);
+        Task? readTask = null;
+        InstallLinkingAuthoritativeEnvelope? borrowed = null;
+        int callbackCount = 0;
+        try
+        {
+            await pausedCommit.BeforeCommit.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            readTask = reader.ReadFencedAsync(envelope =>
+            {
+                Interlocked.Increment(ref callbackCount);
+                borrowed = envelope;
+                Assert.Equal(1, envelope.Generation);
+                Assert.Equal(request.CommitId, envelope.CommitId);
+                Assert.Equal(request.SnapshotSha256, envelope.SnapshotSha256);
+                Assert.Equal(request.EnvelopeSha256, envelope.EnvelopeSha256);
+                Assert.Equal(request.ProtectedEnvelope, envelope.ProtectedEnvelope);
+            }, cancellation.Token);
+            await AssertDatabaseBlockedByAsync(readerName, writerName);
+            Assert.Equal(0, Volatile.Read(ref callbackCount));
+            Assert.False(readTask.IsCompleted);
+            // Independent MVCC observer still sees the pre-commit empty authority.
+            Assert.Equal(0, await _fixture.ScalarLongAsync(
+                "SELECT generation FROM install_linking.snapshot_head WHERE singleton = true"));
+
+            pausedCommit.Release.TrySetResult();
+            InstallLinkingEnvelopeCompareExchangeResult written =
+                await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(InstallLinkingEnvelopeCommitDisposition.Applied, written.Disposition);
+            await readTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(1, Volatile.Read(ref callbackCount));
+            AssertCleared(borrowed);
+            Assert.Equal(1, await _fixture.ScalarLongAsync(
+                "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+        }
+        finally
+        {
+            pausedCommit.Release.TrySetResult();
+            using InstallLinkingEnvelopeCompareExchangeResult drained =
+                await writeTask.WaitAsync(TimeSpan.FromSeconds(15));
+            if (readTask is not null)
+            {
+                await readTask.WaitAsync(TimeSpan.FromSeconds(15));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Cancellation_while_database_lock_waiting_never_invokes_capture_or_leaves_a_fence()
+    {
+        await _fixture.ResetAsync();
+        string readerName = $"fence_reader_{Guid.NewGuid():N}";
+        string writerName = $"fence_writer_{Guid.NewGuid():N}";
+        await using NpgsqlDataSource readerSource = CreateNamedDataSource(readerName);
+        await using NpgsqlDataSource writerSource = CreateNamedDataSource(writerName);
+        var pausedCommit = new PausedCommitUnitOfWorkFactory(writerSource);
+        var writer = new NpgsqlInstallLinkingSnapshotAuthority(writerSource, pausedCommit);
+        var reader = new NpgsqlInstallLinkingSnapshotAuthority(readerSource);
+        InstallLinkingEnvelopeCompareExchangeRequest request = RequestForEmptyHead("cancel-wait");
+        using var cancellation = new CancellationTokenSource();
+        Task<InstallLinkingEnvelopeCompareExchangeResult> writeTask = writer.CompareExchangeAsync(request);
+        Task<Exception?>? readCompletion = null;
+        int callbackCount = 0;
+        try
+        {
+            await pausedCommit.BeforeCommit.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            readCompletion = Record.ExceptionAsync(() => reader.ReadFencedAsync(
+                _ => Interlocked.Increment(ref callbackCount), cancellation.Token));
+            await AssertDatabaseBlockedByAsync(readerName, writerName);
+            cancellation.Cancel();
+            Exception? failure = await readCompletion.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.IsAssignableFrom<OperationCanceledException>(failure);
+            Assert.Equal(0, Volatile.Read(ref callbackCount));
+            Assert.False(writeTask.IsCompleted);
+
+            pausedCommit.Release.TrySetResult();
+            InstallLinkingEnvelopeCompareExchangeResult written =
+                await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.True(written.Committed, written.Code);
+            await reader.ReadFencedAsync(envelope =>
+            {
+                Interlocked.Increment(ref callbackCount);
+                Assert.Equal(request.CommitId, envelope.CommitId);
+            }).WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(1, Volatile.Read(ref callbackCount));
+        }
+        finally
+        {
+            cancellation.Cancel();
+            pausedCommit.Release.TrySetResult();
+            using InstallLinkingEnvelopeCompareExchangeResult drained =
+                await writeTask.WaitAsync(TimeSpan.FromSeconds(15));
+            if (readCompletion is not null)
+            {
+                await readCompletion.WaitAsync(TimeSpan.FromSeconds(15));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Coordinator_rejects_stale_bound_mirror_before_local_capture_after_real_CAS()
+    {
+        await _fixture.ResetAsync();
+        await using NpgsqlDataSource readerSource = CreateNamedDataSource($"mirror_reader_{Guid.NewGuid():N}");
+        await using NpgsqlDataSource writerSource = CreateNamedDataSource($"mirror_writer_{Guid.NewGuid():N}");
+        var authority = new NpgsqlInstallLinkingSnapshotAuthority(readerSource);
+        var writer = new NpgsqlInstallLinkingSnapshotAuthority(writerSource);
+        var coordinator = new InstallLinkingPostgresAuthorityCoordinator(authority);
+        InstallLinkingEnvelopeCompareExchangeRequest seed = RequestForEmptyHead("local-mirror");
+        using InstallLinkingEnvelopeCompareExchangeResult seeded = await writer.CompareExchangeAsync(seed);
+        Assert.True(seeded.Committed, seeded.Code);
+        using (InstallLinkingAuthoritativeEnvelope localMirror = await authority.ReadCurrentAsync())
+        {
+            coordinator.BindValidatedLocalMirror(localMirror);
+        }
+
+        int callbackCount = 0;
+        var localWriterGate = new object();
+        InstallLinkingRollbackAuthorityReadiness matching;
+        lock (localWriterGate)
+        {
+            matching = coordinator.ReadBoundLocalMirror(() => callbackCount++);
+        }
+        Assert.True(matching.Ready, matching.Code);
+        Assert.Equal("postgres_authority_fenced", matching.Code);
+        Assert.Equal(1, callbackCount);
+        // The bytes and both digests are unchanged: generation/commit identity must fence this out.
+        InstallLinkingEnvelopeCompareExchangeRequest next = RequestAfter(seed, "local-mirror");
+        Assert.Equal(seed.SnapshotSha256, next.SnapshotSha256);
+        Assert.Equal(seed.EnvelopeSha256, next.EnvelopeSha256);
+        Assert.Equal(seed.ProtectedEnvelope, next.ProtectedEnvelope);
+        Assert.NotEqual(seed.CommitId, next.CommitId);
+        using InstallLinkingEnvelopeCompareExchangeResult advanced = await writer.CompareExchangeAsync(next);
+        Assert.True(advanced.Committed, advanced.Code);
+
+        InstallLinkingRollbackAuthorityReadiness stale;
+        lock (localWriterGate)
+        {
+            stale = coordinator.ReadBoundLocalMirror(() => callbackCount++);
+        }
+
+        Assert.False(stale.Ready);
+        Assert.Equal("postgres_authority_head_mismatch", stale.Code);
+        Assert.Equal(1, callbackCount);
+        using InstallLinkingAuthoritativeEnvelope current = await authority.ReadCurrentAsync();
+        Assert.Equal(next.CommitId, current.CommitId);
+        Assert.Equal(next.ProtectedEnvelope, current.ProtectedEnvelope);
+        Assert.Equal(2, await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+    }
+
+    [Fact]
+    public async Task Synchronous_coordinator_under_nonpumping_context_completes_after_real_row_lock_wait()
+    {
+        await _fixture.ResetAsync();
+        string readerName = $"context_reader_{Guid.NewGuid():N}";
+        string blockerName = $"context_blocker_{Guid.NewGuid():N}";
+        await using NpgsqlDataSource readerSource = CreateNamedDataSource(readerName);
+        await using NpgsqlDataSource blockerSource = CreateNamedDataSource(blockerName);
+        var authority = new NpgsqlInstallLinkingSnapshotAuthority(readerSource);
+        var coordinator = new InstallLinkingPostgresAuthorityCoordinator(authority);
+        using InstallLinkingEnvelopeCompareExchangeResult seeded =
+            await authority.CompareExchangeAsync(RequestForEmptyHead("context-head"));
+        Assert.True(seeded.Committed, seeded.Code);
+        using (InstallLinkingAuthoritativeEnvelope mirror = await authority.ReadCurrentAsync())
+        {
+            coordinator.BindValidatedLocalMirror(mirror);
+        }
+
+        await using NpgsqlConnection blocker = await blockerSource.OpenConnectionAsync();
+        await using NpgsqlTransaction transaction = await blocker.BeginTransactionAsync();
+        await using (NpgsqlCommand lockHead = blocker.CreateCommand())
+        {
+            lockHead.Transaction = transaction;
+            lockHead.CommandText = """
+                SELECT generation FROM install_linking.snapshot_head
+                WHERE singleton = true FOR UPDATE
+                """;
+            Assert.Equal(1L, Convert.ToInt64(await lockHead.ExecuteScalarAsync()));
+        }
+
+        var context = new NonPumpingSynchronizationContext();
+        var completion = new TaskCompletionSource<InstallLinkingRollbackAuthorityReadiness>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var localWriterGate = new object();
+        int callbackCount = 0;
+        var thread = new Thread(() =>
+        {
+            SynchronizationContext.SetSynchronizationContext(context);
+            try
+            {
+                lock (localWriterGate)
+                {
+                    completion.TrySetResult(coordinator.ReadBoundLocalMirror(
+                        () => Interlocked.Increment(ref callbackCount)));
+                }
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(null);
+            }
+        })
+        {
+            // A synchronization-context regression must fail within a bound, never hang the runner.
+            IsBackground = true,
+            Name = "install-linking-nonpumping-read-fence"
+        };
+        bool released = false;
+        thread.Start();
+        try
+        {
+            await AssertDatabaseBlockedByAsync(readerName, blockerName);
+            Assert.False(completion.Task.IsCompleted);
+            Assert.Equal(0, Volatile.Read(ref callbackCount));
+            await transaction.RollbackAsync();
+            released = true;
+
+            InstallLinkingRollbackAuthorityReadiness readiness =
+                await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.True(readiness.Ready, readiness.Code);
+            Assert.Equal("postgres_authority_fenced", readiness.Code);
+            Assert.Equal(1, Volatile.Read(ref callbackCount));
+            Assert.Equal(0, context.PostCount);
+            Assert.True(thread.Join(TimeSpan.FromSeconds(1)));
+        }
+        finally
+        {
+            if (!released)
+            {
+                await transaction.RollbackAsync();
+            }
+
+            await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Read_fence_never_mutates_empty_or_committed_head_or_commit_count(bool committed)
+    {
+        await _fixture.ResetAsync();
+        var authority = new NpgsqlInstallLinkingSnapshotAuthority(_fixture.AdminDataSource);
+        if (committed)
+        {
+            using InstallLinkingEnvelopeCompareExchangeResult seeded =
+                await authority.CompareExchangeAsync(RequestForEmptyHead("read-only-head"));
+            Assert.True(seeded.Committed, seeded.Code);
+        }
+
+        using InstallLinkingAuthoritativeEnvelope before = await authority.ReadCurrentAsync();
+        long commitsBefore = await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits");
+        InstallLinkingAuthoritativeEnvelope? borrowed = null;
+        int callbacks = 0;
+        await authority.ReadFencedAsync(envelope =>
+        {
+            callbacks++;
+            borrowed = envelope;
+            AssertSameHead(before, envelope);
+        });
+        using InstallLinkingAuthoritativeEnvelope after = await authority.ReadCurrentAsync();
+
+        Assert.Equal(1, callbacks);
+        AssertSameHead(before, after);
+        Assert.Equal(commitsBefore, await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+        if (committed)
+        {
+            AssertCleared(borrowed);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Corrupt_or_missing_authority_head_rejects_fenced_capture(bool missing)
+    {
+        await _fixture.ResetAsync();
+        var authority = new NpgsqlInstallLinkingSnapshotAuthority(_fixture.AdminDataSource);
+        using InstallLinkingEnvelopeCompareExchangeResult seeded =
+            await authority.CompareExchangeAsync(RequestForEmptyHead("valid-before-corruption"));
+        Assert.True(seeded.Committed, seeded.Code);
+        await _fixture.ExecuteAdminAsync(missing
+            ? "DELETE FROM install_linking.snapshot_head WHERE singleton = true"
+            : """
+              ALTER TABLE install_linking.snapshot_head
+                  DISABLE TRIGGER snapshot_head_monotonic_advance_v2;
+              UPDATE install_linking.snapshot_head
+              SET protected_envelope = decode('636f7272757074', 'hex')
+              WHERE singleton = true;
+              ALTER TABLE install_linking.snapshot_head
+                  ENABLE TRIGGER snapshot_head_monotonic_advance_v2;
+              """);
+        int callbacks = 0;
+
+        Exception? failure = await Record.ExceptionAsync(() => authority.ReadFencedAsync(
+            _ => callbacks++)).WaitAsync(TimeSpan.FromSeconds(10));
+        if (missing)
+        {
+            Assert.IsType<InvalidDataException>(failure);
+        }
+        else
+        {
+            Assert.IsType<CryptographicException>(failure);
+        }
+
+        Assert.Equal(0, callbacks);
+        Assert.Equal(1, await _fixture.ScalarLongAsync(
+            "SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+        // A fresh independent transaction can immediately own the singleton relation/row.
+        await using NpgsqlConnection probe = await _fixture.AdminDataSource.OpenConnectionAsync();
+        await using NpgsqlTransaction transaction = await probe.BeginTransactionAsync();
+        await using NpgsqlCommand command = probe.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT generation FROM install_linking.snapshot_head
+            WHERE singleton = true FOR UPDATE NOWAIT
+            """;
+        await command.ExecuteScalarAsync();
+        await transaction.RollbackAsync();
+    }
+
+    private NpgsqlDataSource CreateNamedDataSource(string applicationName)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(_fixture.ConnectionString)
+        {
+            ApplicationName = applicationName,
+            Pooling = false
+        };
+        return NpgsqlDataSource.Create(builder.ConnectionString);
+    }
+
+    private async Task AssertDatabaseBlockedByAsync(string waitingApplication, string blockingApplication)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        await using NpgsqlConnection observer =
+            await _fixture.AdminDataSource.OpenConnectionAsync(deadline.Token);
+        await using NpgsqlCommand command = observer.CreateCommand();
+        command.CommandText = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_stat_activity AS waiter
+                JOIN pg_stat_activity AS blocker
+                  ON blocker.pid = ANY(pg_blocking_pids(waiter.pid))
+                WHERE waiter.application_name = @waiting
+                  AND blocker.application_name = @blocking
+                  AND waiter.wait_event_type = 'Lock'
+                  AND waiter.pid <> blocker.pid)
+            """;
+        command.Parameters.AddWithValue("waiting", waitingApplication);
+        command.Parameters.AddWithValue("blocking", blockingApplication);
+        try
+        {
+            while (!Convert.ToBoolean(await command.ExecuteScalarAsync(deadline.Token)))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(20), deadline.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Assert.Fail("PostgreSQL did not report the expected distinct waiting/blocking backends within three seconds.");
+        }
+    }
+
+    private static InstallLinkingEnvelopeCompareExchangeRequest RequestAfter(
+        InstallLinkingEnvelopeCompareExchangeRequest parent,
+        string value)
+    {
+        InstallLinkingEnvelopeCompareExchangeRequest next = RequestForEmptyHead(value);
+        return next with
+        {
+            ExpectedGeneration = parent.NextGeneration,
+            ExpectedCommitId = parent.CommitId,
+            ExpectedEnvelopeSha256 = parent.EnvelopeSha256.ToArray(),
+            NextGeneration = parent.NextGeneration + 1
+        };
+    }
+
+    private static void AssertCleared(InstallLinkingAuthoritativeEnvelope? envelope)
+    {
+        Assert.NotNull(envelope);
+        Assert.NotNull(envelope.SnapshotSha256);
+        Assert.NotNull(envelope.EnvelopeSha256);
+        Assert.NotNull(envelope.ProtectedEnvelope);
+        Assert.All(envelope.SnapshotSha256, value => Assert.Equal((byte)0, value));
+        Assert.All(envelope.EnvelopeSha256, value => Assert.Equal((byte)0, value));
+        Assert.All(envelope.ProtectedEnvelope, value => Assert.Equal((byte)0, value));
+    }
+
+    private static void AssertSameHead(
+        InstallLinkingAuthoritativeEnvelope expected,
+        InstallLinkingAuthoritativeEnvelope actual)
+    {
+        Assert.Equal(expected.Generation, actual.Generation);
+        Assert.Equal(expected.CommitId, actual.CommitId);
+        Assert.Equal(expected.EnvelopeVersion, actual.EnvelopeVersion);
+        Assert.Equal(expected.SnapshotSha256, actual.SnapshotSha256);
+        Assert.Equal(expected.EnvelopeSha256, actual.EnvelopeSha256);
+        Assert.Equal(expected.ProtectedEnvelope, actual.ProtectedEnvelope);
+        Assert.Equal(expected.UpdatedAtUtc, actual.UpdatedAtUtc);
+    }
+
+    private sealed class NonPumpingSynchronizationContext : SynchronizationContext
+    {
+        private int _postCount;
+
+        public int PostCount => Volatile.Read(ref _postCount);
+
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+            Interlocked.Increment(ref _postCount);
+            // Intentionally never dispatch: a sync coordinator cannot depend on this queue.
+        }
+    }
+
+    private sealed class PausedCommitUnitOfWorkFactory : IInstallLinkingPostgresUnitOfWorkFactory
+    {
+        private readonly NpgsqlInstallLinkingPostgresUnitOfWorkFactory _inner;
+
+        public PausedCommitUnitOfWorkFactory(NpgsqlDataSource dataSource)
+        {
+            _inner = new(dataSource);
+        }
+
+        public TaskCompletionSource BeforeCommit { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<IInstallLinkingPostgresUnitOfWork> BeginAsync(CancellationToken cancellationToken)
+            => new PausedCommitUnitOfWork(await _inner.BeginAsync(cancellationToken), this);
+
+        private sealed class PausedCommitUnitOfWork(
+            IInstallLinkingPostgresUnitOfWork inner,
+            PausedCommitUnitOfWorkFactory owner) : IInstallLinkingPostgresUnitOfWork
+        {
+            public NpgsqlConnection Connection => inner.Connection;
+            public NpgsqlTransaction Transaction => inner.Transaction;
+
+            public async Task CommitAsync(CancellationToken cancellationToken)
+            {
+                // All real CAS commands already ran on this independent real transaction.
+                owner.BeforeCommit.TrySetResult();
+                await owner.Release.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
+                await inner.CommitAsync(cancellationToken);
+            }
+
+            public Task RollbackAsync(CancellationToken cancellationToken)
+                => inner.RollbackAsync(cancellationToken);
+
+            public ValueTask DisposeAsync() => inner.DisposeAsync();
+        }
+    }
+
     private async Task AssertLiveSchemaProblemAsync(
         string sql,
         string expectedProblem)
@@ -1564,9 +2134,25 @@ public sealed class InstallLinkingPostgresAuthorityFixture : IAsyncLifetime
         string password = Convert.ToHexString(
             RandomNumberGenerator.GetBytes(32));
         _container = new PostgreSqlBuilder("postgres:17-alpine")
+            .WithName($"chummer-read-fence-tests-{Guid.NewGuid():N}")
             .WithDatabase("chummer_install_linking")
             .WithUsername("postgres")
             .WithPassword(password)
+            .WithCreateParameterModifier(parameters =>
+            {
+                HostConfig hostConfig = parameters.HostConfig
+                    ?? throw new InvalidOperationException("The PostgreSQL test host configuration is missing.");
+                // Replace the module's default wildcard publication, do not add another binding.
+                hostConfig.PortBindings = new Dictionary<string, IList<PortBinding>>
+                {
+                    ["5432/tcp"] = new[]
+                    {
+                        new PortBinding { HostIP = "127.0.0.1", HostPort = string.Empty }
+                    }
+                };
+                hostConfig.NanoCPUs = 1_000_000_000L;
+                hostConfig.Memory = 512L * 1024 * 1024;
+            })
             .Build();
     }
 
@@ -1575,19 +2161,34 @@ public sealed class InstallLinkingPostgresAuthorityFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
-        AdminDataSource = NpgsqlDataSource.Create(ConnectionString);
-        await new InstallLinkingPostgresMigrator(AdminDataSource).MigrateAsync();
+        try
+        {
+            await _container.StartAsync();
+            AdminDataSource = NpgsqlDataSource.Create(ConnectionString);
+            await new InstallLinkingPostgresMigrator(AdminDataSource).MigrateAsync();
+        }
+        catch
+        {
+            // Do not depend on the test framework invoking fixture disposal after
+            // initialization fails, especially when the external reaper is disabled.
+            await DisposeAsync();
+            throw;
+        }
     }
 
     public async Task DisposeAsync()
     {
-        if (AdminDataSource is not null)
+        try
         {
-            await AdminDataSource.DisposeAsync();
+            if (AdminDataSource is not null)
+            {
+                await AdminDataSource.DisposeAsync();
+            }
         }
-
-        await _container.DisposeAsync();
+        finally
+        {
+            await _container.DisposeAsync();
+        }
     }
 
     public async Task ResetAsync()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import importlib.util
 import json
 import os
@@ -74,6 +75,7 @@ PACKAGE_PLANE_PROJECTS = (
     "Chummer.Run.Api/Chummer.Run.Api.csproj",
     "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj",
     "Chummer.BuildGhost.ToughTongue.Tests/Chummer.BuildGhost.ToughTongue.Tests.csproj",
+    "Chummer.Run.Api.Postgres.Tests/Chummer.Run.Api.Postgres.Tests.csproj",
     "Chummer.Tests/Chummer.Tests.csproj",
 )
 LOCKED_PROJECTS = (
@@ -426,6 +428,232 @@ def test_package_plane_receipt_rejects_empty_or_partial_test_runs(
         },
         "focused tests",
     )
+
+
+def _postgres_trx(**overrides: int) -> bytes:
+    # Synthetic parser fixture only; never presented as database execution evidence.
+    counters = dict(total=2, executed=2, passed=2, failed=0, error=0, timeout=0,
+                    aborted=0, notExecuted=0, inconclusive=0)
+    counters.update(overrides)
+    values = " ".join(f'{key}="{value}"' for key, value in counters.items())
+    return f'<TestRun><ResultSummary><Counters {values}/></ResultSummary></TestRun>'.encode()
+
+
+@pytest.mark.parametrize("mutation", ["hardlink", "fifo", "oversized", "changed_during_read"])
+def test_original_trx_read_rejects_aliases_special_files_and_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str,
+) -> None:
+    verifier = load_verifier_module()
+    path = tmp_path / "original.trx"
+    if mutation == "fifo":
+        os.mkfifo(path)
+    else:
+        path.write_bytes(_postgres_trx())
+        if mutation == "hardlink":
+            os.link(path, tmp_path / "alias.trx")
+        elif mutation == "oversized":
+            with path.open("r+b") as stream:
+                stream.truncate(16 * 1024 * 1024 + 1)
+        else:
+            original_fstat = os.fstat
+            observations = 0
+
+            def change_after_read(descriptor):
+                nonlocal observations
+                observations += 1
+                if observations == 2:
+                    path.write_bytes(_postgres_trx() + b" ")
+                return original_fstat(descriptor)
+
+            monkeypatch.setattr(verifier.os, "fstat", change_after_read)
+    with pytest.raises(verifier.VerificationError):
+        verifier._read_trx_bytes(path)
+
+
+@pytest.mark.parametrize("bad_path", ["relative", "source", "existing", "symlink", "parent_link", "traversal", "missing_parent", "root"])
+def test_original_test_results_reject_unsafe_or_reused_paths(tmp_path: Path, bad_path: str) -> None:
+    verifier = load_verifier_module()
+    source = tmp_path / "source"
+    source.mkdir()
+    existing = tmp_path / "existing"
+    existing.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(existing, target_is_directory=True)
+    paths = {
+        "relative": Path("results"), "source": source / "results", "existing": existing,
+        "symlink": link, "parent_link": link / "results", "traversal": tmp_path / "unused/../results",
+        "missing_parent": tmp_path / "missing/results", "root": Path("/"),
+    }
+    with pytest.raises(verifier.VerificationError):
+        verifier._prepare_test_results_directory(source, paths[bad_path])
+    assert list(existing.iterdir()) == []
+
+
+def test_original_test_results_are_fresh_private_and_not_deleted_with_consumer(tmp_path: Path) -> None:
+    verifier = load_verifier_module()
+    source = tmp_path / "source"
+    source.mkdir()
+    results = verifier._prepare_test_results_directory(source, tmp_path / "retained")
+    assert results.stat().st_mode & 0o777 == 0o700
+    original = _postgres_trx(failed=1, passed=1)
+    (results / "postgres-package-plane.trx").write_bytes(original)
+    source.rmdir()
+    assert (results / "postgres-package-plane.trx").read_bytes() == original
+
+
+@pytest.mark.parametrize("outcome", ["pass", "process_failure", "zero", "failed", "skipped", "inconsistent_skip", "missing", "symlink"])
+def test_postgres_is_mandatory_and_original_failure_trx_survives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, outcome: str,
+) -> None:
+    verifier = load_verifier_module()
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    results = verifier._prepare_test_results_directory(consumer, tmp_path / "results")
+    trx = results / "postgres-package-plane.trx"
+    mutations = {"zero": dict(total=0, executed=0, passed=0), "failed": dict(passed=1, failed=1),
+                 "skipped": dict(executed=1, passed=1, notExecuted=1), "inconsistent_skip": dict(notExecuted=1)}
+    original = _postgres_trx(**mutations.get(outcome, {}))
+    calls = []
+    environment = {"PATH": "/unit-test-only", "CI": "true"}
+    common = ("-p:ChummerUseLocalCompatibilityTree=false", "-p:RestorePackagesPath=unit-test-cache")
+
+    def observe_command(command, *, cwd, env):
+        # Unit-test command observation; this test does not launch dotnet or Docker.
+        calls.append((tuple(command), cwd, dict(env)))
+        if command[1] == "test":
+            if outcome == "symlink":
+                target = tmp_path / "unrelated.trx"
+                target.write_bytes(original)
+                trx.symlink_to(target)
+            elif outcome != "missing":
+                trx.write_bytes(original)
+            if outcome == "process_failure":
+                raise verifier.VerificationError("controlled test-process failure")
+        return ""
+
+    monkeypatch.setattr(verifier, "_run", observe_command)
+    args = (consumer, results, tmp_path / "NuGet.Config", tmp_path / "packages", "dotnet", common, environment)
+    if outcome == "pass":
+        assert verifier._run_postgres_tests(*args)["passed"] == 2
+    else:
+        with pytest.raises(verifier.VerificationError):
+            verifier._run_postgres_tests(*args)
+    assert len(calls) == 2
+    restore, test = (row[0] for row in calls)
+    assert restore[1] == "restore" and "--locked-mode" in restore and "--no-cache" in restore
+    assert restore[restore.index("--configfile") + 1] == str(tmp_path / "NuGet.Config")
+    assert test[1] == "test" and "--no-restore" in test and "--filter" not in test
+    assert test[test.index("--framework") + 1] == "net10.0"
+    assert test[test.index("--configuration") + 1] == "Release"
+    assert all(row[0][2].endswith("Chummer.Run.Api.Postgres.Tests.csproj") for row in calls)
+    assert all(row[1] == consumer and row[0][-len(common):] == common for row in calls)
+    assert calls[0][2] == environment
+    assert calls[1][2] == dict(environment, TESTCONTAINERS_RYUK_DISABLED="true")
+    assert "TESTCONTAINERS_RYUK_DISABLED" not in environment
+    if outcome not in {"missing", "symlink"}:
+        assert trx.read_bytes() == original
+
+
+def test_postgres_rejects_preexisting_trx_before_any_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    verifier = load_verifier_module()
+    results = tmp_path / "results"
+    results.mkdir()
+    trx = results / "postgres-package-plane.trx"
+    original = _postgres_trx()
+    trx.write_bytes(original)
+    monkeypatch.setattr(verifier, "_run", lambda *args, **kwargs: pytest.fail("must not run with stale TRX"))
+    with pytest.raises(verifier.VerificationError, match="start absent"):
+        verifier._run_postgres_tests(tmp_path, results, tmp_path, tmp_path, "dotnet", (), {})
+    assert trx.read_bytes() == original
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_original_test_results_cli_keeps_existing_callers_compatible(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit: bool,
+) -> None:
+    verifier = load_verifier_module()
+    argv = ["verify-hub-package-plane.py", "--repo-root", str(tmp_path),
+            "--core-bundle", str(tmp_path / "core.zip"), "--receipt", str(tmp_path / "receipt.json")]
+    if explicit:
+        argv += ["--test-results-directory", str(tmp_path / "original-trx")]
+    monkeypatch.setattr(sys, "argv", argv)
+    parsed = verifier.parse_args()
+    assert parsed.test_results_directory == (tmp_path / "original-trx" if explicit else None)
+    assert parsed.dotnet == "dotnet"
+
+
+@pytest.mark.parametrize("mutation", [None, "missing", "unknown", "symlink", "changed_counts", "failed", "skipped"])
+def test_original_trx_evidence_binds_exact_three_raw_files(
+    tmp_path: Path, mutation: str | None,
+) -> None:
+    verifier = load_verifier_module()
+    originals = {name: _postgres_trx(total=index, executed=index, passed=index)
+                 for index, name in enumerate(verifier.TEST_TRX_FILES, 1)}
+    expected = {}
+    for name, raw in originals.items():
+        path = tmp_path / name
+        path.write_bytes(raw)
+        expected[name] = verifier._trx_counts(path)
+    name = "postgres-package-plane.trx"
+    if mutation == "missing":
+        expected.pop(name)
+    elif mutation == "unknown":
+        expected["unrelated.trx"] = expected.pop(name)
+    elif mutation == "symlink":
+        (tmp_path / name).unlink()
+        (tmp_path / name).symlink_to(tmp_path / "package-plane.trx")
+    elif mutation == "changed_counts":
+        (tmp_path / name).write_bytes(_postgres_trx(total=4, executed=4, passed=4))
+    elif mutation == "failed":
+        (tmp_path / name).write_bytes(_postgres_trx(passed=1, failed=1))
+    elif mutation == "skipped":
+        (tmp_path / name).write_bytes(_postgres_trx(notExecuted=1))
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+    if mutation is None:
+        assert verifier._test_evidence(tmp_path, expected) == {
+            name: {"sha256": hashlib.sha256(raw).hexdigest(), "size_bytes": len(raw)}
+            for name, raw in originals.items()
+        }
+    else:
+        with pytest.raises(verifier.VerificationError):
+            verifier._test_evidence(tmp_path, expected)
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
+
+
+def test_postgres_project_workflow_and_original_retention_are_mandatory() -> None:
+    verifier = load_verifier_module()
+    source = inspect.getsource(verifier.verify)
+    assert "postgres_test_counts = _run_postgres_tests(" in source
+    assert '"postgres_tests": postgres_test_counts' in source
+    assert '"test_evidence": _test_evidence(results,' in source
+    assert "Chummer.Run.Api.Postgres.Tests" in verifier.LOCKED_PROJECTS
+    assert "Chummer.Run.Api.Postgres.Tests/obj/project.assets.json" in inspect.getsource(verifier._audit_assets)
+    assert "results = root /" not in source
+    assert "receipt_path.stem}-test-results" in source
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text()
+    retention = workflow.split("      - name: Retain original C# test runner evidence including PostgreSQL failures\n", 1)[1].split("      - name:", 1)[0]
+    assert "if: always()" in retention and "overwrite: false" in retention
+    assert "${{ github.run_id }}-${{ github.run_attempt }}" in retention
+    assert "/*.trx" in retention and "if-no-files-found: error" in retention
+    assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in retention
+    assert '--test-results-directory "${RUNNER_TEMP}/hub-package-plane-tests-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"' in workflow
+    assert "TESTCONTAINERS_RYUK_DISABLED" not in workflow
+    project = ElementTree.parse(ROOT / "Chummer.Run.Api.Postgres.Tests/Chummer.Run.Api.Postgres.Tests.csproj").getroot()
+    assert project.findtext(".//RestorePackagesWithLockFile") == "true"
+    assert project.findtext(".//RestoreLockedMode") == "true"
+    assert "../Chummer.Run.Api/Chummer.Run.Api.csproj" in {p.get("Include") for p in project.findall(".//ProjectReference")}
+    assert {p.get("Link") for p in project.findall(".//Compile")} == {
+        "InstallLinkingPostgresAuthorityIntegrationTests.cs", "InstallLinkingPostgresCoordinatorStoreTests.cs",
+    }
+    assert all("Condition" not in group.attrib and "Condition" not in item.attrib
+               for group in project.findall("ItemGroup") for item in group.findall("Compile"))
+    fixture = (ROOT / "Chummer.Tests/InstallLinkingPostgresAuthorityIntegrationTests.cs").read_text()
+    assert 'HostIP = "127.0.0.1"' in fixture and "Guid.NewGuid()" in fixture
+    assert "NanoCPUs = 1_000_000_000L" in fixture and "Memory = 512L * 1024 * 1024" in fixture
+    initialize = fixture.split("public async Task InitializeAsync()", 1)[1].split("public async Task DisposeAsync()", 1)[0]
+    assert "catch" in initialize and "await DisposeAsync()" in initialize and "throw;" in initialize
+    dispose = fixture.split("public async Task DisposeAsync()", 1)[1].split("public async Task ResetAsync()", 1)[0]
+    assert "finally" in dispose and "await _container.DisposeAsync()" in dispose
 
 
 @pytest.mark.parametrize(
