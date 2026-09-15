@@ -5,12 +5,89 @@ using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
 using Xunit;
 
 namespace Chummer.Tests;
 
 public sealed class InstallLinkingPostgresCoordinatorStoreTests
 {
+    [Fact]
+    public void Unfenced_authority_is_unavailable_even_when_its_bound_readiness_is_green()
+    {
+        using var authority = new FakeSnapshotAuthority();
+        var coordinator = new InstallLinkingPostgresAuthorityCoordinator(authority);
+        using InstallLinkingAuthoritativeEnvelope empty = authority.CloneCurrent();
+        coordinator.BindValidatedLocalMirror(empty);
+        Assert.True(coordinator.Evaluate().Ready);
+        int reads = authority.ReadCount;
+        int readinessChecks = authority.ReadinessCount;
+        bool captured = false;
+
+        InstallLinkingRollbackAuthorityReadiness result =
+            coordinator.ReadBoundLocalMirror(() => captured = true);
+
+        Assert.False(result.Ready);
+        Assert.Equal("postgres_read_fence_unavailable", result.Code);
+        Assert.False(captured);
+        Assert.Equal(reads, authority.ReadCount);
+        Assert.Equal(readinessChecks, authority.ReadinessCount);
+        Assert.Empty(authority.ObservedRequests);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Coordinator_rejects_async_void_and_multicast_callbacks_before_invocation(
+        bool multicast)
+    {
+        using var authority = new FakeSnapshotAuthority();
+        var coordinator = new InstallLinkingPostgresAuthorityCoordinator(authority);
+        int invoked = 0;
+        Action asynchronous = async () =>
+        {
+            Interlocked.Increment(ref invoked);
+            await Task.Yield();
+        };
+        Action capture = multicast
+            ? new Action(() => Interlocked.Increment(ref invoked)) + asynchronous
+            : asynchronous;
+
+        Assert.Throws<ArgumentException>(() => coordinator.ReadBoundLocalMirror(capture));
+
+        Assert.Equal(0, invoked);
+        Assert.Equal(0, authority.ReadCount);
+        Assert.Equal(0, authority.ReadinessCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Npgsql_fence_rejects_async_void_and_multicast_before_opening_a_unit_of_work(
+        bool multicast)
+    {
+        // No connection is opened: rejection must precede even the unit-of-work factory.
+        await using NpgsqlDataSource dataSource = NpgsqlDataSource.Create(
+            "Host=127.0.0.1;Username=unused;Database=unused;Pooling=false");
+        var factory = new NoBeginUnitOfWorkFactory();
+        var authority = new NpgsqlInstallLinkingSnapshotAuthority(dataSource, factory);
+        int invoked = 0;
+        Action<InstallLinkingAuthoritativeEnvelope> asynchronous = async _ =>
+        {
+            Interlocked.Increment(ref invoked);
+            await Task.Yield();
+        };
+        Action<InstallLinkingAuthoritativeEnvelope> capture = multicast
+            ? new Action<InstallLinkingAuthoritativeEnvelope>(
+                _ => Interlocked.Increment(ref invoked)) + asynchronous
+            : asynchronous;
+
+        await Assert.ThrowsAsync<ArgumentException>(() => authority.ReadFencedAsync(capture));
+
+        Assert.Equal(0, invoked);
+        Assert.Equal(0, factory.BeginCount);
+    }
+
     [Fact]
     public void Readiness_requires_an_exact_head_that_was_bound_after_local_mirroring()
     {
@@ -299,12 +376,15 @@ public sealed class InstallLinkingPostgresCoordinatorStoreTests
         private InstallLinkingAuthoritativeEnvelope _current = Empty();
 
         public bool ForceConflict { get; init; }
+        public int ReadCount { get; private set; }
+        public int ReadinessCount { get; private set; }
         public List<InstallLinkingEnvelopeCompareExchangeRequest> ObservedRequests { get; } = [];
 
         public Task<InstallLinkingAuthoritativeEnvelope> ReadCurrentAsync(
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ReadCount++;
             return Task.FromResult(CloneCurrent());
         }
 
@@ -343,6 +423,7 @@ public sealed class InstallLinkingPostgresCoordinatorStoreTests
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ReadinessCount++;
             lock (_gate)
             {
                 return Task.FromResult(new InstallLinkingPostgresReadiness(
@@ -406,6 +487,18 @@ public sealed class InstallLinkingPostgresCoordinatorStoreTests
                 _current.Dispose();
                 _current = Empty();
             }
+        }
+    }
+
+    private sealed class NoBeginUnitOfWorkFactory : IInstallLinkingPostgresUnitOfWorkFactory
+    {
+        public int BeginCount { get; private set; }
+
+        public ValueTask<IInstallLinkingPostgresUnitOfWork> BeginAsync(
+            CancellationToken cancellationToken)
+        {
+            BeginCount++;
+            throw new InvalidOperationException("A rejected callback must not open PostgreSQL.");
         }
     }
 }

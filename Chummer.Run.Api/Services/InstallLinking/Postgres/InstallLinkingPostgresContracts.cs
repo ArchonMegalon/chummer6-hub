@@ -679,6 +679,46 @@ public interface IInstallLinkingSnapshotAuthority
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Optional exclusion capability, not an optimistic readiness observation. The implementation
+/// owns the validated envelope and keeps the same authority row locked against CAS throughout
+/// the synchronous callback. The borrowed envelope and its arrays must not be retained,
+/// disposed, or mutated by the callback; they are cleared before this operation finishes.
+/// Callbacks must perform only bounded synchronous reads: no async work, HTTP, or mutations.
+/// Direct async-void callbacks (including multicast members) are rejected. This check cannot
+/// prevent trusted synchronous code from incorrectly launching nested fire-and-forget work.
+/// Callers must acquire any local store writer gate BEFORE entering this operation, and may
+/// then acquire the snapshot/binding gate AFTER the row. Never acquire a local writer gate
+/// after row ownership. Cancellation cannot preempt a synchronous callback; it is checked
+/// before and after the callback, and exclusion ends when the operation releases the row.
+/// This does not confer identity, consent, or continuing revocation authority.
+/// </summary>
+public interface IInstallLinkingSnapshotReadFence
+{
+    Task ReadFencedAsync(
+        Action<InstallLinkingAuthoritativeEnvelope> capture,
+        CancellationToken cancellationToken = default);
+}
+
+internal static class InstallLinkingReadFenceCallback
+{
+    internal static void Validate(Delegate capture)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        foreach (Delegate callback in capture.GetInvocationList())
+        {
+            if (callback.Method.IsDefined(
+                    typeof(System.Runtime.CompilerServices.AsyncStateMachineAttribute),
+                    inherit: false))
+            {
+                throw new ArgumentException(
+                    "An InstallLinking read-fence callback must be synchronous.",
+                    nameof(capture));
+            }
+        }
+    }
+}
+
 public interface IInstallLinkingPostgresUnitOfWork : IAsyncDisposable
 {
     NpgsqlConnection Connection { get; }

@@ -37,6 +37,73 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
         => _authority.CheckReadinessAsync(cancellationToken);
 
     /// <summary>
+    /// Runs a bounded synchronous local read only while PostgreSQL excludes concurrent CAS
+    /// and the current bound mirror exactly matches that locked head. The caller must already
+    /// hold the local InstallLinkingStore.Gate; order is local store gate, PostgreSQL row,
+    /// then this binding/snapshot gate. The callback must not acquire a local writer gate,
+    /// mutate state, or perform HTTP/async work. It may execute on another thread, so it must
+    /// not reenter a thread-owned local gate. Its synchronous work cannot be preempted.
+    /// Success describes this capture only, not future revocation safety or user authority.
+    /// </summary>
+    public InstallLinkingRollbackAuthorityReadiness ReadBoundLocalMirror(
+        Action capture,
+        CancellationToken cancellationToken = default)
+    {
+        InstallLinkingReadFenceCallback.Validate(capture);
+        if (_authority is not IInstallLinkingSnapshotReadFence fence)
+        {
+            return new(false, "postgres_read_fence_unavailable");
+        }
+
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(ReadinessDeadline);
+        var result = new InstallLinkingRollbackAuthorityReadiness(
+            false,
+            "postgres_authority_not_bound");
+        try
+        {
+            fence.ReadFencedAsync(current =>
+            {
+                lock (_bindingGate)
+                {
+                    deadline.Token.ThrowIfCancellationRequested();
+                    if (_boundHead is null)
+                    {
+                        return;
+                    }
+
+                    if (!_boundHead.Matches(current))
+                    {
+                        result = new(false, "postgres_authority_head_mismatch");
+                        return;
+                    }
+
+                    capture();
+                    deadline.Token.ThrowIfCancellationRequested();
+                    result = new(true, "postgres_authority_fenced");
+                }
+            }, deadline.Token).GetAwaiter().GetResult();
+            deadline.Token.ThrowIfCancellationRequested();
+            return result;
+        }
+        catch (Exception exception) when (exception is
+            NpgsqlException or
+            IOException or
+            TimeoutException or
+            OperationCanceledException)
+        {
+            return new(false, "postgres_unavailable");
+        }
+        catch (Exception exception) when (exception is
+            InvalidDataException or
+            CryptographicException or
+            InvalidOperationException)
+        {
+            return new(false, "postgres_authority_invalid");
+        }
+    }
+
+    /// <summary>
     /// Binds readiness only after the caller has validated, loaded, and durably mirrored the
     /// exact authority envelope. Calling this before the mirror is durable would create a
     /// readiness-only authority and is intentionally not supported by this type.

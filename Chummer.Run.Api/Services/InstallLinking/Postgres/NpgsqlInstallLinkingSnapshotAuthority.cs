@@ -19,17 +19,18 @@ public sealed class NpgsqlInstallLinkingPostgresUnitOfWorkFactory :
     public async ValueTask<IInstallLinkingPostgresUnitOfWork> BeginAsync(
         CancellationToken cancellationToken)
     {
-        NpgsqlConnection connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        NpgsqlConnection connection = await _dataSource.OpenConnectionAsync(cancellationToken)
+            .ConfigureAwait(false);
         try
         {
             NpgsqlTransaction transaction = await connection.BeginTransactionAsync(
                 IsolationLevel.ReadCommitted,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
             return new NpgsqlInstallLinkingPostgresUnitOfWork(connection, transaction);
         }
         catch
         {
-            await connection.DisposeAsync();
+            await connection.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
@@ -64,14 +65,20 @@ internal sealed class NpgsqlInstallLinkingPostgresUnitOfWork :
             return;
         }
 
-        await Transaction.RollbackAsync(cancellationToken);
+        await Transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
         _completed = true;
     }
 
     public async ValueTask DisposeAsync()
     {
-        await Transaction.DisposeAsync();
-        await Connection.DisposeAsync();
+        try
+        {
+            await Transaction.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            await Connection.DisposeAsync().ConfigureAwait(false);
+        }
     }
 }
 
@@ -80,8 +87,11 @@ internal sealed class NpgsqlInstallLinkingPostgresUnitOfWork :
 /// envelope. A filesystem copy may be repaired from this authority, but is never allowed to
 /// advance or lower its head.
 /// </summary>
-public sealed class NpgsqlInstallLinkingSnapshotAuthority : IInstallLinkingSnapshotAuthority
+public sealed class NpgsqlInstallLinkingSnapshotAuthority :
+    IInstallLinkingSnapshotAuthority,
+    IInstallLinkingSnapshotReadFence
 {
+    private static readonly TimeSpan ReadFenceIoDeadline = TimeSpan.FromSeconds(5);
     private readonly NpgsqlDataSource _dataSource;
     private readonly IInstallLinkingPostgresUnitOfWorkFactory _unitOfWorkFactory;
     private readonly InstallLinkingPostgresMigrator _migrator;
@@ -132,6 +142,48 @@ public sealed class NpgsqlInstallLinkingSnapshotAuthority : IInstallLinkingSnaps
             envelope.Dispose();
             throw;
         }
+    }
+
+    public async Task ReadFencedAsync(
+        Action<InstallLinkingAuthoritativeEnvelope> capture,
+        CancellationToken cancellationToken = default)
+    {
+        InstallLinkingReadFenceCallback.Validate(capture);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(ReadFenceIoDeadline);
+        CancellationToken operationToken = deadline.Token;
+        operationToken.ThrowIfCancellationRequested();
+        IInstallLinkingPostgresUnitOfWork unitOfWork =
+            await _unitOfWorkFactory.BeginAsync(operationToken).ConfigureAwait(false);
+        await using (unitOfWork.ConfigureAwait(false))
+        {
+            try
+            {
+                // ReadCommitted waits for an earlier writer and then sees that writer's new head.
+                // FOR UPDATE is the exact singleton-row exclusion used by CompareExchangeAsync.
+                // Concurrent fenced readers serialize too; this is not a READ ONLY transaction.
+                using InstallLinkingAuthoritativeEnvelope current = await ReadHeadAsync(
+                    unitOfWork.Connection,
+                    unitOfWork.Transaction,
+                    forUpdate: true,
+                    operationToken).ConfigureAwait(false);
+                ValidateAuthoritativeEnvelope(current);
+                operationToken.ThrowIfCancellationRequested();
+                capture(current);
+                // A synchronous callback cannot be forcibly canceled. Never report successful
+                // capture after its caller canceled or the I/O budget expired while it ran.
+                operationToken.ThrowIfCancellationRequested();
+            }
+            finally
+            {
+                // Never commit a read fence. Cleanup gets its own bounded I/O budget even when
+                // the caller canceled; disposal also closes the connection if rollback fails.
+                using var cleanup = new CancellationTokenSource(ReadFenceIoDeadline);
+                await unitOfWork.RollbackAsync(cleanup.Token).ConfigureAwait(false);
+            }
+        }
+
+        operationToken.ThrowIfCancellationRequested();
     }
 
     public async Task<InstallLinkingEnvelopeCompareExchangeResult> CompareExchangeAsync(
@@ -438,7 +490,8 @@ public sealed class NpgsqlInstallLinkingSnapshotAuthority : IInstallLinkingSnaps
         bool forUpdate,
         CancellationToken cancellationToken)
     {
-        await using NpgsqlCommand command = connection.CreateCommand();
+        NpgsqlCommand command = connection.CreateCommand();
+        await using var commandScope = command.ConfigureAwait(false);
         command.Transaction = transaction;
         command.CommandText = """
             SELECT generation, commit_id, envelope_version, snapshot_sha256,
@@ -446,9 +499,10 @@ public sealed class NpgsqlInstallLinkingSnapshotAuthority : IInstallLinkingSnaps
             FROM install_linking.snapshot_head
             WHERE singleton = true
             """ + (forUpdate ? " FOR UPDATE" : string.Empty);
-        await using NpgsqlDataReader reader =
-            await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        await using var readerScope = reader.ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             throw new InvalidDataException(
                 "The InstallLinking PostgreSQL authority head is missing.");

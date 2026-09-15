@@ -161,7 +161,17 @@ jobs:
           python3 scripts/ai/verify-hub-package-plane.py \
             --repo-root . \
             --core-bundle "${core_bundle}" \
-            --receipt "${RUNNER_TEMP}/HUB_NO_SIBLINGS_PACKAGE_PLANE.generated.json"
+            --receipt "${RUNNER_TEMP}/HUB_NO_SIBLINGS_PACKAGE_PLANE.generated.json" \
+            --test-results-directory "${RUNNER_TEMP}/hub-package-plane-tests-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Retain original C# test runner evidence including PostgreSQL failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hub-package-plane-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hub-package-plane-tests-${{ github.run_id }}-${{ github.run_attempt }}/*.trx
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: false
       - name: Upload immutable package-plane receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
