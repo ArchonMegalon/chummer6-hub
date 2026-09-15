@@ -197,6 +197,33 @@ public sealed class AccountService
         }
     }
 
+    /// <summary>
+    /// Observes an existing canonical principal-to-user mapping under one store
+    /// lock. This does not authenticate the principal or create an account, and
+    /// does not grant continuing authorization after the observation.
+    /// </summary>
+    internal string? GetExistingCanonicalUserIdBySubject(string subjectId)
+    {
+        string? normalized = NormalizeOptional(subjectId);
+        if (normalized is null) return null;
+        lock (_store.Gate)
+        {
+            if (!_store.UserIdBySubjectId.TryGetValue(normalized, out string? indexedUserId)
+                || string.IsNullOrWhiteSpace(indexedUserId)
+                || !_store.UsersById.TryGetValue(indexedUserId, out HubUserDto? user)
+                || user is null
+                || !string.Equals(indexedUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            // Load() builds this index from both the primary principal and
+            // normalized historical linked principals, using ordinal-ignore-case.
+            bool belongsToUser = string.Equals(NormalizeOptional(user.SubjectId), normalized, StringComparison.OrdinalIgnoreCase)
+                || user.LinkedPrincipals?.Any(principal => string.Equals(
+                    NormalizeOptional(principal), normalized, StringComparison.OrdinalIgnoreCase)) == true;
+            return belongsToUser ? user.UserId : null;
+        }
+    }
+
     public HubUserDto UpdateGroupMemberships(string userId, IReadOnlyList<string> groupIds)
     {
         var normalizedUserId = NormalizeRequired(userId, nameof(userId));
