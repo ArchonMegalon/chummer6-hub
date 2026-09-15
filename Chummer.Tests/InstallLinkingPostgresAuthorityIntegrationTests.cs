@@ -1,10 +1,18 @@
 using System.Net;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Chummer.Application.Workspaces;
+using Chummer.Contracts.BuildGhost;
 using Chummer.Contracts.Characters;
+using Chummer.Contracts.Owners;
+using Chummer.Contracts.Rulesets;
 using Chummer.Contracts.Workspaces;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
+using Chummer.Infrastructure.Owners;
+using Chummer.Infrastructure.Workspaces;
+using Chummer.Rulesets.Sr5;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -2259,6 +2267,431 @@ public sealed class InstallLinkingPostgresAuthorityIntegrationTests :
         AssertSameHead(beforeDeniedRevalidation, afterDeniedRevalidation);
         Assert.Equal(persistedSnapshot,
             File.ReadAllBytes(configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"]!));
+    }
+
+    [Theory]
+    [InlineData("unchanged")]
+    [InlineData("revoked_consent")]
+    [InlineData("revoked_grant")]
+    [InlineData("new_session")]
+    [InlineData("snapshot_generation")]
+    [InlineData("authority_generation")]
+    [InlineData("canceled")]
+    [InlineData("expired_session")]
+    [SupportedOSPlatform("linux")]
+    public async Task Rook_private_Core_result_requires_fresh_authority_after_runtime_disposal(string change)
+    {
+        Assert.True(OperatingSystem.IsLinux(), "The actual request-private scratch allocator requires Linux.");
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        using RookRuntimeScenario scenario = await Task.Run(() => new RookRuntimeScenario(stores), deadline.Token)
+            .WaitAsync(deadline.Token);
+        InstallLinkingRookReadConsent consent = await scenario.GrantAsync(deadline.Token).WaitAsync(deadline.Token);
+        Assert.Equal(1, scenario.Identity.Calls);
+        using InstallLinkingAuthoritativeEnvelope granted = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+        byte[] mirror = File.ReadAllBytes(scenario.Reader.Store.StoragePath);
+        byte[] snapshots = File.ReadAllBytes(scenario.SnapshotPath);
+        long commits = await _fixture.ScalarLongAsync("SELECT COUNT(*) FROM install_linking.snapshot_commits");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        scenario.Identity.BeforeResponse = async (call, ct) =>
+        {
+            if (call != 3) return;
+            entered.TrySetResult();
+            await release.Task.WaitAsync(ct);
+        };
+
+        Task<WorkspaceRuleQuestionResult> pending = Task.Run(
+            () => scenario.ResolveAsync(consent, requestCancellation.Token), deadline.Token);
+        try
+        {
+            // The real adapter reached its second Identity call only after actual
+            // Core restore/query and disposal. Nothing has been released yet.
+            await entered.Task.WaitAsync(deadline.Token);
+            Assert.False(pending.IsCompleted);
+            Assert.Equal(3, scenario.Identity.Calls);
+            Assert.True(scenario.RuntimeClock.SawOwnedScratch,
+                "Core's actual restore receipt clock did not observe its allocated private child before revalidation.");
+            scenario.AssertPrivateWorkCleanedAndInputsUnchanged();
+            using (InstallLinkingAuthoritativeEnvelope readOnly = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token))
+                AssertSameHead(granted, readOnly);
+            Assert.Equal(commits, await _fixture.ScalarLongAsync("SELECT COUNT(*) FROM install_linking.snapshot_commits"));
+            Assert.Equal(snapshots, File.ReadAllBytes(scenario.SnapshotPath));
+
+            if (change is "revoked_consent" or "revoked_grant" or "authority_generation")
+            {
+                var writer = await Task.Run(stores.OpenStore, deadline.Token).WaitAsync(deadline.Token);
+                if (change == "revoked_consent")
+                {
+                    InstallLinkingRookReadConsent revoked = await Task.Run(() => writer.Service.RevokeRookReadConsent(
+                        scenario.UserId, RookConsentPostgresStores.SubjectId, consent.ConsentId, consent.Version,
+                        deadline.Token), deadline.Token).WaitAsync(deadline.Token);
+                    Assert.NotNull(revoked.RevokedAtUtc);
+                }
+                else if (change == "revoked_grant")
+                {
+                    await Task.Run(() => writer.Service.RevokeGrantForOwner(RookConsentPostgresStores.InstallationId,
+                        scenario.UserId, RookConsentPostgresStores.SubjectId), deadline.Token).WaitAsync(deadline.Token);
+                }
+                else
+                {
+                    var next = new InstallLinkingEnvelopeCompareExchangeRequest(granted.Generation, granted.CommitId,
+                        granted.EnvelopeSha256!.ToArray(), granted.Generation + 1, Guid.NewGuid(),
+                        granted.EnvelopeVersion!.Value, granted.SnapshotSha256!.ToArray(),
+                        granted.EnvelopeSha256!.ToArray(), granted.ProtectedEnvelope!.ToArray());
+                    try
+                    {
+                        using InstallLinkingEnvelopeCompareExchangeResult committed =
+                            await writer.Authority.CompareExchangeAsync(next, deadline.Token);
+                        Assert.True(committed.Committed, committed.Code);
+                        using InstallLinkingAuthoritativeEnvelope advanced = await writer.Authority.ReadCurrentAsync(deadline.Token);
+                        Assert.Equal(granted.ProtectedEnvelope, advanced.ProtectedEnvelope);
+                        Assert.Equal(granted.EnvelopeSha256, advanced.EnvelopeSha256);
+                        Assert.Equal(granted.Generation + 1, advanced.Generation);
+                        Assert.NotEqual(granted.CommitId, advanced.CommitId);
+                    }
+                    finally
+                    {
+                        CryptographicOperations.ZeroMemory(next.ExpectedEnvelopeSha256!);
+                        CryptographicOperations.ZeroMemory(next.SnapshotSha256);
+                        CryptographicOperations.ZeroMemory(next.EnvelopeSha256);
+                        CryptographicOperations.ZeroMemory(next.ProtectedEnvelope);
+                    }
+                }
+                // The caller's once-valid mirror remains byte-identical and active:
+                // only the real PostgreSQL fence can detect this external writer.
+                Assert.Equal(mirror, File.ReadAllBytes(scenario.Reader.Store.StoragePath));
+                Assert.Equal(consent, scenario.Reader.Store.RookReadConsentsById[consent.ConsentId]);
+                Assert.Equal(InstallationGrantStates.Active, scenario.Reader.Store.GrantsById[consent.GrantId].Status);
+            }
+            else if (change == "snapshot_generation")
+            {
+                InstallLinkedWorkspaceSnapshotRecord changed = scenario.Snapshots.UpsertForInstallation(
+                    scenario.Installation, scenario.Selected with { Name = "Explicit concurrent remote metadata update" },
+                    scenario.Selected.RemoteRevision, scenario.Selected.ServerToken);
+                Assert.Equal(scenario.Selected.RemoteRevision + 1, changed.RemoteRevision);
+                Assert.Equal(scenario.Selected.WorkspaceContinuationDigest, changed.WorkspaceContinuationDigest);
+            }
+            else if (change == "new_session") scenario.Identity.SessionId = "another-active-owner-session";
+            else if (change == "expired_session") scenario.Identity.ExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(-1);
+            else if (change == "canceled") requestCancellation.Cancel();
+            using InstallLinkingAuthoritativeEnvelope beforeRelease = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+            byte[] snapshotBeforeRelease = File.ReadAllBytes(scenario.SnapshotPath);
+            release.TrySetResult();
+            if (change == "unchanged")
+            {
+                WorkspaceRuleQuestionResult result = await pending.WaitAsync(deadline.Token);
+                Assert.True(result.Resolved, result.FailureReason);
+                Assert.Equal(1, result.Level);
+                Assert.Equal(4, result.MaximumLevel);
+                Assert.Equal(WorkspaceRuleQuestionIntegrity.ComputeResultDigest(result), result.ResultDigest);
+                WorkspaceRuleQuestionBinding binding = Assert.IsType<WorkspaceRuleQuestionBinding>(result.Binding);
+                Assert.Equal(scenario.Owner.Value, binding.OwnerId);
+                Assert.False(binding.TrustedLocalOwner);
+                Assert.NotEqual(scenario.ExportIssuerId, binding.OwnerAuthorityInstanceId);
+                Assert.Equal(scenario.Exported.Snapshot.Workspace.Id, binding.WorkspaceId);
+                Assert.Equal(2, binding.ContentRevision);
+                Assert.Equal(1, binding.SavedRevision);
+                Assert.NotEqual(scenario.Selected.RemoteRevision, binding.ContentRevision);
+                Assert.Equal(RookRuntimeScenario.SavedQualityId, binding.SubjectId);
+                Assert.NotEmpty(binding.ExecutingModules);
+                WorkspaceRuleSourceAnchor anchor = Assert.Single(result.SourceAnchors);
+                Assert.Equal("HUBTEST", anchor.SourceBook);
+                Assert.Equal(12, anchor.Page);
+                Assert.Equal(RookRuntimeScenario.QualitySourceId, anchor.QualitySourceId);
+                Assert.NotEmpty(anchor.CalculationTrace);
+                Assert.DoesNotContain(RookRuntimeScenario.PrivateNotes, JsonSerializer.Serialize(result));
+            }
+            else if (change == "canceled")
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(deadline.Token));
+            else if (change == "expired_session")
+            {
+                HubRequestAuthException denied = await Assert.ThrowsAsync<HubRequestAuthException>(
+                    () => pending.WaitAsync(deadline.Token));
+                Assert.Equal(StatusCodes.Status401Unauthorized, denied.StatusCode);
+            }
+            else
+            {
+                InstallLinkingOperationException denied = await Assert.ThrowsAsync<InstallLinkingOperationException>(
+                    () => pending.WaitAsync(deadline.Token));
+                Assert.Equal(change == "snapshot_generation" ? StatusCodes.Status409Conflict : StatusCodes.Status403Forbidden,
+                    denied.StatusCode);
+            }
+            using InstallLinkingAuthoritativeEnvelope afterRelease = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+            AssertSameHead(beforeRelease, afterRelease);
+            Assert.Equal(snapshotBeforeRelease, File.ReadAllBytes(scenario.SnapshotPath));
+            scenario.AssertPrivateWorkCleanedAndInputsUnchanged();
+        }
+        finally
+        {
+            release.TrySetResult();
+            requestCancellation.Cancel();
+            // Never dispose the real stores beneath an abandoned asynchronous read
+            // when an assertion fails. Its expected denial/cancellation may be drained;
+            // failure to terminate within this separate cleanup bound fails the test.
+            try { await pending.WaitAsync(TimeSpan.FromSeconds(5)); }
+            catch (Exception) when (pending.IsCompleted) { }
+        }
+    }
+
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task Rook_private_Core_unsupported_intent_returns_only_its_actual_unresolved_result_after_revalidation()
+    {
+        Assert.True(OperatingSystem.IsLinux());
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        using RookRuntimeScenario scenario = await Task.Run(() => new RookRuntimeScenario(stores), deadline.Token)
+            .WaitAsync(deadline.Token);
+        InstallLinkingRookReadConsent consent = await scenario.GrantAsync(deadline.Token).WaitAsync(deadline.Token);
+        using InstallLinkingAuthoritativeEnvelope before = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+        byte[] snapshot = File.ReadAllBytes(scenario.SnapshotPath);
+        WorkspaceRuleQuestionResult result = await Task.Run(() => scenario.ResolveAsync(consent, deadline.Token,
+            intent: "unsupported-read-intent"), deadline.Token).WaitAsync(deadline.Token);
+        Assert.Equal(3, scenario.Identity.Calls);
+        Assert.Equal(WorkspaceRuleQuestionSchemas.ResultV1, result.Schema);
+        Assert.Equal(WorkspaceRuleQuestionStatuses.Unresolved, result.Status);
+        Assert.False(result.Resolved);
+        Assert.Null(result.Binding);
+        Assert.Null(result.Level);
+        Assert.Null(result.MaximumLevel);
+        Assert.Empty(result.SourceAnchors);
+        Assert.Empty(result.Explanation.SourceAnchorIds);
+        Assert.Equal(WorkspaceRuleQuestionIntegrity.ComputeResultDigest(result), result.ResultDigest);
+        Assert.DoesNotContain(RookRuntimeScenario.PrivateNotes, JsonSerializer.Serialize(result));
+        Assert.True(scenario.RuntimeClock.SawOwnedScratch);
+        using InstallLinkingAuthoritativeEnvelope after = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+        AssertSameHead(before, after);
+        Assert.Equal(snapshot, File.ReadAllBytes(scenario.SnapshotPath));
+        scenario.AssertPrivateWorkCleanedAndInputsUnchanged();
+    }
+
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task Rook_private_Core_restore_rejects_a_complete_but_invalid_character_without_releasing_projection()
+    {
+        Assert.True(OperatingSystem.IsLinux());
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        using RookRuntimeScenario scenario = await Task.Run(() => new RookRuntimeScenario(stores, malformed: true), deadline.Token)
+            .WaitAsync(deadline.Token);
+        InstallLinkingRookReadConsent consent = await scenario.GrantAsync(deadline.Token).WaitAsync(deadline.Token);
+        using InstallLinkingAuthoritativeEnvelope before = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+        byte[] selected = File.ReadAllBytes(scenario.SnapshotPath);
+        InstallLinkingOperationException failure = await Assert.ThrowsAsync<InstallLinkingOperationException>(
+            () => Task.Run(() => scenario.ResolveAsync(consent, deadline.Token), deadline.Token).WaitAsync(deadline.Token));
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, failure.StatusCode);
+        Assert.Equal("The selected Rook rule read is unavailable.", failure.Message);
+        Assert.Null(failure.InnerException);
+        Assert.Equal(2, scenario.Identity.Calls); // Grant + capture; no result reaches revalidation.
+        using InstallLinkingAuthoritativeEnvelope after = await scenario.Reader.Authority.ReadCurrentAsync(deadline.Token);
+        AssertSameHead(before, after);
+        Assert.Equal(selected, File.ReadAllBytes(scenario.SnapshotPath));
+        scenario.AssertPrivateWorkCleanedAndInputsUnchanged();
+    }
+
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task Rook_private_Core_read_canceled_before_capture_performs_no_identity_or_private_work()
+    {
+        Assert.True(OperatingSystem.IsLinux());
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await using RookConsentPostgresStores stores = await RookConsentPostgresStores.CreateAsync(_fixture);
+        using RookRuntimeScenario scenario = await Task.Run(() => new RookRuntimeScenario(stores), deadline.Token)
+            .WaitAsync(deadline.Token);
+        InstallLinkingRookReadConsent consent = await scenario.GrantAsync(deadline.Token).WaitAsync(deadline.Token);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => scenario.ResolveAsync(consent, canceled.Token).WaitAsync(deadline.Token));
+        Assert.Equal(1, scenario.Identity.Calls);
+        scenario.AssertPrivateWorkCleanedAndInputsUnchanged();
+    }
+
+    [SupportedOSPlatform("linux")]
+    private sealed class RookRuntimeScenario : IDisposable
+    {
+        public const string SavedQualityId = "42424242-1111-4111-8111-111111111111";
+        public const string QualitySourceId = "42424242-2222-4222-8222-222222222222";
+        public const string PrivateNotes = "PRIVATE-HUB-RUNTIME-NOTES-MUST-NOT-LEAVE-THE-CARRIER";
+        private const string SettingsId = "42424242-3333-4333-8333-333333333333";
+        private readonly HttpClient _http;
+        private readonly RookWorkspaceReadAdmissionService _admission;
+        private readonly RookWorkspaceRuleReadService _reads;
+        private readonly string _coreRoot;
+        private readonly Dictionary<string, byte[]> _coreInputs;
+        private readonly string _scratch;
+        private readonly HttpRequest _request;
+        public (InstallLinkingStore Store, InstallLinkingService Service,
+            NpgsqlInstallLinkingSnapshotAuthority Authority, string ApplicationName) Reader { get; }
+        public string UserId { get; }
+        public OwnerScope Owner { get; }
+        public string ExportIssuerId { get; }
+        public WorkspaceContinuationExport Exported { get; }
+        public RookRuntimeIdentityTransport Identity { get; }
+        public RookRuntimeClock RuntimeClock { get; }
+        public ClaimedInstallationDto Installation { get; }
+        public InstallLinkedWorkspaceSnapshotRecord Selected { get; }
+        public InstallLinkedWorkspaceSnapshotService Snapshots { get; }
+        public string SnapshotPath { get; }
+
+        public RookRuntimeScenario(RookConsentPostgresStores stores, bool malformed = false)
+        {
+            Reader = stores.OpenStore();
+            SnapshotPath = Path.Combine(stores.Root, "rook-runtime-snapshots.json");
+            IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Testing",
+                ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.example.invalid",
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(stores.Root, "rook-runtime-community.json"),
+                ["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"] = SnapshotPath
+            }).Build();
+            var accounts = new AccountService(new CommunityStore(configuration, NullLogger<CommunityStore>.Instance));
+            var user = accounts.EnsureUser(RookConsentPostgresStores.SubjectId, "Runtime owner", "runtime@example.invalid");
+            UserId = user.UserId;
+            RookConsentPostgresStores.SeedInstallation(Reader.Store, UserId);
+            Installation = Reader.Store.InstallationsById[RookConsentPostgresStores.InstallationId];
+            Owner = new(InstallLinkedWorkspaceSnapshotTransfer.ComputeContinuationOwnerId(user.SubjectId));
+            _coreRoot = Path.Combine(stores.Root, "core-fixture");
+            string data = Path.Combine(_coreRoot, "data");
+            Directory.CreateDirectory(data);
+            // Synthetic fixture content, not sourcebook or production rule authority.
+            // The actual packaged Core resolver interprets these ordinary source files.
+            File.WriteAllText(Path.Combine(data, "settings.xml"), $"""
+                <chummer><settings><setting><id>{SettingsId}</id><buildmethod>Priority</buildmethod>
+                <buildpoints>25</buildpoints><books><book>SR5</book><book>HUBTEST</book></books>
+                <customdatadirectorynames/></setting></settings></chummer>
+                """);
+            File.WriteAllText(Path.Combine(data, "books.xml"), """
+                <chummer><books><book><code>SR5</code><name>Fixture base</name></book>
+                <book><code>HUBTEST</code><name>Hub integration fixture</name></book></books></chummer>
+                """);
+            File.WriteAllText(Path.Combine(data, "qualities.xml"), $"""
+                <chummer><qualities><quality><id>{QualitySourceId}</id><name>Hub fixture quality</name>
+                <category>Positive</category><limit>4</limit><source>HUBTEST</source><page>12</page>
+                </quality></qualities></chummer>
+                """);
+            File.WriteAllText(Path.Combine(data, "lifemodules.xml"),
+                "<chummer><stages><stage order=\"0\">Nationality</stage></stages><modules/></chummer>");
+            string xml = malformed ? "<character><notes>" + PrivateNotes : $"""
+                <character><name>Hub rule fixture</name><alias>Before</alias><metatype>Human</metatype>
+                <settings>{SettingsId}</settings><buildmethod>Priority</buildmethod><createdversion>5.225.0</createdversion>
+                <appversion>5.225.0</appversion><created>False</created><karma>0</karma><nuyen>0</nuyen>
+                <notes>{PrivateNotes}</notes><qualities><quality><guid>{SavedQualityId}</guid>
+                <sourceid>{QualitySourceId}</sourceid><name>Hub fixture quality</name><qualitytype>Positive</qualitytype>
+                <qualitysource>Selected</qualitysource><bp>0</bp><extra/><sourcename/><notes/>
+                <source>SR5</source><page>999</page><bonus/></quality></qualities></character>
+                """;
+            var workspaceId = new CharacterWorkspaceId("hub-rook-runtime-selected");
+            var envelope = new WorkspacePayloadEnvelope("sr5", Sr5WorkspaceCodec.SchemaVersion, Sr5WorkspaceCodec.Sr5PayloadKind, xml);
+            var sourceStore = new FileWorkspaceStore(Path.Combine(_coreRoot, "original-workspaces"));
+            using (var sourceOwner = new RequestOwnerContextAccessor(Owner))
+            {
+                ExportIssuerId = sourceOwner.Capture().AuthorityInstanceId;
+                Assert.True(sourceStore.CreateWorkspaceDocument(Owner, workspaceId, new WorkspaceDocument(envelope)).Success);
+                Assert.True(sourceStore.SaveCheckpoint(Owner, workspaceId, 1).Success);
+                Assert.True(sourceStore.ReplaceWorkspaceDocument(Owner, workspaceId, 1,
+                    new WorkspaceDocument(envelope with { Payload = xml.Replace("Before", "After", StringComparison.Ordinal) })).Success);
+                var exported = new WorkspaceContinuationExportService(sourceStore, sourceOwner)
+                    .Export(sourceOwner.Capture(), workspaceId);
+                Assert.True(exported.Success, exported.Error);
+                Exported = Assert.IsType<WorkspaceContinuationExport>(exported.Value);
+            }
+            WorkspaceDocumentSnapshot workspace = Exported.Snapshot.Workspace;
+            Assert.Equal(2, workspace.ContentRevision);
+            Assert.Equal(1, workspace.SavedRevision);
+            using JsonDocument encoded = JsonDocument.Parse(WorkspaceContinuationCodec.Encode(
+                Exported, InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes));
+            var incoming = new InstallLinkedWorkspaceSnapshotRecord("", workspaceId.Value, workspace.Document.RulesetId,
+                "NativeXml", workspace.Document.SchemaVersion, workspace.Document.PayloadKind, workspace.Document.Content,
+                workspace.LastUpdatedUtc, Installation.InstallationId, "Hub rule fixture", null, null, null, null, null,
+                0, 0, false, WorkspaceContinuation: encoded.RootElement.Clone(), WorkspaceContinuationDigest: Exported.SnapshotDigest);
+            Selected = new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(configuration))
+                .UpsertForInstallation(Installation, incoming, 0);
+            Assert.Equal(1, Selected.RemoteRevision);
+            // Actual persisted carrier read through a fresh store, not a DTO-only fake.
+            Snapshots = new(new InstallLinkedWorkspaceSnapshotStore(configuration));
+            _scratch = Path.Combine(stores.Root, "private-rule-runtime");
+            Directory.CreateDirectory(_scratch, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            File.WriteAllText(Path.Combine(_scratch, "unrelated-sentinel"), "keep");
+            RuntimeClock = new(_scratch);
+            var factory = new PrivateWorkspaceRuleRuntimeFactory(_scratch, _coreRoot, _coreRoot, null, RuntimeClock);
+            Identity = new RookRuntimeIdentityTransport();
+            _http = new(Identity);
+            var sessions = new HubSessionAccountAdmissionService(_http, configuration, accounts, TimeProvider.System);
+            _admission = new(sessions, accounts, Reader.Service, Snapshots, TimeProvider.System);
+            _reads = new(_admission, factory);
+            _request = new DefaultHttpContext().Request;
+            _request.Headers.Authorization = "Bearer rook-runtime-test-session";
+            _coreInputs = ReadCoreInputs();
+        }
+
+        public Task<InstallLinkingRookReadConsent> GrantAsync(CancellationToken ct) => _admission.GrantAsync(_request,
+            Installation.InstallationId, Installation.GrantId!, Selected.WorkspaceId, Selected.RemoteRevision,
+            Selected.ServerToken!, Selected.WorkspaceContinuationDigest!, true, DateTimeOffset.UtcNow.AddMinutes(2), ct);
+
+        public Task<WorkspaceRuleQuestionResult> ResolveAsync(InstallLinkingRookReadConsent consent, CancellationToken ct,
+            string intent = WorkspaceRuleQuestionIntents.QualityLevel)
+            => _reads.ResolveAsync(_request, Installation.InstallationId, Installation.GrantId!, consent.ConsentId,
+                consent.Version, intent, SavedQualityId, "en", ct);
+
+        public void AssertPrivateWorkCleanedAndInputsUnchanged()
+        {
+            Assert.Empty(Directory.GetDirectories(_scratch));
+            Assert.Equal(new[] { Path.Combine(_scratch, "unrelated-sentinel") }, Directory.GetFiles(_scratch));
+            Assert.Equal("keep", File.ReadAllText(Path.Combine(_scratch, "unrelated-sentinel")));
+            Dictionary<string, byte[]> after = ReadCoreInputs();
+            Assert.Equal(_coreInputs.Keys.OrderBy(path => path), after.Keys.OrderBy(path => path));
+            foreach ((string path, byte[] bytes) in _coreInputs) Assert.Equal(bytes, after[path]);
+        }
+
+        private Dictionary<string, byte[]> ReadCoreInputs() => Directory.GetFiles(_coreRoot, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => Path.GetRelativePath(_coreRoot, path), File.ReadAllBytes, StringComparer.Ordinal);
+
+        public void Dispose() => _http.Dispose(); // Outer owned fixture closes stores, role and exact temporary tree.
+    }
+
+    private sealed class RookRuntimeClock(string scratch) : TimeProvider
+    {
+        private int _sawOwnedScratch;
+        public bool SawOwnedScratch => Volatile.Read(ref _sawOwnedScratch) != 0;
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            // Read-only observation at the genuine Core restore-receipt producer,
+            // not a substituted factory, restore result, rule answer or filesystem.
+            if (Directory.GetDirectories(scratch).Length == 1)
+                Volatile.Write(ref _sawOwnedScratch, 1);
+            return DateTimeOffset.UtcNow;
+        }
+    }
+
+    private sealed class RookRuntimeIdentityTransport : HttpMessageHandler
+    {
+        private int _calls;
+        public int Calls => Volatile.Read(ref _calls);
+        public string SessionId { get; set; } = "rook-runtime-initial-session";
+        public DateTimeOffset ExpiresAtUtc { get; set; } = DateTimeOffset.UtcNow.AddMinutes(10);
+        public Func<int, CancellationToken, Task>? BeforeResponse { get; set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            int call = Interlocked.Increment(ref _calls);
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("https://identity.example.invalid/api/v1/identity/introspect", request.RequestUri?.AbsoluteUri);
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            IdentityIntrospectionRequest? input = JsonSerializer.Deserialize<IdentityIntrospectionRequest>(
+                await request.Content!.ReadAsStringAsync(ct), options);
+            Assert.Equal("rook-runtime-test-session", Assert.IsType<IdentityIntrospectionRequest>(input).AccessToken);
+            if (BeforeResponse is { } before) await before(call, ct);
+            ct.ThrowIfCancellationRequested();
+            return new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new IdentityIntrospectionResponse(true, SessionId,
+                    RookConsentPostgresStores.SubjectId, ["player"], ExpiresAtUtc), options), Encoding.UTF8, "application/json")
+            };
+        }
     }
 
     private sealed class RookPostgresIdentityTransport(DateTimeOffset expiresAtUtc) : HttpMessageHandler

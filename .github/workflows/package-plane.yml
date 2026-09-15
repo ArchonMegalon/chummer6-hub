@@ -77,6 +77,8 @@ jobs:
             --only-binary=:all: --require-hashes --index-url https://pypi.org/simple \
             --requirement eng/ci-rook-system-python-requirements.txt
           /usr/bin/python3 -I -c 'import yaml; assert yaml.__version__ == "6.0.3"; assert hasattr(yaml, "SafeLoader")'
+      - name: Verify non-promoting package observation with real isolated YAML
+        run: python3 -m pytest -q tests/test_hub_package_authority_observation.py
       - name: Verify Rook rollback authority without Docker or providers
         shell: bash
         run: |
@@ -149,13 +151,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          core_bundle="${RUNNER_TEMP}/chummer-core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845.zip"
+          core_bundle="${RUNNER_TEMP}/chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip"
           curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
             --fail --location --silent --show-error --retry 0 \
             --connect-timeout 15 --max-time 120 --max-filesize 16777216 \
             --output "${core_bundle}" \
-            "https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845/chummer-core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845.zip"
-          echo "6006a99d40ea63323b19c3e629c8b3c0810b0f599909071110409e742e5a3a12  ${core_bundle}" \
+            "https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6/chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip"
+          echo "d45350886940a3323ed72a9f7b72ad539e0383e13a55063dcf10c90d491dac1b  ${core_bundle}" \
             | sha256sum --check --strict
           chmod 0600 "${core_bundle}"
           python3 scripts/ai/verify-hub-package-plane.py \
