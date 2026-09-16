@@ -1,0 +1,44 @@
+name: chummer6-rook
+
+# Private, read-only Build Ghost deployment.  This file intentionally consumes
+# an already-reviewed immutable image; it never builds from a mutable checkout
+# and it never attaches the service to the public-origin network.
+services:
+  chummer-run-ai:
+    profiles: ["rook-private"]
+    image: "${CHUMMER_RUN_AI_IMAGE:?Set CHUMMER_RUN_AI_IMAGE to an immutable digest-pinned image}"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    mem_limit: "${CHUMMER_RUN_AI_MEMORY_LIMIT:-512m}"
+    cpus: "${CHUMMER_RUN_AI_CPUS:-0.50}"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    env_file:
+      - path: "${CHUMMER_RUN_AI_ENV_FILE:?Set an owner-only environment file for the private service}"
+        required: true
+    environment:
+      ASPNETCORE_URLS: "http://+:8080"
+      ASPNETCORE_ENVIRONMENT: "Production"
+      # Provider activation and remote execution stay disabled until an
+      # independently verified canary and release receipt exist.
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED: "false"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - fleet-origin
+
+networks:
+  fleet-origin:
+    external: true
+    name: "${CHUMMER_FLEET_NETWORK:-codex-fleet-net}"
