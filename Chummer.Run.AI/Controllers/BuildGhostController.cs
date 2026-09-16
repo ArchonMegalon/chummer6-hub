@@ -53,6 +53,32 @@ public sealed class BuildGhostController(
     public ActionResult<BuildGhostPersonaReleaseProjection> RookRelease()
         => Ok(releases.ResolveRook());
 
+    [HttpGet("readiness")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public IActionResult Readiness()
+    {
+        BuildGhostPrivateToolDeploymentValidation deployment =
+            BuildGhostPrivateToolDeploymentContract.FromConfiguration(configuration);
+        if (!deployment.Accepted || deployment.Package is null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Build Ghost private tool unavailable",
+                detail: "The private tool deployment contract is not active.");
+        }
+
+        Response.Headers.CacheControl = "no-store";
+        return Ok(new
+        {
+            service = "chummer.run.ai.build-ghost",
+            status = "ready",
+            providerNeutral = deployment.Package.ProviderNeutral,
+            remoteExecutionEnabled = deployment.Package.RemoteExecutionEnabled,
+            deploymentDigest = deployment.Package.PackageDigest
+        });
+    }
+
     [HttpPost("tool")]
     [IgnoreAntiforgeryToken]
     [RequestSizeLimit(16 * 1024)]
