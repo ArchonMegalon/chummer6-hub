@@ -26,6 +26,7 @@ services:
     environment:
       ASPNETCORE_URLS: "http://+:8080"
       ASPNETCORE_ENVIRONMENT: "Production"
+      AllowedHosts: "chummer.run"
       # Provider activation and remote execution stay disabled until an
       # independently verified canary and release receipt exist.
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"
@@ -44,7 +45,7 @@ services:
     expose:
       - "8080"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/api/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "-H", "Host: chummer.run", "http://127.0.0.1:8080/api/health"]
       interval: 15s
       timeout: 5s
       retries: 3
