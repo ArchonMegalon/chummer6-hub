@@ -23,6 +23,8 @@ def validate(image: str, env_file: Path) -> list[str]:
     if not _DIGEST.search(image.strip()):
         reasons.append("image-must-be-sha256-digest-pinned")
 
+    if env_file.is_symlink():
+        reasons.append("env-file-must-not-be-symlink")
     try:
         resolved = env_file.resolve(strict=True)
     except FileNotFoundError:
@@ -30,7 +32,7 @@ def validate(image: str, env_file: Path) -> list[str]:
         return reasons
     if not env_file.is_absolute():
         reasons.append("env-file-must-be-absolute")
-    if resolved.is_symlink() or not resolved.is_file():
+    if not resolved.is_file():
         reasons.append("env-file-must-be-regular-file")
     else:
         mode = stat.S_IMODE(resolved.stat().st_mode)

@@ -56,3 +56,15 @@ def test_preflight_requires_authority_contract_and_internal_auth(tmp_path: Path)
     assert module.validate(
         "ghcr.io/example/rook@sha256:" + "c" * 64, env_file
     ) == []
+
+
+def test_preflight_rejects_secret_file_symlink(tmp_path: Path) -> None:
+    target = tmp_path / "real.env"
+    target.write_text("TOKEN=redacted\n")
+    target.chmod(0o600)
+    link = tmp_path / "rook.env"
+    link.symlink_to(target)
+    module = _module()
+    assert "env-file-must-not-be-symlink" in module.validate(
+        "ghcr.io/example/rook@sha256:" + "d" * 64, link
+    )
