@@ -27,6 +27,16 @@ services:
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED: "false"
       CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED: "false"
+      # The generic AI gateway defaults its two mock lanes to enabled.  A
+      # private Rook instance must override every provider explicitly so a
+      # future configuration change cannot activate a provider by omission.
+      AiGateway__Providers__AiMagicx__Enabled: "false"
+      AiGateway__Providers__OneMinAi__Enabled: "false"
+      AiGateway__Providers__ChatPlayground__Enabled: "false"
+      AiGateway__Providers__PromptingSystems__Enabled: "false"
+      AiGateway__Providers__BrowserAct__Enabled: "false"
+      AiGateway__Providers__MarkupGo__Enabled: "false"
+      AiGateway__Providers__PeekShot__Enabled: "false"
     expose:
       - "8080"
     healthcheck:

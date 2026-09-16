@@ -26,5 +26,15 @@ def test_private_rook_profile_fails_closed_for_secrets_and_provider_activation()
     assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"' in compose
     assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED: "false"' in compose
     assert 'CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED: "false"' in compose
+    for provider in (
+        "AiMagicx",
+        "OneMinAi",
+        "ChatPlayground",
+        "PromptingSystems",
+        "BrowserAct",
+        "MarkupGo",
+        "PeekShot",
+    ):
+        assert f"AiGateway__Providers__{provider}__Enabled: \"false\"" in compose
     assert 'read_only: true' in compose
     assert 'cap_drop: ["ALL"]' in compose
