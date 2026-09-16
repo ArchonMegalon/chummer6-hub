@@ -68,6 +68,23 @@ public sealed class BuildGhostController(
                 detail: "The private tool deployment contract is not active.");
         }
 
+        string authorityEndpoint = configuration[
+            BuildGhostPrivateToolAuthorityClient.AuthorityEndpointConfigurationKey]?.Trim() ?? string.Empty;
+        string serviceToken = configuration[
+            BuildGhostPrivateToolAuthorityClient.ServiceTokenConfigurationKey]?.Trim() ?? string.Empty;
+        if (!Uri.TryCreate(authorityEndpoint, UriKind.Absolute, out Uri? authorityUri)
+            || !string.Equals(authorityUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(authorityUri.Host, "chummer.run", StringComparison.OrdinalIgnoreCase)
+                && !authorityUri.Host.EndsWith(".chummer.run", StringComparison.OrdinalIgnoreCase))
+            || !string.Equals(authorityUri.AbsolutePath, "/api/internal/build-ghost/tool/resolve", StringComparison.Ordinal)
+            || serviceToken.Length < 32)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Build Ghost authority unavailable",
+                detail: "The packet authority endpoint or service credential is not configured.");
+        }
+
         Response.Headers.CacheControl = "no-store";
         return Ok(new
         {
