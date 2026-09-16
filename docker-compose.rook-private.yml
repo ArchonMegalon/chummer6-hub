@@ -8,9 +8,13 @@ services:
     profiles: ["rook-private"]
     image: "${CHUMMER_RUN_AI_IMAGE:?Set CHUMMER_RUN_AI_IMAGE to an immutable digest-pinned image}"
     restart: unless-stopped
+    user: "${CHUMMER_RUN_AI_UID:-1654}:${CHUMMER_RUN_AI_GID:-1654}"
     read_only: true
     cap_drop: ["ALL"]
     security_opt: ["no-new-privileges:true"]
+    init: true
+    ulimits:
+      core: 0
     pids_limit: 128
     mem_limit: "${CHUMMER_RUN_AI_MEMORY_LIMIT:-512m}"
     cpus: "${CHUMMER_RUN_AI_CPUS:-0.50}"

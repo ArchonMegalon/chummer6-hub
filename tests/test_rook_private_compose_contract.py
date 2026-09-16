@@ -38,3 +38,6 @@ def test_private_rook_profile_fails_closed_for_secrets_and_provider_activation()
         assert f"AiGateway__Providers__{provider}__Enabled: \"false\"" in compose
     assert 'read_only: true' in compose
     assert 'cap_drop: ["ALL"]' in compose
+    assert 'user: "${CHUMMER_RUN_AI_UID:-1654}:${CHUMMER_RUN_AI_GID:-1654}"' in compose
+    assert "    init: true" in compose
+    assert "      core: 0" in compose
