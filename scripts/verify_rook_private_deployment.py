@@ -41,10 +41,17 @@ def validate(image: str, env_file: Path) -> list[str]:
         values: dict[str, str] = {}
         for line in resolved.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
-            if not stripped or stripped.startswith("#") or "=" not in stripped:
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "=" not in stripped:
+                reasons.append("env-line-invalid")
                 continue
             key, value = stripped.split("=", 1)
-            values[key.strip()] = value.strip().strip("\"'")
+            normalized_key = key.strip()
+            if not normalized_key or normalized_key in values:
+                reasons.append("env-duplicate-or-empty-key")
+                continue
+            values[normalized_key] = value.strip().strip("\"'")
         for key in sorted(_REQUIRED_ENV):
             if not values.get(key):
                 reasons.append(f"env-missing-{key.lower()}")

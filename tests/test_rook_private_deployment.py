@@ -68,3 +68,15 @@ def test_preflight_rejects_secret_file_symlink(tmp_path: Path) -> None:
     assert "env-file-must-not-be-symlink" in module.validate(
         "ghcr.io/example/rook@sha256:" + "d" * 64, link
     )
+
+
+def test_preflight_rejects_ambiguous_env_entries(tmp_path: Path) -> None:
+    env_file = tmp_path / "rook.env"
+    env_file.write_text("BROKEN\nTOKEN=one\nTOKEN=two\n")
+    env_file.chmod(0o600)
+    module = _module()
+    reasons = module.validate(
+        "ghcr.io/example/rook@sha256:" + "e" * 64, env_file
+    )
+    assert "env-line-invalid" in reasons
+    assert "env-duplicate-or-empty-key" in reasons
