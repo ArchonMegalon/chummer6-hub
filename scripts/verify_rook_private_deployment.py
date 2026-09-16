@@ -10,6 +10,12 @@ from pathlib import Path
 
 
 _DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
+_REQUIRED_ENV = {
+    "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_ENDPOINT",
+    "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTH_AUDIENCE",
+    "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTHORITY_ENDPOINT",
+    "CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN",
+}
 
 
 def validate(image: str, env_file: Path) -> list[str]:
@@ -30,6 +36,20 @@ def validate(image: str, env_file: Path) -> list[str]:
         mode = stat.S_IMODE(resolved.stat().st_mode)
         if mode & (stat.S_IRWXG | stat.S_IRWXO):
             reasons.append("env-file-must-not-be-group-or-world-accessible")
+        values: dict[str, str] = {}
+        for line in resolved.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            key, value = stripped.split("=", 1)
+            values[key.strip()] = value.strip().strip("\"'")
+        for key in sorted(_REQUIRED_ENV):
+            if not values.get(key):
+                reasons.append(f"env-missing-{key.lower()}")
+        if len(values.get("CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN", "")) < 32:
+            reasons.append("env-private-tool-service-token-too-short")
+        if not values.get("CHUMMER_AI_INTERNAL_API_TOKEN") and not values.get("FLEET_INTERNAL_API_TOKEN"):
+            reasons.append("env-internal-api-token-missing")
     return reasons
 
 
