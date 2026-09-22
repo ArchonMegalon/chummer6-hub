@@ -88,7 +88,11 @@ for explicit reader acceptance. Android now saves the selected reading edition
 first and acknowledges exactly that text to Hub. If delivery is uncertain, the
 local edition remains readable; the authoring status refresh reconciles its
 acceptance without a new generation. Provider-side advancement remains a separate
-worker action and is not implemented or enabled by this endpoint.
+worker action, not enabled by this endpoint. EA's explicit `--advance-accepted`
+mode now verifies this acknowledgement against its exact retained draft/receipt,
+rechecks the live provider draft, and fences a single approval click. That adapter
+has simulated-browser coverage, not yet a live reader-approved continuation.
+It cannot write the next chapter, reserve credits or publish a book.
 
 ## Verification
 
