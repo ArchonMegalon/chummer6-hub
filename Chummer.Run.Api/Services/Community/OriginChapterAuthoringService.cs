@@ -18,7 +18,8 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
     private const string Schema = "chummer.origin.chapter-job/v1";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 16 };
     private readonly object _gate = new();
-    private sealed record StoredJob(string Schema, string OwnerDigest, OriginChapterAuthoringJob Job, string Digest);
+    private sealed record StoredJob(string Schema, string OwnerDigest, OriginChapterAuthoringJob Job, string Digest,
+        string? ExecutionAdmission = null);
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["CHUMMER_RUNTIME_STATE_ROOT"]);
 
@@ -56,6 +57,59 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
         return Locked(root => Read(JobPath(root, Owner(subjectId), requestId), Owner(subjectId), requestId));
     }
 
+    // Provider workers get opaque work identities, not identity subjects or
+    // install credentials. This seam does not select accounts or authorize quota.
+    internal IReadOnlyList<OriginChapterWorkerItem> PendingForWorker(int limit)
+    {
+        if (limit is < 1 or > 20) throw new ArgumentException("Invalid worker page size.");
+        return Locked(root => Directory.EnumerateFiles(root, "*.json").Order(StringComparer.Ordinal)
+            .Select(path => ReadWorkerRecord(root, Path.GetFileNameWithoutExtension(path)))
+            .Where(stored => stored.Job.State != OriginChapterAuthoringStates.ReviewRequired)
+            .Take(limit).Select(WorkerItem).ToArray());
+    }
+
+    internal OriginChapterWorkerItem GetForWorker(string workId)
+        => Locked(root => WorkerItem(ReadWorkerRecord(root, workId)));
+
+    internal OriginChapterWorkerAdmission AdmitForWorker(string workId, string sourceDigest, string executionAdmission)
+    {
+        RequireId(executionAdmission);
+        return Locked(root =>
+        {
+            StoredJob stored = ReadWorkerRecord(root, workId);
+            if (stored.Job.SourceDigest != sourceDigest)
+                throw new InvalidOperationException("The authoring source changed.");
+            if (stored.ExecutionAdmission is not null)
+            {
+                if (stored.ExecutionAdmission != executionAdmission)
+                    throw new InvalidOperationException("The request has a different execution admission.");
+                return new OriginChapterWorkerAdmission(WorkerItem(stored), MayStartGeneration: false);
+            }
+            if (stored.Job.State != OriginChapterAuthoringStates.AwaitingAuthoring)
+                throw new InvalidOperationException("Reconcile this existing dispatch; do not redispatch.");
+            var fenced = stored.Job with { State = OriginChapterAuthoringStates.ReconciliationRequired };
+            string path = JobPath(root, stored.OwnerDigest, fenced.RequestId);
+            Write(path, stored.OwnerDigest, fenced, executionAdmission);
+            return new OriginChapterWorkerAdmission(WorkerItem(ReadWorkerRecord(root, workId)), MayStartGeneration: true);
+        });
+    }
+
+    internal OriginChapterWorkerItem CompleteForWorker(string workId, string sourceDigest, string executionAdmission,
+        string draftText, string providerReceiptDigest)
+    {
+        RequireId(executionAdmission);
+        ValidateResult(draftText, providerReceiptDigest);
+        return Locked(root =>
+        {
+            StoredJob stored = ReadWorkerRecord(root, workId);
+            if (stored.ExecutionAdmission != executionAdmission || stored.Job.SourceDigest != sourceDigest)
+                throw new InvalidOperationException("The admitted chapter source does not match.");
+            OriginChapterAuthoringJob completed = Completed(stored.Job, draftText, providerReceiptDigest);
+            Write(JobPath(root, stored.OwnerDigest, completed.RequestId), stored.OwnerDigest, completed, executionAdmission);
+            return WorkerItem(ReadWorkerRecord(root, workId));
+        });
+    }
+
     // Trusted worker seam, deliberately not a public HTTP endpoint. A successful
     // fence is not credit approval. Recovery reads/reconciles the provider job;
     // it must not call generation again when this method returns false.
@@ -74,27 +128,39 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
     internal OriginChapterAuthoringJob Complete(string subjectId, string requestId, string sourceDigest,
         string draftText, string providerReceiptDigest)
     {
-        if (string.IsNullOrWhiteSpace(draftText) || Encoding.UTF8.GetByteCount(draftText) > MaximumDraftBytes
-            || !IsDigest(providerReceiptDigest)) throw new ArgumentException("The chapter result is invalid or oversized.");
+        ValidateResult(draftText, providerReceiptDigest);
         return Locked(root =>
         {
             string owner = Owner(subjectId);
             string path = JobPath(root, owner, requestId);
-            var job = Read(path, owner, requestId) ?? throw new KeyNotFoundException();
+            var stored = ReadStored(path, owner, requestId) ?? throw new KeyNotFoundException();
+            var job = stored.Job;
             if (job.SourceDigest != sourceDigest) throw new InvalidOperationException("The authoring source changed.");
-            if (job.State == OriginChapterAuthoringStates.ReviewRequired)
-            {
-                if (job.DraftText != draftText || job.ProviderReceiptDigest != providerReceiptDigest)
-                    throw new InvalidOperationException("A retained chapter result cannot be replaced.");
-                return job;
-            }
-            if (job.State != OriginChapterAuthoringStates.ReconciliationRequired)
-                throw new InvalidOperationException("This authoring request was not dispatched.");
-            var result = job with { State = OriginChapterAuthoringStates.ReviewRequired,
-                DraftText = draftText, ProviderReceiptDigest = providerReceiptDigest };
+            if (stored.ExecutionAdmission is not null)
+                throw new InvalidOperationException("Use the bound worker completion path for this admitted job.");
+            var result = Completed(job, draftText, providerReceiptDigest);
             Write(path, owner, result);
             return result;
         });
+    }
+
+    private static void ValidateResult(string draftText, string providerReceiptDigest)
+    {
+        if (string.IsNullOrWhiteSpace(draftText) || Encoding.UTF8.GetByteCount(draftText) > MaximumDraftBytes
+            || !IsDigest(providerReceiptDigest)) throw new ArgumentException("The chapter result is invalid or oversized.");
+    }
+
+    private static OriginChapterAuthoringJob Completed(OriginChapterAuthoringJob job, string text, string receipt)
+    {
+        if (job.State == OriginChapterAuthoringStates.ReviewRequired)
+        {
+            if (job.DraftText != text || job.ProviderReceiptDigest != receipt)
+                throw new InvalidOperationException("A retained chapter result cannot be replaced.");
+            return job;
+        }
+        if (job.State != OriginChapterAuthoringStates.ReconciliationRequired)
+            throw new InvalidOperationException("This authoring request was not dispatched.");
+        return job with { State = OriginChapterAuthoringStates.ReviewRequired, DraftText = text, ProviderReceiptDigest = receipt };
     }
 
     public int EraseForSubject(string subjectId)
@@ -136,6 +202,9 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
     }
 
     private static OriginChapterAuthoringJob? Read(string path, string owner, string requestId)
+        => ReadStored(path, owner, requestId)?.Job;
+
+    private static StoredJob? ReadStored(string path, string owner, string? requestId)
     {
         RejectLink(path);
         if (!File.Exists(path)) return null;
@@ -147,7 +216,11 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
         if (used > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
         var stored = JsonSerializer.Deserialize<StoredJob>(bytes.AsSpan(0, used), Json);
         if (stored is null || stored.Schema != Schema || stored.OwnerDigest != owner
-            || stored.Job is not { } job || job.RequestId != requestId || stored.Digest != Digest(job)
+            || stored.Job is not { } job || !ValidId(job.RequestId) || requestId is not null && job.RequestId != requestId
+            || stored.Digest != StoredDigest(job, stored.ExecutionAdmission)
+            || Path.GetFileNameWithoutExtension(path) != WorkId(owner, job.RequestId)
+            || stored.ExecutionAdmission is not null && (!ValidId(stored.ExecutionAdmission)
+                || job.State == OriginChapterAuthoringStates.AwaitingAuthoring)
             || job.SourceDigest != OriginChapterSourceIdentity.Digest(job.Source) || job.Provider != "first_book_ai"
             || job.State is not (OriginChapterAuthoringStates.AwaitingAuthoring
                 or OriginChapterAuthoringStates.ReconciliationRequired or OriginChapterAuthoringStates.ReviewRequired)
@@ -155,12 +228,13 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
                 ? string.IsNullOrWhiteSpace(job.DraftText) || Encoding.UTF8.GetByteCount(job.DraftText) > MaximumDraftBytes || !IsDigest(job.ProviderReceiptDigest)
                 : job.DraftText is not null || job.ProviderReceiptDigest is not null))
             throw new InvalidDataException("The private authoring record is invalid.");
-        return job;
+        return stored;
     }
 
-    private static void Write(string path, string owner, OriginChapterAuthoringJob job)
+    private static void Write(string path, string owner, OriginChapterAuthoringJob job, string? executionAdmission = null)
     {
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new StoredJob(Schema, owner, job, Digest(job)), Json);
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(
+            new StoredJob(Schema, owner, job, StoredDigest(job, executionAdmission), executionAdmission), Json);
         if (bytes.Length > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
         string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
         try
@@ -181,9 +255,22 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
 
     private static void RequireId(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value != value.Trim() || value.Any(char.IsControl))
+        if (!ValidId(value))
             throw new ArgumentException("The authoring identity is invalid.");
     }
+    private static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 256
+        && value == value.Trim() && !value.Any(char.IsControl);
+    private static string StoredDigest(OriginChapterAuthoringJob job, string? admission)
+        => admission is null ? Digest(job) : Digest(new { Job = job, ExecutionAdmission = admission });
+    private static string WorkId(string owner, string request) => owner + "." + Digest(request);
+    private static StoredJob ReadWorkerRecord(string root, string workId)
+    {
+        if (workId is not { Length: 129 } || workId[64] != '.' || !IsDigest(workId[..64]) || !IsDigest(workId[65..]))
+            throw new ArgumentException("The worker identity is invalid.");
+        return ReadStored(Path.Combine(root, workId + ".json"), workId[..64], null) ?? throw new KeyNotFoundException();
+    }
+    private static OriginChapterWorkerItem WorkerItem(StoredJob stored)
+        => new(WorkId(stored.OwnerDigest, stored.Job.RequestId), stored.Job, stored.ExecutionAdmission);
     private static string Owner(string subject) { RequireId(subject); return Digest(subject); }
     private static string JobPath(string root, string owner, string request) { RequireId(request); return Path.Combine(root, owner + "." + Digest(request) + ".json"); }
     private static string Digest<T>(T value) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, Json))).ToLowerInvariant();
@@ -194,3 +281,7 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
             throw new IOException("Linked private authoring storage is not allowed.");
     }
 }
+
+// Private worker API DTOs, not public package contracts or provider account data.
+public sealed record OriginChapterWorkerItem(string WorkId, OriginChapterAuthoringJob Job, string? ExecutionAdmission);
+public sealed record OriginChapterWorkerAdmission(OriginChapterWorkerItem Work, bool MayStartGeneration);

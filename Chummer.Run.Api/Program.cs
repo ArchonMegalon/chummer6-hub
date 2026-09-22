@@ -227,6 +227,7 @@ app.UseExceptionHandler(errorApp =>
         await JsonSerializer.SerializeAsync(context.Response.Body, problem);
     });
 });
+app.UseOriginChapterWorkerLane();
 app.UseForwardedHeaders();
 app.Use(async (context, next) =>
 {
