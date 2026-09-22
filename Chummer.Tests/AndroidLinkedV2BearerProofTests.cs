@@ -6,6 +6,8 @@ using Chummer.Contracts.Workspaces;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +21,77 @@ namespace Chummer.Tests;
 public sealed class AndroidLinkedV2BearerProofTests
 {
     private static readonly JsonSerializerOptions ContinuationWebJson = new(JsonSerializerDefaults.Web);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_origin_chapter_requires_consent_and_reopens_only_the_same_private_request(bool consent)
+    {
+        using Fixture fixture = new();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de-AT",
+            "Synthetic runner", [new("fact", "decision", "Elf")]);
+        string requestId = OriginChapterSourceIdentity.RequestId(source);
+        var request = new AndroidLinkedOriginChapterRequest("android-v2", new(requestId, source, consent));
+        string body = JsonSerializer.Serialize(request, ContinuationWebJson);
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/request", body).CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, http =>
+        {
+            dispatched = true;
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
+                { ControllerContext = new() { HttpContext = http } };
+            var response = Assert.IsAssignableFrom<ObjectResult>(controller.RequestChapter(request).Result);
+            Assert.Equal(consent ? 200 : 400, response.StatusCode);
+            if (consent)
+            {
+                var job = Assert.IsType<OriginChapterAuthoringJob>(response.Value);
+                Assert.Equal(requestId, job.RequestId);
+                Assert.Equal(OriginChapterSourceIdentity.Digest(source), job.SourceDigest);
+                Assert.Equal(OriginChapterAuthoringStates.AwaitingAuthoring, job.State);
+                Assert.Null(job.DraftText);
+            }
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        var read = new AndroidLinkedOriginChapterReadRequest("android-v2", requestId);
+        var readContext = fixture.Sign("/api/v2/android/linked/origin/chapters/read",
+            JsonSerializer.Serialize(read, ContinuationWebJson)).CreateContext();
+        await fixture.InvokeAsync(readContext, http =>
+        {
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
+                { ControllerContext = new() { HttpContext = http } };
+            if (consent) Assert.IsType<OkObjectResult>(controller.ReadChapter(read).Result);
+            else Assert.IsType<NotFoundResult>(controller.ReadChapter(read).Result);
+        });
+        Assert.Null(fixture.CreateChapterAuthoring().Get("another-subject", requestId));
+    }
+
+    [Fact]
+    public async Task Signed_v2_origin_chapter_rechecks_revocation_before_storing()
+    {
+        using Fixture fixture = new();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "en",
+            "Synthetic runner", [new("fact", "decision", "Elf")]);
+        var request = new AndroidLinkedOriginChapterRequest("android-v2",
+            new(OriginChapterSourceIdentity.RequestId(source), source, true));
+        var unsigned = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
+            { ControllerContext = new() { HttpContext = new DefaultHttpContext() } };
+        Assert.IsType<UnauthorizedResult>(unsigned.RequestChapter(request).Result);
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/request",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext();
+        await fixture.InvokeAsync(context, http =>
+        {
+            lock (fixture.Store.Gate)
+            {
+                var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+            }
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
+                { ControllerContext = new() { HttpContext = http } };
+            Assert.IsType<UnauthorizedResult>(controller.RequestChapter(request).Result);
+        });
+        Assert.Null(fixture.CreateChapterAuthoring().Get("subject-v2", request.Authoring.RequestId));
+    }
 
     [Theory]
     [InlineData(false)]
@@ -1565,6 +1638,7 @@ public sealed class AndroidLinkedV2BearerProofTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking-store.json"),
+                    ["CHUMMER_RUNTIME_STATE_ROOT"] = _root,
                     ["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"] = Path.Combine(_root, "workspace-store.json")
                 })
                 .Build();
@@ -1621,6 +1695,7 @@ public sealed class AndroidLinkedV2BearerProofTests
         public InstallLinkedWorkspaceSnapshotService WorkspaceSnapshots { get; }
         public TimeProvider TimeProvider { get; }
         public CapturingLogger Logger { get; } = new();
+        public OriginChapterAuthoringService CreateChapterAuthoring() => new(_configuration);
 
         public void Reload()
         {

@@ -84,6 +84,7 @@
     <Compile Include="InstallLinkedWorkspaceSnapshotTests.cs" />
     <Compile Include="InstallLinkedWorkspaceSnapshotTransferTests.cs" />
     <Compile Include="AccountAuxiliaryDataErasureServiceTests.cs" />
+    <Compile Include="OriginChapterAuthoringServiceTests.cs" />
     <Compile Include="InstallLinkingBrowserCallbackTests.cs" />
     <Compile Include="InstallLinkingStoreSecurityTests.cs" />
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />

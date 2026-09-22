@@ -4,6 +4,7 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Contracts.Billing;
+using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -68,11 +69,16 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
         fixture.PromptFoundry.DraftsById["draft-1"] = new PromptFoundryDraftProjection(
             "draft-1", "template-1", "campaign-1", "group-1", "user-delete", null, "local", "private prompt", null,
             "negative", [], [], "passed", null, 1, "draft", Baseline, Baseline, null);
+        fixture.OriginChapters.Create("subject-delete", new OriginChapterAuthoringRequest("chapter-request",
+            new OriginChapterSource("workspace-1", "chapter-1", new string('a', 64), "decision-1", "en-US", "Runner",
+                [new OriginChapterSourceFact("fact-1", "decision-1", "Synthetic accepted choice")]), true), () => true);
 
         AccountAuxiliaryDataErasureResult result = fixture.Service.Erase("user-delete", "subject-delete");
 
         Assert.True(result.RecordsRemoved >= 11);
-        Assert.Equal(13, result.RecordsRemovedByComponent.Count);
+        Assert.Equal(14, result.RecordsRemovedByComponent.Count);
+        Assert.Equal(1, result.RecordsRemovedByComponent["origin_chapter_jobs"]);
+        Assert.Null(fixture.OriginChapters.Get("subject-delete", "chapter-request"));
         Assert.Empty(fixture.Brilliant.Members);
         Assert.Empty(fixture.MyFirstBook.Entries);
         Assert.Empty(fixture.HorizonUsage.Entries);
@@ -133,6 +139,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             var values = new Dictionary<string, string?>
             {
                 ["ASPNETCORE_ENVIRONMENT"] = "Testing",
+                ["CHUMMER_RUNTIME_STATE_ROOT"] = _directory,
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = PathFor("brilliant.json"),
                 ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = PathFor("myfirstbook.json"),
                 ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = PathFor("horizon-usage.json"),
@@ -166,6 +173,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             OriginDossiers = new OriginDossierPublicationService(
                 Configuration,
                 NullLogger<OriginDossierPublicationService>.Instance);
+            OriginChapters = new OriginChapterAuthoringService(Configuration);
             Service = new AccountAuxiliaryDataErasureService(
                 Brilliant,
                 MyFirstBook,
@@ -179,7 +187,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
                 VideoFoundry,
                 PromptFoundry,
                 KarmaForge,
-                OriginDossiers);
+                OriginDossiers,
+                OriginChapters);
         }
 
         public IConfiguration Configuration { get; }
@@ -196,6 +205,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
         public PromptFoundryStore PromptFoundry { get; }
         public KarmaForgeStore KarmaForge { get; }
         public OriginDossierPublicationService OriginDossiers { get; }
+        public OriginChapterAuthoringService OriginChapters { get; }
         public AccountAuxiliaryDataErasureService Service { get; }
 
         private string PathFor(string name) => Path.Combine(_directory, name);

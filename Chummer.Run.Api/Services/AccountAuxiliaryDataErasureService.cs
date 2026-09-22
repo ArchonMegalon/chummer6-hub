@@ -34,6 +34,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
     private readonly PromptFoundryStore _promptFoundry;
     private readonly KarmaForgeStore _karmaForge;
     private readonly OriginDossierPublicationService _originDossiers;
+    private readonly OriginChapterAuthoringService? _originChapters;
 
     public AccountAuxiliaryDataErasureService(
         BrilliantDirectoriesBillingStore brilliantDirectories,
@@ -48,7 +49,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         GmSessionVideoFoundryStore videoFoundry,
         PromptFoundryStore promptFoundry,
         KarmaForgeStore karmaForge,
-        OriginDossierPublicationService originDossiers)
+        OriginDossierPublicationService originDossiers,
+        OriginChapterAuthoringService? originChapters = null)
     {
         _brilliantDirectories = brilliantDirectories;
         _myFirstBookUsage = myFirstBookUsage;
@@ -63,6 +65,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         _promptFoundry = promptFoundry;
         _karmaForge = karmaForge;
         _originDossiers = originDossiers;
+        _originChapters = originChapters;
     }
 
     public AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId)
@@ -107,7 +110,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             ["gm_session_video_foundry"] = EraseVideoFoundry(normalizedUser),
             ["prompt_foundry"] = ErasePromptFoundry(normalizedUser),
             ["karma_forge"] = EraseKarmaForge(normalizedSubject),
-            ["origin_dossier_publications"] = _originDossiers.EraseForAccount(normalizedUser, normalizedSubject)
+            ["origin_dossier_publications"] = _originDossiers.EraseForAccount(normalizedUser, normalizedSubject),
+            ["origin_chapter_jobs"] = _originChapters?.EraseForSubject(normalizedSubject) ?? 0
         };
 
         return new AccountAuxiliaryDataErasureResult(removed.Values.Sum(), removed);
