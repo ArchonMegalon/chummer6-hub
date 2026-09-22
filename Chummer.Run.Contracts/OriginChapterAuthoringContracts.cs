@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Chummer.Run.Contracts.Community;
 
@@ -76,6 +77,10 @@ public sealed record OriginChapterAuthoringJob(
     string RequestId, string SourceDigest, OriginChapterSource Source, string State,
     string Provider, string? DraftText, string? ProviderReceiptDigest)
 {
+    // Omitted for old/unreviewed jobs, preserving their durable wire checksum.
+    // Reading acceptance is not mechanics, publication or new spending authority.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReaderAcceptedTextDigest { get; init; }
     public bool RequiresReaderReview => true;
     public bool AffectsMechanics => false;
     public bool PublicationAuthorized => false;

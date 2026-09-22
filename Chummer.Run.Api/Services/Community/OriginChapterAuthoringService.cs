@@ -57,6 +57,29 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
         return Locked(root => Read(JobPath(root, Owner(subjectId), requestId), Owner(subjectId), requestId));
     }
 
+    public OriginChapterAuthoringJob AcceptReading(string subjectId, string requestId, string sourceDigest,
+        string providerReceiptDigest, string textDigest, bool explicitlyConfirmed, Func<bool> stillAuthorized)
+    {
+        RequireId(requestId);
+        if (!explicitlyConfirmed || !IsDigest(sourceDigest) || !IsDigest(providerReceiptDigest) || !IsDigest(textDigest))
+            throw new ArgumentException("Exact reader confirmation is required.");
+        return Locked(root =>
+        {
+            if (!stillAuthorized()) throw new UnauthorizedAccessException();
+            string owner = Owner(subjectId);
+            string path = JobPath(root, owner, requestId);
+            var stored = ReadStored(path, owner, requestId) ?? throw new KeyNotFoundException();
+            var job = stored.Job;
+            if (job.State != OriginChapterAuthoringStates.ReviewRequired || job.SourceDigest != sourceDigest
+                || job.ProviderReceiptDigest != providerReceiptDigest || TextDigest(job.DraftText!) != textDigest)
+                throw new InvalidOperationException("The reviewed text or source changed.");
+            if (job.ReaderAcceptedTextDigest is not null) return job;
+            var accepted = job with { ReaderAcceptedTextDigest = textDigest };
+            Write(path, owner, accepted, stored.ExecutionAdmission);
+            return accepted;
+        });
+    }
+
     // Provider workers get opaque work identities, not identity subjects or
     // install credentials. This seam does not select accounts or authorize quota.
     internal IReadOnlyList<OriginChapterWorkerItem> PendingForWorker(int limit)
@@ -222,6 +245,8 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
             || stored.ExecutionAdmission is not null && (!ValidId(stored.ExecutionAdmission)
                 || job.State == OriginChapterAuthoringStates.AwaitingAuthoring)
             || job.SourceDigest != OriginChapterSourceIdentity.Digest(job.Source) || job.Provider != "first_book_ai"
+            || job.ReaderAcceptedTextDigest is not null && (job.State != OriginChapterAuthoringStates.ReviewRequired
+                || job.DraftText is null || job.ReaderAcceptedTextDigest != TextDigest(job.DraftText))
             || job.State is not (OriginChapterAuthoringStates.AwaitingAuthoring
                 or OriginChapterAuthoringStates.ReconciliationRequired or OriginChapterAuthoringStates.ReviewRequired)
             || (job.State == OriginChapterAuthoringStates.ReviewRequired
@@ -270,10 +295,13 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
         return ReadStored(Path.Combine(root, workId + ".json"), workId[..64], null) ?? throw new KeyNotFoundException();
     }
     private static OriginChapterWorkerItem WorkerItem(StoredJob stored)
-        => new(WorkId(stored.OwnerDigest, stored.Job.RequestId), stored.Job, stored.ExecutionAdmission);
+        => new(WorkId(stored.OwnerDigest, stored.Job.RequestId), stored.Job, stored.ExecutionAdmission,
+            Digest(new { Scope = "origin-reader-book/v1", stored.OwnerDigest,
+                stored.Job.Source.WorkspaceId, stored.Job.Source.Locale }));
     private static string Owner(string subject) { RequireId(subject); return Digest(subject); }
     private static string JobPath(string root, string owner, string request) { RequireId(request); return Path.Combine(root, owner + "." + Digest(request) + ".json"); }
     private static string Digest<T>(T value) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, Json))).ToLowerInvariant();
+    private static string TextDigest(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
     private static bool IsDigest(string? value) => value is { Length: 64 } && value.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
     private static void RejectLink(string path)
     {
@@ -283,5 +311,6 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
 }
 
 // Private worker API DTOs, not public package contracts or provider account data.
-public sealed record OriginChapterWorkerItem(string WorkId, OriginChapterAuthoringJob Job, string? ExecutionAdmission);
+public sealed record OriginChapterWorkerItem(string WorkId, OriginChapterAuthoringJob Job, string? ExecutionAdmission,
+    string BookRef);
 public sealed record OriginChapterWorkerAdmission(OriginChapterWorkerItem Work, bool MayStartGeneration);

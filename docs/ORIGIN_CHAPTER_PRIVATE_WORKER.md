@@ -2,7 +2,8 @@
 
 This is a local execution seam, not provider enablement, automatic spending,
 publication, a Core rules endpoint or a completed app/provider deployment.
-The public signed-install request/read route remains unchanged.
+Public chapter access remains signed-install-only; reader acceptance has its own
+bounded route and cannot be issued through the private provider worker API.
 
 ## Listener and credentials
 
@@ -32,7 +33,11 @@ responses use the existing no-store private-response headers.
 1. The signed Android caller creates a consent-bound, source-bound private job.
 2. The trusted worker GETs `pending?limit=20` (maximum 20) or `/{workId}`.
    `workId` is an opaque owner/request-scoped reference, not an identity subject
-   or install credential. Source facts remain private.
+   or install credential. `bookRef` is a separate opaque identity derived from
+   owner, workspace and exact story locale. It survives later chapter decisions
+   and runner display-name changes; another owner, runner or locale cannot share
+   it. The worker must bind it to one provider project, not allocate a new paid
+   book for each request. Source facts remain private.
 3. After separately obtaining execution/quota admission and preparing the exact
    provider mapping, POST `/{workId}/admit` with `sourceDigest` and
    `executionAdmission` (opaque admission reference, not a secret).
@@ -45,6 +50,14 @@ responses use the existing no-store private-response headers.
    Repeating the identical completion is safe; replacement prose is rejected.
 6. The existing Android read route returns `review_required`. The app still owns
    explicit reader adoption; no Core or character mutation occurs here.
+7. Only after explicit reader confirmation, the signed app POSTs
+   `/api/v2/android/linked/origin/chapters/accept` with installation/request ID,
+   exact source digest, provider receipt digest, SHA-256 of UTF-8 draft text and
+   `explicitlyConfirmed: true`. Hub rechecks the current install owner and stored
+   draft before retaining `readerAcceptedTextDigest`. Cold/repeated identical
+   acknowledgement is idempotent; missing jobs, changed text, another owner or
+   revoked grants cannot be accepted. The worker can read this digest, never set
+   it. It grants no publication, mechanics or new spending authority.
 
 Admission does **not** reserve or assert provider credits. Hub does not receive
 provider account IDs, login material, browser cookies or execution credentials.
@@ -65,9 +78,17 @@ the server's source, locale, owner-scoped work identity and review/no-mutation
 flags before invoking the existing non-replaying chapter writer.
 
 It is deliberately not a public/generic EA tool or a background daemon. Automatic
-book creation, book-level mapping, future-chapter preparation and deployment
+book creation, future-chapter preparation and deployment
 remain required before claiming unattended app generation. Never spend a new
 book credit per chapter implicitly, or attach an old test draft to a new source.
+The connector now retains an append-only private provider mapping for `bookRef`
+and rejects account/project/locale/slot changes before admitting work. This does
+not grant chapter approval: First Book's observed next-chapter flow still waits
+for explicit reader acceptance. Android now saves the selected reading edition
+first and acknowledges exactly that text to Hub. If delivery is uncertain, the
+local edition remains readable; the authoring status refresh reconciles its
+acceptance without a new generation. Provider-side advancement remains a separate
+worker action and is not implemented or enabled by this endpoint.
 
 ## Verification
 

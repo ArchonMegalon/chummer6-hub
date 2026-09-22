@@ -25,6 +25,48 @@ public sealed class AndroidLinkedV2BearerProofTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Signed_v2_origin_chapter_acceptance_requires_current_install_owner(bool revoke)
+    {
+        using Fixture fixture = new();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de",
+            "Synthetic runner", [new("fact", "decision", "Elf")]);
+        var service = fixture.CreateChapterAuthoring();
+        var job = service.Create("subject-v2", new(OriginChapterSourceIdentity.RequestId(source), source, true), () => true);
+        Assert.True(service.TryFenceDispatch("subject-v2", job.RequestId, job.SourceDigest));
+        string text = "Private proposed chapter", receipt = new string('b', 64);
+        string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+        service.Complete("subject-v2", job.RequestId, job.SourceDigest, text, receipt);
+        var request = new AndroidLinkedOriginChapterAcceptRequest("android-v2", job.RequestId, job.SourceDigest, receipt, digest, true);
+        var unsigned = new AndroidLinkedOriginChaptersController(fixture.Service, service)
+            { ControllerContext = new() { HttpContext = new DefaultHttpContext() } };
+        Assert.IsType<UnauthorizedResult>(unsigned.AcceptChapter(request).Result);
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/accept",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext();
+        bool reached = false;
+        await fixture.InvokeAsync(context, http =>
+        {
+            reached = true;
+            if (revoke)
+            {
+                lock (fixture.Store.Gate)
+                {
+                    var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                    fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+                }
+            }
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, service)
+                { ControllerContext = new() { HttpContext = http } };
+            if (revoke) Assert.IsType<UnauthorizedResult>(controller.AcceptChapter(request).Result);
+            else Assert.Equal(digest, Assert.IsType<OriginChapterAuthoringJob>(
+                Assert.IsType<OkObjectResult>(controller.AcceptChapter(request).Result).Value).ReaderAcceptedTextDigest);
+        });
+        Assert.True(reached);
+        Assert.Equal(revoke ? null : digest, fixture.CreateChapterAuthoring().Get("subject-v2", job.RequestId)!.ReaderAcceptedTextDigest);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Signed_v2_origin_chapter_requires_consent_and_reopens_only_the_same_private_request(bool consent)
     {
         using Fixture fixture = new();

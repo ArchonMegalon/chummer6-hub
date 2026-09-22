@@ -67,6 +67,32 @@ public sealed class OriginChapterWorkerTests : IDisposable
     }
 
     [Fact]
+    public void Book_reference_survives_new_chapters_and_restart_but_separates_owner_runner_and_language()
+    {
+        var service = Service();
+        var request = Request();
+        service.Create("subject", request, () => true);
+        var first = Assert.Single(service.PendingForWorker(20));
+        var next = request with { RequestId = "next", Source = request.Source with
+        { ChapterId = "school", ChapterDigest = new string('b', 64), AcceptedDecisionId = "school-choice", RunnerName = "New display name" } };
+        service.Create("subject", next, () => true);
+        var second = Service().PendingForWorker(20).Single(w => w.Job.RequestId == "next");
+        Assert.NotEqual(first.WorkId, second.WorkId);
+        Assert.Equal(first.BookRef, second.BookRef);
+        Assert.Equal(64, first.BookRef.Length);
+        service.Create("other-owner", request, () => true);
+        service.Create("subject", request with { RequestId = "runner-2", Source = request.Source with { WorkspaceId = "runner-2" } }, () => true);
+        service.Create("subject", request with { RequestId = "spanish", Source = request.Source with { Locale = "es" } }, () => true);
+        var books = Service().PendingForWorker(20).GroupBy(w => w.BookRef).ToArray();
+        Assert.Equal(4, books.Length);
+        Assert.Equal(2, books.Single(b => b.Key == first.BookRef).Count());
+        service.AdmitForWorker(first.WorkId, first.Job.SourceDigest, "admission");
+        Assert.Equal(first.BookRef, Service().GetForWorker(first.WorkId).BookRef);
+        service.CompleteForWorker(first.WorkId, first.Job.SourceDigest, "admission", "Retained prose", new string('d', 64));
+        Assert.Equal(first.BookRef, Service().GetForWorker(first.WorkId).BookRef);
+    }
+
+    [Fact]
     public void Only_the_exact_admitted_result_can_be_returned_to_the_app()
     {
         var service = Service();

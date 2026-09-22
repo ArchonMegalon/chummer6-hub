@@ -50,6 +50,35 @@ public sealed class OriginChapterAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public void Reader_acceptance_binds_exact_text_source_receipt_owner_and_survives_restart()
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        string receipt = new string('c', 64), text = "Exact private draft.";
+        string digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+        Assert.Throws<InvalidOperationException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", text, receipt);
+        Assert.Null(Service().Get("subject", job.RequestId)!.ReaderAcceptedTextDigest);
+        Assert.Throws<ArgumentException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, false, Authorized));
+        Assert.Throws<UnauthorizedAccessException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, () => false));
+        Assert.Throws<KeyNotFoundException>(() => service.AcceptReading("other-owner", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized));
+        Assert.Throws<InvalidOperationException>(() => service.AcceptReading("subject", job.RequestId, new string('b', 64), receipt, digest, true, Authorized));
+        Assert.Throws<InvalidOperationException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, new string('b', 64), digest, true, Authorized));
+        Assert.Throws<InvalidOperationException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, new string('b', 64), true, Authorized));
+        var accepted = service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized);
+        Assert.Equal(digest, accepted.ReaderAcceptedTextDigest);
+        Assert.Equal(digest, Service().AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized).ReaderAcceptedTextDigest);
+        Assert.Equal(digest, Service().GetForWorker(work.WorkId).Job.ReaderAcceptedTextDigest);
+        Assert.Equal(digest, Service().CompleteForWorker(work.WorkId, job.SourceDigest, "admission", text, receipt).Job.ReaderAcceptedTextDigest);
+        Assert.False(accepted.AffectsMechanics);
+        Assert.False(accepted.PublicationAuthorized);
+        Service().EraseForSubject("subject");
+        Assert.Throws<KeyNotFoundException>(() => Service().AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized));
+    }
+
+    [Fact]
     public void Consent_source_bounds_and_current_authorization_are_required_before_storage()
     {
         var request = Request();
