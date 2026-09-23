@@ -35,9 +35,16 @@ else if (enableHttpsRedirection)
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], (IdentityAccessService identity) =>
+app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], (IdentityAccessService identity, IIdentityEmailDeliveryService email) =>
 {
     bool ready = identity.IsStorageReady();
+    // Login readiness includes primary delivery history, even with mail disabled.
+    // A corrupt/unavailable history must not be hidden behind a healthy session store.
+    if (ready)
+    {
+        try { _ = email.GetStatus(); }
+        catch { ready = false; }
+    }
     return Results.Json(new
     {
         ok = ready,

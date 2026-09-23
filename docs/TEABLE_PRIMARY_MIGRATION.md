@@ -879,7 +879,8 @@ authenticated account/book smoke and readiness readback still have to pass befor
 the existing Cloudflare tunnel can be deliberately switched.
 
 Local state still includes install mirrors and auxiliary state outside the migrated
-primary slices (including Identity email-delivery history). Preserve it until the
+primary slices. Identity email-delivery history is now covered by the source slice
+below, but it has not been deployed. Preserve local state until the
 remaining custody/erasure work and complete cold-host recovery are proven; do not
 assume every mounted state byte is a disposable cache.
 
@@ -888,3 +889,44 @@ rejection, primary wiring, isolated networking, loopback publication, selected
 private mounts and absence of legacy PostgreSQL/certificate/broad-credential inputs.
 They use synthetic paths/IDs and never build, create or start a container. This
 does not replace the runtime checks or provision any production token.
+
+## Identity mail history and dispatch admission — 2026-09-23
+
+`IdentityEmailDeliveryService` now follows the explicit Identity storage selector.
+In Teable mode it uses the same restricted Identity transport/table, with a separate
+`identity-email-delivery` stream and `chummer.identity.email-delivery-primary/v1`
+snapshot. Recipient/provider mappings, guardrail events, webhook history and dispatch
+fences restore without local files. Every read/mutation refreshes primary authority;
+unavailable, malformed or regressing state never falls back to cached/local history.
+The existing local mode remains available. The Identity health route now checks
+delivery history as well as session storage; dependency-injection registration is
+covered by a focused primary-mode test.
+
+Before the first configured provider is called, the primary service commits a
+pending dispatch keyed by the hashed ticket and bound to the message fingerprint.
+Competing writers cannot both obtain admission. A pending/unknown outcome is never
+automatically resent, switched to another provider or exposed as an inline preview.
+Acknowledged acceptance can be read back after reconstruction without another send.
+An uncertain storage write invalidates that instance until cold reconciliation;
+finalization reads fresh state so an intervening webhook is retained, including a
+bounce that arrived before the provider's acceptance response. Provider response
+bodies and raw transport exception messages are no longer stored/logged as errors.
+
+This is **at most one automatic dispatch per admitted ticket**, not exactly-once
+delivery or an inbox-delivery guarantee. A crash after admission but before sending
+can leave a ticket unsent and pending; no automatic recovery sends it. A user can
+request a new login ticket through the normal throttled Identity flow. The 100-event
+recent-history window does not trim dispatch fences. Primary snapshots have a
+16 MiB bound and fail closed at capacity; archival/retention and historical erasure
+are not implemented by this slice. No existing local history is silently imported.
+Ticket strings, callback URLs and message bodies are not included in the snapshot.
+
+47 focused local tests pass with clean affected Identity/API/test compilation.
+They include the existing Identity/mail/webhook/admin cases and 16 new primary
+cases: cold history/session restoration, one-time login completion, restored
+cooldown, duplicate/conflicting admissions, uncertain writes before/after provider
+acceptance, post-provider read failure, malformed state, no local fallback,
+disabled-provider preview rejection and webhook ordering. Transport is simulated
+inside a network-disabled Docker container. No real email, Teable mutation,
+credential provisioning, browser action, service deployment, signing or Play upload
+occurred. Full Hub cold startup and actual FirstBook narration remain open.
