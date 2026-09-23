@@ -22,7 +22,7 @@ public sealed class CommunityStore : IDisposable
     private TeableRevisionStore.Head? _primaryHead;
     private int _scopeDepth;
     private bool _primaryFailed;
-    private bool _deferPrimaryArtifactCommit;
+    private bool _deferPrimaryCommit;
     private const string PrimaryStream = "community";
     // v2 adds the co-committed campaign metadata. Older writers must reject this
     // state instead of dropping that field on their next whole-snapshot write.
@@ -391,7 +391,7 @@ public sealed class CommunityStore : IDisposable
         EnsurePrimaryUsable();
         if (IsPrimary && (!Monitor.IsEntered(_gate) || _scopeDepth == 0))
             throw new InvalidOperationException("Primary community writes require a current store scope.");
-        if (_deferPrimaryArtifactCommit) return;
+        if (_deferPrimaryCommit) return;
         try { PersistValidatedLocked(); }
         catch
         {
@@ -467,27 +467,27 @@ public sealed class CommunityStore : IDisposable
         File.Move(tempPath, _storagePath, true);
     }
 
-    // Campaign metadata and its Community projection share one primary revision.
+    // Multi-part Campaign operations share one primary revision.
     // A nested PersistLocked stages changes; only successful callback completion
     // may commit them. Never attempt a compensating remote overwrite on failure.
-    internal T ExecutePrimaryArtifactTransaction<T>(Func<T> mutation)
+    internal T ExecutePrimaryTransaction<T>(Func<T> mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
         using var scope = Enter();
-        if (!IsPrimary || _deferPrimaryArtifactCommit)
-            throw new InvalidOperationException("Primary artifact transactions require one non-nested primary operation.");
+        if (!IsPrimary || _deferPrimaryCommit)
+            throw new InvalidOperationException("Primary transactions require one non-nested primary operation.");
         byte[] before = JsonSerializer.SerializeToUtf8Bytes(CaptureSnapshotLocked(), _jsonOptions);
         try
         {
-            _deferPrimaryArtifactCommit = true;
+            _deferPrimaryCommit = true;
             T result = mutation();
-            _deferPrimaryArtifactCommit = false;
+            _deferPrimaryCommit = false;
             PersistLocked();
             return result;
         }
         catch
         {
-            _deferPrimaryArtifactCommit = false;
+            _deferPrimaryCommit = false;
             // Failed/uncertain transport already poisoned this instance. Restore
             // memory only; a new instance must reconcile the authoritative head.
             ApplySnapshotLocked(JsonSerializer.Deserialize<CommunityStoreSnapshot>(before, _jsonOptions)
@@ -496,7 +496,7 @@ public sealed class CommunityStore : IDisposable
         }
         finally
         {
-            _deferPrimaryArtifactCommit = false;
+            _deferPrimaryCommit = false;
             CryptographicOperations.ZeroMemory(before);
         }
     }

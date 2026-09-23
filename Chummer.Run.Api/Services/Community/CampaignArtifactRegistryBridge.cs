@@ -52,7 +52,7 @@ public sealed class CampaignArtifactRegistryBridge
 
         if (_primaryCommunity is not null)
         {
-            return _primaryCommunity.ExecutePrimaryArtifactTransaction(() =>
+            return _primaryCommunity.ExecutePrimaryTransaction(() =>
             {
                 // Always acquire Community before the private registry lock.
                 // Restore from this operation's current primary revision, never

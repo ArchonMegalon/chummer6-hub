@@ -122,6 +122,15 @@ preserved; none of its unreadable records were decrypted or silently imported.
   reject rather than silently discard the added metadata. No production Community
   primary has been activated. Existing v1 snapshots require explicit migration;
   there is no automatic v1 conversion or local-file import.
+  Campaign workspace, organizer, open-run and movement operations now retain one
+  current Community scope across their read/admission/write sequence. A stale
+  principal mapping cannot seed or mutate the reassigned account. In primary mode,
+  open-run closeout stages its resolution approval, world tick, player-safe news
+  and closed listing for one commit. A validation failure restores memory; a
+  conflicting or uncertain commit requires cold readback without replay. Campaign
+  construction requires an explicit support dependency instead of inventing a
+  temporary local support store. These changes do not migrate every Campaign
+  collaborator or establish a distributed read lease.
   This slice is **not registered for production**: remaining Community consumers,
   other auxiliary stores and historical erasure still need conversion.
 - Support cases, crash incidents/clusters/work items and their indexes now have
@@ -444,6 +453,17 @@ added. API/test builds completed without compiler warnings/errors. Tests use
 synthetic simulated transport with networking disabled, not real accounts or a
 whole-host restore. No provider, email, credential, deployment or Play action.
 
+Campaign spine follow-up: 109 focused tests pass across primary Campaign,
+artifact, support, Community and faction storage and existing Campaign guardrail,
+movement and adoption behavior. Nine new cases cover cold restore without local
+files, atomic closeout, conflict/lost-acknowledgement recovery, invalid-input
+rollback, revoked membership, reassigned principal, movement receipts and outage
+isolation. The terminal result was recovered with a network-disabled local Docker
+`--no-build --no-restore` run of the current compiled assembly after the previous
+process handle was lost. No new package seal or hosted qualification is claimed.
+All remote data is synthetic simulated transport; no accounts were transferred,
+no production mode was enabled, and no provider or Play action occurred.
+
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
@@ -459,7 +479,8 @@ whole-host restore. No provider, email, credential, deployment or Play action.
    Fleet mutation paths still carry mutable state over external awaits. Those
    paths remain explicitly blocked in primary mode until durable operation
    fences and uncertain-outcome reconciliation exist. Campaign recap/replay
-   metadata now co-commits with aftermath; other Campaign operations and auxiliary
+   metadata now co-commits with aftermath, and CampaignSpine operations use fresh
+   scopes with atomic open-run closeout; other Campaign collaborators and auxiliary
    consumers still need conversion. This is not whole-Campaign activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;
    do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary
