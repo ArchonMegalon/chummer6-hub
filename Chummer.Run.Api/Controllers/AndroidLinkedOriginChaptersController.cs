@@ -35,7 +35,7 @@ public sealed class AndroidLinkedOriginChaptersController(
         => installationId is not null
             && AndroidLinkedV2RequestProof.TryGetPrincipal(HttpContext, out var principal)
             && principal!.Installation.InstallationId == installationId
-            ? installLinking.ResolveAndroidLinkedV2Principal(principal)?.SubjectId : null;
+            ? installLinking.ResolveAndroidLinkedV2Principal(principal, requireAvailableAuthority: true)?.SubjectId : null;
 
     private ActionResult WithOwner(string? installationId, Func<string, ActionResult> action)
     {
@@ -49,6 +49,8 @@ public sealed class AndroidLinkedOriginChaptersController(
             // private prose based only on the principal captured before I/O.
             return CurrentSubject(installationId) == subject ? result : Unauthorized();
         }
+        catch (InstallLinkingOperationException error) when (error.StatusCode == StatusCodes.Status503ServiceUnavailable)
+        { return StatusCode(StatusCodes.Status503ServiceUnavailable, "Private authoring authorization is unavailable. Check the same request before retrying."); }
         catch (UnauthorizedAccessException) { return Unauthorized(); }
         catch (KeyNotFoundException) { return NotFound(); }
         catch (ArgumentException) { return BadRequest("The narrative request is invalid."); }

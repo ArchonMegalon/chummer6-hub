@@ -97,6 +97,98 @@ public sealed class AndroidLinkedV2BearerProofTests
     }
 
     [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    public async Task Signed_v2_authority_outage_is_unavailable_not_invalid_credentials(int failOnCall, bool throws)
+    {
+        using Fixture fixture = new();
+        var probe = new ChapterReadinessProbe { FailOnCall = failOnCall, ThrowOnFailure = throws };
+        fixture.UseReadinessProbe(probe);
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/read",
+            "{\"installationId\":\"android-v2\",\"requestId\":\"chapter\"}").CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, _ => dispatched = true);
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
+        Assert.Equal(failOnCall, probe.Calls);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body);
+        string response = await reader.ReadToEndAsync();
+        Assert.Contains("temporarily unavailable", response, StringComparison.Ordinal);
+        Assert.DoesNotContain("private-backend-detail", response, StringComparison.Ordinal);
+        Assert.Equal(InstallationGrantStates.Active, fixture.Store.GrantsById[Fixture.GrantId].Status);
+    }
+
+    [Theory]
+    [InlineData("request", false)]
+    [InlineData("read", false)]
+    [InlineData("accept", false)]
+    [InlineData("request", true)]
+    [InlineData("read", true)]
+    [InlineData("accept", true)]
+    public async Task Signed_v2_chapter_authority_outage_does_not_disclose_prose_or_record_acceptance(
+        string action, bool afterChapterRead)
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var chapters = PrimaryChapters(remote);
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de",
+            "Synthetic runner", [new("fact", "decision", "Human")]);
+        var job = chapters.Create("subject-v2", new(OriginChapterSourceIdentity.RequestId(source), source, true), () => true);
+        var work = Assert.Single(chapters.PendingForWorker(20));
+        chapters.AdmitForWorker(work.WorkId, job.SourceDigest, "execution");
+        const string text = "Private synthetic prose; never disclose during authority outage.";
+        string receipt = new string('c', 64), digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+        chapters.CompleteForWorker(work.WorkId, job.SourceDigest, "execution", text, receipt);
+        object body = action switch
+        {
+            "request" => new AndroidLinkedOriginChapterRequest("android-v2", new(job.RequestId, source, true)),
+            "read" => new AndroidLinkedOriginChapterReadRequest("android-v2", job.RequestId),
+            _ => new AndroidLinkedOriginChapterAcceptRequest("android-v2", job.RequestId, job.SourceDigest, receipt, digest, true)
+        };
+        int writes = remote.HeadPosts;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/" + action,
+            JsonSerializer.Serialize(body, ContinuationWebJson)).CreateContext(), http =>
+        {
+            var probe = new ChapterReadinessProbe();
+            fixture.UseReadinessProbe(probe);
+            if (afterChapterRead) remote.BeforeHeadReadResponse = () => probe.FailOnCall = probe.Calls + 1;
+            else probe.FailOnCall = 1;
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var result = action switch
+            {
+                "request" => controller.RequestChapter((AndroidLinkedOriginChapterRequest)body),
+                "read" => controller.ReadChapter((AndroidLinkedOriginChapterReadRequest)body),
+                _ => controller.AcceptChapter((AndroidLinkedOriginChapterAcceptRequest)body)
+            };
+            var unavailable = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, unavailable.StatusCode);
+            Assert.DoesNotContain(text, JsonSerializer.Serialize(unavailable.Value), StringComparison.Ordinal);
+            Assert.Contains("no-store", http.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        });
+        Assert.Equal(writes, remote.HeadPosts);
+        Assert.Null(chapters.Get("subject-v2", job.RequestId)!.ReaderAcceptedTextDigest);
+        Assert.Equal(InstallationGrantStates.Active, fixture.Store.GrantsById[Fixture.GrantId].Status);
+    }
+
+    private sealed class ChapterReadinessProbe : IInstallLinkingStoreReadinessProbe
+    {
+        public int Calls { get; private set; }
+        public int FailOnCall { get; set; } = int.MaxValue;
+        public bool ThrowOnFailure { get; init; }
+        public InstallLinkingStoreReadiness Evaluate()
+        {
+            bool ready = ++Calls < FailOnCall;
+            if (!ready && ThrowOnFailure) throw new IOException("private-backend-detail");
+            return new(ready, ready ? "ready" : "unavailable");
+        }
+    }
+
+    [Theory]
     [InlineData("request", false)]
     [InlineData("read", false)]
     [InlineData("accept", false)]
@@ -1917,6 +2009,9 @@ public sealed class AndroidLinkedV2BearerProofTests
 
         public InstallLinkingService CreateSharedService()
             => new(_store, _configuration);
+
+        public void UseReadinessProbe(IInstallLinkingStoreReadinessProbe probe)
+            => Service = new(_store, _configuration, probe);
 
         public InstallLinkedWorkspaceSnapshotService CreateColdWorkspaceSnapshots()
             => new(new InstallLinkedWorkspaceSnapshotStore(_configuration));
