@@ -30,11 +30,14 @@ def inputs() -> dict[str, str]:
     }
 
 
-def render(environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def render(environment: dict[str, str], *, google: bool = False) -> subprocess.CompletedProcess[str]:
     if not shutil.which("docker"):
         pytest.skip("Docker Compose is required for actual interpolation verification")
+    command = ["docker", "compose", "-p", "chummer-teable-primary-local", "--env-file", "/dev/null", "-f", str(COMPOSE)]
+    if google:
+        command += ["-f", str(ROOT / "docker-compose.teable-primary-google.yml")]
     return subprocess.run(
-        ["docker", "compose", "--env-file", "/dev/null", "-f", str(COMPOSE), "config", "--format", "json"],
+        [*command, "config", "--format", "json"],
         env=environment, cwd=ROOT, capture_output=True, text=True, timeout=15, check=False,
     )
 
@@ -128,5 +131,51 @@ def test_missing_explicit_inputs_fail_before_a_container_can_be_created(missing:
     environment = inputs()
     del environment[missing]
     result = render(environment)
+    assert result.returncode != 0
+    assert missing in result.stderr
+
+
+def google_inputs() -> dict[str, str]:
+    return {
+        **inputs(),
+        "GOOGLE_OIDC_CLIENT_ID": "synthetic-client.apps.googleusercontent.com",
+        "GOOGLE_OIDC_CLIENT_SECRET": "synthetic-not-a-credential",
+        "GOOGLE_OIDC_REDIRECT_URI": "https://chummer.run/auth/google/callback",
+        "UNRELATED_SECRET": "must-not-be-forwarded",
+    }
+
+
+def test_google_activation_changes_only_four_hub_settings(config: dict) -> None:
+    result = render(google_inputs(), google=True)
+    assert result.returncode == 0, result.stderr
+    activated = json.loads(result.stdout)
+    environment = activated["services"]["hub"]["environment"]
+    assert environment.pop("CHUMMER_GOOGLE_OIDC_REQUIRED") == "true"
+    for key in ("GOOGLE_OIDC_CLIENT_ID", "GOOGLE_OIDC_CLIENT_SECRET", "GOOGLE_OIDC_REDIRECT_URI"):
+        assert environment.pop(key) == google_inputs()[key]
+    # Exact comparison preserves loopback bindings, worker separation, all
+    # primary stores, disabled emails/news, image/state roots and Identity.
+    assert activated == config
+
+
+def test_explicit_local_project_overrides_a_legacy_env_project() -> None:
+    environment = google_inputs()
+    environment["COMPOSE_PROJECT_NAME"] = "chummer6-hub"
+    result = render(environment, google=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["name"] == "chummer-teable-primary-local"
+
+
+@pytest.mark.parametrize("missing", [
+    "GOOGLE_OIDC_CLIENT_ID", "GOOGLE_OIDC_CLIENT_SECRET", "GOOGLE_OIDC_REDIRECT_URI",
+])
+@pytest.mark.parametrize("blank", [False, True])
+def test_google_activation_rejects_missing_or_empty_credentials(missing: str, blank: bool) -> None:
+    environment = google_inputs()
+    if blank:
+        environment[missing] = ""
+    else:
+        del environment[missing]
+    result = render(environment, google=True)
     assert result.returncode != 0
     assert missing in result.stderr

@@ -5,6 +5,37 @@ fresh Hub account and Origin book/job state. This is not a backup/projection.
 Production has **not** been cut over. The original encrypted Docker volume is
 preserved; none of its unreadable records were decrypted or silently imported.
 
+### Private Google entry activation (2026-09-23)
+
+`docker-compose.teable-primary-google.yml` is an optional overlay for the local
+primary stack. It passes only the existing Chummer Google client ID, secret and
+registered callback plus the required-provider flag to Hub. It does not create
+an OAuth client, enable email, attach ingress, expose the private worker port,
+change Identity, or activate other consumers. Missing/empty values reject at
+Compose rendering; 22 focused Compose tests preserve all other settings exactly.
+
+Always select `-p chummer-teable-primary-local` explicitly. A legacy protected
+env file can contain `COMPOSE_PROJECT_NAME` and otherwise select the old project
+despite the base file's name. Supply the protected OAuth input file first and
+the current non-secret primary paths file second; retain explicit current image
+and state-root overrides when the older paths file is historical. Use
+`config --quiet`, never print a rendered secret-bearing model. Recreate only
+`hub` with `up -d --no-deps hub`; no new build is needed for this configuration.
+
+The live local check reused image `6197b702fe6a…` and the same Teable state.
+`/login` now renders Google. `/auth/google/start` returns the expected Google
+HTTPS redirect with the canonical Chummer callback, S256 PKCE, state/nonce and
+Secure/HttpOnly cookies. No redirect was followed, account logged in, email sent,
+or provider credit spent. Both existing synthetic chapters and their distinct
+acceptance states survived Hub recreation. This is not a complete OAuth login.
+
+Public ingress remains unchanged and unavailable. The read-only Cloudflare
+inspection found the exact apex DNS target tunnel down with zero connectors,
+pointing to an inactive host port 8091. A generic running `cloudflared` container
+belongs to a different tunnel; do not restart or repurpose it. Public cutover,
+post-callback account/linking verification and Android UI reading/export remain
+open. Keep the ordinary Hub listener separate from the private worker listener.
+
 ### Small-state reader optimization (2026-09-23)
 
 New writes of at most 32 KiB include optional `inlineBase64` bytes in the unique
