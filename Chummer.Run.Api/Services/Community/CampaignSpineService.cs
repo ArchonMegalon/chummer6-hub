@@ -4595,7 +4595,7 @@ public sealed class CampaignSpineService
 
     private string ResolveGroupSupportEscalationSummary(HubUserDto user)
     {
-        lock (_supportStore.Gate)
+        using (_supportStore.Enter())
         {
             var cases = _supportStore.CasesById.Values
                 .Where(item =>
@@ -4808,7 +4808,7 @@ public sealed class CampaignSpineService
 
     private IReadOnlyList<OrganizerSupportCaseProjection> BuildOrganizerSupportCases(HubUserDto user)
     {
-        lock (_supportStore.Gate)
+        using (_supportStore.Enter())
         {
             return _supportStore.CasesById.Values
                 .Where(item =>

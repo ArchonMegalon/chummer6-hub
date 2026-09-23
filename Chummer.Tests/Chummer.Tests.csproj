@@ -111,6 +111,11 @@
     <Compile Include="SponsorTeablePersistenceTests.cs" />
     <Compile Include="CampaignArtifactTeablePersistenceTests.cs" />
     <Compile Include="CampaignSpineGuardrailTests.cs" />
+    <Compile Include="SupportTeablePersistenceTests.cs" />
+    <Compile Include="SupportStoreAccountErasureTests.cs" />
+    <Compile Include="CrashSupportServiceTests.cs" />
+    <Compile Include="SupportCasesControllerUploadTests.cs" />
+    <Compile Include="AccountErasureServiceTests.cs" />
     <Compile Include="CodexParticipationGuardrailTests.cs" />
     <Compile Include="BlackLedgerFactionOnboardingTests.cs" />
     <Compile Include="TeableUserProjectionServiceTests.cs" />

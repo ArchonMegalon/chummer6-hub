@@ -51,7 +51,7 @@ public sealed class CrashSupportService
     {
         ArgumentNullException.ThrowIfNull(envelope);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             string normalizedCrashId = NormalizeRequired(envelope.CrashId, nameof(envelope.CrashId), MaxCrashIdLength);
             if (_store.IncidentIdByCrashId.TryGetValue(normalizedCrashId, out string? existingIncidentId)
@@ -117,7 +117,7 @@ public sealed class CrashSupportService
     public CrashIncidentProjection? GetIncident(string incidentId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(incidentId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.IncidentsById.GetValueOrDefault(incidentId.Trim());
         }
@@ -125,7 +125,7 @@ public sealed class CrashSupportService
 
     public CrashClusterListResponse ListClusters(string? status = null, string? fingerprint = null)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             IEnumerable<CrashClusterProjection> items = _store.ClustersById.Values;
             if (!string.IsNullOrWhiteSpace(status))
@@ -148,7 +148,7 @@ public sealed class CrashSupportService
 
     public CrashWorkItemListResponse ListWorkItems(string? status = null, string? candidateOwnerRepo = null)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             IEnumerable<CrashWorkItemProjection> items = _store.WorkItemsById.Values;
             if (!string.IsNullOrWhiteSpace(status))

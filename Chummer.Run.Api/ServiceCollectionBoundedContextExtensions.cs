@@ -285,7 +285,19 @@ internal static class ServiceCollectionBoundedContextExtensions
 
     public static IServiceCollection AddHubControlAndSupportContext(this IServiceCollection services)
     {
-        services.AddSingleton<SupportStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetRequiredService<ILogger<SupportStore>>();
+            if (configuration["CHUMMER_SUPPORT_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new SupportStore(configuration, logger);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_SUPPORT_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary support table is required."),
+                configuration["CHUMMER_SUPPORT_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private support token file is required."));
+            try { return new SupportStore(configuration, logger, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<SupportAttachmentStorageService>();
         services.AddSingleton<SupportCaseService>();
         services.AddSingleton<SupportCasePresentationService>();

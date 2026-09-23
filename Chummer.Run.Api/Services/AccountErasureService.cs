@@ -56,6 +56,7 @@ public sealed class AccountErasureService : IAccountErasureService
         string normalizedSubject = string.IsNullOrWhiteSpace(subjectId)
             ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
             : subjectId.Trim();
+        _support.EnsureAccountErasureSupported();
         string? userId = _accounts.GetBySubject(normalizedSubject)?.UserId;
         byte[] hmacKey = ResolveReceiptKey();
         try

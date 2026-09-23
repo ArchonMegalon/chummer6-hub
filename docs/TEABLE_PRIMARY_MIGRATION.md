@@ -124,6 +124,23 @@ preserved; none of its unreadable records were decrypted or silently imported.
   there is no automatic v1 conversion or local-file import.
   This slice is **not registered for production**: remaining Community consumers,
   other auxiliary stores and historical erasure still need conversion.
+- Support cases, crash incidents/clusters/work items and their indexes now have
+  an explicit primary registration. Every outer case/crash/Campaign support read
+  refreshes the support snapshot; nested operations retain pending changes.
+  Crash intake and its case/index projection commit together; the outer identical
+  persistence call does not create a second revision. Conflicting or uncertain
+  snapshot writes disable the instance until cold reconciliation. Missing/corrupt
+  primary state never falls back to a local file or silently restarts empty.
+  Actual attachment bytes use bounded immutable revision-1 streams in the same
+  table. All inputs are checked before a batch starts; case references are saved
+  only after successful blob storage. An interrupted blob/batch can leave inert
+  orphan bytes, not a downloadable partial case. Downloads check current reporter
+  access and case attachment membership in one synchronous scope, then validate
+  immutable blob identity and metadata. Extension-based download MIME is retained.
+  This is not a distributed read lease or an email/reward outbox transaction.
+  Historical support/attachment erasure remains unsupported and now rejects at
+  the beginning of account erasure, before journal or other account side effects.
+  No runtime configuration is changed by this registration.
 
 Identity configuration, for an isolated migration environment only:
 
@@ -138,6 +155,17 @@ Use a dedicated base-scoped runtime credential, not EA's broader credential.
 The file must be a private, owned regular file, not a symlink; HTTPS is mandatory
 and redirects are disabled. Default local mode is unchanged. No automatic local
 import occurs when primary mode is enabled.
+
+Support cases and attachments share one explicit primary configuration:
+
+```text
+CHUMMER_SUPPORT_STORAGE_PROVIDER=teable
+CHUMMER_SUPPORT_TEABLE_TABLE_ID=<dedicated support primary table>
+CHUMMER_SUPPORT_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+```
+
+The attachment service must use the same SupportStore instance. A mixed local
+attachment/primary case configuration rejects rather than creating local blobs.
 
 Origin uses a separate table/token registration:
 
@@ -403,13 +431,28 @@ comes from a network-disabled `--no-build --no-restore` replay of its compiled
 assembly, not a new build or hosted qualification. All remote data is synthetic.
 No actual account migration, runtime activation, provider or Play operation.
 
+Support follow-up: 91 focused local Docker tests pass across new primary case,
+crash and attachment storage, existing support/upload/account-erasure tests and
+Campaign regressions. Coverage includes complete cold case/attachment restoration,
+reporter reassignment, current download access, one-commit crash idempotency,
+conflicts, uncertain case/blob writes, nested reads, malformed snapshots, orphan
+non-disclosure, immutable blob checks, MIME safety, outage isolation and erasure
+preflight. The initial 89-case run passed 88; the remaining new assertion compared
+timeline dictionary object identities rather than serialized content. The corrected
+test checks the whole case's serialized content; two focused attachment tests were
+added. API/test builds completed without compiler warnings/errors. Tests use
+synthetic simulated transport with networking disabled, not real accounts or a
+whole-host restore. No provider, email, credential, deployment or Play action.
+
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
    stores. Origin jobs, private first-party documents, linked runner snapshots,
    MyFirstBook usage, Origin credit reservations, billing membership, Horizon
    usage and request receipts have primary implementations with atomic new
-   charge/receipt storage. Publication-index/provider-output artifacts and other
+   charge/receipt storage. Support cases/crashes and attachment bytes now have
+   primary implementations too, but historical/orphan erasure remains open.
+   Publication-index/provider-output artifacts and other
    auxiliary stores still need custody review. The isolated Community slice is
    not a complete activation. Faction onboarding's cached state is now removed;
    sponsor observations are freshly rebound after their GET, but the legacy
