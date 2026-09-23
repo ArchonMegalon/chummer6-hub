@@ -39,7 +39,7 @@ public sealed class TeableRevisionStoreTests
         {
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
                 { ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(root, host, "install-linking-store.json") }).Build();
-            var authority = new InstallLinkingPostgresAuthorityCoordinator(new TeableInstallLinkingSnapshotAuthority(remote.Store()));
+            var authority = new InstallLinkingPostgresAuthorityCoordinator(new TeableInstallLinkingSnapshotAuthority(remote.Store()), "teable");
             return new(configuration, services.GetRequiredService<IDataProtectionProvider>(),
                 NullLogger<InstallLinkingStore>.Instance, authority);
         }

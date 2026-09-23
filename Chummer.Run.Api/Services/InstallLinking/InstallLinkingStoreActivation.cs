@@ -7,6 +7,11 @@ namespace Chummer.Run.Api.Services.InstallLinking;
 
 public sealed record DataProtectionKeyProtectionStatus(bool Ready, string Code);
 
+public interface IDataProtectionPrimaryReadinessProbe
+{
+    DataProtectionKeyProtectionStatus Evaluate();
+}
+
 public sealed record InstallLinkingStoreReadiness(bool Ready, string Code);
 
 public interface IInstallLinkingStoreReadinessProbe

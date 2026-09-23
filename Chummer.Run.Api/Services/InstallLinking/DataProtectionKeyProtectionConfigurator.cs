@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Chummer.Storage.Teable;
+using Chummer.Run.Api.Services.Teable;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -35,6 +36,29 @@ public static class DataProtectionKeyProtectionConfigurator
 
         string protectionMode = configuration["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"]?.Trim()
             ?? "certificate";
+        if (protectionMode == TeableDataProtectionRuntime.Mode)
+        {
+            if (certificatePath is not null || passwordFile is not null)
+            {
+                builder.UseEphemeralDataProtectionProvider();
+                return new(false, "data_protection_conflicting_key_protection_modes");
+            }
+
+            try
+            {
+                var store = TeableRevisionStore.OpenFromPrivateTokenFile(
+                    new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                    configuration["CHUMMER_DATA_PROTECTION_TEABLE_TABLE_ID"] ?? string.Empty,
+                    configuration["CHUMMER_DATA_PROTECTION_TEABLE_TOKEN_FILE"] ?? string.Empty);
+                return ConfigureTeablePrimary(builder, store, ownsStore: true);
+            }
+            catch
+            {
+                builder.UseEphemeralDataProtectionProvider();
+                return new(false, "teable_key_ring_configuration_invalid");
+            }
+        }
+
         if (protectionMode == OwnerOnlyLocalMode)
         {
             if (certificatePath is not null || passwordFile is not null)
@@ -196,6 +220,29 @@ public static class DataProtectionKeyProtectionConfigurator
         }
     }
 
+    internal static DataProtectionKeyProtectionStatus ConfigureTeablePrimary(
+        IDataProtectionBuilder builder, TeableRevisionStore store, bool ownsStore)
+    {
+        var runtime = new TeableDataProtectionRuntime(store, ownsStore);
+        try
+        {
+            runtime.VerifyColdRoundTrip();
+            builder.Services.AddSingleton<IDataProtectionPrimaryReadinessProbe>(_ => runtime);
+            builder.Services.AddOptions<KeyManagementOptions>().Configure<IDataProtectionPrimaryReadinessProbe>((options, probe) =>
+            {
+                options.XmlRepository = (TeableDataProtectionRuntime)probe;
+                options.XmlEncryptor = null;
+            });
+            return new(true, TeableDataProtectionRuntime.ReadyCode);
+        }
+        catch
+        {
+            runtime.Dispose();
+            builder.UseEphemeralDataProtectionProvider();
+            return new(false, "teable_key_ring_configuration_invalid");
+        }
+    }
+
     private static DataProtectionKeyProtectionStatus ConfigureOwnerOnlyLocal(
         IDataProtectionBuilder builder,
         string keyRingPath)
@@ -230,6 +277,8 @@ public static class DataProtectionKeyProtectionConfigurator
         string keyRingPath,
         DataProtectionKeyProtectionStatus status)
     {
+        if (status.Code == TeableDataProtectionRuntime.ReadyCode)
+            return "teable_key_ring_requires_primary_probe";
         if (status is not { Ready: true, Code: OwnerOnlyLocalStatus })
             return ValidateEncryptedKeyRing(keyRingPath, repairOwnerMode: false);
 

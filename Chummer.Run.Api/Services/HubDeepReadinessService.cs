@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Chummer.Storage.Teable;
 using Microsoft.Extensions.Hosting;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.Teable;
 
 namespace Chummer.Run.Api.Services;
 
@@ -26,6 +27,7 @@ public sealed class HubDeepReadinessService
     private readonly IReadOnlyList<IReleaseShelfPublicationReadinessProbe> _publicationProbes;
     private readonly IInstallLinkingStoreReadinessProbe? _installLinkingStore;
     private readonly DataProtectionKeyProtectionStatus? _dataProtectionKeyProtection;
+    private readonly IDataProtectionPrimaryReadinessProbe? _primaryKeyReadiness;
     private readonly object _publicationAssessmentLock = new();
     private readonly SemaphoreSlim _publicationRefreshGate = new(initialCount: 1, maxCount: 1);
     private CachedPublicationAssessment? _cachedPublicationAssessment;
@@ -37,7 +39,8 @@ public sealed class HubDeepReadinessService
         ReleaseShelfGenerationStore? releaseShelf = null,
         IEnumerable<IReleaseShelfPublicationReadinessProbe>? publicationProbes = null,
         IInstallLinkingStoreReadinessProbe? installLinkingStore = null,
-        DataProtectionKeyProtectionStatus? dataProtectionKeyProtection = null)
+        DataProtectionKeyProtectionStatus? dataProtectionKeyProtection = null,
+        IDataProtectionPrimaryReadinessProbe? primaryKeyReadiness = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
@@ -51,6 +54,7 @@ public sealed class HubDeepReadinessService
             .ToArray();
         _installLinkingStore = installLinkingStore;
         _dataProtectionKeyProtection = dataProtectionKeyProtection;
+        _primaryKeyReadiness = primaryKeyReadiness;
     }
 
     public HubDeepReadinessReport Evaluate()
@@ -203,6 +207,16 @@ public sealed class HubDeepReadinessService
         string? probePath = null;
         try
         {
+            if (_configuration["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"]?.Trim() == TeableDataProtectionRuntime.Mode)
+            {
+                if (_dataProtectionKeyProtection is not { Ready: true, Code: TeableDataProtectionRuntime.ReadyCode }
+                    || _primaryKeyReadiness is not TeableDataProtectionRuntime)
+                    return Failed("data_protection_storage", "teable_key_ring_probe_missing");
+                var status = _primaryKeyReadiness.Evaluate();
+                return status.Ready ? Passed("data_protection_storage", status.Code)
+                    : Failed("data_protection_storage", status.Code);
+            }
+
             string storagePath = HubRuntimePathDefaults.ResolveDataProtectionKeysPath(_configuration, _environment);
             if (HubRuntimePathDefaults.UsesTempFallback(storagePath))
             {

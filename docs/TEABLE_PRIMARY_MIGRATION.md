@@ -11,8 +11,13 @@ preserved; none of its unreadable records were decrypted or silently imported.
   credential-file reader. API and Identity reference that single implementation.
 - Immutable bounded chunks and a unique successor manifest provide compare-and-
   exchange admission. Lost acknowledgements are reconciled without POST replay.
-- Install-linking snapshot and Data Protection key repository adapters exist.
-  Their production activation is not yet wired.
+- Install-linking and Data Protection have explicit production primary
+  registrations. Startup proves remote key custody with two independent provider
+  instances. Deep readiness checks the remote key repository, not a local key
+  directory. Account snapshots restore from the primary into a disposable,
+  protected local mirror; readiness rejects a mirror behind the remote head.
+  Competing PostgreSQL/certificate configuration is rejected. This registration
+  is implemented and tested, **not deployed**.
 - Identity has an explicit Teable primary mode. Sessions, subject roles, hashed
   email tickets and recipient throttling state are remote, not local mirrors.
   Every authorization reads current primary state. Conflicting/uncertain writes
@@ -57,7 +62,29 @@ CHUMMER_ORIGIN_TEABLE_TABLE_ID=<dedicated chapter table>
 CHUMMER_ORIGIN_TEABLE_TOKEN_FILE=<absolute private mounted token file>
 ```
 
-Both primary modes remain deployment work in progress, not a switch to enable on
+API account/key custody uses distinct explicit registrations:
+
+```text
+ASPNETCORE_ENVIRONMENT=Production
+CHUMMER_INSTALL_LINKING_STORAGE_PROVIDER=teable
+CHUMMER_INSTALL_LINKING_STORE_PATH=<absolute disposable local mirror path>
+CHUMMER_INSTALL_LINKING_TEABLE_TABLE_ID=<dedicated account snapshot table>
+CHUMMER_INSTALL_LINKING_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE=teable_primary
+CHUMMER_DATA_PROTECTION_TEABLE_TABLE_ID=<dedicated private key table>
+CHUMMER_DATA_PROTECTION_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+```
+
+The actual Data Protection keys live in the private table without the old
+certificate wrapping, as explicitly requested. They remain sensitive material;
+neither the table nor its credentials may be public. Do not carry over competing
+PostgreSQL connection-string or certificate settings. An unreadable encrypted
+key history fails startup validation; it is not replaced with new keys. Rook's
+PostgreSQL read-fence semantics and the PostgreSQL-specific runtime-role endpoint
+are **not** claimed by this backend. That deployment/readback distinction remains
+to be resolved before a public cutover.
+
+All primary modes remain deployment work in progress, not switches to enable on
 the public Hub yet. Origin history erasure also deliberately rejects until its
 cleanup is implemented. No actual First Book execution was implied by a job test.
 
@@ -90,6 +117,16 @@ The 47 existing affected account-capture, identity-link, group-invite, ledger,
 experience and account-erasure regressions also pass. Both bounded runs built
 the affected API and test assembly without compiler warnings/errors.
 
+API activation follow-up: 69 focused tests passed for the production Teable
+registration, cold key/account restoration, grant revocation, stale mirror
+rejection, remote key outages, encrypted-history rejection, mixed configuration
+rejection, transport revisions, existing activation and PostgreSQL coordinator
+regressions. The first test compilation found a non-constant optional test-host
+parameter; it was corrected before execution. The terminal test replay reused
+the compiled local assembly (`--no-build`); no hosted or live-deployment result
+is implied. The actual production registrations were exercised with simulated
+Teable transport. PostgreSQL remains the default and retains its status codes.
+
 Runtime credential preparation: the existing EA API token returned HTTP 403 from
 the read-only `/api/access-token` metadata endpoint. It has not been deployed to
 Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
@@ -101,7 +138,9 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
 1. Finish Community consumer/DI conversion and remaining document/artifact
    stores. Origin jobs and the isolated Community account slice are implemented,
    but full-book export artifacts/other stores are not proven host-independent.
-2. Explicit API primary activation and remote key custody.
+2. Complete the runtime readiness/deployment readback for the new primary backend;
+   do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary
+   registration and key custody are implemented but not activated publicly.
 3. Erasure of historical private snapshots and orphan chunks. Identity account
    erasure currently rejects Teable mode rather than claiming a false deletion.
 4. Restricted production credentials and complete configuration/secret custody.

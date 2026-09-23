@@ -262,7 +262,25 @@ internal static class ServiceCollectionBoundedContextExtensions
         ArgumentNullException.ThrowIfNull(environment);
         bool publicDownloadOnly = environment.IsProduction()
             && configuration.GetValue<bool>("CHUMMER_PUBLIC_DOWNLOAD_ONLY");
-        if (environment.IsProduction() && !publicDownloadOnly)
+        string storageProvider = configuration["CHUMMER_INSTALL_LINKING_STORAGE_PROVIDER"] ?? "postgres";
+        if (storageProvider is not ("postgres" or "teable"))
+            throw new InvalidOperationException("Install-linking storage provider is invalid.");
+        if (storageProvider == "teable")
+        {
+            if (!environment.IsProduction() || publicDownloadOnly
+                || configuration["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"]?.Trim() != TeableDataProtectionRuntime.Mode
+                || !string.IsNullOrWhiteSpace(configuration["CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE"])
+                || !string.IsNullOrWhiteSpace(configuration["CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING"]))
+                throw new InvalidOperationException("Teable install-linking requires explicit production primary key custody and no competing PostgreSQL configuration.");
+            services.AddSingleton<TeableInstallLinkingRuntime>();
+            services.AddSingleton(provider => new InstallLinkingPostgresAuthorityCoordinator(
+                provider.GetRequiredService<TeableInstallLinkingRuntime>().Authority, backend: "teable"));
+            services.AddSingleton<IInstallLinkingSnapshotAuthority>(provider =>
+                provider.GetRequiredService<InstallLinkingPostgresAuthorityCoordinator>());
+            services.AddSingleton<IInstallLinkingRollbackAuthorityReadinessProbe>(provider =>
+                provider.GetRequiredService<InstallLinkingPostgresAuthorityCoordinator>());
+        }
+        else if (environment.IsProduction() && !publicDownloadOnly)
         {
             services.AddSingleton(_ => new InstallLinkingPostgresRuntime(
                 InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
