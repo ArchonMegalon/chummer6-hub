@@ -102,6 +102,16 @@ preserved; none of its unreadable records were decrypted or silently imported.
   Each mutation retains one synchronous outer scope across its validation and
   commit; nested domain reads cannot replace pending state. Campaign summary
   dependencies are not thereby declared fully migrated.
+  Sponsor intents, consent and account-facing queries also use current scopes.
+  A Fleet GET observation carries only a detached snapshot/fingerprint across
+  the wait, then re-reads and compares the complete stored session and account.
+  Changed ownership/state, terminal sessions and a different returned lane reject
+  before applying the reply. Consent cannot reopen stopped/revoked sessions or
+  reset an already-consented session. Primary mode never auto-activates Fleet.
+  Fleet creation, device auth, activation and stop/delete remain explicitly
+  unavailable in primary mode pending durable operation fencing/reconciliation.
+  This is a read/intent migration, not complete sponsor-operation support; the
+  remaining legacy external-write paths still require that conversion.
   This slice is **not registered for production**: remaining Community consumers,
   campaign artifact persistence and historical erasure still need conversion.
 
@@ -361,6 +371,17 @@ not real account data or a production cutover. BrowserAct's current inventory wa
 checked read-only: none of its 23 profiles is scoped to Teable. New isolated
 profile/login and restricted runtime-token setup still need explicit approval.
 
+Sponsor observation follow-up: 44 focused tests passed for primary sponsor
+state, existing participation input guards, Community, ledger and group behavior.
+This includes cold intent/consent restoration, fresh Fleet status and recognition,
+delayed reply versus revocation/lane/account changes, same-store nonblocking
+observation, a competing final commit, wrong-lane rejection, outage after the
+external read and no primary Fleet mutation/auto-activation. The existing local
+auto-activation path is retained and checked with a simulated Fleet handler.
+41 tests passed first; three focused commit/outage/local-compatibility cases were
+then added and all 44 passed. API and test compilation is clean. No Teable or
+Fleet network calls, credential changes, deployment or Play operations occurred.
+
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
@@ -370,8 +391,10 @@ profile/login and restricted runtime-token setup still need explicit approval.
    charge/receipt storage. Publication-index/provider-output artifacts and other
    auxiliary stores still need custody review. The isolated Community slice is
    not a complete activation. Faction onboarding's cached state is now removed;
-   sponsor sessions still carry mutable state over external awaits and must not
-   be converted by blindly replacing lock statements. Campaign artifact and
+   sponsor observations are freshly rebound after their GET, but the legacy
+   Fleet mutation paths still carry mutable state over external awaits. Those
+   paths remain explicitly blocked in primary mode until durable operation
+   fences and uncertain-outcome reconciliation exist. Campaign artifact and
    other auxiliary consumers still retain local dependencies.
 2. Complete the runtime readiness/deployment readback for the new primary backend;
    do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary

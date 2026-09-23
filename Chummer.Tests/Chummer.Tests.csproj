@@ -108,6 +108,8 @@
     <Compile Include="IdentityTeablePersistenceTests.cs" />
     <Compile Include="CommunityTeablePersistenceTests.cs" />
     <Compile Include="FactionTeablePersistenceTests.cs" />
+    <Compile Include="SponsorTeablePersistenceTests.cs" />
+    <Compile Include="CodexParticipationGuardrailTests.cs" />
     <Compile Include="BlackLedgerFactionOnboardingTests.cs" />
     <Compile Include="TeableUserProjectionServiceTests.cs" />
     <Compile Include="AccountCanonicalCaptureTests.cs" />
