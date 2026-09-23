@@ -2,15 +2,23 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "Chummer.Application": {
+        "type": "Transitive",
+        "resolved": "0.0.0-packageplane.candidate.sh524b2f42b0626",
+        "contentHash": "45eGRdG/f4kmFxS0u9WgJIfPmO8zueqOrHVjFlzqpRC8BJNo6VmNjMF3A3vPKpGevm5MaTP53vV+jJjzl34rdQ==",
+        "dependencies": {
+          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh524b2f42b0626",
+          "Chummer.Hub.Registry.Contracts": "0.0.0-packageplane.20260721.1",
+          "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1"
+        }
+      },
       "Chummer.Engine.Contracts": {
-        "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.sh524b2f42b0626, )",
+        "type": "Transitive",
         "resolved": "0.0.0-packageplane.candidate.sh524b2f42b0626",
         "contentHash": "QTLEvfwusqvYjNzQvxXCV9tqM25ZUhJ9IePdZfgM6/6zCTuoYhhbpP2V7LvI5MqRQ/nQYrHZ/dOalOUPDWN09g=="
       },
       "Chummer.Engine.GmCharacterEdits": {
-        "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.sh524b2f42b0626, )",
+        "type": "Transitive",
         "resolved": "0.0.0-packageplane.candidate.sh524b2f42b0626",
         "contentHash": "5h7RkRlg7MVCjSgBTtS6K+tAiX8i8ezk86mm5biF2WHZ7AhCs9k20LdHh+vOMlsYBw3Ydy7qsbAjlnkuzHICOQ==",
         "dependencies": {
@@ -25,41 +33,9 @@
         }
       },
       "Chummer.Hub.Registry.Contracts": {
-        "type": "Direct",
-        "requested": "[0.1.1-packageplane.20260924.1, )",
+        "type": "Transitive",
         "resolved": "0.1.1-packageplane.20260924.1",
         "contentHash": "5U2yainTczstLQba/UVel8pFukmqzHub1pdbkQZy6SR9vDrtrhdCCGjf2MS/vD1XIlWhaW6wk5pexVM3qqrTtA=="
-      },
-      "Chummer.Run.Registry": {
-        "type": "Direct",
-        "requested": "[0.1.1-packageplane.20260924.1, )",
-        "resolved": "0.1.1-packageplane.20260924.1",
-        "contentHash": "0xwLELoloHl4dUG+KNQnjKTYmpJZuGZc7ym6u88qIq9zOsE6dN4lALhMvWYLZ8dR6O43eX1glUGnlanXPeLYSw==",
-        "dependencies": {
-          "Chummer.Hub.Registry.Contracts": "0.1.1-packageplane.20260924.1"
-        }
-      },
-      "Npgsql": {
-        "type": "Direct",
-        "requested": "[10.0.3, )",
-        "resolved": "10.0.3",
-        "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w=="
-      },
-      "YamlDotNet": {
-        "type": "Direct",
-        "requested": "[16.3.0, )",
-        "resolved": "16.3.0",
-        "contentHash": "SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA=="
-      },
-      "Chummer.Application": {
-        "type": "Transitive",
-        "resolved": "0.0.0-packageplane.candidate.sh524b2f42b0626",
-        "contentHash": "45eGRdG/f4kmFxS0u9WgJIfPmO8zueqOrHVjFlzqpRC8BJNo6VmNjMF3A3vPKpGevm5MaTP53vV+jJjzl34rdQ==",
-        "dependencies": {
-          "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh524b2f42b0626",
-          "Chummer.Hub.Registry.Contracts": "0.0.0-packageplane.20260721.1",
-          "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1"
-        }
       },
       "Chummer.Infrastructure": {
         "type": "Transitive",
@@ -106,10 +82,28 @@
           "Chummer.Run.Contracts": "0.0.0-packageplane.20260721.1"
         }
       },
+      "Chummer.Run.Registry": {
+        "type": "Transitive",
+        "resolved": "0.1.1-packageplane.20260924.1",
+        "contentHash": "0xwLELoloHl4dUG+KNQnjKTYmpJZuGZc7ym6u88qIq9zOsE6dN4lALhMvWYLZ8dR6O43eX1glUGnlanXPeLYSw==",
+        "dependencies": {
+          "Chummer.Hub.Registry.Contracts": "0.1.1-packageplane.20260924.1"
+        }
+      },
+      "Npgsql": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w=="
+      },
       "SharpCompress": {
         "type": "Transitive",
         "resolved": "0.50.1",
         "contentHash": "VY90K8BBvaAMvvRDJ8EvsfI/GgoIYxlgxMpxdgwpzaesJ0pGSHTLbZ7SD4JYxsGCnOibzua/+8HvDjV6KTw4jA=="
+      },
+      "YamlDotNet": {
+        "type": "Transitive",
+        "resolved": "16.3.0",
+        "contentHash": "SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA=="
       },
       "chummer.campaign.contracts": {
         "type": "Project",
@@ -122,6 +116,22 @@
       },
       "chummer.play.contracts": {
         "type": "Project"
+      },
+      "chummer.run.api": {
+        "type": "Project",
+        "dependencies": {
+          "Chummer.Campaign.Contracts": "[0.1.1-packageplane.20260924.1, )",
+          "Chummer.Control.Contracts": "[0.1.1-packageplane.20260924.1, )",
+          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sh524b2f42b0626, )",
+          "Chummer.Engine.GmCharacterEdits": "[0.0.0-packageplane.candidate.sh524b2f42b0626, )",
+          "Chummer.Hub.Registry.Contracts": "[0.1.1-packageplane.20260924.1, )",
+          "Chummer.Run.Contracts": "[0.1.1-packageplane.20260924.1, )",
+          "Chummer.Run.Registry": "[0.1.1-packageplane.20260924.1, )",
+          "Chummer.Storage.Teable": "[1.0.0, )",
+          "Chummer.World.Contracts": "[0.1.1-packageplane.20260924.1, )",
+          "Npgsql": "[10.0.3, )",
+          "YamlDotNet": "[16.3.0, )"
+        }
       },
       "chummer.run.contracts": {
         "type": "Project",
