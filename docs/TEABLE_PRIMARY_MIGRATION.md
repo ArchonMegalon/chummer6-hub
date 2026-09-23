@@ -118,10 +118,11 @@ preserved; none of its unreadable records were decrypted or silently imported.
   Callback failure restores memory without a remote write; a conflicting or
   uncertain commit requires cold reconciliation, never a compensating overwrite.
   This is private campaign metadata, not public release/runtime Registry authority.
-  The Community envelope is now `chummer.hub.community-primary/v2`, so old writers
-  reject rather than silently discard the added metadata. No production Community
-  primary has been activated. Existing v1 snapshots require explicit migration;
-  there is no automatic v1 conversion or local-file import.
+  The Community envelope is now `chummer.hub.community-primary/v3`: v2 added
+  campaign metadata; v3 also retains invitation failure windows. Old writers
+  must reject rather than silently discard either field. No production Community
+  primary has been activated. Existing v1/v2 snapshots require explicit migration;
+  there is no automatic older-schema conversion or local-file import.
   Campaign workspace, organizer, open-run and movement operations now retain one
   current Community scope across their read/admission/write sequence. A stale
   principal mapping cannot seed or mutate the reassigned account. In primary mode,
@@ -131,6 +132,18 @@ preserved; none of its unreadable records were decrypted or silently imported.
   construction requires an explicit support dependency instead of inventing a
   temporary local support store. These changes do not migrate every Campaign
   collaborator or establish a distributed read lease.
+  Campaign collaboration now refreshes reads, campaign/invite creation, redemption,
+  membership authority and runsite operations. Primary transactions roll back the
+  complete in-memory snapshot and commit membership, invite consumption and replay
+  response together. Failed invitation attempts persist across instances/restarts;
+  successful new redemption clears that budget in the membership commit. An
+  already-committed redemption replay does not reset the primary failure budget.
+  Recoverable Data Protection keys preserve invite-secret replay; constructors
+  using the known ephemeral provider reject primary mode. The deployment still
+  needs the configured remote-key readiness check, not merely a non-ephemeral type.
+  The external Core edit path remains unavailable in primary mode until a durable
+  operation fence/reconciliation spans Core execution and the Community commit.
+  This is not whole-Campaign activation or general delegated-edit authority.
   This slice is **not registered for production**: remaining Community consumers,
   other auxiliary stores and historical erasure still need conversion.
 - Support cases, crash incidents/clusters/work items and their indexes now have
@@ -464,6 +477,19 @@ process handle was lost. No new package seal or hosted qualification is claimed.
 All remote data is synthetic simulated transport; no accounts were transferred,
 no production mode was enabled, and no provider or Play action occurred.
 
+Campaign collaboration follow-up: 124 focused local Docker tests pass, including
+12 new primary cases and the existing collaboration suite. Coverage includes
+independent remote-key providers, exact invitation replay after cold restore,
+one-use races, lost-acknowledgement membership recovery, runsite visibility,
+revocation/reassigned principals, rollback and persistent failure throttling.
+Old v2 or missing/invalid admission state rejects. API/tests compile without
+warnings/errors after correcting a new guard's parameter name. The first executable
+run passed 119/120: its short-code fixture was malformed and never reached the
+counter. The corrected fixture uses a valid-format wrong code and verifies each
+persisted counter; four restore-rejection cases were also added. Simulated remote
+transport only, network disabled. No live account migration, provider, key/credential
+operation, deployment or Play change occurred.
+
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
@@ -480,7 +506,9 @@ no production mode was enabled, and no provider or Play action occurred.
    paths remain explicitly blocked in primary mode until durable operation
    fences and uncertain-outcome reconciliation exist. Campaign recap/replay
    metadata now co-commits with aftermath, and CampaignSpine operations use fresh
-   scopes with atomic open-run closeout; other Campaign collaborators and auxiliary
+   scopes with atomic open-run closeout. Collaboration's invitation/membership and
+   runsite paths now use current primary state, but external Core editing still
+   requires a cross-store operation fence. Other collaborators and auxiliary
    consumers still need conversion. This is not whole-Campaign activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;
    do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary

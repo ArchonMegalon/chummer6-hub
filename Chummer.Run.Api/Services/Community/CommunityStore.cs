@@ -24,9 +24,9 @@ public sealed class CommunityStore : IDisposable
     private bool _primaryFailed;
     private bool _deferPrimaryCommit;
     private const string PrimaryStream = "community";
-    // v2 adds the co-committed campaign metadata. Older writers must reject this
-    // state instead of dropping that field on their next whole-snapshot write.
-    private const string PrimarySchema = "chummer.hub.community-primary/v2";
+    // v3 retains invitation failure windows across replicas/restarts. Older
+    // writers must reject this envelope instead of dropping admission state.
+    private const string PrimarySchema = "chummer.hub.community-primary/v3";
     private const int MaximumPrimaryBytes = 16 * 1024 * 1024;
     private sealed record PrimaryEnvelope(string Schema, CommunityStoreSnapshot Snapshot);
     private readonly ILogger<CommunityStore> _logger;
@@ -123,7 +123,8 @@ public sealed class CommunityStore : IDisposable
         finally { if (head is not null) CryptographicOperations.ZeroMemory(head.Bytes); }
     }
 
-    private static CommunityStoreSnapshot EmptySnapshot() => new([], [], [], [], [], [], [], [], [], [], [], [], []);
+    private static CommunityStoreSnapshot EmptySnapshot() => new([], [], [], [], [], [], [], [], [], [], [], [], [],
+        CampaignInviteAttempts: new Dictionary<string, CampaignInviteAttemptWindow>());
 
     private static void ValidatePrimarySnapshot(CommunityStoreSnapshot snapshot)
     {
@@ -152,6 +153,13 @@ public sealed class CommunityStore : IDisposable
             || snapshot.Groups.Select(group => group.GroupId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != snapshot.Groups.Count)
             throw new InvalidDataException("Community primary group identity is invalid.");
         CampaignArtifactRegistryBridge.ValidatePrimaryBackup(snapshot.CampaignArtifactRegistry);
+        if (snapshot.CampaignInviteAttempts is null || snapshot.CampaignInviteAttempts.Any(item =>
+                !users.Contains(item.Key) || item.Value is null || item.Value.Failures is < 1 or > 10
+                || item.Value.WindowStartedAtUtc == default
+                || item.Value.WindowStartedAtUtc > DateTimeOffset.MaxValue.AddMinutes(-10))
+            || snapshot.CampaignInviteAttempts.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count()
+                != snapshot.CampaignInviteAttempts.Count)
+            throw new InvalidDataException("Primary campaign invitation admission state is invalid.");
         if (snapshot.AftermathPackages is { Count: > 0 })
         {
             var artifactIds = snapshot.CampaignArtifactRegistry?.Artifacts
@@ -221,6 +229,7 @@ public sealed class CommunityStore : IDisposable
     internal Dictionary<string, CampaignRunsiteState> CampaignRunsitesByRunId { get; } = new(StringComparer.OrdinalIgnoreCase);
     internal Dictionary<string, CampaignCreationIdempotencyState> CampaignCreationsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignInviteCreationIdempotencyState> CampaignInviteCreationsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, CampaignInviteAttemptWindow> CampaignInviteAttemptsByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
     internal Dictionary<string, CampaignRunsiteDraftIdempotencyState> CampaignRunsiteDraftCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignRunsitePublishIdempotencyState> CampaignRunsitePublishCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignRedemptionIdempotencyState> CampaignRedemptionsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
@@ -275,6 +284,14 @@ public sealed class CommunityStore : IDisposable
         {
             throw new InvalidOperationException("Campaign collaboration transactions require the community-store lock.");
         }
+
+        if (IsPrimary)
+            return ExecutePrimaryTransaction(() =>
+            {
+                T result = mutation();
+                CampaignCollaborationPersistenceFaultInjector?.Invoke();
+                return result;
+            });
 
         CampaignCollaborationTransactionSnapshot before = CaptureCampaignCollaborationTransactionLocked();
         try
@@ -651,7 +668,9 @@ public sealed class CommunityStore : IDisposable
                 .ToArray(),
             CampaignTeardowns: CampaignTeardownsByIdempotencyKey.Values
                 .OrderBy(static item => item.Key, StringComparer.Ordinal)
-                .ToArray());
+                .ToArray(),
+            CampaignInviteAttempts: CampaignInviteAttemptsByUserId.ToDictionary(
+                static item => item.Key, static item => item.Value, StringComparer.OrdinalIgnoreCase));
 
     private void Load()
     {
@@ -713,6 +732,9 @@ public sealed class CommunityStore : IDisposable
 
     private void ApplySnapshotLocked(CommunityStoreSnapshot snapshot)
     {
+        CampaignInviteAttemptsByUserId.Clear();
+        foreach (var item in snapshot.CampaignInviteAttempts ?? new Dictionary<string, CampaignInviteAttemptWindow>())
+            CampaignInviteAttemptsByUserId.Add(item.Key, item.Value);
         PlaySessionAuthorizationValidator.ValidateSnapshot(
             snapshot.PlaySessions ?? Array.Empty<PlaySessionBinding>(),
             snapshot.PlayParticipants ?? Array.Empty<PlaySessionParticipant>(),
@@ -1164,7 +1186,8 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<CampaignGmAuthorityAuditState>? CampaignGmAuthorityAudit = null,
     IReadOnlyList<CampaignGmAuthorityIdempotencyState>? CampaignGmAuthorityCommands = null,
     IReadOnlyList<CampaignTeardownIdempotencyState>? CampaignTeardowns = null,
-    HubArtifactStoreBackupPackage? CampaignArtifactRegistry = null);
+    HubArtifactStoreBackupPackage? CampaignArtifactRegistry = null,
+    IReadOnlyDictionary<string, CampaignInviteAttemptWindow>? CampaignInviteAttempts = null);
 
 internal sealed record CampaignCollaborationTransactionSnapshot(
     IReadOnlyList<HubUserDto> Users,
