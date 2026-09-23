@@ -156,6 +156,25 @@ or public migration. The cold latency still exceeds Android's 20-second request
 budget. Original volumes and old state roots remain intact. No provider advance,
 signed AAB or Play upload occurred. Source is pushed to the feature branch, not main.
 
+### Chapter authorization outage classification — 2026-09-23
+
+Functional source `4e467fb31d2ecf3ee5ac49ceb28393d613049ce8` distinguishes
+unavailable account authority from invalid credentials in signed HTTP admission
+and Origin controller revalidation. Ten regressions first reproduced incorrect
+401/Unauthorized results, then passed with 503 and no prose disclosure or chapter
+acceptance. Invalid/revoked credentials remain rejected, final authority checks
+remain fresh, and legacy null-return service callers retain their contract.
+All 165 focused local Hub tests pass; the Android managed transport regression
+also confirms stable credentials, no retries and explicit unknown write outcomes.
+
+Local image `ab98221dd828…` replaced only the private preparation Hub. A signed
+read of the existing real First Book chapter passed after restart (200, 18.09s),
+without repeating generation or acceptance. Identity, state roots and the public
+route were unchanged. This fixes a demonstrated error-classification defect,
+not the proven cause of the earlier transient live 401 or the cold latency risk.
+Actual Android live reading/adoption/export, provider continuation, public
+cutover, complete host recovery and Play delivery remain open.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux
