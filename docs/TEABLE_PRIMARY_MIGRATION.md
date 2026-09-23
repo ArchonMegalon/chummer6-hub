@@ -5,6 +5,24 @@ fresh Hub account and Origin book/job state. This is not a backup/projection.
 Production has **not** been cut over. The original encrypted Docker volume is
 preserved; none of its unreadable records were decrypted or silently imported.
 
+### Small-state reader optimization (2026-09-23)
+
+New writes of at most 32 KiB include optional `inlineBase64` bytes in the unique
+v1 revision manifest. Reads still fetch the current remote head and validate its
+stream, revision, commit, length and full SHA-256; there is no authorization cache.
+An invalid inline payload fails closed rather than falling back to another copy.
+Large states and historical manifests continue through the bounded chunk reader.
+All writes retain the complete legacy chunks, so the previous v1 reader can ignore
+the optional field and restore the same bytes. No historical rows are rewritten.
+This intentionally trades a bounded duplicate copy on small writes for fewer
+sequential HTTP reads; it is not a new storage or authentication authority.
+
+Fresh account readiness still validates the UNIQUE/NOT NULL schema and the full
+current protected state, now in two independent requests instead of three for
+small heads. Signed admission, final revocation checks, nonce CAS, readback after
+uncertain commits, remote-outage rejection and the five-second readiness deadline
+are unchanged. This does not by itself establish a latency or availability SLO.
+
 ### Actual native-client/recovery follow-up (2026-09-23 17:19 UTC)
 
 The shipping managed Android account service, proof transport, owner accessor and

@@ -150,10 +150,82 @@ public sealed class TeableRevisionStoreTests
     }
 
     [Fact]
+    public async Task Small_head_reads_exact_remote_bytes_in_one_request_without_caching_authority()
+    {
+        using var remote = new Remote();
+        using var store = remote.Store();
+        var first = await store.CompareExchangeAsync("grant", null, Guid.NewGuid(), "active"u8.ToArray());
+        int reads = remote.GetRequests;
+        Assert.Equal(first.Bytes, (await store.ReadAsync("grant"))!.Bytes);
+        Assert.Equal(1, remote.GetRequests - reads);
+        var revoked = await remote.Store().CompareExchangeAsync("grant", first, Guid.NewGuid(), "revoked"u8.ToArray());
+        reads = remote.GetRequests;
+        Assert.Equal(revoked.Bytes, (await store.ReadAsync("grant"))!.Bytes);
+        Assert.Equal(1, remote.GetRequests - reads);
+        remote.FailReads = true;
+        await Assert.ThrowsAsync<HttpRequestException>(() => store.ReadAsync("grant"));
+    }
+
+    [Fact]
+    public async Task Inline_head_keeps_complete_legacy_chunks_for_rollback_and_reads_old_manifests()
+    {
+        using var remote = new Remote();
+        byte[] bytes = Enumerable.Range(0, 32 * 1024).Select(i => (byte)(i % 251)).ToArray();
+        var written = await remote.Store().CompareExchangeAsync("compat", null, Guid.NewGuid(), bytes);
+        JsonObject row = remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "head");
+        JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
+        Assert.Equal(1, manifest["version"]!.GetValue<int>());
+        Assert.Equal(bytes, Convert.FromBase64String(manifest["inlineBase64"]!.GetValue<string>()));
+        Assert.Equal(bytes, Convert.FromBase64String(remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "chunk")["payload"]!.GetValue<string>()));
+        manifest.Remove("inlineBase64"); // The existing v1 reader ignores unknown fields and follows these chunks.
+        row["payload"] = manifest.ToJsonString();
+        int reads = remote.GetRequests;
+        var reopened = await remote.Store().ReadAsync("compat");
+        Assert.Equal(written.Commit, reopened!.Commit);
+        Assert.Equal(bytes, reopened.Bytes);
+        Assert.Equal(2, remote.GetRequests - reads);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-base64")]
+    [InlineData("Y2hhbmdl")]
+    public async Task Invalid_inline_bytes_fail_closed_even_with_valid_legacy_chunks(string inline)
+    {
+        using var remote = new Remote();
+        await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), "secret"u8.ToArray());
+        JsonObject row = remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "head");
+        JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
+        manifest["inlineBase64"] = inline;
+        row["payload"] = manifest.ToJsonString();
+        int reads = remote.GetRequests;
+        await Assert.ThrowsAsync<InvalidDataException>(() => remote.Store().ReadAsync("accounts"));
+        Assert.Equal(1, remote.GetRequests - reads); // No fallback to a second representation after corruption.
+    }
+
+    [Fact]
+    public async Task Large_heads_remain_chunked_and_cannot_admit_inline_payloads()
+    {
+        using var remote = new Remote();
+        byte[] bytes = new byte[32 * 1024 + 1];
+        await remote.Store().CompareExchangeAsync("large", null, Guid.NewGuid(), bytes);
+        JsonObject row = remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "head");
+        JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
+        Assert.Null(manifest["inlineBase64"]);
+        manifest["inlineBase64"] = Convert.ToBase64String(bytes);
+        row["payload"] = manifest.ToJsonString();
+        await Assert.ThrowsAsync<InvalidDataException>(() => remote.Store().ReadAsync("large"));
+    }
+
+    [Fact]
     public async Task Corrupt_chunk_is_not_replaced_with_an_empty_or_local_state()
     {
         using var remote = new Remote();
         await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), "secret"u8.ToArray());
+        JsonObject head = remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "head");
+        JsonObject manifest = JsonNode.Parse(head["payload"]!.GetValue<string>())!.AsObject();
+        manifest.Remove("inlineBase64"); // Exercise the retained legacy chunk reader.
+        head["payload"] = manifest.ToJsonString();
         remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "chunk")["payload"] = "Y2hhbmdl";
         await Assert.ThrowsAsync<InvalidDataException>(() => remote.Store().ReadAsync("accounts"));
     }

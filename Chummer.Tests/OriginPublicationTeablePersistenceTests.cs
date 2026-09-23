@@ -124,7 +124,17 @@ public sealed class OriginPublicationTeablePersistenceTests : IDisposable
             var entry = Assert.Single(cold.ReadEntries());
             var chunks = remote.Rows.Where(p => p.Value["stream"]!.GetValue<string>().StartsWith("origin-pub-asset-", StringComparison.Ordinal)).ToArray();
             if (failure == "missing") foreach (var chunk in chunks) remote.Rows.Remove(chunk.Key);
-            else if (failure == "corrupt") chunks.First(p => p.Value["kind"]!.GetValue<string>() == "chunk").Value["payload"] = "Y29ycnVwdA==";
+            else if (failure == "corrupt")
+            {
+                var head = chunks.First(p => p.Value["kind"]!.GetValue<string>() == "head").Value;
+                var manifest = System.Text.Json.Nodes.JsonNode.Parse(head["payload"]!.GetValue<string>())!.AsObject();
+                if (manifest["inlineBase64"] is not null)
+                {
+                    manifest["inlineBase64"] = "Y29ycnVwdA==";
+                    head["payload"] = manifest.ToJsonString();
+                }
+                else chunks.First(p => p.Value["kind"]!.GetValue<string>() == "chunk").Value["payload"] = "Y29ycnVwdA==";
+            }
             else remote.FailReads = true;
             if (failure == "outage") Assert.Throws<HttpRequestException>(() => cold.ReadBytes(entry.BookArtifactPath!));
             else Assert.Throws<InvalidDataException>(() => cold.ReadBytes(entry.BookArtifactPath!));

@@ -23,7 +23,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
 
     public sealed record Head(long Revision, Guid Commit, string Sha256, byte[] Bytes);
     private sealed record Manifest(int Version, string Stream, long Revision, Guid Commit,
-        string? PreviousSha256, int Length, string Sha256, int Chunks);
+        string? PreviousSha256, int Length, string Sha256, int Chunks, string? InlineBase64 = null);
 
     public static TeableRevisionStore Open(Uri origin, string tableId, string token)
     {
@@ -97,7 +97,12 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
             string payload = Convert.ToBase64String(part.Span);
             await CreateOnceAsync(key, stream, "chunk", revision, payload, ct);
         }
-        var manifest = new Manifest(1, stream, revision, commit, expected?.Sha256, bytes.Length, hash, count);
+        // Small states fit in the unique head itself, eliminating a dependent
+        // HTTP read on every fresh authorization check. Keep v1 chunks as well:
+        // existing readers can ignore this optional field during rollback.
+        // This is current remote data, not a cached authorization decision.
+        var manifest = new Manifest(1, stream, revision, commit, expected?.Sha256, bytes.Length, hash, count,
+            bytes.Length <= ChunkBytes ? Convert.ToBase64String(bytes.Span) : null);
         string manifestKey = HeadKey(stream, revision);
         await CreateOnceAsync(manifestKey, stream, "head", revision, JsonSerializer.Serialize(manifest, Json), ct);
         JsonElement? winner = await FindAsync(new[] { ("revision_key", manifestKey) }, latest: false, ct);
@@ -150,6 +155,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
             || manifest.Revision == 1 && manifest.PreviousSha256 is not null
             || manifest.Revision > 1 && !Digest(manifest.PreviousSha256)
             || manifest.Chunks != (manifest.Length + ChunkBytes - 1) / ChunkBytes
+            || manifest.InlineBase64 is not null && manifest.Length > ChunkBytes
             || fields.GetProperty("revision_key").GetString() != HeadKey(stream, manifest.Revision)
             || fields.GetProperty("stream").GetString() != stream || fields.GetProperty("kind").GetString() != "head"
             || fields.GetProperty("revision").GetInt64() != manifest.Revision)
@@ -158,7 +164,14 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
         byte[] bytes = new byte[manifest.Length];
         try
         {
-            for (int index = 0; index < manifest.Chunks; index++)
+            if (manifest.InlineBase64 is not null)
+            {
+                // Malformed inline bytes must not fall back to a different
+                // representation. Both formats use the same exact length/hash.
+                if (!Convert.TryFromBase64String(manifest.InlineBase64, bytes, out int used)
+                    || used != manifest.Length) throw Invalid();
+            }
+            else for (int index = 0; index < manifest.Chunks; index++)
             {
                 string key = ChunkKey(stream, manifest.Commit, index);
                 JsonElement part = await FindAsync(new[] { ("revision_key", key) }, latest: false, ct) ?? throw Invalid();

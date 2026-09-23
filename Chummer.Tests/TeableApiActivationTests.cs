@@ -106,7 +106,7 @@ public sealed class TeableApiActivationTests : IDisposable
         }
         int reads = accounts.GetRequests;
         Assert.True(activation.Evaluate().Ready);
-        Assert.Equal(3, accounts.GetRequests - reads); // schema, head, one bounded chunk
+        Assert.Equal(2, accounts.GetRequests - reads); // schema and exact inline head; no cached authority
         accounts.Unique = false;
         Assert.False(activation.Evaluate().Ready);
         accounts.Unique = true;
@@ -121,6 +121,13 @@ public sealed class TeableApiActivationTests : IDisposable
     {
         using var keys = new Remote();
         using var accounts = new Remote();
+        void LoseFinalRead()
+        {
+            accounts.FailReads = true;
+            // The inline head is the complete read now. Lose this response,
+            // rather than waiting for a chunk GET that no longer exists.
+            throw new HttpRequestException("synthetic final-read outage");
+        }
         using var services = Services(keys, accounts, "bootstrap");
         var activation = services.GetRequiredService<InstallLinkingStoreActivation>();
         var service = new InstallLinkingService(new InstallLinkingStoreAccess(activation), Configuration("bootstrap"), activation);
@@ -141,7 +148,7 @@ public sealed class TeableApiActivationTests : IDisposable
             // Nonce commit, then grant commit, then the final fresh authority
             // check. The committed grant must not be returned on an outage.
             accounts.BeforeHeadPost = () => accounts.BeforeHeadPost = () =>
-                accounts.BeforeHeadReadResponse = () => accounts.FailReads = true;
+                accounts.BeforeHeadReadResponse = LoseFinalRead;
         }
         int reads = accounts.GetRequests;
         if (outageAfterCommit)
@@ -164,7 +171,7 @@ public sealed class TeableApiActivationTests : IDisposable
             Assert.NotNull(service.ResolveAndroidLinkedV2Principal(principal));
             int totalAdmissionReads = accounts.GetRequests - admissionReads;
             Console.WriteLine($"Signed request primary GETs: {totalAdmissionReads}");
-            Assert.InRange(totalAdmissionReads, 1, 25);
+            Assert.InRange(totalAdmissionReads, 1, 16);
             reads += totalAdmissionReads;
         }
         // Retain fresh operation admission, nonce persistence, grant CAS and
@@ -190,7 +197,7 @@ public sealed class TeableApiActivationTests : IDisposable
         {
             var principal = coldService.ResolveAndroidLinkedV2Grant("android-probe", grantId, recovered.Exchange.Grant.AccessToken);
             Assert.NotNull(principal);
-            accounts.BeforeHeadPost = () => accounts.BeforeHeadReadResponse = () => accounts.FailReads = true;
+            accounts.BeforeHeadPost = () => accounts.BeforeHeadReadResponse = LoseFinalRead;
             var proofError = Assert.Throws<InstallLinkingOperationException>(() => coldService.TryUseAndroidLinkedV2Proof(
                 grantId, new string('q', 43), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(1)));
             Assert.Equal(503, proofError.StatusCode);
@@ -199,7 +206,7 @@ public sealed class TeableApiActivationTests : IDisposable
             Assert.False(coldService.TryUseAndroidLinkedV2Proof(grantId, new string('q', 43),
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(1))); // committed proof cannot replay
 
-            accounts.BeforeHeadPost = () => accounts.BeforeHeadReadResponse = () => accounts.FailReads = true;
+            accounts.BeforeHeadPost = () => accounts.BeforeHeadReadResponse = LoseFinalRead;
             int revocationReads = accounts.GetRequests;
             var revokeError = Assert.Throws<InstallLinkingOperationException>(() => coldService.RevokeAndroidLinkedV2Grant(principal));
             Assert.Equal(503, revokeError.StatusCode);
