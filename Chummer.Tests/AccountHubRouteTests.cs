@@ -24,6 +24,39 @@ namespace Chummer.Tests;
 
 public sealed class AccountHubRouteTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("participation")]
+    public async Task AccountPagesRemainUsableWithoutInventingMembershipDuringPrimaryOutage(string? section)
+    {
+        using var remote = new TeableRevisionStoreTests.Remote { FailReads = true };
+        using var fixture = AccountHubRouteFixture.Create((services, configuration) =>
+        {
+            var primary = new ConfigurationBuilder().AddConfiguration(configuration)
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"] = "teable" })
+                .Build();
+            services.AddSingleton(_ => new BrilliantDirectoriesBillingStore(primary, primary: remote.Store(), ownsPrimary: true));
+        });
+        var view = Assert.IsType<ViewResult>(await fixture.CreateController().AccountPage(section, null, CancellationToken.None));
+        AccountHubCardViewModel membership;
+        if (section is null)
+        {
+            var model = Assert.IsType<AccountHubPageViewModel>(view.Model);
+            Assert.Equal("Membership unavailable", model.MembershipLabel);
+            Assert.Equal("Membership details unavailable right now.", model.MembershipSummary);
+            Assert.Equal("Book limit is unavailable right now.", model.BookQuotaSummary);
+            membership = Assert.Single(model.Cards, item => item.Title == "Membership");
+        }
+        else
+        {
+            var model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+            Assert.Contains("Membership details unavailable right now.", model.Highlights);
+            membership = Assert.Single(model.Cards, item => item.Title == "Membership");
+        }
+        Assert.Equal("Check membership", membership.PrimaryLabel);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
     [Fact]
     public async Task AccountRootShowsMinimalHubForSignedInUser()
     {
@@ -598,7 +631,7 @@ public sealed class AccountHubRouteTests
         public CampaignSpineService CampaignSpine => _provider.GetRequiredService<CampaignSpineService>();
         public AccountService Accounts => _provider.GetRequiredService<AccountService>();
 
-        public static AccountHubRouteFixture Create()
+        public static AccountHubRouteFixture Create(Action<IServiceCollection, IConfiguration>? configure = null)
         {
             string root = Path.Combine(Path.GetTempPath(), "chummer-account-hub-route-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
@@ -637,6 +670,7 @@ public sealed class AccountHubRouteTests
                 .AddHubCampaignSpineContext()
                 .AddHubControlAndSupportContext()
                 .AddHubInstallAndOrchestrationAdapters();
+            configure?.Invoke(services, configuration);
             return new AccountHubRouteFixture(root, services.BuildServiceProvider());
         }
 

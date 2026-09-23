@@ -568,8 +568,8 @@ to repeat its creation phase over an existing synthetic Community snapshot.
    usage and request receipts have primary implementations with atomic new
    charge/receipt storage. Support cases/crashes and attachment bytes now have
    primary implementations too, but historical/orphan erasure remains open.
-   Publication-index/provider-output artifacts and other
-   auxiliary stores still need custody review. The isolated Community slice is
+   Private Origin publication indexes and artifact bytes now have primary custody;
+   other auxiliary stores still need review. The isolated Community slice is
    not a complete activation. Faction onboarding's cached state is now removed;
    sponsor observations are freshly rebound after their GET, but the legacy
    Fleet mutation paths still carry mutable state over external awaits. Those
@@ -747,3 +747,30 @@ commit uncertainty, cold restore, outage and delayed ownership/removal cases.
 Only synthetic HTTP transport was used. No EA service was started, no real
 notification was sent, and no runtime configuration, browser session or Play
 artifact changed. Full Hub migration and remaining optional consumers stay open.
+
+## Optional Origin allowance during primary failure — 2026-09-23
+
+The account-page allowance projection now returns unavailable for bounded primary
+transport, deadline, schema and JSON failures. Previously those failures escaped
+the optional projection and aborted the account page. Strict allowance reads and
+consumption still propagate the actual failure; no cache, free-tier allowance or
+zeroed usage replaces unreadable authority. Once remote state is readable, a
+fresh service restores the consumed allowance unchanged.
+
+Account root and participation views now label missing membership as unavailable,
+with a Check membership action, instead of implying a Free plan/one-book allowance.
+The existing known Free and Supporter displays remain unchanged.
+
+91 focused local Docker tests pass, including seven new projection/route cases,
+existing membership/authoring and billing checks and affected account routes.
+The five initial storage-failure regressions reproduced the defect before the
+patch. The intermediate run passed 86/91 because new strict-operation assertions
+incorrectly assumed ledger failures permanently fence an instance; each outer
+read actually reconciles afresh. Corrected assertions verify the real failure
+types and maintain the injected timeout for each attempted operation. No primary
+behavior was weakened to satisfy them. API/test compilation is clean. These are
+synthetic, network-isolated checks, not rendered-browser or production evidence.
+
+Earlier migration commits through `cfc710028` were synchronized to the existing
+`feat/origin-chapter-jobs-20260922` development branch and remotely confirmed.
+That is source backup, not a main merge, package seal, Hub cutover or Play release.

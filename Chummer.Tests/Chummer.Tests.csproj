@@ -93,6 +93,7 @@
     <Compile Include="OriginPublicationTeablePersistenceTests.cs" />
     <Compile Include="AuthoringLedgerTeablePersistenceTests.cs" />
     <Compile Include="MembershipTeablePersistenceTests.cs" />
+    <Compile Include="AccountHubRouteTests.cs" />
     <Compile Include="HorizonTeablePersistenceTests.cs" />
     <Compile Include="HorizonGovernedRenderRequestComposerServiceTests.cs" />
     <Compile Include="HorizonCapabilityServiceTests.cs" />

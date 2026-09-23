@@ -34,6 +34,73 @@ public sealed class MembershipTeablePersistenceTests : IDisposable
     private static BrilliantDirectoriesMemberSyncRequest Request(string user = "user", string status = "active", bool active = true)
         => new(user, "member-" + user, user + "@example.invalid", "supporter", "ignored provider label", status, active, Now);
 
+    [Theory]
+    [InlineData("membership")]
+    [InlineData("usage")]
+    public void Optional_book_allowance_is_unavailable_during_primary_outage_without_resetting_or_consuming_quota(string unavailable)
+    {
+        using var membershipRemote = new Remote();
+        using var usageRemote = new Remote();
+        using var membership = Membership(membershipRemote);
+        using var usage = Usage(usageRemote);
+        var projection = new OriginAuthoringAllowanceProjectionService(Service(membership, usage));
+        var consumed = projection.ConsumeAllowance("user");
+        Assert.Equal(1, consumed.WindowUsed);
+        Assert.Equal(0, consumed.WindowRemaining);
+        int writes = membershipRemote.HeadPosts + usageRemote.HeadPosts;
+        Remote failed = unavailable == "membership" ? membershipRemote : usageRemote;
+        failed.FailReads = true;
+
+        Assert.Null(projection.TryGetAllowance("user"));
+        Assert.Throws<HttpRequestException>(() => projection.GetAllowance("user"));
+        Assert.Throws<HttpRequestException>(() => projection.ConsumeAllowance("user"));
+        Assert.Equal(writes, membershipRemote.HeadPosts + usageRemote.HeadPosts);
+
+        failed.FailReads = false;
+        using var coldMembership = Membership(membershipRemote);
+        using var coldUsage = Usage(usageRemote);
+        var restored = new OriginAuthoringAllowanceProjectionService(Service(coldMembership, coldUsage));
+        Assert.Equal(consumed, restored.GetAllowance("user"));
+        Assert.Throws<InvalidOperationException>(() => restored.ConsumeAllowance("user"));
+        Assert.Equal(writes, membershipRemote.HeadPosts + usageRemote.HeadPosts);
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Theory]
+    [InlineData("schema")]
+    [InlineData("json")]
+    [InlineData("deadline")]
+    public async Task Optional_book_projection_never_invents_allowance_from_corrupt_or_timed_out_primary_state(string failure)
+    {
+        using var remote = new Remote();
+        if (failure != "deadline")
+        {
+            using var transport = remote.Store();
+            byte[] invalid = failure == "schema" ? "{}"u8.ToArray() : "{"u8.ToArray();
+            await transport.CompareExchangeAsync("myfirstbook-usage", null, Guid.NewGuid(), invalid);
+        }
+        else remote.BeforeHeadReadResponse = () => throw new OperationCanceledException("synthetic read deadline");
+        int writes = remote.HeadPosts;
+        using var membership = Membership(remote);
+        using var usage = Usage(remote);
+        var projection = new OriginAuthoringAllowanceProjectionService(Service(membership, usage));
+        Assert.Null(projection.TryGetAllowance("user"));
+        Type expected = failure switch
+        {
+            "schema" => typeof(InvalidDataException),
+            "json" => typeof(JsonException),
+            _ => typeof(OperationCanceledException)
+        };
+        // Every outer read reconciles remote state; a single injected timeout
+        // is not a permanent outage. Hold the fault for each strict operation.
+        if (failure == "deadline") remote.BeforeHeadReadResponse = () => throw new OperationCanceledException("synthetic read deadline");
+        Assert.Throws(expected, () => projection.GetAllowance("user"));
+        if (failure == "deadline") remote.BeforeHeadReadResponse = () => throw new OperationCanceledException("synthetic read deadline");
+        Assert.Throws(expected, () => projection.ConsumeAllowance("user"));
+        Assert.Equal(writes, remote.HeadPosts);
+        Assert.False(Directory.Exists(_root));
+    }
+
     [Fact]
     public void Membership_and_consumed_allowance_restore_together_without_local_files()
     {
