@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -9,6 +10,8 @@ namespace Chummer.Run.Api.Services.InstallLinking;
 
 public static class DataProtectionKeyProtectionConfigurator
 {
+    internal const string OwnerOnlyLocalMode = "owner_only_local";
+    internal const string OwnerOnlyLocalStatus = "owner_only_local_key_ring";
     private const int MaximumCertificatesInBundle = 16;
     private const int MaximumPrivateKeyCertificates = 8;
 
@@ -27,6 +30,25 @@ public static class DataProtectionKeyProtectionConfigurator
         {
             builder.UseEphemeralDataProtectionProvider();
             return new(false, "plaintext_certificate_password_rejected");
+        }
+
+        string protectionMode = configuration["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"]?.Trim()
+            ?? "certificate";
+        if (protectionMode == OwnerOnlyLocalMode)
+        {
+            if (certificatePath is not null || passwordFile is not null)
+            {
+                builder.UseEphemeralDataProtectionProvider();
+                return new(false, "data_protection_conflicting_key_protection_modes");
+            }
+
+            return ConfigureOwnerOnlyLocal(builder, keyRingPath);
+        }
+
+        if (protectionMode != "certificate")
+        {
+            builder.UseEphemeralDataProtectionProvider();
+            return new(false, "data_protection_key_protection_mode_invalid");
         }
 
         if (certificatePath is null || passwordFile is null)
@@ -173,6 +195,55 @@ public static class DataProtectionKeyProtectionConfigurator
         }
     }
 
+    private static DataProtectionKeyProtectionStatus ConfigureOwnerOnlyLocal(
+        IDataProtectionBuilder builder,
+        string keyRingPath)
+    {
+        try
+        {
+            // This is an explicit single-host custody choice, never an automatic
+            // fallback for missing certificate secrets or an old encrypted ring.
+            var repository = new OwnerOnlyDataProtectionKeyRepository(keyRingPath);
+            _ = repository.GetAllElements();
+            VerifyDataProtectionRoundTrip(keyRingPath, verification =>
+                verification.Services.Configure<KeyManagementOptions>(options =>
+                {
+                    options.XmlRepository = repository;
+                    options.XmlEncryptor = null;
+                }));
+            builder.Services.Configure<KeyManagementOptions>(options =>
+            {
+                options.XmlRepository = repository;
+                options.XmlEncryptor = null;
+            });
+            return new(true, OwnerOnlyLocalStatus);
+        }
+        catch
+        {
+            builder.UseEphemeralDataProtectionProvider();
+            return new(false, "data_protection_owner_only_key_ring_invalid");
+        }
+    }
+
+    internal static string? ValidateConfiguredKeyRing(
+        string keyRingPath,
+        DataProtectionKeyProtectionStatus status)
+    {
+        if (status is not { Ready: true, Code: OwnerOnlyLocalStatus })
+            return ValidateEncryptedKeyRing(keyRingPath, repairOwnerMode: false);
+
+        try
+        {
+            var repository = new OwnerOnlyDataProtectionKeyRepository(keyRingPath);
+            return repository.GetAllElements().Any(element => element.Name == "key")
+                ? null : "key_ring_empty";
+        }
+        catch
+        {
+            return "data_protection_owner_only_key_ring_invalid";
+        }
+    }
+
     private static byte[] ReadSecretFile(string path, int maximumBytes, bool strict)
     {
         string fullPath = Path.GetFullPath(path);
@@ -214,13 +285,17 @@ public static class DataProtectionKeyProtectionConfigurator
         X509Certificate2 primaryCertificate,
         X509Certificate2[] decryptionCertificates,
         string keyRingPath)
+        => VerifyDataProtectionRoundTrip(keyRingPath, verification => verification
+            .ProtectKeysWithCertificate(primaryCertificate)
+            .UnprotectKeysWithAnyCertificate(decryptionCertificates));
+
+    private static void VerifyDataProtectionRoundTrip(
+        string keyRingPath,
+        Action<IDataProtectionBuilder> configure)
     {
         IDataProtectionProvider provider = DataProtectionProvider.Create(
             new DirectoryInfo(keyRingPath),
-            verification => verification
-                .SetApplicationName("Chummer.Run.Api")
-                .ProtectKeysWithCertificate(primaryCertificate)
-                .UnprotectKeysWithAnyCertificate(decryptionCertificates));
+            verification => configure(verification.SetApplicationName("Chummer.Run.Api")));
         byte[] cleartext = RandomNumberGenerator.GetBytes(32);
         byte[]? protectedPayload = null;
         byte[]? recovered = null;

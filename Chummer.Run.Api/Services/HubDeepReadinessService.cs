@@ -232,9 +232,9 @@ public sealed class HubDeepReadinessService
 
             if (_environment.IsProduction())
             {
-                string? keyRingFailure = DataProtectionKeyProtectionConfigurator.ValidateEncryptedKeyRing(
+                string? keyRingFailure = DataProtectionKeyProtectionConfigurator.ValidateConfiguredKeyRing(
                     storagePath,
-                    repairOwnerMode: false);
+                    _dataProtectionKeyProtection!);
                 if (keyRingFailure is not null)
                 {
                     return Failed("data_protection_storage", keyRingFailure);
