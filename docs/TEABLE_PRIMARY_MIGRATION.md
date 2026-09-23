@@ -490,6 +490,34 @@ persisted counter; four restore-rejection cases were also added. Simulated remot
 transport only, network disabled. No live account migration, provider, key/credential
 operation, deployment or Play change occurred.
 
+### Live synthetic Community/support restoration — 2026-09-23
+
+Three independent, read-only-filesystem Docker processes completed against the
+existing explicitly synthetic Teable table. Source implementation:
+`25dc0c002eb3fa870b799351a6c74930d897a335`; reused API assembly SHA-256:
+`afb7fbf99ca17a4f9ce03d92f2dcad16bb0046ba413dc02a50e7e452a596430b`.
+The small diagnostic executable was built locally against that existing assembly;
+this was not another Hub build, package seal or release qualification.
+
+- `create`, 09:28:49 UTC: synthetic accounts, campaign/dossier, protected invite,
+  support case and a chunk-spanning attachment were stored in the test table.
+- `restore-and-join`, 09:29:46 UTC: a fresh process read the existing accounts,
+  restored the identical invitation secrets through the remote keyring, redeemed
+  once, issued/revoked a second invite and read the exact attachment bytes.
+- `cold-verify`, 09:30:53 UTC: a third process restored membership and the exact
+  prior redemption without consuming again, observed the invite revocation, and
+  rejected foreign account access to both case and attachment. Attachment SHA-256
+  matched and no local account/attachment directory was created.
+
+Only synthetic data was written. The existing operator credential stayed in
+stdin/process memory for this bounded diagnostic; it was not installed in Hub or
+stored in an image, argument list or credential file. A restricted production
+credential remains unprovisioned. No email/authoring provider, production service,
+Cloudflare, signing or Play action occurred. All three containers exited and were
+removed. This does not prove complete deployment/configuration recovery, historical
+erasure, a physical host failover or migration of real users. The driver refuses
+to repeat its creation phase over an existing synthetic Community snapshot.
+
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
