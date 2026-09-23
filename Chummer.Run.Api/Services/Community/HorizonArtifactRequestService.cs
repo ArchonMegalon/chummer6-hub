@@ -219,13 +219,16 @@ public sealed class HorizonArtifactRequestService
         HorizonArtifactRequestCreateRequest request,
         HorizonCapabilityDefinition capability,
         DateTimeOffset createdAtUtc)
+        => BuildRequestId(capability.HorizonId, capability.CapabilityId, Clean(request.UserId), Clean(request.SourceRef), createdAtUtc);
+
+    internal static string BuildRequestId(string horizonId, string capabilityId, string userId, string sourceRef, DateTimeOffset createdAtUtc)
     {
         string material = string.Join(
             "\n",
-            capability.HorizonId,
-            capability.CapabilityId,
-            Clean(request.UserId),
-            Clean(request.SourceRef),
+            horizonId,
+            capabilityId,
+            userId,
+            sourceRef,
             createdAtUtc.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture));
         string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material))).ToLowerInvariant()[..16];
         return $"horizon-artifact-{digest}";

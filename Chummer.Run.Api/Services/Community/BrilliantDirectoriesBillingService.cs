@@ -149,7 +149,11 @@ public sealed class BrilliantDirectoriesBillingService
     }
 
     public MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now = null, string? email = null)
+        => ConsumeMyFirstBookQuota(userId, now, email, 1);
+
+    internal MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now, string? email, int unitsRequested)
     {
+        if (unitsRequested <= 0) throw new InvalidOperationException("A positive MyFirstBook allowance count is required.");
         DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
         MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, effectiveNow, email);
         using (_myFirstBookUsage.Enter())
@@ -160,15 +164,15 @@ public sealed class BrilliantDirectoriesBillingService
             MyFirstBookUsageLedgerEntry? previous = existingIndex >= 0 ? _myFirstBookUsage.Entries[existingIndex] : null;
             // Re-read usage within the same scope that will commit it. A quota
             // observation obtained before this scope is not write admission.
-            if ((previous?.MonthlyUsed ?? 0) >= snapshot.MonthlyLimit)
+            if ((previous?.MonthlyUsed ?? 0) < 0 || unitsRequested > (long)snapshot.MonthlyLimit - (previous?.MonthlyUsed ?? 0))
                 throw new InvalidOperationException("Monthly MyFirstBook allowance is exhausted for this account.");
             MyFirstBookUsageLedgerEntry updated = existingIndex >= 0
                 ? _myFirstBookUsage.Entries[existingIndex] with
                 {
-                    MonthlyUsed = _myFirstBookUsage.Entries[existingIndex].MonthlyUsed + 1,
+                    MonthlyUsed = checked(_myFirstBookUsage.Entries[existingIndex].MonthlyUsed + unitsRequested),
                     UpdatedAtUtc = effectiveNow
                 }
-                : new MyFirstBookUsageLedgerEntry(snapshot.UserId, snapshot.WindowStartUtc, 1, effectiveNow);
+                : new MyFirstBookUsageLedgerEntry(snapshot.UserId, snapshot.WindowStartUtc, unitsRequested, effectiveNow);
             if (existingIndex >= 0)
             {
                 _myFirstBookUsage.Entries[existingIndex] = updated;

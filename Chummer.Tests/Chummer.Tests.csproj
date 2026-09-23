@@ -91,6 +91,11 @@
     <Compile Include="OriginDocumentTeablePersistenceTests.cs" />
     <Compile Include="AuthoringLedgerTeablePersistenceTests.cs" />
     <Compile Include="MembershipTeablePersistenceTests.cs" />
+    <Compile Include="HorizonTeablePersistenceTests.cs" />
+    <Compile Include="HorizonGovernedRenderRequestComposerServiceTests.cs" />
+    <Compile Include="HorizonCapabilityServiceTests.cs" />
+    <Compile Include="RunsiteOrientationRequestComposerServiceTests.cs" />
+    <Compile Include="PropertyquarryApartmentVideoArtifactRequestBridgeServiceTests.cs" />
     <Compile Include="BrilliantDirectoriesBillingTests.cs" />
     <Compile Include="RepoPaths.cs" />
     <Compile Include="OriginDossierProviderCreditReservationServiceTests.cs" />

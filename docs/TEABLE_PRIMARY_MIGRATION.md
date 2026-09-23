@@ -69,6 +69,17 @@ preserved; none of its unreadable records were decrypted or silently imported.
   status policy requires reconciliation. A failed local sync no longer leaves an
   uncommitted upgrade in memory. This is private billing-state custody, not a live
   billing-provider integration, new entitlement source or payment proof.
+- Horizon weekly usage and request receipts now have explicit primary modes.
+  Cold reads restore allowance counts and accepted/blocked request metadata,
+  including governed render bindings, without creating local files. Conflicting
+  writes require a fresh read; uncertain receipt writes are reconciled by reading,
+  not replaying consumption. Hostile identity/status/quota bindings fail closed.
+  Restored render requests do not activate a provider or assert rendered output.
+  Monthly multi-unit consumption is now one allowance commit, not a loop that
+  can partially charge a request. Weekly allowance checks also reject integer
+  overflow. Usage consumption and request-receipt creation remain separate
+  commits: a receipt failure after consumption still needs recovery before
+  cutover. This is not an end-to-end atomic request/dispatch transaction.
 - Community profiles, principal mappings and groups now have an isolated primary
   implementation using the existing typed snapshot. Explicit synchronous scopes
   refresh at outer entry; nested account/group/identity-link/ledger/experience
@@ -140,8 +151,7 @@ CHUMMER_ORIGIN_PROVIDER_RESERVATION_TEABLE_TOKEN_FILE=<absolute private mounted 
 
 These preserve the existing case-insensitive billing-user and monthly-window
 semantics, not the separate opaque subject identity rules. Historical erasure is
-preflighted before auxiliary mutations. Other Horizon artifact ledgers remain
-local and must not be mistaken for migrated state.
+preflighted before auxiliary mutations.
 
 The membership input to those quotas has its own registration:
 
@@ -155,6 +165,21 @@ The existing provider sync secret and status configuration remain required at
 their original boundaries. Neither secret is copied into membership rows. No
 legacy billing file is imported automatically, and historical membership erasure
 is rejected before any auxiliary-account deletion begins.
+
+Horizon usage and request receipts have separate registrations:
+
+```text
+CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER=teable
+CHUMMER_HORIZON_ARTIFACT_USAGE_TEABLE_TABLE_ID=<dedicated private usage table>
+CHUMMER_HORIZON_ARTIFACT_USAGE_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+CHUMMER_HORIZON_REQUEST_RECEIPT_STORAGE_PROVIDER=teable
+CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TABLE_ID=<dedicated private receipt table>
+CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+```
+
+These are stored usage and request records, not provider outputs or publication
+authority. Historical deletion remains rejected before auxiliary erasure starts.
+The existing compose-only/provider-disabled boundaries are unchanged.
 
 API account/key custody uses distinct explicit registrations:
 
@@ -266,6 +291,15 @@ and incompatible policy, corrupt rows, failed-local-sync rollback, explicit DI
 and erasure preflight. API/test compilation has no compiler warnings/errors.
 This is simulated transport, not live customer migration or provider readback.
 
+Horizon follow-up: 23 existing governed-render/capability/domain-bridge tests
+passed. The focused primary-ledger, billing, reservation and erasure run passed
+110 tests, including cold receipt/usage restore, competing last slots and batch
+charges, lost acknowledgements, hostile rows, overflow rejection and deletion
+preflight. After the original process handle was lost, the terminal result was
+recovered with a bounded `--no-build --no-restore` test replay of the already
+compiled assembly; no unchanged build or full suite was repeated. Tests use
+synthetic simulated transport. No live data, provider, deployment or Play change.
+
 Runtime credential preparation: the existing EA API token returned HTTP 403 from
 the read-only `/api/access-token` metadata endpoint. It has not been deployed to
 Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
@@ -276,8 +310,9 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
    stores. Origin jobs, private first-party documents, linked runner snapshots,
-   MyFirstBook usage, Origin credit reservations and billing membership have
-   primary implementations. Publication-index/provider-output artifacts and other
+   MyFirstBook usage, Origin credit reservations, billing membership, Horizon
+   usage and request receipts have primary implementations. Close the separate
+   quota-consumption/request-receipt recovery gap. Publication-index/provider-output artifacts and other
    auxiliary stores still need custody review. The isolated Community slice is
    not a complete activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;

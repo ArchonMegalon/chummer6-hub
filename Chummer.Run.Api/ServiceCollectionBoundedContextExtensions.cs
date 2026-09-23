@@ -150,10 +150,32 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<BrilliantDirectoriesBillingService>();
         services.AddSingleton<HorizonCapabilityService>();
         services.AddSingleton<HorizonArtifactAccessTokenService>();
-        services.AddSingleton<HorizonArtifactUsageStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new HorizonArtifactUsageStore(configuration);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_HORIZON_ARTIFACT_USAGE_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary artifact usage table is required."),
+                configuration["CHUMMER_HORIZON_ARTIFACT_USAGE_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private artifact usage token is required."));
+            try { return new HorizonArtifactUsageStore(configuration, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<HorizonArtifactQuotaService>();
         services.AddSingleton<OriginAuthoringAllowanceProjectionService>();
-        services.AddSingleton<HorizonArtifactRequestReceiptStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_HORIZON_REQUEST_RECEIPT_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new HorizonArtifactRequestReceiptStore(configuration);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary artifact receipt table is required."),
+                configuration["CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private artifact receipt token is required."));
+            try { return new HorizonArtifactRequestReceiptStore(configuration, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<HorizonArtifactRequestService>();
         services.AddSingleton<SubscribrWebhookStore>();
         services.AddSingleton<SubscribrProviderWebhookService>();
