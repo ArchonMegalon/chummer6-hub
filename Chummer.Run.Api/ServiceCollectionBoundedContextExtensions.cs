@@ -180,7 +180,25 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SubscribrWebhookStore>();
         services.AddSingleton<SubscribrProviderWebhookService>();
         services.AddSingleton<RunsiteTourQuotaService>();
-        services.AddSingleton<OriginDossierPublicationService>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetRequiredService<ILogger<OriginDossierPublicationService>>();
+            var capabilities = provider.GetService<HorizonCapabilityService>();
+            var media = provider.GetService<MediaArtifactHorizonsService>();
+            if (configuration["CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new OriginDossierPublicationService(configuration, capabilities, media, logger);
+            var store = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_ORIGIN_PUBLICATION_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary publication table is required."),
+                configuration["CHUMMER_ORIGIN_PUBLICATION_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private publication token is required."));
+            try
+            {
+                return new OriginDossierPublicationService(configuration, capabilities, media, logger,
+                    new TeableOriginPublicationStorage(store, configuration["CHUMMER_ORIGIN_PUBLICATION_IMPORT_ROOT"], ownsStore: true));
+            }
+            catch { store.Dispose(); throw; }
+        });
         services.AddSingleton(provider =>
         {
             var configuration = provider.GetRequiredService<IConfiguration>();

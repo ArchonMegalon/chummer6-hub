@@ -1331,7 +1331,9 @@ public sealed class AccountsController : Controller
                 resolvedArtifactKind);
             return artifact is null
                 ? NotFound()
-                : PhysicalFile(artifact.Path, artifact.ContentType, enableRangeProcessing: true);
+                : artifact.Content is not null
+                    ? File(artifact.Content, artifact.ContentType, enableRangeProcessing: true)
+                    : PhysicalFile(artifact.Path, artifact.ContentType, enableRangeProcessing: true);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {

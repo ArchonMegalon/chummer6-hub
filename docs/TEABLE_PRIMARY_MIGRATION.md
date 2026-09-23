@@ -595,3 +595,56 @@ to repeat its creation phase over an existing synthetic Community snapshot.
 Append-only hashes are not protection from a privileged table administrator.
 This store is not a distributed read-lock/lease provider and does not authorize
 Rook or guarantee automatic failover or zero data loss.
+
+## Private publication and export custody — 2026-09-23
+
+`OriginDossierPublicationService` now has an explicit Teable primary mode for
+its private account publication index and the actual artifact bytes. This is not
+public Registry publication authority or a new provider-generation permission.
+The existing manuscript, consent, canon, cover, packaging and provider-receipt
+validators apply to the restored bytes unchanged. Drafts do not become approved
+books merely by moving to Teable.
+
+```text
+CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER=teable
+CHUMMER_ORIGIN_PUBLICATION_TEABLE_TABLE_ID=<dedicated private publication table>
+CHUMMER_ORIGIN_PUBLICATION_TEABLE_TOKEN_FILE=<private mounted runtime token>
+CHUMMER_ORIGIN_PUBLICATION_IMPORT_ROOT=<optional absolute private staging root>
+```
+
+Fresh synchronous scopes read the current primary index. Artifact references bind
+the exact owner/project and content digest. Immutable revision-1 blobs contain
+the owner binding and complete bytes; missing, replaced or corrupt blobs and
+remote outages fail without local fallback. API downloads copy bytes before
+scope cleanup and retain existing MIME/range behavior. Portrait, voice and scene
+selections persist through the same index compare-and-exchange. Foreign account
+requests still cannot download or change the owner's publication.
+
+Operator imports are opt-in, Linux x64 only, beneath
+`<import-root>/<owner-project-hash>/`. Directories and regular files must be
+private and owned; symlinks, unsafe permissions and paths outside that namespace
+reject. No legacy index is automatically imported. Artifact bytes are committed
+before the index, so a failed admission can leave private orphan blobs. Historical
+and orphan erasure is not implemented: account erasure rejects before auxiliary
+side effects rather than claiming those bytes were removed.
+
+Limits: 64 MiB per artifact, 128 MiB cached bytes per outer operation, and the
+shared bounded index (4 MiB, at most 2048 entries). Nested scopes retain borrowed
+bytes until the outer scope exits, then clear them. Content stream names hash
+the full owner/content identity to fit the transport's 128-character limit.
+
+Verification: 83 focused tests passed in keyless local Docker with networking
+disabled, including primary cold restore, foreign ownership, stale concurrent
+writes, uncertain commits, corrupt/missing/replaced bytes, nested scopes, private
+staging, current owner changes and early erasure rejection. A full existing
+publication fixture was imported, all its local files removed, and its validated
+book/cover downloads and changed selections restored through fresh services.
+This fixture is synthetic test data, not actual FirstBook/provider output.
+The run also includes existing publication and auxiliary-erasure regressions;
+the API/test build emitted no compiler warnings or errors.
+
+The first run exposed an overlong stream key; the follow-up fixed that and the
+nested cache lifetime. Three negative assertions initially used the wrong common
+exception base; they now check the actual exact failure types. No failed run is
+counted as passing. This is simulated-transport verification, not a live primary
+cutover, complete host reconstruction, package reseal or Play delivery.

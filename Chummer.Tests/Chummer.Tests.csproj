@@ -89,6 +89,8 @@
     <Compile Include="OriginChapterWorkerTests.cs" />
     <Compile Include="OriginChapterTeablePersistenceTests.cs" />
     <Compile Include="OriginDocumentTeablePersistenceTests.cs" />
+    <Compile Include="OriginDossierPublicationServiceTests.cs" />
+    <Compile Include="OriginPublicationTeablePersistenceTests.cs" />
     <Compile Include="AuthoringLedgerTeablePersistenceTests.cs" />
     <Compile Include="MembershipTeablePersistenceTests.cs" />
     <Compile Include="HorizonTeablePersistenceTests.cs" />

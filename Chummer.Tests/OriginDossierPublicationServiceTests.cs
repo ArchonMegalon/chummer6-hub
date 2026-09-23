@@ -19,6 +19,63 @@ public sealed class OriginDossierPublicationServiceTests
     private const string OriginPackagingAccountAlias = "INK01_ORIGIN_PACKAGING";
 
     [Fact]
+    public void Primary_publication_restores_validated_downloads_and_selections_after_all_staging_is_removed()
+    {
+        if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("Private staging requires Linux.");
+        using var remote = new TeableRevisionStoreTests.Remote();
+        string root = Path.Combine(Path.GetTempPath(), "origin-teable-" + Guid.NewGuid().ToString("N"));
+        var owner = new OriginDossierPublicationIndexEntry { OwnerUserId = "user-1", SubjectId = "subject-1", ProjectId = "origin-1" };
+        string ownerRoot = Path.Combine(root, TeableOriginPublicationStorage.Owner(owner));
+        try
+        {
+            var artifacts = CreateGoldArtifacts(ownerRoot, "origin-1");
+            foreach (string directory in Directory.GetDirectories(root, "*", SearchOption.AllDirectories).Prepend(root))
+                File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            foreach (string file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+                File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            byte[] bookBytes = File.ReadAllBytes(artifacts.BookArtifactPath);
+            byte[] coverBytes = File.ReadAllBytes(artifacts.StorySceneCoverPath);
+            var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            var request = JsonSerializer.Deserialize<OriginDossierPublicationImportRequest>(JsonSerializer.Serialize(
+                BuildIndexEntry("user-1", "subject-1", "origin-1", "Glass Rain", "Vanta", artifacts), json), json)!;
+            var user = new HubUserDto("user-1", "subject-1", "Runner", "runner", "private", "UTC", "AT", [], [],
+                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+            IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+                { ["CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER"] = "teable" }).Build();
+            using (var writer = new OriginDossierPublicationService(configuration, null, null,
+                NullLogger<OriginDossierPublicationService>.Instance, new(remote.Store(), root)))
+            {
+                var imported = writer.UpsertForAccount(user, "subject-1", request);
+                Assert.True(imported.GoldReady, string.Join(", ", imported.MissingGoldRequirements));
+            }
+            Directory.Delete(root, recursive: true);
+            using var cold = new OriginDossierPublicationService(configuration, null, null,
+                NullLogger<OriginDossierPublicationService>.Instance, new(remote.Store()));
+            var restored = Assert.Single(cold.ListForAccount("user-1", "subject-1"));
+            Assert.True(restored.GoldReady, string.Join(", ", restored.MissingGoldRequirements));
+            var book = cold.GetArtifactForAccount("user-1", "subject-1", "origin-1", "book");
+            Assert.NotNull(book);
+            Assert.Equal(bookBytes, book.Content);
+            Assert.Equal("application/pdf", book.ContentType);
+            Assert.Equal(coverBytes, cold.GetArtifactForAccount("user-1", "subject-1", "origin-1", "cover")!.Content);
+            Assert.Null(cold.GetArtifactForAccount("other-user", "other-subject", "origin-1", "book"));
+            Assert.Null(cold.SelectAudiobookVoiceForAccount("other-user", "other-subject", "origin-1", "voice-wire"));
+            Assert.NotNull(cold.SelectAudiobookVoiceForAccount("user-1", "subject-1", "origin-1", "voice-wire"));
+            Assert.NotNull(cold.SelectPortraitForAccount("user-1", "subject-1", "origin-1", "portrait-origin-1-clinic"));
+            Assert.NotNull(cold.SelectCinematicSceneForAccount("user-1", "subject-1", "origin-1", "scene-simrig-betrayal"));
+            using var final = new OriginDossierPublicationService(configuration, null, null,
+                NullLogger<OriginDossierPublicationService>.Instance, new(remote.Store()));
+            var selected = Assert.Single(final.ListForAccount("user-1", "subject-1"));
+            Assert.Equal("voice-wire", Assert.Single(selected.AudiobookVoiceOptions!, choice => choice.Selected).VoiceId);
+            Assert.Equal("portrait-origin-1-clinic", Assert.Single(selected.PortraitChoices!, choice => choice.Selected).PortraitId);
+            Assert.Equal("scene-simrig-betrayal", Assert.Single(selected.SceneHighlights!, choice => choice.Selected).SceneId);
+            Assert.Equal(bookBytes, book.Content); // Download is a copy, not a zeroed scope-cache buffer.
+            Assert.False(Directory.Exists(root));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
     public void ListForAccountReturnsOnlyOwnedGoldReadyOriginDossierPublication()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));

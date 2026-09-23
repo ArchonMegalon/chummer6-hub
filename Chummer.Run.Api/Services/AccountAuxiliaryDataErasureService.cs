@@ -74,6 +74,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
 
     public void EnsureAccountErasureSupported()
     {
+        _originDossiers.EnsureAccountErasureSupported();
         _originDocuments?.EnsureAccountErasureSupported();
         _originChapters?.EnsureAccountErasureSupported();
         _installSnapshots.EnsureAccountErasureSupported();

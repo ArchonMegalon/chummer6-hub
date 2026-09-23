@@ -16,6 +16,21 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
 {
     private static readonly DateTimeOffset Baseline = new(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
 
+    [Fact]
+    public void Primary_publication_history_blocks_erasure_before_auxiliary_mutations()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var publications = new OriginDossierPublicationService(configuration, null, null,
+            NullLogger<OriginDossierPublicationService>.Instance, new(remote.Store()));
+        using Fixture fixture = new(publications: publications);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -246,7 +261,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             BrilliantDirectoriesBillingStore? membership = null,
             HorizonArtifactUsageStore? horizonUsage = null,
             HorizonArtifactRequestReceiptStore? artifactReceipts = null,
-            OriginChapterAuthoringService? chapters = null)
+            OriginChapterAuthoringService? chapters = null,
+            OriginDossierPublicationService? publications = null)
         {
             Directory.CreateDirectory(_directory);
             var values = new Dictionary<string, string?>
@@ -283,7 +299,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             VideoFoundry = new GmSessionVideoFoundryStore(Configuration);
             PromptFoundry = new PromptFoundryStore(Configuration);
             KarmaForge = new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance);
-            OriginDossiers = new OriginDossierPublicationService(
+            OriginDossiers = publications ?? new OriginDossierPublicationService(
                 Configuration,
                 NullLogger<OriginDossierPublicationService>.Instance);
             OriginChapters = chapters ?? new OriginChapterAuthoringService(Configuration);
