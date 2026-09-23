@@ -151,6 +151,16 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
         using var deadline = new CancellationTokenSource(ReadinessDeadline);
         try
         {
+            if (_authority is TeableInstallLinkingSnapshotAuthority teable)
+            {
+                using var head = teable.ReadCurrentForReadinessAsync(deadline.Token)
+                    .GetAwaiter().GetResult();
+                deadline.Token.ThrowIfCancellationRequested();
+                return expected.Matches(head)
+                    ? new(true, Code("authority_bound"))
+                    : new(false, Code("authority_head_mismatch"));
+            }
+
             InstallLinkingPostgresReadiness readiness = CheckReadinessAsync(deadline.Token)
                 .GetAwaiter()
                 .GetResult();

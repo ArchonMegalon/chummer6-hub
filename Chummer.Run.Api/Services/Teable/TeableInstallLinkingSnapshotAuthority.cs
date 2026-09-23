@@ -25,9 +25,18 @@ internal sealed class TeableInstallLinkingSnapshotAuthority(TeableRevisionStore 
 
     public async Task<InstallLinkingPostgresReadiness> CheckReadinessAsync(CancellationToken cancellationToken = default)
     {
-        await store.VerifySchemaAsync(cancellationToken);
-        using var head = await ReadCurrentAsync(cancellationToken);
+        using var head = await ReadCurrentForReadinessAsync(cancellationToken);
         return new(true, "teable_snapshot_authority_ready", 1, 1, head.Generation, DateTimeOffset.UtcNow);
+    }
+
+    // Schema and the validated current envelope are one readiness observation.
+    // Return its envelope to the coordinator instead of downloading the same
+    // protected payload a second time merely to compare the bound head.
+    internal async Task<InstallLinkingAuthoritativeEnvelope> ReadCurrentForReadinessAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await store.VerifySchemaAsync(cancellationToken);
+        return await ReadCurrentAsync(cancellationToken);
     }
 
     public async Task<InstallLinkingEnvelopeCompareExchangeResult> CompareExchangeAsync(

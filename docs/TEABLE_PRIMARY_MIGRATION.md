@@ -65,6 +65,18 @@ an outage is recovered with the original operation identity and grant, not newly
 issued. The new optimized source still needs a live HTTP retest; no latency or
 deployment claim is inferred from the simulated transport test.
 
+The subsequent image's HTTP check failed earlier, with 503 at device approval:
+startup had retained an unavailable install-linking activation. The five-second
+readiness check downloaded the current protected envelope twice. A new regression
+confirmed five remote reads (schema, head/chunk, head/chunk). The Teable adapter
+now returns its schema-verified envelope to the coordinator for the exact bound-head
+comparison: three reads, no caching or skipped validation. The existing deadline,
+PostgreSQL readiness path, mutation CAS and fresh per-operation checks remain.
+114 focused transport/activation/signed-request tests and 31 existing coordinator/
+activation compatibility tests pass locally. Bootstrap now measures 32 GETs. The live
+device-link route still requires testing against this changed image; neither the
+previous health response nor these tests establish real narration or publication.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux

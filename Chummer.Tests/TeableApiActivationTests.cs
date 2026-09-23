@@ -60,6 +60,30 @@ public sealed class TeableApiActivationTests : IDisposable
         return services.BuildServiceProvider();
     }
 
+    [Fact]
+    public void Primary_readiness_checks_schema_and_one_current_envelope_without_duplicate_payload_reads()
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "readiness");
+        var activation = services.GetRequiredService<InstallLinkingStoreActivation>();
+        var store = activation.GetRequiredStore();
+        lock (store.Gate)
+        {
+            store.GrantsById["synthetic"] = new("synthetic", "install", InstallationGrantStates.Active,
+                "synthetic-only", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(1), "user", "subject");
+            store.PersistLocked();
+        }
+        int reads = accounts.GetRequests;
+        Assert.True(activation.Evaluate().Ready);
+        Assert.Equal(3, accounts.GetRequests - reads); // schema, head, one bounded chunk
+        accounts.Unique = false;
+        Assert.False(activation.Evaluate().Ready);
+        accounts.Unique = true;
+        accounts.FailReads = true;
+        Assert.False(activation.Evaluate().Ready);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
