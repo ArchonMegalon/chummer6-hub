@@ -90,6 +90,12 @@ preserved; none of its unreadable records were decrypted or silently imported.
   operations retain that snapshot. Conflicting or uncertain writes disable the
   instance. Unconverted legacy `Gate` callers and local-file consumers reject
   primary mode rather than using stale authorization or creating a local shadow.
+  Recognition/leaderboards and the operator user projection now read from explicit
+  current scopes. Public profile opt-out is observed on the next read. Community,
+  Passport, Signal Deck and Living World summary composition captures Community
+  counts together before touching installation/publication dependencies; it no
+  longer reads notification counts outside the Community scope. No scope crosses
+  an asynchronous projection call, and no external projection is enabled here.
   This slice is **not registered for production**: remaining Community consumers,
   campaign artifact persistence and historical erasure still need conversion.
 
@@ -321,6 +327,17 @@ this bounded execution; two new local cold-restore cases exercise the new read
 model. API and bounded test assembly compiled without warnings/errors. No live
 Teable data, public deployment, provider dispatch or Play operation was performed.
 
+Community projection follow-up: 58 focused tests passed for primary Community,
+existing Teable user projections, canonical account capture, group invites,
+ledger and user-experience behavior. New cases cover cold recognition readback,
+remote public-consent withdrawal, nested pending snapshots, fresh operator rows,
+Passport/Signal Deck notification counts and primary outages without cached
+results. The initial run passed 56/58: two new summary tests supplied a null
+legacy installation dependency. The fixture now uses the supported unready
+production activation/access path; no product fallback was weakened. API/test
+builds have no compiler warnings/errors. Live Teable, provider and production
+configuration remain unchanged; this is simulated remote verification.
+
 Runtime credential preparation: the existing EA API token returned HTTP 403 from
 the read-only `/api/access-token` metadata endpoint. It has not been deployed to
 Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
@@ -335,7 +352,9 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
    usage and request receipts have primary implementations with atomic new
    charge/receipt storage. Publication-index/provider-output artifacts and other
    auxiliary stores still need custody review. The isolated Community slice is
-   not a complete activation.
+   not a complete activation. In particular, faction onboarding retains a cached
+   mutable state reference, and sponsor sessions carry mutable state over external
+   awaits; neither may be converted by blindly replacing lock statements.
 2. Complete the runtime readiness/deployment readback for the new primary backend;
    do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary
    registration and key custody are implemented but not activated publicly.

@@ -1,8 +1,14 @@
 using System.Text.Json.Nodes;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Ledger;
 using Chummer.Storage.Teable;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using Remote = Chummer.Tests.TeableRevisionStoreTests.Remote;
@@ -12,6 +18,7 @@ namespace Chummer.Tests;
 public sealed class CommunityTeablePersistenceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "community-teable-" + Guid.NewGuid().ToString("N"));
+    private readonly List<IDisposable> _authorities = [];
     private IConfiguration Configuration(string provider = "teable") => new ConfigurationBuilder().AddInMemoryCollection(
         new Dictionary<string, string?>
         {
@@ -174,5 +181,158 @@ public sealed class CommunityTeablePersistenceTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => new CommunityStore(Configuration("wrong"), NullLogger<CommunityStore>.Instance));
     }
 
-    public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true); }
+    [Fact]
+    public void Recognition_projections_restore_and_observe_remote_public_consent_withdrawal()
+    {
+        using var remote = new Remote();
+        using var writer = Store(remote);
+        var accounts = new AccountService(writer);
+        var user = accounts.EnsureUser("principal", "Synthetic contributor");
+        using (writer.Enter())
+        {
+            writer.UsersById[user.UserId] = user with { Visibility = "public" };
+            writer.PersistLocked();
+        }
+        var experience = new UserExperienceService(writer, accounts);
+        experience.Upsert(new UpsertHubUserExperienceRequest(SubjectId: "principal", PublicContributionProfileOptIn: true));
+        new LedgerService(writer, new(writer), new(writer)).Ingest(new ContributionReceiptDto(
+            ReceiptId: "synthetic-receipt", EventKind: "slice_landed", LaneId: "lane", ProjectId: "project",
+            UserId: user.UserId, GroupId: null, SponsorSessionId: null, ParticipantCodexCode: "participant-a",
+            AuthClass: "operator", LaneType: "direct", Verified: true, ParticipantTotalTokens: 100));
+        using var reader = Store(remote);
+        var boards = new LeaderboardService(reader);
+        int writes = remote.HeadPosts;
+        Assert.Equal(user.UserId, Assert.Single(boards.IndividualLeaderboard(publicOnly: true)).UserId);
+        Assert.Equal(user.UserId, Assert.Single(boards.SponsorRankLeaderboard(publicOnly: true)).UserId);
+        Assert.Equal(user.UserId, Assert.Single(boards.CodexUsageLeaderboard(publicOnly: true)).UserId);
+        Assert.Empty(boards.GroupLeaderboard(publicOnly: true));
+        Assert.Equal(1, boards.UserRecognitionSummary(user.UserId).ContributionCount);
+        Assert.Equal(2, boards.Quests().Count);
+        Assert.Equal(writes, remote.HeadPosts);
+
+        experience.Upsert(new UpsertHubUserExperienceRequest(SubjectId: "principal", PublicContributionProfileOptIn: false));
+        Assert.Empty(boards.IndividualLeaderboard(publicOnly: true));
+        Assert.Empty(boards.SponsorRankLeaderboard(publicOnly: true));
+        Assert.Empty(boards.CodexUsageLeaderboard(publicOnly: true));
+        Assert.Equal(user.UserId, Assert.Single(boards.IndividualLeaderboard()).UserId);
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Fact]
+    public void Nested_recognition_read_retains_the_outer_pending_snapshot()
+    {
+        using var remote = new Remote();
+        using var store = Store(remote);
+        var user = new AccountService(store).EnsureUser("principal", "Original");
+        using (store.Enter())
+        {
+            store.UsersById[user.UserId] = user with { DisplayName = "Pending transaction" };
+            Assert.Equal("Pending transaction", Assert.Single(new LeaderboardService(store).IndividualLeaderboard()).DisplayName);
+            store.PersistLocked();
+        }
+        using var cold = Store(remote);
+        Assert.Equal("Pending transaction", Assert.Single(new LeaderboardService(cold).IndividualLeaderboard()).DisplayName);
+    }
+
+    private TeableUserProjectionService Projection(CommunityStore store, NoHttp factory)
+        => new(store, Configuration(), factory, NullLogger<TeableUserProjectionService>.Instance);
+
+    [Fact]
+    public void Operator_user_projection_reads_primary_changes_without_enabling_remote_projection()
+    {
+        using var remote = new Remote();
+        using var writer = Store(remote);
+        var user = new AccountService(writer).EnsureUser("principal", "Original");
+        using var reader = Store(remote);
+        var factory = new NoHttp();
+        var projection = Projection(reader, factory);
+        Assert.Equal(user.UserId, Assert.Single(projection.GetDashboard().Users).UserId);
+        using (writer.Enter())
+        {
+            writer.UsersById[user.UserId] = user with { DisplayName = "Fresh primary name" };
+            writer.PersistLocked();
+        }
+        Assert.Equal("Fresh primary name", Assert.Single(projection.GetDashboard().Users).DisplayName);
+        Assert.Equal(0, factory.Calls);
+        Assert.False(Directory.Exists(_root));
+    }
+
+    private CommunityCreatorHorizonsService Summaries(CommunityStore store)
+    {
+        // Exercise the supported unready-installation path, not a null legacy store.
+        var activation = new InstallLinkingStoreActivation(Configuration(), new EphemeralDataProtectionProvider(),
+            new UnconfiguredProductionHost(), NullLoggerFactory.Instance, []);
+        _authorities.Add(activation);
+        return new(store, new InstallLinkingStoreAccess(activation), null!); // No publication lookup in these summaries.
+    }
+
+    [Fact]
+    public void Passport_and_signal_summaries_restore_current_notification_counts_without_local_files()
+    {
+        using var remote = new Remote();
+        using var writer = Store(remote);
+        var user = new AccountService(writer).EnsureUser("principal");
+        using (writer.Enter())
+        {
+            var now = DateTimeOffset.UtcNow;
+            writer.ParticipationNotificationReceipts.Add(new("synthetic", "participation", "event", user.UserId,
+                "synthetic-hash", "redacted", "synthetic-hash", "Runner", "join", "/community", "email",
+                "recorded", true, now, now));
+            writer.PersistLocked();
+        }
+        using var reader = Store(remote);
+        var summaries = Summaries(reader);
+        Assert.Equal(1, summaries.BuildPassportSummary().ParticipationNotificationCount);
+        Assert.Equal(1, summaries.BuildSignalDeckSummary().ParticipationNotificationCount);
+        Assert.Empty(summaries.BuildCommunitySummary().OpenRuns);
+        using (writer.Enter())
+        {
+            writer.ParticipationNotificationReceipts.Clear();
+            writer.PersistLocked(); // Current-view update only, not historical erasure.
+        }
+        Assert.Equal(0, summaries.BuildPassportSummary().ParticipationNotificationCount);
+        Assert.Equal(0, summaries.BuildSignalDeckSummary().ParticipationNotificationCount);
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Theory]
+    [InlineData("recognition")]
+    [InlineData("operator")]
+    [InlineData("passport")]
+    public void Primary_projection_outage_never_returns_cached_account_data(string surface)
+    {
+        using var remote = new Remote();
+        using var store = Store(remote);
+        new AccountService(store).EnsureUser("principal");
+        Action observe = surface switch
+        {
+            "recognition" => () => new LeaderboardService(store).IndividualLeaderboard(),
+            "operator" => () => Projection(store, new NoHttp()).GetDashboard(),
+            _ => () => Summaries(store).BuildPassportSummary()
+        };
+        observe();
+        remote.FailReads = true;
+        Assert.Throws<HttpRequestException>(observe);
+        Assert.Throws<InvalidOperationException>(observe);
+    }
+
+    private sealed class NoHttp : IHttpClientFactory
+    {
+        internal int Calls { get; private set; }
+        public HttpClient CreateClient(string name) { Calls++; throw new InvalidOperationException("No external calls allowed."); }
+    }
+
+    private sealed class UnconfiguredProductionHost : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Production;
+        public string ApplicationName { get; set; } = "Synthetic.Community.Primary";
+        public string ContentRootPath { get; set; } = Path.GetTempPath();
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    public void Dispose()
+    {
+        foreach (var authority in _authorities) authority.Dispose();
+        if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
+    }
 }
