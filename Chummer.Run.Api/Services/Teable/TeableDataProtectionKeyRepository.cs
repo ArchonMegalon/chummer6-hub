@@ -5,6 +5,7 @@ using System.Xml;
 using System.Xml.Linq;
 using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.DataProtection.Repositories;
+using Chummer.Storage.Teable;
 
 namespace Chummer.Run.Api.Services.Teable;
 

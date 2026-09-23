@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 
+using Chummer.Storage.Teable;
+
 namespace Chummer.Run.Api.Services.InstallLinking.Postgres;
 
 public static class InstallLinkingPostgresSchema

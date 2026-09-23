@@ -3,25 +3,53 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text;
 
-namespace Chummer.Run.Api.Services.Teable;
+namespace Chummer.Storage.Teable;
 
 /// <summary>
 /// Remote, append-only primary bytes. A UNIQUE, NOT NULL revision_key admits
 /// exactly one successor. No check-then-PATCH and no local fallback. This is not
 /// a read-lock/lease provider; callers must not infer revocation fencing from it.
 /// </summary>
-internal sealed class TeableRevisionStore(HttpClient client, string tableId, string token)
+public sealed class TeableRevisionStore(HttpClient client, string tableId, string token) : IDisposable
 {
+    private bool _ownsClient;
     internal const int ChunkBytes = 32 * 1024;
     internal const int MaximumBytes = 64 * 1024 * 1024 + 64; // Includes a bounded store-specific header.
     private const int MaximumResponseBytes = 256 * 1024;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 12 };
     private string TablePath => ValidId(tableId, "tbl") ? $"api/table/{tableId}" : throw Invalid();
 
-    internal sealed record Head(long Revision, Guid Commit, string Sha256, byte[] Bytes);
+    public sealed record Head(long Revision, Guid Commit, string Sha256, byte[] Bytes);
     private sealed record Manifest(int Version, string Stream, long Revision, Guid Commit,
         string? PreviousSha256, int Length, string Sha256, int Chunks);
+
+    public static TeableRevisionStore Open(Uri origin, string tableId, string token)
+    {
+        if (origin is not { IsAbsoluteUri: true, Scheme: "https", AbsolutePath: "/", UserInfo: "", Query: "", Fragment: "" }
+            || !ValidId(tableId, "tbl") || string.IsNullOrWhiteSpace(token) || token.Length > 4096 || token.Any(char.IsControl))
+            throw Invalid();
+        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
+            { BaseAddress = origin, Timeout = TimeSpan.FromSeconds(15) };
+        return new(client, tableId, token) { _ownsClient = true };
+    }
+
+    public void Dispose() { if (_ownsClient) client.Dispose(); }
+
+    public static TeableRevisionStore OpenFromPrivateTokenFile(Uri origin, string tableId, string tokenFile)
+    {
+        if (!Path.IsPathFullyQualified(tokenFile)) throw Invalid();
+        LinuxSecureFile.ValidateExistingDirectory(Path.GetDirectoryName(tokenFile)!, ownerOnly: false, readOnlyFileSystem: false);
+        byte[] bytes = LinuxSecureFile.ReadOwnerOnlyRegularFile(tokenFile, 4098, repairOwnerMode: false);
+        try
+        {
+            string token = new UTF8Encoding(false, true).GetString(bytes).TrimEnd('\r', '\n');
+            if (token.Any(c => c < '!' || c > '~')) throw Invalid();
+            return Open(origin, tableId, token);
+        }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
+    }
 
     public async Task VerifySchemaAsync(CancellationToken ct = default)
     {
@@ -217,4 +245,4 @@ internal sealed class TeableRevisionStore(HttpClient client, string tableId, str
     private static InvalidDataException Invalid() => new("Teable primary storage contract is invalid.");
 }
 
-internal sealed class TeableRevisionConflictException() : IOException("The remote state changed; reload before a new command.");
+public sealed class TeableRevisionConflictException() : IOException("The remote state changed; reload before a new command.");

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services.Teable;
+using Chummer.Storage.Teable;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using System.Security.Cryptography;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -175,7 +176,7 @@ public sealed class TeableRevisionStoreTests
         Assert.DoesNotContain("synthetic-token", error.ToString());
     }
 
-    private sealed class Remote : HttpMessageHandler
+    internal sealed class Remote : HttpMessageHandler
     {
         public Dictionary<string, JsonObject> Rows { get; } = new();
         public bool Unique { get; set; } = true;
@@ -184,6 +185,9 @@ public sealed class TeableRevisionStoreTests
         public bool Oversized { get; set; }
         public bool ContentLength { get; set; }
         public bool Unauthorized { get; set; }
+        public bool FailReads { get; set; }
+        public bool CommitThenFailHard { get; set; }
+        public Action? BeforeHeadPost { get; set; }
         public int HeadPosts { get; private set; }
         private int _headReads;
         private readonly TaskCompletionSource _headBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -195,6 +199,7 @@ public sealed class TeableRevisionStoreTests
         {
             Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
             Assert.Equal("synthetic-token", request.Headers.Authorization.Parameter);
+            if (FailReads && request.Method == HttpMethod.Get) throw new HttpRequestException("synthetic outage");
             if (Unauthorized) return new(HttpStatusCode.Unauthorized) { Content = new StringContent("secret-provider-message") };
             if (Oversized)
             {
@@ -214,12 +219,18 @@ public sealed class TeableRevisionStoreTests
                 Assert.DoesNotContain("synthetic-token", body);
                 var fields = JsonNode.Parse(body)!["records"]![0]!["fields"]!.AsObject();
                 string key = fields["revision_key"]!.GetValue<string>();
+                if (fields["kind"]!.GetValue<string>() == "head" && BeforeHeadPost is { } before)
+                {
+                    BeforeHeadPost = null;
+                    before();
+                }
                 lock (Rows)
                 {
                     if (!Rows.TryAdd(key, (JsonObject)fields.DeepClone())) return new(HttpStatusCode.BadRequest);
                     if (fields["kind"]!.GetValue<string>() == "head")
                     {
                         HeadPosts++;
+                        if (CommitThenFailHard) { CommitThenFailHard = false; return new(HttpStatusCode.ServiceUnavailable); }
                         if (LoseCommitResponse) { LoseCommitResponse = false; throw new HttpRequestException("synthetic lost response"); }
                     }
                 }

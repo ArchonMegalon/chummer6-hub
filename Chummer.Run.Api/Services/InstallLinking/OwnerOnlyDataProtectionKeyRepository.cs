@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Chummer.Storage.Teable;
 using System.Xml;
 using System.Xml.Linq;
 using Microsoft.AspNetCore.DataProtection.Repositories;

@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
+using Chummer.Storage.Teable;
 
 namespace Chummer.Run.Api.Services.Teable;
 

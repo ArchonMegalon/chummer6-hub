@@ -88,6 +88,11 @@
     <Compile Include="OriginChapterWorkerTests.cs" />
     <Compile Include="DataProtectionKeyProtectionConfiguratorTests.cs" />
     <Compile Include="TeableRevisionStoreTests.cs" />
+    <Compile Include="IdentityTeablePersistenceTests.cs" />
+    <Compile Include="IdentitySubjectErasureTests.cs" />
+    <Compile Include="IdentityAdminRouteAuthorizationTests.cs" />
+    <Compile Include="IdentityEmailWebhookAuthorizationTests.cs" />
+    <ProjectReference Include="..\Chummer.Run.Identity\Chummer.Run.Identity.csproj" />
     <Compile Include="InstallLinkingBrowserCallbackTests.cs" />
     <Compile Include="InstallLinkingStoreSecurityTests.cs" />
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />

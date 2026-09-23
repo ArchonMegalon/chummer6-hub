@@ -1,6 +1,8 @@
 using Chummer.Infrastructure.Workspaces;
 using Microsoft.Extensions.Hosting;
 
+using Chummer.Storage.Teable;
+
 namespace Chummer.Run.Api.Services.InstallLinking;
 
 // A unit-test observation boundary, never resolved from DI or configuration.

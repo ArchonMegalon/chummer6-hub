@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Chummer.Control.Contracts\Chummer.Control.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
+    <ProjectReference Include="..\Chummer.Storage.Teable\Chummer.Storage.Teable.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

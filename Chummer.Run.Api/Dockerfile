@@ -45,6 +45,7 @@ COPY --from=run-services-source eng/NuGet.Container.Config /tmp/chummer-package-
 COPY --from=hub-package-feed /opt/chummer-package-feed /opt/chummer-package-feed
 COPY --from=hub-package-feed /opt/chummer-core-runtime-feed /opt/chummer-core-runtime-feed
 COPY --from=run-services-source Chummer.Run.Api/Chummer.Run.Api.csproj chummer.run-services/Chummer.Run.Api/
+COPY --from=run-services-source Chummer.Storage.Teable/Chummer.Storage.Teable.csproj chummer.run-services/Chummer.Storage.Teable/
 COPY --from=run-services-source Chummer.Run.Api/packages.lock.json chummer.run-services/Chummer.Run.Api/
 COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
 COPY --from=run-services-source Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj chummer.run-services/Chummer.Run.LoopbackProbe/
@@ -74,6 +75,7 @@ RUN dotnet restore chummer.run-services/Chummer.Run.LoopbackProbe/Chummer.Run.Lo
     -p:ChummerPackageFeed= \
     -p:RestoreAdditionalProjectSources=
 COPY --from=run-services-source Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/
+COPY --from=run-services-source Chummer.Storage.Teable/ chummer.run-services/Chummer.Storage.Teable/
 COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/ chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
 COPY --from=run-services-source Chummer.Run.LoopbackProbe/ chummer.run-services/Chummer.Run.LoopbackProbe/
 COPY --from=run-services-source Chummer.Campaign.Contracts/ chummer.run-services/Chummer.Campaign.Contracts/

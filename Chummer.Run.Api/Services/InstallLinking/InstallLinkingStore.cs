@@ -6,6 +6,8 @@ using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Microsoft.AspNetCore.DataProtection;
 
+using Chummer.Storage.Teable;
+
 namespace Chummer.Run.Api.Services.InstallLinking;
 
 public sealed record InstallLinkingPrincipalErasureResult(

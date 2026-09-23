@@ -9,6 +9,8 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Xunit;
 
+using Chummer.Storage.Teable;
+
 namespace Chummer.Tests;
 
 public sealed class RookPrivateRuntimeCompositionTests

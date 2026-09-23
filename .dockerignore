@@ -34,6 +34,8 @@ Chummer.Run.LoopbackProbe/obj/**
 !Chummer.Play.Contracts/**
 !Chummer.Run.Identity/
 !Chummer.Run.Identity/**
+!Chummer.Storage.Teable/
+!Chummer.Storage.Teable/**
 !Chummer.Run.Api/
 !Chummer.Run.Api/**
 !Chummer.Run.AI/

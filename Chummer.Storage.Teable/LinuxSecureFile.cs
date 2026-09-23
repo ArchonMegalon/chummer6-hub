@@ -1,7 +1,7 @@
 using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 
-namespace Chummer.Run.Api.Services.InstallLinking;
+namespace Chummer.Storage.Teable;
 
 internal static class LinuxSecureFile
 {

@@ -220,6 +220,7 @@
           "Chummer.Hub.Registry.Contracts": "[0.1.1-packageplane.20260910.1, )",
           "Chummer.Run.Contracts": "[0.1.1-packageplane.20260910.1, )",
           "Chummer.Run.Registry": "[0.1.1-packageplane.20260910.1, )",
+          "Chummer.Storage.Teable": "[1.0.0, )",
           "Chummer.World.Contracts": "[0.1.1-packageplane.20260910.1, )",
           "Npgsql": "[10.0.3, )",
           "YamlDotNet": "[16.3.0, )"
@@ -232,6 +233,9 @@
           "Chummer.Hub.Registry.Contracts": "[0.1.1-packageplane.20260910.1, )",
           "Chummer.Play.Contracts": "[0.1.1-packageplane.20260910.1, )"
         }
+      },
+      "chummer.storage.teable": {
+        "type": "Project"
       },
       "chummer.world.contracts": {
         "type": "Project"
@@ -456,6 +460,7 @@
           "Chummer.Hub.Registry.Contracts": "[0.1.1-packageplane.20260910.1, )",
           "Chummer.Run.Contracts": "[0.1.1-packageplane.20260910.1, )",
           "Chummer.Run.Registry": "[0.1.1-packageplane.20260910.1, )",
+          "Chummer.Storage.Teable": "[1.0.0, )",
           "Chummer.World.Contracts": "[0.1.1-packageplane.20260910.1, )",
           "Npgsql": "[10.0.3, )",
           "YamlDotNet": "[16.3.0, )"
@@ -468,6 +473,9 @@
           "Chummer.Hub.Registry.Contracts": "[0.1.1-packageplane.20260910.1, )",
           "Chummer.Play.Contracts": "[0.1.1-packageplane.20260910.1, )"
         }
+      },
+      "chummer.storage.teable": {
+        "type": "Project"
       },
       "chummer.world.contracts": {
         "type": "Project"

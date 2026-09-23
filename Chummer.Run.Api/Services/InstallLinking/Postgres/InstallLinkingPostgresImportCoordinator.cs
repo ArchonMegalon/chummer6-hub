@@ -6,6 +6,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Win32.SafeHandles;
 
+using Chummer.Storage.Teable;
+
 namespace Chummer.Run.Api.Services.InstallLinking.Postgres;
 
 internal enum InstallLinkingPostgresImportDisposition

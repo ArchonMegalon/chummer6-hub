@@ -131,6 +131,9 @@
           "Chummer.Play.Contracts": "[0.1.1-packageplane.20260910.1, )"
         }
       },
+      "chummer.storage.teable": {
+        "type": "Project"
+      },
       "chummer.world.contracts": {
         "type": "Project"
       }

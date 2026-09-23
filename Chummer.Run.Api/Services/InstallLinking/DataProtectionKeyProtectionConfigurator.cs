@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Chummer.Storage.Teable;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
