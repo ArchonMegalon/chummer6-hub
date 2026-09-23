@@ -406,6 +406,97 @@ public sealed class CommunityTeablePersistenceTests : IDisposable
         Assert.Throws<InvalidOperationException>(observe);
     }
 
+    [Theory]
+    [InlineData("false", "synthetic-unused-key", "disabled")]
+    [InlineData("true", "", "unconfigured")]
+    public async Task Inactive_important_work_sync_does_not_read_primary_state(string enabled, string key, string expected)
+    {
+        using var remote = new Remote();
+        using var store = Store(remote);
+        var factory = new NoHttp();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_TEABLE_IMPORTANT_WORK_ENABLED"] = enabled,
+            ["CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY"] = key
+        }).Build();
+        var service = new TeableImportantWorkService(store, config, factory, NullLogger<TeableImportantWorkService>.Instance);
+        remote.FailReads = true;
+
+        var result = await service.SyncAllAsync();
+
+        Assert.Equal(expected, result.State);
+        Assert.Equal(0, result.AttemptedCount);
+        Assert.Equal(0, factory.Calls);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
+    [Fact]
+    public void Important_work_records_restore_and_existing_readers_observe_current_primary_state()
+    {
+        using var remote = new Remote();
+        using var writer = Store(remote);
+        using var reader = Store(remote);
+        var factory = new NoHttp();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_TEABLE_IMPORTANT_WORK_ENABLED"] = "false"
+        }).Build();
+        TeableImportantWorkService Service(CommunityStore store) => new(store, config, factory, NullLogger<TeableImportantWorkService>.Instance);
+        var writeService = Service(writer);
+        var readService = Service(reader);
+        var request = new ImportantWorkItemRequest("workflow", "chummer.run", "Initial", "Synthetic only", "open", "normal", ItemId: "primary-work");
+        var initial = writeService.Record(request);
+        Assert.Equivalent(initial, Assert.Single(readService.GetDashboard().Items), strict: true);
+        var updated = writeService.Record(request with { Summary = "Updated" });
+        Assert.Equal(initial.CreatedAtUtc, updated.CreatedAtUtc);
+        Assert.Equivalent(updated, Assert.Single(readService.GetDashboard().Items), strict: true);
+        using var cold = Store(remote);
+        Assert.Equivalent(updated, Assert.Single(Service(cold).GetDashboard().Items), strict: true);
+        Assert.Equal(0, factory.Calls);
+        Assert.False(Directory.Exists(_root));
+
+        remote.FailReads = true;
+        Assert.Throws<HttpRequestException>(() => readService.GetDashboard());
+    }
+
+    [Fact]
+    public void Important_work_conflict_cannot_overwrite_a_concurrent_primary_winner()
+    {
+        using var remote = new Remote();
+        using var first = Store(remote);
+        using var second = Store(remote);
+        var config = new ConfigurationBuilder().Build();
+        TeableImportantWorkService Service(CommunityStore store) => new(store, config, new NoHttp(), NullLogger<TeableImportantWorkService>.Instance);
+        var request = new ImportantWorkItemRequest("workflow", "chummer.run", "Synthetic", "Only a test", "open", "normal", ItemId: "winner");
+        remote.BeforeHeadPost = () => Service(second).Record(request);
+        Assert.Throws<TeableRevisionConflictException>(() => Service(first).Record(request with { ItemId = "loser" }));
+        using var cold = Store(remote);
+        Assert.Equal("winner", Assert.Single(Service(cold).GetDashboard().Items).ItemId);
+        Assert.Throws<InvalidOperationException>(() => Service(first).GetDashboard());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("false")]
+    [InlineData("invalid")]
+    public async Task Disabled_news_worker_finishes_without_primary_reads_or_delivery(string? enabled)
+    {
+        using var remote = new Remote();
+        using var store = Store(remote);
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_BLACK_LEDGER_NEWS_EMAIL_ENABLED"] = enabled
+        }).Build();
+        // No notification collaborator may be used when its lane is disabled.
+        using var worker = new BlackLedgerTickNewsDispatchWorker(store, null!, config);
+        remote.FailReads = true;
+        await worker.StartAsync(CancellationToken.None);
+        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.True(worker.ExecuteTask.IsCompletedSuccessfully);
+        Assert.Equal(0, remote.HeadPosts);
+        Assert.False(Directory.Exists(_root));
+    }
+
     private sealed class NoHttp : IHttpClientFactory
     {
         internal int Calls { get; private set; }

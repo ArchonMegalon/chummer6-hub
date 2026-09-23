@@ -134,6 +134,7 @@
     <Compile Include="CodexParticipationGuardrailTests.cs" />
     <Compile Include="BlackLedgerFactionOnboardingTests.cs" />
     <Compile Include="TeableUserProjectionServiceTests.cs" />
+    <Compile Include="TeableImportantWorkServiceTests.cs" />
     <Compile Include="AccountCanonicalCaptureTests.cs" />
     <Compile Include="IdentityLinkServiceTests.cs" />
     <Compile Include="GroupInviteFlowTests.cs" />

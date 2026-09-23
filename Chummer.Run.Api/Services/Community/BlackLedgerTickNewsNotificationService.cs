@@ -1127,6 +1127,13 @@ public sealed class BlackLedgerTickNewsDispatchWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // A disabled delivery lane must not inspect recipients or materialize
+        // catch-up receipts as a side effect of merely starting the Hub.
+        if (!bool.TryParse(_configuration["CHUMMER_BLACK_LEDGER_NEWS_EMAIL_ENABLED"], out bool enabled) || !enabled)
+        {
+            return;
+        }
+
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(2));
         while (!stoppingToken.IsCancellationRequested)
         {

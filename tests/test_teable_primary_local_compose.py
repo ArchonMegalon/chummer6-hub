@@ -106,6 +106,17 @@ def test_account_book_modes_are_primary_and_legacy_authorities_are_not_inherited
     assert identity["CHUMMER_TEABLE_TABLE_ID"] != hub["CHUMMER_COMMUNITY_TEABLE_TABLE_ID"]
 
 
+def test_preparation_explicitly_disables_projection_reconciliation_and_news_delivery(config: dict) -> None:
+    hub = config["services"]["hub"]["environment"]
+    for key in (
+        "CHUMMER_TEABLE_IMPORTANT_WORK_ENABLED",
+        "CHUMMER_TEABLE_IMPORTANT_WORK_RECONCILE_ENABLED",
+        "CHUMMER_TEABLE_IMPORTANT_WORK_AUTOSYNC_ENABLED",
+        "CHUMMER_BLACK_LEDGER_NEWS_EMAIL_ENABLED",
+    ):
+        assert hub[key] == "false"
+
+
 @pytest.mark.parametrize("missing", [
     "CHUMMER_HUB_PRIMARY_API_IMAGE", "CHUMMER_HUB_PRIMARY_IDENTITY_IMAGE",
     "CHUMMER_HUB_PRIMARY_API_TOKEN_FILE", "CHUMMER_HUB_PRIMARY_IDENTITY_TOKEN_FILE",

@@ -5,6 +5,45 @@ fresh Hub account and Origin book/job state. This is not a backup/projection.
 Production has **not** been cut over. The original encrypted Docker volume is
 preserved; none of its unreadable records were decrypted or silently imported.
 
+### Live restricted-access follow-up (2026-09-23)
+
+The owner approved and two separate project-restricted runtime credentials were
+created (Identity/Hub, record read/create plus field read, expiry 2026-12-22).
+Existing broad operator credentials are unchanged and are not mounted in either
+service. Exact selected credential/configuration bytes and file references were
+backed up to the independent private EA recovery table and read back. Both new
+tokens reject access to that recovery table, updates, deletes and table inventory.
+Dedicated Identity/Hub revision tables passed schema, synthetic append/read and
+duplicate-key rejection checks. Grants are project-level, not per-table isolation.
+
+An isolated local Production-mode smoke reused the preparation images below.
+Identity became healthy; Hub health passed and deep readiness accepted remote
+Data Protection and install-linking authority. Whole-Hub readiness remained false:
+the preparation image lacks release/deployment authority and public canon assets.
+Startup also exposed unscoped legacy Community reads in the Black Ledger news
+worker and Important Work reconciler; the latter has a separate reconcile switch
+not disabled by the current Compose file. These are live integration findings,
+not reasons to relax readiness or claim a completed migration.
+
+The temporary containers/network were removed afterward, retaining all new
+private configuration, state roots and remote bytes. Existing services, original
+volumes and Cloudflare were untouched. No real account/book migration, authoring
+provider dispatch, signed build or Play upload occurred. Authenticated cold
+account/book restoration, current public assets and actual First Book narration
+remain open.
+
+### Startup correction (2026-09-23)
+
+The disabled Important Work reconciler now returns without reading Community
+state, and its explicit record/dashboard operations use current primary scopes.
+The news dispatch worker exits before reading recipients or seeding catch-up
+receipts when email delivery is disabled. The isolated Compose preparation now
+explicitly disables reconciliation, autosync and news email as well as projection.
+All 34 focused Community/Important Work tests and 14 Compose checks pass locally.
+Coverage includes cold reads, competing writes, outages and disabled-worker
+non-execution. This does not enable primary news delivery or establish deployment,
+provider generation, public readiness or Play publication.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux
