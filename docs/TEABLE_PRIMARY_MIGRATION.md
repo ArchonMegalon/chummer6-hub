@@ -828,3 +828,63 @@ The fixture now uses AccountService's actual canonical user ID. No runtime owner
 check was loosened. The corrected API/test build and all 39 account-route tests
 pass locally with network disabled. No production source, service or release
 artifact changed in this follow-up.
+
+## Local Docker preparation, not public cutover — 2026-09-23
+
+`docker-compose.teable-primary-local.yml` is a standalone two-service preparation
+using the existing Hub API and Identity application images, not an overlay for
+the PostgreSQL/certificate public-edge stack. Do not combine those Compose files.
+It has a separate project/network, no incumbent named volumes, no tunnel/EA/Fleet
+network, and publishes only Hub/worker loopback ports (defaults 15098/15099).
+Identity remains internal to that project. Both processes use Production policy,
+non-root identities, read-only image filesystems, dropped capabilities and bounded
+resources. Images are local-only (`pull_policy: never`); there are no build jobs.
+
+Prepare these inputs in an explicitly selected **non-secret path/table env file**:
+
+- `CHUMMER_HUB_PRIMARY_API_IMAGE` / `..._IDENTITY_IMAGE`: exact locally built image
+  IDs containing the reviewed migration source, not the old incumbent images.
+- `CHUMMER_HUB_PRIMARY_API_CONFIG_FILE` / `..._IDENTITY_CONFIG_FILE`: absolute
+  private Production JSON files mounted read-only at `appsettings.Production.json`.
+  Keep matching Identity admin credentials and the existing required account-erasure
+  receipt key here, not in Compose arguments or the non-secret env file. The private
+  chapter-worker credential belongs only in the Hub file. Do not copy a broad EA
+  environment or unrelated provider credentials into either file.
+- `CHUMMER_HUB_PRIMARY_API_TOKEN_FILE` / `..._IDENTITY_TOKEN_FILE`: absolute private
+  restricted Teable tokens; never EA's broad credential. Only these two selected
+  token files are mounted, not a credential directory.
+- `CHUMMER_HUB_PRIMARY_API_TABLE_ID` / `..._IDENTITY_TABLE_ID`: distinct private
+  tables with the revision schema and unique-key constraint described above. The
+  Hub table hosts namespaced account/book/keyring streams; it is not an EA secret
+  recovery table. Verify real credential/table scope before starting.
+- `CHUMMER_HUB_PRIMARY_API_STATE_DIRECTORY` / `..._IDENTITY_STATE_DIRECTORY`:
+  separate pre-provisioned private directories, never original recovery volumes.
+  Ownership must match the explicit UID/GID (defaults 1000:1000). Use directory
+  mode 0700 and private JSON/token file modes 0400 or 0600; reject symlinks.
+
+The long bind syntax refuses automatic creation of missing host paths. Rendering
+does not inspect secret contents or prove that permissions, image bytes or live
+credential scopes are correct. Check the real inputs before any start:
+
+```sh
+docker compose --env-file /absolute/private-paths.env -f docker-compose.teable-primary-local.yml config --quiet
+```
+
+Do not run this from an ambient EA `.env` or use `down --volumes` against the old
+project. No deployment command was executed as part of this change. Email starts
+and auxiliary projection workers remain disabled for preparation; no FirstBook
+worker/provider is launched. Starting this definition is not a public cutover,
+email-login activation, publication or complete host-recovery claim. The real
+authenticated account/book smoke and readiness readback still have to pass before
+the existing Cloudflare tunnel can be deliberately switched.
+
+Local state still includes install mirrors and auxiliary state outside the migrated
+primary slices (including Identity email-delivery history). Preserve it until the
+remaining custody/erasure work and complete cold-host recovery are proven; do not
+assume every mounted state byte is a disposable cache.
+
+13 focused tests render the actual Docker Compose model and check missing-input
+rejection, primary wiring, isolated networking, loopback publication, selected
+private mounts and absence of legacy PostgreSQL/certificate/broad-credential inputs.
+They use synthetic paths/IDs and never build, create or start a container. This
+does not replace the runtime checks or provision any production token.
