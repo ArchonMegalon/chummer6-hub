@@ -35,6 +35,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
     private readonly KarmaForgeStore _karmaForge;
     private readonly OriginDossierPublicationService _originDossiers;
     private readonly OriginChapterAuthoringService? _originChapters;
+    private readonly OriginDossierFirstPartyDocumentService? _originDocuments;
 
     public AccountAuxiliaryDataErasureService(
         BrilliantDirectoriesBillingStore brilliantDirectories,
@@ -50,7 +51,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         PromptFoundryStore promptFoundry,
         KarmaForgeStore karmaForge,
         OriginDossierPublicationService originDossiers,
-        OriginChapterAuthoringService? originChapters = null)
+        OriginChapterAuthoringService? originChapters = null,
+        OriginDossierFirstPartyDocumentService? originDocuments = null)
     {
         _brilliantDirectories = brilliantDirectories;
         _myFirstBookUsage = myFirstBookUsage;
@@ -66,6 +68,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         _karmaForge = karmaForge;
         _originDossiers = originDossiers;
         _originChapters = originChapters;
+        _originDocuments = originDocuments;
     }
 
     public AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId)
@@ -74,6 +77,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
             : subjectId.Trim();
         string? normalizedUser = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
+        _originDocuments?.EnsureAccountErasureSupported();
         var removed = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["brilliant_directories_projection"] = EraseSingleList(

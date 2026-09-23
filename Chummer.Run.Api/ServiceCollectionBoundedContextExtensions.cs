@@ -135,7 +135,18 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SubscribrProviderWebhookService>();
         services.AddSingleton<RunsiteTourQuotaService>();
         services.AddSingleton<OriginDossierPublicationService>();
-        services.AddSingleton<OriginDossierFirstPartyDocumentService>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_ORIGIN_DOCUMENT_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new OriginDossierFirstPartyDocumentService(configuration);
+            var store = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_ORIGIN_DOCUMENT_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Origin document primary table is required."),
+                configuration["CHUMMER_ORIGIN_DOCUMENT_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private document storage token is required."));
+            try { return new OriginDossierFirstPartyDocumentService(configuration, new TeableOriginDocumentStorage(store, ownsStore: true)); }
+            catch { store.Dispose(); throw; }
+        });
         services.AddSingleton(provider =>
         {
             var configuration = provider.GetRequiredService<IConfiguration>();

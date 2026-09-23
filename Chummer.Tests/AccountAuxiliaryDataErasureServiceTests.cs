@@ -17,6 +17,24 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
     private static readonly DateTimeOffset Baseline = new(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Primary_document_history_blocks_erasure_before_any_auxiliary_mutation()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_ORIGIN_DOCUMENT_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var documents = new OriginDossierFirstPartyDocumentService(configuration, new(remote.Store()));
+        var preview = documents.Preview("user-delete", "subject-delete", "book", new("Synthetic title", "Runner",
+            [new("school", "Approved synthetic choice", "player_note", "choice", true)], true));
+        using Fixture fixture = new(documents);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        int writes = remote.HeadPosts;
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Equal(writes, remote.HeadPosts);
+        Assert.NotNull(documents.GetForOwner("user-delete", "subject-delete", "book", preview.RevisionId));
+    }
+
+    [Fact]
     public void Workspace_erasure_preserves_differently_cased_opaque_account_ids()
     {
         using Fixture fixture = new();
@@ -133,7 +151,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             "chummer-auxiliary-erasure-tests",
             Guid.NewGuid().ToString("N"));
 
-        public Fixture()
+        public Fixture(OriginDossierFirstPartyDocumentService? documents = null)
         {
             Directory.CreateDirectory(_directory);
             var values = new Dictionary<string, string?>
@@ -188,7 +206,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
                 PromptFoundry,
                 KarmaForge,
                 OriginDossiers,
-                OriginChapters);
+                OriginChapters,
+                documents);
         }
 
         public IConfiguration Configuration { get; }

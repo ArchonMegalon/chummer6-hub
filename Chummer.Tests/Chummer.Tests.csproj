@@ -87,6 +87,8 @@
     <Compile Include="OriginChapterAuthoringServiceTests.cs" />
     <Compile Include="OriginChapterWorkerTests.cs" />
     <Compile Include="OriginChapterTeablePersistenceTests.cs" />
+    <Compile Include="OriginDocumentTeablePersistenceTests.cs" />
+    <Compile Include="OriginDossierFirstPartyDocumentServiceTests.cs" />
     <Compile Include="DataProtectionKeyProtectionConfiguratorTests.cs" />
     <Compile Include="TeableRevisionStoreTests.cs" />
     <Compile Include="TeableApiActivationTests.cs" />

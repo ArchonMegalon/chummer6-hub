@@ -31,6 +31,14 @@ preserved; none of its unreadable records were decrypted or silently imported.
   job creation; an interrupted reservation is inert. Competing admissions cannot
   both grant generation permission, and an ambiguous acknowledgement leaves the
   existing dispatch for reconciliation, never automatic paid resubmission.
+- Private first-party documents now also have a primary mode. The actual
+  metadata, Markdown, JSON, preview receipt and export receipt live remotely;
+  reading/downloading them creates no local artifact directory. The same
+  owner/input/content validator is used for both backends. An opaque bounded
+  catalogue reserves capacity before document creation. Only the one-time export
+  receipt can be added to an immutable document revision. Conflicts require a new
+  read; lost commit acknowledgements can be reconciled without another write.
+  These are existing first-party drafts, **not generated First Book narration**.
 - Community profiles, principal mappings and groups now have an isolated primary
   implementation using the existing typed snapshot. Explicit synchronous scopes
   refresh at outer entry; nested account/group/identity-link/ledger/experience
@@ -61,6 +69,20 @@ CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER=teable
 CHUMMER_ORIGIN_TEABLE_TABLE_ID=<dedicated chapter table>
 CHUMMER_ORIGIN_TEABLE_TOKEN_FILE=<absolute private mounted token file>
 ```
+
+Private first-party documents have their own explicit registration:
+
+```text
+CHUMMER_ORIGIN_DOCUMENT_STORAGE_PROVIDER=teable
+CHUMMER_ORIGIN_DOCUMENT_TEABLE_TABLE_ID=<dedicated private document table>
+CHUMMER_ORIGIN_DOCUMENT_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+```
+
+This does not import or read a legacy local document directory. Existing owner
+and global capacity settings also apply to inert remote reservations. Document
+deletion remains rejected until historical/orphan erasure is safe. The account
+auxiliary-erasure entry point checks this limitation before its first mutation,
+rather than deleting other stores and claiming the document history is gone.
 
 API account/key custody uses distinct explicit registrations:
 
@@ -127,6 +149,19 @@ the compiled local assembly (`--no-build`); no hosted or live-deployment result
 is implied. The actual production registrations were exercised with simulated
 Teable transport. PostgreSQL remains the default and retains its status codes.
 
+Document follow-up: 44 focused local Docker tests passed, including the existing
+first-party document/controller and auxiliary-account-erasure regressions. New
+cases cover cold byte-identical document/export restore without local files,
+owner/subject/project isolation, capacity admission races, inert reservations,
+lost export acknowledgement, competing exports, primary outage without local
+fallback, hostile artifacts/catalogues and erasure preflight. The initial run
+passed 42 and found one invalid-metadata exception-classification defect: a missing
+owner digest reached an argument-null exception. It is now rejected as invalid
+stored data before comparison. The successful follow-up includes an added test
+proving erasure stops before unrelated auxiliary records are removed. API and test
+assembly compiled without warnings/errors. These are simulated-transport tests,
+not a live Teable or whole-host restore and not provider execution.
+
 Runtime credential preparation: the existing EA API token returned HTTP 403 from
 the read-only `/api/access-token` metadata endpoint. It has not been deployed to
 Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
@@ -136,8 +171,9 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
-   stores. Origin jobs and the isolated Community account slice are implemented,
-   but full-book export artifacts/other stores are not proven host-independent.
+   stores. Origin jobs and first-party document bytes have primary implementations;
+   publication-index/provider-output artifacts and other auxiliary stores still
+   need custody review. The isolated Community slice is not a complete activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;
    do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary
    registration and key custody are implemented but not activated publicly.
