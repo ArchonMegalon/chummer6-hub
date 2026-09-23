@@ -930,3 +930,36 @@ disabled-provider preview rejection and webhook ordering. Transport is simulated
 inside a network-disabled Docker container. No real email, Teable mutation,
 credential provisioning, browser action, service deployment, signing or Play upload
 occurred. Full Hub cold startup and actual FirstBook narration remain open.
+
+## Local runnable image preparation — 2026-09-23
+
+Source `224e0fd99bb326eb838194c0367bed1f427e8751` has now been published locally
+for both API and Identity. Both affected publish commands completed successfully
+using SDK 10.0.111, cached dependencies and network-disabled Docker. This is the
+same diagnostic package graph used by the focused tests, including the explicit
+Core contracts/GM version `0.0.0-packageplane.candidate.shd1c6e3d22360c`; it is
+not a new canonical package-plane seal or a claim about hosted CI.
+
+Two local preparation images contain only the selected publish outputs, excluding
+appsettings, environment files, key files and state. They use the runtime base
+already pinned by the API recipe, include curl for the existing Identity health
+probe, run as UID/GID 1000:1000 and are not uploaded to a registry:
+
+- Identity: `sha256:c3ba01082a18a487e1365c7fdd4bc6d8586e7580d43f2444291a35f440e37838`
+- Hub API: `sha256:dfbcd45375d0b5a51871a596035d96f9bafca84a7fe9f4b0d9d81526c3216269`
+
+Selected image inspections confirm exact source labels, published DLL/dependency
+hashes, omitted config/state and .NET runtime 10.0.10. The private local build packet
+retains the Docker recipe and input/output hashes. An initial Hub image attempt
+failed because network-none changed the apt layer cache key; the subsequent build
+reused the completed runtime layer with the original build network mode. No failed
+attempt is described as successful or as runtime qualification.
+
+Negative entrypoint checks used no network, no host port, read-only containers,
+synthetic table IDs and an absent token path. Identity returned an unhealthy HTTP
+500. Hub refused startup at primary credential-directory validation. These checks
+do not establish successful configured startup, real account admission, remote
+read/write scope or whole-host reconstruction. All temporary containers ended;
+incumbent services, volumes, Cloudflare, mail and Play were untouched. Restricted
+runtime tokens and private production configuration remain required before the
+positive authenticated cold-start/book route can run.
