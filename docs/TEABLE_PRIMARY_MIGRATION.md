@@ -711,3 +711,39 @@ clock rollback, competing invite/exchange consumers, uncertain commits, no-repla
 outage rejection and legacy local rollback/endpoint behavior. Networking was
 disabled; transport and account data were synthetic. No live account migration,
 credential issuance, production service, provider activation or Play upload ran.
+
+## Account participation receipts and dispatch fencing — 2026-09-23
+
+Account sections call ParticipationOperatorNotificationService to read activity
+receipts. That path now reads fresh Community primary state rather than the old
+local gate; cold services restore the same private receipt metadata without
+creating local files. Dispatch admission verifies current account ownership and
+persists its existing pending receipt before making the EA request. Competing
+instances must win that revision commit before sending. No synchronous Community
+scope spans the HTTP wait.
+
+Primary pending/unknown/legacy failed-delivery receipts do not automatically
+retry. Suppressed receipts may still proceed after missing configuration is fixed,
+because suppression never dispatched. A provider failure produces
+`delivery_unknown`, not an assertion that nothing was sent. Provider error bodies
+are not copied into primary account receipts or logs. Unknown attempts continue
+to count toward the existing per-user cap.
+
+Finalization re-reads the current receipt and account and compares detached
+fingerprints. Removed/rebound/changed state rejects instead of being recreated
+or overwritten. Persistence is outside the provider-error catch: an uncertain
+final write cannot cause a second failure-state write or another send. A crash
+after admission may leave a pending receipt requiring manual reconciliation;
+this is at-most-one automatic dispatch admission, not exactly-once delivery or
+proof of an operator receiving a message. Existing local retry policy remains.
+
+13 new regressions failed before the change. The first patched run passed 43/45;
+two tests expected HttpRequestException where the transport deliberately reports
+an uncertain write as IOException. Those exact assertions were corrected.
+The final keyless, network-isolated Docker run passed 112/112 focused primary,
+legacy notification, Community, billing and canonical-account tests, with clean
+API/test compilation. It includes duplicate/concurrent admission, claim/final
+commit uncertainty, cold restore, outage and delayed ownership/removal cases.
+Only synthetic HTTP transport was used. No EA service was started, no real
+notification was sent, and no runtime configuration, browser session or Play
+artifact changed. Full Hub migration and remaining optional consumers stay open.

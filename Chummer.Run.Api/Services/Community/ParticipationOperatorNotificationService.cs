@@ -182,7 +182,7 @@ public sealed class ParticipationOperatorNotificationService
     public IReadOnlyList<ParticipationOperatorNotificationReceipt> ListReceiptsForUser(string userId, int take = 12)
     {
         string normalizedUserId = AccountService.NormalizeRequired(userId, nameof(userId));
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.ParticipationNotificationReceipts
                 .Where(receipt => string.Equals(receipt.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase))
@@ -228,6 +228,7 @@ public sealed class ParticipationOperatorNotificationService
         string authProviderFamily,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         string normalizedAuthProvider = NormalizeAuthProviderFamily(authProviderFamily);
         string normalizedEntryRoute = NormalizeEntryRoute(entryRoute);
         string normalizedIntentKind = AccountService.NormalizeRequired(intentKind, nameof(intentKind)).Trim().ToLowerInvariant();
@@ -237,14 +238,30 @@ public sealed class ParticipationOperatorNotificationService
         string recipient = ResolveOperatorRecipient(notifyChannel);
         (string Status, string Summary, string FailureReason)? suppressedOutcome = ResolveSuppressedOutcome(notifyChannel, recipient);
         ParticipationOperatorNotificationReceipt pendingReceipt;
+        string? accountFingerprint = null;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            if (_store.IsPrimary)
+            {
+                if (!_store.UsersById.TryGetValue(user.UserId, out var current)
+                    || !string.Equals(current.SubjectId, user.SubjectId, StringComparison.Ordinal)
+                    || !_store.UserIdBySubjectId.TryGetValue(user.SubjectId, out string? currentUserId)
+                    || !string.Equals(currentUserId, user.UserId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Participation notification account authority changed.");
+                user = current;
+                normalizedEmail = AccountService.NormalizeOptional(current.Email) ?? string.Empty;
+                accountFingerprint = Fingerprint(current);
+            }
+
             ParticipationOperatorNotificationReceipt? existing = _store.ParticipationNotificationReceipts
                 .FirstOrDefault(receipt => string.Equals(receipt.EventKey, eventKey, StringComparison.OrdinalIgnoreCase));
             if (existing is not null)
             {
-                if (!CanRetryExistingReceipt(existing))
+                if (_store.IsPrimary && !string.Equals(existing.SubjectHash, HashPrivate("subject", user.SubjectId), StringComparison.Ordinal))
+                    throw new InvalidOperationException("Participation notification receipt belongs to a different account binding.");
+                if (!CanRetryExistingReceipt(existing)
+                    || (_store.IsPrimary && existing.Status == "failed_delivery"))
                 {
                     return existing;
                 }
@@ -379,21 +396,41 @@ public sealed class ParticipationOperatorNotificationService
         }
 
 DispatchPendingReceipt:
+        // The pending receipt is the durable admission fence. No store scope or
+        // mutable account object crosses the HTTP wait, and no uncertain attempt
+        // is automatically resent after primary restore.
+        string status = "sent";
+        string? deliveryRef = null;
+        string summary = "The participant event was queued to the internal EA delivery bridge.";
+        string? failureReason = null;
         try
         {
-            string deliveryRef = await SendToEaAsync(pendingReceipt, recipient, notifyChannel, cancellationToken);
-            return FinalizeReceipt(pendingReceipt, "sent", deliveryRef, "The participant event was queued to the internal EA delivery bridge.", null);
+            deliveryRef = await SendToEaAsync(pendingReceipt, recipient, notifyChannel, cancellationToken);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException or JsonException)
         {
-            _logger.LogWarning(ex, "Participant operator notification dispatch failed for receipt {ReceiptId}.", pendingReceipt.ReceiptId);
-            return FinalizeReceipt(
-                pendingReceipt,
-                "failed_delivery",
-                null,
-                "The participant event stayed in the first-party receipt ledger because the EA bridge call failed.",
-                Truncate(ex.Message, 400));
+            if (_store.IsPrimary)
+            {
+                // A timeout or provider error does not prove the send never happened.
+                // Neither provider response bodies nor credentials belong in receipts/logs.
+                _logger.LogWarning("Participant notification outcome is unknown for receipt {ReceiptId} ({FailureType}).",
+                    pendingReceipt.ReceiptId, ex.GetType().Name);
+                status = "delivery_unknown";
+                summary = "The notification delivery outcome requires reconciliation; it will not be resent automatically.";
+                failureReason = "ea_delivery_outcome_unknown";
+            }
+            else
+            {
+                _logger.LogWarning(ex, "Participant operator notification dispatch failed for receipt {ReceiptId}.", pendingReceipt.ReceiptId);
+                status = "failed_delivery";
+                summary = "The participant event stayed in the first-party receipt ledger because the EA bridge call failed.";
+                failureReason = Truncate(ex.Message, 400);
+            }
         }
+
+        // Do not catch a final-state write failure as a provider failure and
+        // perform a second write: the successful send/commit may already exist.
+        return FinalizeReceipt(pendingReceipt, status, deliveryRef, summary, failureReason, accountFingerprint);
     }
 
     private ParticipationOperatorNotificationReceipt FinalizeReceipt(
@@ -401,7 +438,8 @@ DispatchPendingReceipt:
         string status,
         string? deliveryRef,
         string summary,
-        string? failureReason)
+        string? failureReason,
+        string? accountFingerprint)
     {
         ParticipationOperatorNotificationReceipt finalized = receipt with
         {
@@ -418,9 +456,17 @@ DispatchPendingReceipt:
                 reviewState: status),
         };
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             int index = _store.ParticipationNotificationReceipts.FindIndex(item => string.Equals(item.ReceiptId, receipt.ReceiptId, StringComparison.OrdinalIgnoreCase));
+            if (_store.IsPrimary
+                && (index < 0
+                    || Fingerprint(_store.ParticipationNotificationReceipts[index]) != Fingerprint(receipt)
+                    || !_store.UsersById.TryGetValue(receipt.UserId, out var currentUser)
+                    || accountFingerprint is null || Fingerprint(currentUser) != accountFingerprint))
+            {
+                throw new InvalidOperationException("Participation notification authority changed while awaiting delivery.");
+            }
             if (index >= 0)
             {
                 _store.ParticipationNotificationReceipts[index] = finalized;
@@ -429,6 +475,13 @@ DispatchPendingReceipt:
         }
 
         return finalized;
+    }
+
+    private static string Fingerprint<T>(T value)
+    {
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value);
+        try { return Convert.ToHexString(SHA256.HashData(bytes)); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
     }
 
     private (string Status, string Summary, string FailureReason)? ResolveSuppressedOutcome(string notifyChannel, string recipient)
@@ -647,7 +700,8 @@ DispatchPendingReceipt:
         => _store.ParticipationNotificationReceipts.Count(receipt =>
             string.Equals(receipt.UserId, userId, StringComparison.OrdinalIgnoreCase)
             && receipt.OccurredAtUtc >= now.AddHours(-24)
-            && receipt.Status is "pending" or "sent" or "suppressed_recipient_missing" or "suppressed_adapter_unconfigured" or "suppressed_disabled") >= 6;
+            && (receipt.Status is "pending" or "sent" or "suppressed_recipient_missing" or "suppressed_adapter_unconfigured" or "suppressed_disabled"
+                || (_store.IsPrimary && receipt.Status is "delivery_unknown" or "failed_delivery"))) >= 6;
 
     private static string BuildRateLimitBucket(string userId, DateTimeOffset now)
         => $"{userId}:{now:yyyyMMdd}";
