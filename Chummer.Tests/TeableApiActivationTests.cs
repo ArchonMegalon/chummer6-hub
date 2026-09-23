@@ -164,7 +164,7 @@ public sealed class TeableApiActivationTests : IDisposable
             Assert.NotNull(service.ResolveAndroidLinkedV2Principal(principal));
             int totalAdmissionReads = accounts.GetRequests - admissionReads;
             Console.WriteLine($"Signed request primary GETs: {totalAdmissionReads}");
-            Assert.InRange(totalAdmissionReads, 1, 45);
+            Assert.InRange(totalAdmissionReads, 1, 25);
             reads += totalAdmissionReads;
         }
         // Retain fresh operation admission, nonce persistence, grant CAS and
@@ -209,6 +209,44 @@ public sealed class TeableApiActivationTests : IDisposable
             var restored = afterRevoke.GetRequiredService<InstallLinkingStoreActivation>().GetRequiredStore();
             Assert.Equal(InstallationGrantStates.Revoked, Assert.Single(restored.GrantsById.Values).Status);
             Assert.Null(coldService.ResolveAndroidLinkedV2Grant("android-probe", grantId, recovered.Exchange.Grant.AccessToken));
+        }
+    }
+
+    [Theory]
+    [InlineData("activation")]
+    [InlineData("fixed-access")]
+    [InlineData("direct")]
+    public void Signed_admission_never_skips_an_independent_readiness_probe(string access)
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "independent-probe");
+        var activation = services.GetRequiredService<InstallLinkingStoreActivation>();
+        var store = activation.GetRequiredStore();
+        var probe = new UnavailableProbe();
+        var configuration = Configuration("independent-probe");
+        var service = access switch
+        {
+            "activation" => new InstallLinkingService(new InstallLinkingStoreAccess(activation), configuration, probe),
+            "fixed-access" => new InstallLinkingService(new InstallLinkingStoreAccess(store), configuration, probe),
+            _ => new InstallLinkingService(store, configuration, probe)
+        };
+        int writes = accounts.HeadPosts;
+        Assert.Null(service.ResolveAndroidLinkedV2Grant("install", "grant", "token"));
+        var error = Assert.Throws<InstallLinkingOperationException>(() => service.TryUseAndroidLinkedV2Proof(
+            "grant", new string('p', 43), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(1)));
+        Assert.Equal(503, error.StatusCode);
+        Assert.Equal(2, probe.Calls);
+        Assert.Equal(writes, accounts.HeadPosts);
+    }
+
+    private sealed class UnavailableProbe : IInstallLinkingStoreReadinessProbe
+    {
+        public int Calls { get; private set; }
+        public InstallLinkingStoreReadiness Evaluate()
+        {
+            Calls++;
+            return new(false, "synthetic-independent-probe");
         }
     }
 

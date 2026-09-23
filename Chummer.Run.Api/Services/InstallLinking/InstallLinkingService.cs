@@ -35,6 +35,7 @@ public sealed partial class InstallLinkingService
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
     private static readonly TimeSpan RemoteProofClockSkew = TimeSpan.FromMinutes(5);
     private readonly Func<InstallLinkingStore> _storeAccessor;
+    private readonly bool _storeAccessorChecksReadiness;
     private InstallLinkingStore _store => _storeAccessor();
     private readonly TimeSpan _claimTicketLifetime;
     private readonly TimeSpan _browserCallbackLifetime;
@@ -78,6 +79,7 @@ public sealed partial class InstallLinkingService
             configuration,
             readinessProbe)
     {
+        _storeAccessorChecksReadiness = storeAccess.EnforcesReadiness(readinessProbe);
     }
 
     private InstallLinkingService(
@@ -545,7 +547,7 @@ public sealed partial class InstallLinkingService
         string? grantId,
         string? accessToken)
     {
-        if (!IsDurableStoreReady())
+        if (!TryGetDurableStore(out InstallLinkingStore store))
         {
             return null;
         }
@@ -577,7 +579,6 @@ public sealed partial class InstallLinkingService
             return null;
         }
 
-        InstallLinkingStore store = _store;
         lock (store.Gate)
         {
             var operation = new InstallLinkingService(this, store);
@@ -608,12 +609,11 @@ public sealed partial class InstallLinkingService
         AndroidLinkedV2GrantPrincipal principal)
     {
         ArgumentNullException.ThrowIfNull(principal);
-        if (!IsDurableStoreReady())
+        if (!TryGetDurableStore(out InstallLinkingStore store))
         {
             return null;
         }
 
-        InstallLinkingStore store = _store;
         lock (store.Gate)
         {
             var operation = new InstallLinkingService(this, store);
@@ -640,7 +640,12 @@ public sealed partial class InstallLinkingService
         DateTimeOffset now,
         DateTimeOffset expiresAtUtc)
     {
-        EnsureDurableStoreReady();
+        if (!TryGetDurableStore(out InstallLinkingStore store))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status503ServiceUnavailable,
+                "Install-linking is temporarily unavailable.");
+        }
         string normalizedGrantId = NormalizeRequired(grantId, nameof(grantId), MaxGrantIdLength);
         string normalizedPacketKey = NormalizeRequired(packetKey, nameof(packetKey), 64);
         if (!AndroidLinkedV2RequestProof.IsValidPacketKey(normalizedPacketKey)
@@ -649,7 +654,6 @@ public sealed partial class InstallLinkingService
             return false;
         }
 
-        InstallLinkingStore store = _store;
         lock (store.Gate)
         {
             var operation = new InstallLinkingService(this, store);
@@ -2527,6 +2531,32 @@ public sealed partial class InstallLinkingService
 
     private static InstallLinkingOperationException IssuanceLimitReached()
         => new(StatusCodes.Status429TooManyRequests, "install-link issuance limit reached.");
+
+    private bool TryGetDurableStore(out InstallLinkingStore store)
+    {
+        store = null!;
+        try
+        {
+            // Production access already performs this exact activation probe.
+            // Capture that admitted store once, instead of probing it and then
+            // probing again for IsHealthy and the subsequent gate lookup.
+            // Fixed stores and independent probes still require explicit admission.
+            if (!_storeAccessorChecksReadiness && _readinessProbe is not null
+                && !_readinessProbe.Evaluate().Ready)
+            {
+                return false;
+            }
+
+            InstallLinkingStore current = _store;
+            if (!current.IsHealthy) return false;
+            store = current;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     private bool IsDurableStoreReady()
     {
