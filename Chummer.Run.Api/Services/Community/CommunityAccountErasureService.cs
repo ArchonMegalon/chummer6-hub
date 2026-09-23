@@ -27,10 +27,13 @@ public sealed class CommunityAccountErasureService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    public void EnsureAccountErasureSupported() => _store.EnsureAccountErasureSupported();
+
     public CommunityAccountErasureResult Erase(string subjectId, string? knownUserId = null)
     {
         string normalizedSubject = AccountService.NormalizeRequired(subjectId, nameof(subjectId));
         string? normalizedKnownUserId = AccountService.NormalizeOptional(knownUserId);
+        EnsureAccountErasureSupported();
 
         using (_store.Enter())
         {

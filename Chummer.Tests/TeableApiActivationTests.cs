@@ -93,6 +93,43 @@ public sealed class TeableApiActivationTests : IDisposable
     }
 
     [Fact]
+    public void Primary_install_erasure_cannot_claim_success_while_private_history_remains()
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "erasure");
+        var store = services.GetRequiredService<InstallLinkingStoreActivation>().GetRequiredStore();
+        lock (store.Gate)
+        {
+            store.GrantsById["grant"] = new InstallationGrantDto("grant", "install", InstallationGrantStates.Active,
+                "synthetic-private-token", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1), "user", "subject");
+            store.PersistLocked();
+        }
+        int writes = accounts.HeadPosts;
+        byte[] mirror = File.ReadAllBytes(store.StoragePath);
+
+        Assert.Throws<InvalidOperationException>(() => store.ErasePrincipal("user", "subject"));
+
+        Assert.Equal(writes, accounts.HeadPosts);
+        Assert.Equal(mirror, File.ReadAllBytes(store.StoragePath));
+        Assert.True(store.IsHealthy);
+        Assert.Single(store.GrantsById);
+        using var restored = Services(keys, accounts, "erasure-reopen");
+        Assert.Single(restored.GetRequiredService<InstallLinkingStoreActivation>().GetRequiredStore().GrantsById);
+    }
+
+    [Theory]
+    [InlineData("postgres")]
+    [InlineData("teable")]
+    public void Actual_append_only_authority_blocks_erasure_even_with_a_legacy_backend_label(string backend)
+    {
+        using var remote = new Remote();
+        var coordinator = new InstallLinkingPostgresAuthorityCoordinator(new TeableInstallLinkingSnapshotAuthority(remote.Store()), backend);
+        Assert.Throws<InvalidOperationException>(coordinator.EnsureAccountErasureSupported);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Fact]
     public void Actual_remote_key_custody_has_a_live_readiness_probe_not_a_local_directory_probe()
     {
         using var keys = new Remote();

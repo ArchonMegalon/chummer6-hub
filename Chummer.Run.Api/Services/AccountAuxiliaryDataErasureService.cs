@@ -11,6 +11,7 @@ public sealed record AccountAuxiliaryDataErasureResult(
 
 public interface IAccountAuxiliaryDataErasureService
 {
+    void EnsureAccountErasureSupported();
     AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId);
 }
 
@@ -71,19 +72,26 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         _originDocuments = originDocuments;
     }
 
-    public AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId)
+    public void EnsureAccountErasureSupported()
     {
-        string normalizedSubject = string.IsNullOrWhiteSpace(subjectId)
-            ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
-            : subjectId.Trim();
-        string? normalizedUser = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
         _originDocuments?.EnsureAccountErasureSupported();
+        _originChapters?.EnsureAccountErasureSupported();
         _installSnapshots.EnsureAccountErasureSupported();
         _myFirstBookUsage.EnsureAccountErasureSupported();
         _originReservations.EnsureAccountErasureSupported();
         _brilliantDirectories.EnsureAccountErasureSupported();
         _horizonUsage.EnsureAccountErasureSupported();
         _artifactRequests.EnsureAccountErasureSupported();
+        _installLinking.GetRequired().EnsureAccountErasureSupported();
+    }
+
+    public AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId)
+    {
+        string normalizedSubject = string.IsNullOrWhiteSpace(subjectId)
+            ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
+            : subjectId.Trim();
+        string? normalizedUser = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
+        EnsureAccountErasureSupported();
         var removed = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["brilliant_directories_projection"] = EraseSingleList(

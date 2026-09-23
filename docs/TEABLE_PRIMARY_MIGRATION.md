@@ -164,6 +164,26 @@ preserved; none of its unreadable records were decrypted or silently imported.
   the beginning of account erasure, before journal or other account side effects.
   No runtime configuration is changed by this registration.
 
+### Erasure admission during partial migration
+
+Account erasure now preflights the actual Support, Community and auxiliary store
+implementations before starting its journal or deleting Hosted Build workspaces.
+Auxiliary preflight includes chapter jobs and install-linking, not only usage,
+documents and workspace snapshots. Direct entry points retain their own guards.
+The install-linking Teable adapter cannot report successful erasure while older
+protected snapshots and their readable keys remain. Backend naming alone cannot
+turn that append-only adapter into a history-erasing store.
+
+Four focused regression cases reproduced destructive partial erasure or a false
+success before the correction. The corrected local API/test build passes 72
+focused tests, including those four and two backend-label cases. Tests use
+simulated Teable transport with networking disabled; they verify unchanged local
+bytes, remote heads, grants, support cases and no journal/remote-erasure dispatch
+on rejected admission. No real records were erased and no production service was
+changed. This closes the late-admission defect, **not historical erasure itself**.
+Historical cleanup, cross-service Identity readiness and the full deployment
+restore remain unfinished; these guards are not a cutover authorization.
+
 Identity configuration, for an isolated migration environment only:
 
 ```text

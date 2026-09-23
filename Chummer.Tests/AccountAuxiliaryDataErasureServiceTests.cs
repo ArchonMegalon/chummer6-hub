@@ -104,6 +104,25 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
     }
 
     [Fact]
+    public void Primary_chapter_history_blocks_erasure_before_local_ledger_deletion()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var chapters = new OriginChapterAuthoringService(configuration, new(remote.Store()));
+        using Fixture fixture = new(chapters: chapters);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        fixture.MyFirstBook.PersistLocked();
+
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+
+        Assert.Single(fixture.MyFirstBook.Entries);
+        using var reopened = new MyFirstBookUsageStore(fixture.Configuration);
+        Assert.Single(reopened.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Fact]
     public void Workspace_erasure_preserves_differently_cased_opaque_account_ids()
     {
         using Fixture fixture = new();
@@ -226,7 +245,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             OriginDossierProviderCreditReservationStore? reservations = null,
             BrilliantDirectoriesBillingStore? membership = null,
             HorizonArtifactUsageStore? horizonUsage = null,
-            HorizonArtifactRequestReceiptStore? artifactReceipts = null)
+            HorizonArtifactRequestReceiptStore? artifactReceipts = null,
+            OriginChapterAuthoringService? chapters = null)
         {
             Directory.CreateDirectory(_directory);
             var values = new Dictionary<string, string?>
@@ -266,7 +286,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             OriginDossiers = new OriginDossierPublicationService(
                 Configuration,
                 NullLogger<OriginDossierPublicationService>.Instance);
-            OriginChapters = new OriginChapterAuthoringService(Configuration);
+            OriginChapters = chapters ?? new OriginChapterAuthoringService(Configuration);
             Service = new AccountAuxiliaryDataErasureService(
                 Brilliant,
                 MyFirstBook,

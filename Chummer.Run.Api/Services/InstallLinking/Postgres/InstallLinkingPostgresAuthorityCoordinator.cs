@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Chummer.Run.Api.Services.Teable;
 using Npgsql;
 
 namespace Chummer.Run.Api.Services.InstallLinking.Postgres;
@@ -29,6 +30,14 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
     }
 
     private string Code(string suffix) => _backend + "_" + suffix;
+
+    internal void EnsureAccountErasureSupported()
+    {
+        // The Teable adapter appends snapshots. Replacing the current snapshot
+        // cannot erase its older protected payloads while the keyring is retained.
+        if (_backend == "teable" || _authority is TeableInstallLinkingSnapshotAuthority)
+            throw new InvalidOperationException("Primary install-linking erasure requires historical payload cleanup before activation.");
+    }
 
     public Task<InstallLinkingAuthoritativeEnvelope> ReadCurrentAsync(
         CancellationToken cancellationToken = default)

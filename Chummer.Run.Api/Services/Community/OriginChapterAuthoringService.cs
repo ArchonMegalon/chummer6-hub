@@ -217,10 +217,15 @@ public sealed class OriginChapterAuthoringService : IDisposable
         return job with { State = OriginChapterAuthoringStates.ReviewRequired, DraftText = text, ProviderReceiptDigest = receipt };
     }
 
-    public int EraseForSubject(string subjectId)
+    public void EnsureAccountErasureSupported()
     {
         if (_primary is not null)
             throw new InvalidOperationException("Primary authoring erasure requires historical payload cleanup before activation.");
+    }
+
+    public int EraseForSubject(string subjectId)
+    {
+        EnsureAccountErasureSupported();
         if (!IsConfigured) return 0;
         return Locked(root =>
         {

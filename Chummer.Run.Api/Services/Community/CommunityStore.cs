@@ -251,10 +251,15 @@ public sealed class CommunityStore : IDisposable
     public BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboardingState { get; set; }
     internal HubArtifactStoreBackupPackage? CampaignArtifactRegistry { get; set; }
 
+    internal void EnsureAccountErasureSupported()
+    {
+        if (IsPrimary) throw new InvalidOperationException("Primary account erasure requires historical-record cleanup before admission.");
+    }
+
     internal T ExecuteAccountErasureTransactionLocked<T>(Func<T> mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
-        if (IsPrimary) throw new InvalidOperationException("Primary account erasure requires historical-record cleanup before admission.");
+        EnsureAccountErasureSupported();
         if (!System.Threading.Monitor.IsEntered(Gate))
         {
             throw new InvalidOperationException("Account erasure transactions require the community-store lock.");

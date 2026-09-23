@@ -57,6 +57,11 @@ public sealed class AccountErasureService : IAccountErasureService
             ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
             : subjectId.Trim();
         _support.EnsureAccountErasureSupported();
+        // Reject a known unsupported storage mode before the journal, external
+        // workspace deletion or any local deletion. Component-level guards alone
+        // are too late when only part of the deployment has moved to Teable.
+        _community.EnsureAccountErasureSupported();
+        _auxiliary.EnsureAccountErasureSupported();
         string? userId = _accounts.GetBySubject(normalizedSubject)?.UserId;
         byte[] hmacKey = ResolveReceiptKey();
         try
