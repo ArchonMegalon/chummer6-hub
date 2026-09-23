@@ -83,6 +83,7 @@
     <Compile Include="AndroidLinkedV2BearerProofTests.cs" />
     <Compile Include="InstallLinkedWorkspaceSnapshotTests.cs" />
     <Compile Include="InstallLinkedWorkspaceSnapshotTransferTests.cs" />
+    <Compile Include="InstallLinkedWorkspaceTeablePersistenceTests.cs" />
     <Compile Include="AccountAuxiliaryDataErasureServiceTests.cs" />
     <Compile Include="OriginChapterAuthoringServiceTests.cs" />
     <Compile Include="OriginChapterWorkerTests.cs" />

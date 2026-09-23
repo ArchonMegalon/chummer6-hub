@@ -356,7 +356,18 @@ internal static class ServiceCollectionBoundedContextExtensions
             services.AddSingleton<InstallLinkingService>();
             services.AddSingleton<PersonalizedInstallScriptService>();
         }
-        services.AddSingleton<InstallLinkedWorkspaceSnapshotStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new InstallLinkedWorkspaceSnapshotStore(configuration);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary workspace table is required."),
+                configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private workspace storage token is required."));
+            try { return new InstallLinkedWorkspaceSnapshotStore(configuration, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<InstallLinkedWorkspaceSnapshotService>();
         services.AddTransient<RookWorkspaceReadAdmissionService>();
         services.AddSingleton<AndroidLinkedV2RequestProofVerifier>();

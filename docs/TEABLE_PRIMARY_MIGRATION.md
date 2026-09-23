@@ -39,6 +39,14 @@ preserved; none of its unreadable records were decrypted or silently imported.
   receipt can be added to an immutable document revision. Conflicts require a new
   read; lost commit acknowledgements can be reconciled without another write.
   These are existing first-party drafts, **not generated First Book narration**.
+- Linked runner snapshots now have an explicit primary mode, with a separate
+  revision stream for each exact subject/user owner. Full Core continuations,
+  auxiliary state and finalization history restore without a local snapshot
+  file. Each outer synchronous owner scope reads current remote state and drops
+  its mutable shadow when it ends. Concurrent writes require a fresh read;
+  lost acknowledgements never trigger write replay. Observed revision floors
+  survive owner switches. Remote outages/invalid state return 503 and conflicts
+  return 409, without a local-file fallback. Existing local mode is unchanged.
 - Community profiles, principal mappings and groups now have an isolated primary
   implementation using the existing typed snapshot. Explicit synchronous scopes
   refresh at outer entry; nested account/group/identity-link/ledger/experience
@@ -83,6 +91,19 @@ and global capacity settings also apply to inert remote reservations. Document
 deletion remains rejected until historical/orphan erasure is safe. The account
 auxiliary-erasure entry point checks this limitation before its first mutation,
 rather than deleting other stores and claiming the document history is gone.
+
+Linked runner snapshots use a distinct explicit registration:
+
+```text
+CHUMMER_INSTALL_LINKED_WORKSPACE_STORAGE_PROVIDER=teable
+CHUMMER_INSTALL_LINKED_WORKSPACE_TEABLE_TABLE_ID=<dedicated private workspace table>
+CHUMMER_INSTALL_LINKED_WORKSPACE_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+```
+
+This is transport custody, not new Core rule or continuation-application authority.
+No legacy file import or distributed read fence is implied. Scope entry must be
+synchronous and cannot cross an `await`. Historical workspace erasure remains
+blocked and is checked before any auxiliary-account deletion takes place.
 
 API account/key custody uses distinct explicit registrations:
 
@@ -162,6 +183,19 @@ proving erasure stops before unrelated auxiliary records are removed. API and te
 assembly compiled without warnings/errors. These are simulated-transport tests,
 not a live Teable or whole-host restore and not provider execution.
 
+Linked workspace follow-up: the terminal local Docker run passed 98 focused
+workspace-primary, Android bearer-proof and auxiliary-erasure tests. The earlier
+179-case run passed 178, failing only the production DI fixture's unintended
+PostgreSQL configuration; the fixture now selects the explicit primary backend.
+The next run exposed a real error-mapping gap: `InvalidDataException` did not
+map to 503 on rollback detection. That was corrected before the terminal pass.
+Complete snapshots, account separation, owner-switch rollback rejection, same-
+owner races, uncertain writes, old local-file preservation and erasure preflight
+are covered. API/test builds have no compiler warnings/errors; the SDK workload
+notice is not a new workload qualification. This is simulated transport, not
+live account migration or whole-host reconstruction. A final 15-case workspace
+run also passed after tightening every hostile-record assertion to require 503.
+
 Runtime credential preparation: the existing EA API token returned HTTP 403 from
 the read-only `/api/access-token` metadata endpoint. It has not been deployed to
 Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
@@ -171,7 +205,8 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
-   stores. Origin jobs and first-party document bytes have primary implementations;
+   stores. Origin jobs, private first-party documents and linked runner snapshots
+   have primary implementations;
    publication-index/provider-output artifacts and other auxiliary stores still
    need custody review. The isolated Community slice is not a complete activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;

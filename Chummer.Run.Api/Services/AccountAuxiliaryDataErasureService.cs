@@ -78,6 +78,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             : subjectId.Trim();
         string? normalizedUser = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
         _originDocuments?.EnsureAccountErasureSupported();
+        _installSnapshots.EnsureAccountErasureSupported();
         var removed = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["brilliant_directories_projection"] = EraseSingleList(

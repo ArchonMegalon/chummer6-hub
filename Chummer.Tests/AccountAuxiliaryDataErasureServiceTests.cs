@@ -17,6 +17,20 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
     private static readonly DateTimeOffset Baseline = new(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Primary_workspace_history_blocks_erasure_before_auxiliary_side_effects()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_INSTALL_LINKED_WORKSPACE_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var workspaces = new InstallLinkedWorkspaceSnapshotStore(configuration, remote.Store());
+        using Fixture fixture = new(workspaces: workspaces);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Fact]
     public void Primary_document_history_blocks_erasure_before_any_auxiliary_mutation()
     {
         using var remote = new TeableRevisionStoreTests.Remote();
@@ -151,7 +165,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             "chummer-auxiliary-erasure-tests",
             Guid.NewGuid().ToString("N"));
 
-        public Fixture(OriginDossierFirstPartyDocumentService? documents = null)
+        public Fixture(OriginDossierFirstPartyDocumentService? documents = null,
+            InstallLinkedWorkspaceSnapshotStore? workspaces = null)
         {
             Directory.CreateDirectory(_directory);
             var values = new Dictionary<string, string?>
@@ -179,7 +194,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             OriginReservations = new OriginDossierProviderCreditReservationStore(Configuration);
             ArtifactRequests = new HorizonArtifactRequestReceiptStore(Configuration);
             PayFunnels = new PayFunnelsBillingStore(Configuration);
-            InstallSnapshots = new InstallLinkedWorkspaceSnapshotStore(Configuration);
+            InstallSnapshots = workspaces ?? new InstallLinkedWorkspaceSnapshotStore(Configuration);
             InstallLinking = new InstallLinkingStore(
                 Configuration,
                 new EphemeralDataProtectionProvider(),
