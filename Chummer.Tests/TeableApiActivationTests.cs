@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Services;
@@ -57,6 +58,66 @@ public sealed class TeableApiActivationTests : IDisposable
         // protected snapshots and key providers use the real registrations.
         services.Replace(ServiceDescriptor.Singleton<TeableInstallLinkingRuntime>(_ => new(accounts.Store())));
         return services.BuildServiceProvider();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void V2_bootstrap_does_not_recheck_remote_authority_for_every_dictionary_access(bool outageAfterCommit)
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "bootstrap");
+        var activation = services.GetRequiredService<InstallLinkingStoreActivation>();
+        var service = new InstallLinkingService(new InstallLinkingStoreAccess(activation), Configuration("bootstrap"), activation);
+        using var rsa = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+        service.IssueBrowserCallback(new(InstallationId: "android-probe", ArtifactId: "android-play-app", ApplicationVersion: "synthetic",
+            ChannelId: "internal", HeadId: "android", Platform: "android", Arch: "arm64", CallbackUri: "chummer://install-link",
+            PublicKey: publicKey, HostLabel: null, InstallAccessClass: InstallAccessClasses.AccountRequired), "user-probe", "subject-probe", "proof_poll_v2");
+        var request = new AndroidInstallLinkProofPollV2Request("android-probe", "android", "synthetic", "internal", "android", "arm64",
+            publicKey, DateTimeOffset.UtcNow.ToUnixTimeSeconds(), new string('n', 24), "", null, new string('o', 32), "proof_poll_v2");
+        request = request with { Signature = Convert.ToBase64String(rsa.SignData(AndroidInstallLinkV2BootstrapProof.CreateCanonicalPayload(request),
+            HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)) };
+        if (outageAfterCommit)
+        {
+            // Nonce commit, then grant commit, then the final fresh authority
+            // check. The committed grant must not be returned on an outage.
+            accounts.BeforeHeadPost = () => accounts.BeforeHeadPost = () =>
+                accounts.BeforeHeadReadResponse = () => accounts.FailReads = true;
+        }
+        int reads = accounts.GetRequests;
+        if (outageAfterCommit)
+        {
+            var error = Assert.Throws<InstallLinkingOperationException>(() => service.PollBrowserCallbackV2(request));
+            Assert.Equal(503, error.StatusCode);
+            Assert.True(accounts.FailReads);
+        }
+        else
+        {
+            var result = service.PollBrowserCallbackV2(request);
+            Assert.NotNull(result.Exchange);
+            Assert.False(result.Exchange.AlreadyClaimed);
+        }
+        // Retain fresh operation admission, nonce persistence, grant CAS and
+        // final authority read; do not multiply those by each field lookup.
+        Assert.InRange(accounts.GetRequests - reads, 1, 45);
+        Console.WriteLine($"Bootstrap primary GETs: {accounts.GetRequests - reads}; post-commit outage: {outageAfterCommit}");
+        accounts.FailReads = true;
+        Assert.Throws<InstallLinkingOperationException>(() => service.PollBrowserCallbackV2(request));
+        accounts.FailReads = false;
+        using var cold = Services(keys, accounts, "bootstrap-cold");
+        var coldActivation = cold.GetRequiredService<InstallLinkingStoreActivation>();
+        string grantId = Assert.Single(coldActivation.GetRequiredStore().GrantsById.Values).GrantId;
+        request = request with { Nonce = new string('r', 24), Signature = "" };
+        request = request with { Signature = Convert.ToBase64String(rsa.SignData(AndroidInstallLinkV2BootstrapProof.CreateCanonicalPayload(request),
+            HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)) };
+        var recovered = new InstallLinkingService(new InstallLinkingStoreAccess(coldActivation), Configuration("bootstrap-cold"), coldActivation)
+            .PollBrowserCallbackV2(request);
+        Assert.NotNull(recovered.Exchange);
+        Assert.True(recovered.Exchange.AlreadyClaimed);
+        Assert.Equal(grantId, recovered.Exchange.Grant.GrantId);
+        Assert.Single(coldActivation.GetRequiredStore().GrantsById);
     }
 
     [Fact]

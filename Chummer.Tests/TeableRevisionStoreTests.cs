@@ -190,6 +190,7 @@ public sealed class TeableRevisionStoreTests
         public Action? BeforeHeadPost { get; set; }
         public Action? BeforeHeadReadResponse { get; set; }
         public int HeadPosts { get; private set; }
+        public int GetRequests { get; private set; }
         private int _headReads;
         private readonly TaskCompletionSource _headBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -198,6 +199,7 @@ public sealed class TeableRevisionStoreTests
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            if (request.Method == HttpMethod.Get) GetRequests++;
             Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
             Assert.Equal("synthetic-token", request.Headers.Authorization.Parameter);
             if (FailReads && request.Method == HttpMethod.Get) throw new HttpRequestException("synthetic outage");

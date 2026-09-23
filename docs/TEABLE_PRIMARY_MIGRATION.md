@@ -44,6 +44,27 @@ Coverage includes cold reads, competing writes, outages and disabled-worker
 non-execution. This does not enable primary news delivery or establish deployment,
 provider generation, public readiness or Play publication.
 
+The corrected local image also includes the tracked public canon runtime files.
+Login/health and the isolated worker access boundaries passed. A real HTTP smoke
+issued a short-lived synthetic session, created its private Hub profile, recreated
+both containers with empty local state roots, and restored the exact profile and
+session from Teable. Session revocation was observed afterward. This is bounded
+account recovery, not a whole-Hub/provider/book migration.
+
+The Android device-link approval route passed, but its subsequent signed exchange
+exceeded the client's 35-second wait. A separate primary read proved the callback
+and grant had committed. The owned synthetic grant was explicitly revoked; no
+paid operation was involved. Inspection and a failing regression found 174 remote
+GETs during a single bootstrap because every dictionary lookup re-evaluated the
+store activation. The v2 exchange now uses a synchronous operation-local view
+under the same store gate, retaining explicit readiness checks, nonce admission,
+mutation CAS and a final primary check before releasing its reply. The focused
+regression measures 44 GETs (42 when final readback fails); 101 existing/focused
+checks plus two final outage/recovery cases pass locally. A committed result after
+an outage is recovered with the original operation identity and grant, not newly
+issued. The new optimized source still needs a live HTTP retest; no latency or
+deployment claim is inferred from the simulated transport test.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux

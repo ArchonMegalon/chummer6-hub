@@ -43,6 +43,21 @@ public sealed partial class InstallLinkingService
     private readonly int _maxPendingBrowserCallbacksPerPrincipal;
     private readonly IInstallLinkingStoreReadinessProbe? _readinessProbe;
 
+    // A synchronous operation-local view, never retained by DI or shared across
+    // requests. The caller admits the exact store and holds its gate throughout.
+    // Explicit readiness checks and persistence CAS still consult the primary;
+    // individual dictionary/property lookups need not repeat remote activation.
+    private InstallLinkingService(InstallLinkingService source, InstallLinkingStore store)
+    {
+        _storeAccessor = () => store;
+        _readinessProbe = source._readinessProbe;
+        _claimTicketLifetime = source._claimTicketLifetime;
+        _browserCallbackLifetime = source._browserCallbackLifetime;
+        _maxPendingClaimTicketsPerPrincipal = source._maxPendingClaimTicketsPerPrincipal;
+        _maxDownloadReceiptsPerPrincipalPerHour = source._maxDownloadReceiptsPerPrincipalPerHour;
+        _maxPendingBrowserCallbacksPerPrincipal = source._maxPendingBrowserCallbacksPerPrincipal;
+    }
+
     public InstallLinkingService(
         InstallLinkingStore store,
         IConfiguration configuration,
@@ -1391,6 +1406,23 @@ public sealed partial class InstallLinkingService
     }
 
     public PollInstallBrowserCallbackResult PollBrowserCallbackV2(
+        AndroidInstallLinkProofPollV2Request request)
+    {
+        EnsureDurableStoreReady();
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
+        {
+            var operation = new InstallLinkingService(this, store);
+            PollInstallBrowserCallbackResult result = operation.PollBrowserCallbackV2Core(request);
+            // A remote writer or outage after the commit must not turn a stale
+            // local result into a successful grant response. Recovery still uses
+            // the existing immutable operation receipt, never a new grant.
+            operation.EnsureDurableStoreReady();
+            return result;
+        }
+    }
+
+    private PollInstallBrowserCallbackResult PollBrowserCallbackV2Core(
         AndroidInstallLinkProofPollV2Request request)
     {
         EnsureDurableStoreReady();
