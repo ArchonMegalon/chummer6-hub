@@ -126,6 +126,36 @@ This establishes bounded live install/account recovery and private route admissi
 not actual chapter generation, reading/adoption, complete host recovery, public
 cutover or Play delivery. Latency remains visible; no network SLO is claimed.
 
+### Real First Book chapter and cold primary readback — 2026-09-23
+
+The original synthetic Mira request now has actual German First Book prose, not
+a placeholder. One paid book setup and one first-chapter generation were observed;
+the existing worker fences prevented replay. The worker completed the exact Hub
+job as review-required, with mechanics and publication still false. Its 4,007-
+character draft was read over the signed Android HTTP route and survived restart.
+
+Functional Hub source `ba700e3443fff65403cb61ae867dc793cccf9e72` additionally
+captures one freshly admitted store per signed authorization operation. It avoids
+repeating the exact activation probe solely for a property/gate lookup; independent
+probes and all final current-authority checks remain. The regression failed at
+43 remote GETs before the fix and passed at 25 afterward. All 155 focused local
+activation, signed-proof, chapter, coordinator and revocation tests pass.
+
+Local image `756c64a185e4…` returned the retained chapter in 22.30s cold and
+10.16s/10.48s warm. An intervening 401 remains unclassified; unchanged unexpired
+credentials subsequently worked. No failed read was counted as acceptance. After
+operator inspection of the fictional text, explicit synthetic-only acceptance
+returned 200 in 16.31s. A newly recreated Hub with an empty local state root then
+restored the exact prose, provider receipt and accepted-text digest from Teable
+(200, 11.41s). The shared canonical request identity was also verified.
+
+The text digest is `efcd74dd96130040f150f3cffbab99c81a8c339934a74ecb355bab2c76f43fba`.
+This is bounded real-provider/synthetic-account evidence, not a real player's
+approval, Android UI/export proof, future-chapter continuation, whole-host failover
+or public migration. The cold latency still exceeds Android's 20-second request
+budget. Original volumes and old state roots remain intact. No provider advance,
+signed AAB or Play upload occurred. Source is pushed to the feature branch, not main.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux
