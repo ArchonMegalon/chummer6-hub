@@ -32,6 +32,8 @@ responses use the existing no-store private-response headers.
 
 1. The signed Android caller creates a consent-bound, source-bound private job.
 2. The trusted worker GETs `pending?limit=20` (maximum 20) or `/{workId}`.
+   Optional `bookRef=<64 lowercase hex>` filters before the page limit, so one
+   explicitly enrolled book is not hidden by unrelated pending jobs.
    `workId` is an opaque owner/request-scoped reference, not an identity subject
    or install credential. `bookRef` is a separate opaque identity derived from
    owner, workspace and exact story locale. It survives later chapter decisions
@@ -58,6 +60,18 @@ responses use the existing no-store private-response headers.
    acknowledgement is idempotent; missing jobs, changed text, another owner or
    revoked grants cannot be accepted. The worker can read this digest, never set
    it. It grants no publication, mechanics or new spending authority.
+8. A continuation request carries `previous` with the exact prior request ID,
+   source digest, provider-receipt digest and accepted UTF-8 text digest. Hub
+   verifies it under the same owner, workspace, language and runner name, with
+   distinct chapter/decision IDs and all previous facts retained. The edge is
+   immutable on retry. The worker receives the corresponding opaque
+   `previousWorkId`; queue/file/provider-slot order is not chapter authority.
+
+The app derives that predecessor from Core's accepted-decision ordering and its
+selected reading, not a pending draft. Missing or ambiguous earlier readings
+stop continuation; Hub independently checks its explicit acceptance. Old jobs
+omit the optional edge and retain their serialized integrity identity. Restore
+does not invent links or migrate old drafts into new authoring jobs.
 
 Admission does **not** reserve or assert provider credits. Hub does not receive
 provider account IDs, login material, browser cookies or execution credentials.
@@ -77,9 +91,11 @@ prepared provider mapping and the complete approved source projection. It checks
 the server's source, locale, owner-scoped work identity and review/no-mutation
 flags before invoking the existing non-replaying chapter writer.
 
-It is deliberately not a public/generic EA tool or a background daemon. Automatic
-book creation, future-chapter preparation and deployment
-remain required before claiming unattended app generation. Never spend a new
+It is deliberately not a public/generic EA tool. EA's local cycle now composes
+the existing setup/write phases; its intake tick can choose one exact successor
+for an explicitly enrolled book, with a fixed account and bounded chapter/credit
+admission. Deployment, browser ownership and real-user provider authorization
+remain separate requirements before claiming unattended app generation. Never spend a new
 book credit per chapter implicitly, or attach an old test draft to a new source.
 The connector now retains an append-only private provider mapping for `bookRef`
 and rejects account/project/locale/slot changes before admitting work. This does
@@ -91,7 +107,8 @@ acceptance without a new generation. Provider-side advancement remains a separat
 worker action, not enabled by this endpoint. EA's explicit `--advance-accepted`
 mode now verifies this acknowledgement against its exact retained draft/receipt,
 rechecks the live provider draft, and fences a single approval click. That adapter
-has simulated-browser coverage, not yet a live reader-approved continuation.
+has simulated-browser coverage; a separately retained synthetic live canary
+also continued once, without establishing real-user or Android UI authority.
 It cannot write the next chapter, reserve credits or publish a book.
 
 ## Verification

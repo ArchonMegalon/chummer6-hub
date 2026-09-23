@@ -13,7 +13,15 @@ public sealed record OriginChapterSource(
 public sealed record OriginChapterSourceFact(string FactId, string DecisionId, string Text);
 
 public sealed record OriginChapterAuthoringRequest(
-    string RequestId, OriginChapterSource Source, bool ExternalProcessingConsent);
+    string RequestId, OriginChapterSource Source, bool ExternalProcessingConsent)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OriginChapterPredecessor? Previous { get; init; }
+}
+
+/// <summary>Exact reader-accepted predecessor, not provider order or spending authority.</summary>
+public sealed record OriginChapterPredecessor(
+    string RequestId, string SourceDigest, string ProviderReceiptDigest, string TextDigest);
 
 /// <summary>Shared, bounded wire identity. A digest is not Core or provider authority.</summary>
 public static class OriginChapterSourceIdentity
@@ -50,6 +58,15 @@ public static class OriginChapterSourceIdentity
     // device. A lost response or application restart never invents a paid retry.
     public static string RequestId(OriginChapterSource source) => "chapter-" + Digest(source);
 
+    public static OriginChapterPredecessor? CapturePredecessor(OriginChapterPredecessor? previous)
+    {
+        if (previous is null) return null;
+        RequireId(previous.RequestId);
+        if (!IsDigest(previous.SourceDigest) || !IsDigest(previous.ProviderReceiptDigest) || !IsDigest(previous.TextDigest))
+            throw new ArgumentException("The reader-accepted predecessor is invalid.");
+        return previous;
+    }
+
     private static void RequireId(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 256 || value != value.Trim() || value.Any(char.IsControl))
@@ -81,6 +98,9 @@ public sealed record OriginChapterAuthoringJob(
     // Reading acceptance is not mechanics, publication or new spending authority.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReaderAcceptedTextDigest { get; init; }
+    // Absent on historical jobs: never infer a predecessor when restoring them.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OriginChapterPredecessor? Previous { get; init; }
     public bool RequiresReaderReview => true;
     public bool AffectsMechanics => false;
     public bool PublicationAuthorized => false;

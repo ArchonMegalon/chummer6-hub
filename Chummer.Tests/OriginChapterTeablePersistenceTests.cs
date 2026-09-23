@@ -60,6 +60,56 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
     }
 
     [Fact]
+    public void Pending_book_filter_precedes_page_limit_and_does_not_cross_owners()
+    {
+        using var remote = new Remote();
+        var a = Service(remote).Create("owner-a", Request(), Authorized);
+        Service(remote).Create("owner-b", Request(), Authorized);
+        var both = Service(remote).PendingForWorker(20);
+        Assert.Equal(2, both.Count);
+        foreach (var item in both)
+            Assert.Equal(item.WorkId, Assert.Single(Service(remote).PendingForWorker(1, item.BookRef)).WorkId);
+        Assert.Empty(Service(remote).PendingForWorker(20, new string('0', 64)));
+        Assert.Throws<ArgumentException>(() => Service(remote).PendingForWorker(20, "invalid"));
+    }
+
+    [Fact]
+    public void Accepted_predecessor_and_worker_edge_survive_remote_only_restart()
+    {
+        using var remote = new Remote();
+        var first = Service(remote).Create("owner", Request(), Authorized);
+        var work = Assert.Single(Service(remote).PendingForWorker(20));
+        Service(remote).AdmitForWorker(work.WorkId, first.SourceDigest, "execution");
+        const string text = "The accepted first chapter.";
+        string receipt = new string('c', 64);
+        Service(remote).CompleteForWorker(work.WorkId, first.SourceDigest, "execution", text, receipt);
+        Service(remote).AcceptReading("owner", first.RequestId, first.SourceDigest, receipt, Hash(text), true, Authorized);
+        var previous = new OriginChapterPredecessor(first.RequestId, first.SourceDigest, receipt, Hash(text));
+        var next = Request("request-two") with
+        {
+            Source = first.Source with
+            {
+                ChapterId = "chapter-two", AcceptedDecisionId = "decision-two",
+                Facts = [..first.Source.Facts, new("fact-two", "decision-two", "Left the corporate school.")]
+            },
+            Previous = previous
+        };
+        Service(remote).Create("owner", next, Authorized);
+
+        var restored = Assert.Single(Service(remote).PendingForWorker(20));
+        Assert.Equal(previous, restored.Job.Previous);
+        Assert.Equal(work.WorkId, restored.PreviousWorkId);
+        Assert.Equal(work.BookRef, restored.BookRef);
+        Assert.Equal(previous, Service(remote).Get("owner", next.RequestId)!.Previous);
+        Assert.Equal(previous, Service(remote).GetForWorker(restored.WorkId).Job.Previous);
+        Assert.Null(Service(remote).Get("other-owner", next.RequestId));
+        Assert.Null(restored.Job.ReaderAcceptedTextDigest);
+        Assert.Equal(Hash(text), Service(remote).GetForWorker(work.WorkId).Job.ReaderAcceptedTextDigest);
+        Assert.Throws<InvalidOperationException>(() => Service(remote).Create("owner", next with { Previous = null }, Authorized));
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Fact]
     public void Two_workers_cannot_both_receive_permission_to_generate()
     {
         using var remote = new Remote();

@@ -10,8 +10,8 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class InternalOriginChaptersController(OriginChapterAuthoringService authoring) : ControllerBase
 {
     [HttpGet("pending")]
-    public ActionResult Pending([FromQuery] int limit = 20)
-        => Guard(() => Ok(authoring.PendingForWorker(limit)));
+    public ActionResult Pending([FromQuery] int limit = 20, [FromQuery] string? bookRef = null)
+        => Guard(() => Ok(authoring.PendingForWorker(limit, bookRef)));
 
     [HttpGet("{workId}")]
     public ActionResult Read(string workId)

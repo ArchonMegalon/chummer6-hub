@@ -15,6 +15,135 @@ public sealed class OriginChapterAuthoringServiceTests : IDisposable
         [new("fact-one", "decision-one", "The player selected Renraku.")]), true);
     private static bool Authorized() => true;
 
+    private (OriginChapterAuthoringJob Job, OriginChapterWorkerItem Work) Accepted()
+    {
+        using var service = Service();
+        var job = service.Create("subject-a", Request(), Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission-one");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission-one", "Accepted scene.", new string('c', 64));
+        string text = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("Accepted scene.")));
+        job = service.AcceptReading("subject-a", job.RequestId, job.SourceDigest, new string('c', 64), text, true, Authorized);
+        return (job, service.GetForWorker(work.WorkId));
+    }
+
+    private static OriginChapterAuthoringRequest Next(OriginChapterAuthoringJob old)
+        => new("request-two", old.Source with { ChapterId = "chapter-two", AcceptedDecisionId = "decision-two",
+            ChapterDigest = new string('d', 64), Facts = [.. old.Source.Facts,
+                new("fact-two", "decision-two", "The player selected corporate schooling.")] }, true)
+        { Previous = new(old.RequestId, old.SourceDigest, old.ProviderReceiptDigest!, old.ReaderAcceptedTextDigest!) };
+
+    [Fact]
+    public void Successor_retains_exact_accepted_predecessor_and_opaque_worker_edge_after_restart()
+    {
+        var (old, work) = Accepted();
+        var request = Next(old);
+        var next = Service().Create("subject-a", request, Authorized);
+        var restored = Service().Get("subject-a", next.RequestId)!;
+        Assert.Equal(request.Previous, restored.Previous);
+        Assert.Equal(next.SourceDigest, restored.SourceDigest);
+        Assert.Equal(request.Previous, Service().Create("subject-a", request, Authorized).Previous);
+        var pending = Assert.Single(Service().PendingForWorker(20));
+        Assert.Equal(work.WorkId, pending.PreviousWorkId);
+        Assert.Equal(work.BookRef, pending.BookRef);
+        Assert.NotEqual(work.WorkId, pending.WorkId);
+        Service().AdmitForWorker(pending.WorkId, next.SourceDigest, "admission-two");
+        var completed = Service().CompleteForWorker(pending.WorkId, next.SourceDigest, "admission-two", "Next scene.", new string('e', 64));
+        Assert.Equal(work.WorkId, completed.PreviousWorkId);
+        Assert.Equal(request.Previous, completed.Job.Previous);
+        Assert.Null(completed.Job.ReaderAcceptedTextDigest);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(old),
+            System.Text.Json.JsonSerializer.Serialize(Service().Get("subject-a", old.RequestId)));
+    }
+
+    [Theory]
+    [InlineData("owner")]
+    [InlineData("missing")]
+    [InlineData("source")]
+    [InlineData("receipt")]
+    [InlineData("text")]
+    [InlineData("workspace")]
+    [InlineData("locale")]
+    [InlineData("name")]
+    [InlineData("chapter")]
+    [InlineData("decision")]
+    [InlineData("history")]
+    public void Invalid_predecessor_does_not_create_or_register_a_successor(string change)
+    {
+        var (old, _) = Accepted();
+        var request = Next(old);
+        string owner = change == "owner" ? "subject-b" : "subject-a";
+        request = change switch
+        {
+            "missing" => request with { Previous = request.Previous! with { RequestId = "missing" } },
+            "source" => request with { Previous = request.Previous! with { SourceDigest = new string('0', 64) } },
+            "receipt" => request with { Previous = request.Previous! with { ProviderReceiptDigest = new string('0', 64) } },
+            "text" => request with { Previous = request.Previous! with { TextDigest = new string('0', 64) } },
+            "workspace" => request with { Source = request.Source with { WorkspaceId = "other" } },
+            "locale" => request with { Source = request.Source with { Locale = "en" } },
+            "name" => request with { Source = request.Source with { RunnerName = "Other" } },
+            "chapter" => request with { Source = request.Source with { ChapterId = old.Source.ChapterId } },
+            "decision" => request with { Source = request.Source with { AcceptedDecisionId = old.Source.AcceptedDecisionId } },
+            "history" => request with { Source = request.Source with { Facts = request.Source.Facts.Skip(1).ToArray() } },
+            _ => request
+        };
+        Assert.Throws<InvalidOperationException>(() => Service().Create(owner, request, Authorized));
+        Assert.Null(Service().Get(owner, request.RequestId));
+        Assert.Empty(Service().PendingForWorker(20));
+    }
+
+    [Fact]
+    public void Unaccepted_previous_text_is_not_an_automatic_reader_confirmation()
+    {
+        using var service = Service();
+        var old = service.Create("subject-a", Request(), Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, old.SourceDigest, "admission-one");
+        old = service.CompleteForWorker(work.WorkId, old.SourceDigest, "admission-one", "Unaccepted scene.", new string('c', 64)).Job;
+        var request = Next(old) with { Previous = new(old.RequestId, old.SourceDigest, old.ProviderReceiptDigest!, new string('b', 64)) };
+        Assert.Throws<InvalidOperationException>(() => service.Create("subject-a", request, Authorized));
+        Assert.Null(service.Get("subject-a", old.RequestId)!.ReaderAcceptedTextDigest);
+        Assert.Null(service.Get("subject-a", request.RequestId));
+    }
+
+    [Fact]
+    public void Immutable_request_cannot_drop_or_change_predecessor_and_revocation_blocks_new_write()
+    {
+        var (old, _) = Accepted();
+        var request = Next(old);
+        int checks = 0;
+        Assert.Throws<UnauthorizedAccessException>(() => Service().Create("subject-a", request, () => ++checks == 1));
+        Assert.Null(Service().Get("subject-a", request.RequestId));
+        Service().Create("subject-a", request, Authorized);
+        Assert.Throws<InvalidOperationException>(() => Service().Create("subject-a", request with { Previous = null }, Authorized));
+        Assert.Throws<InvalidOperationException>(() => Service().Create("subject-a", request with
+            { Previous = request.Previous! with { TextDigest = new string('f', 64) } }, Authorized));
+        Assert.Throws<ArgumentException>(() => Service().Create("subject-a", request with
+            { Previous = request.Previous! with { RequestId = request.RequestId } }, Authorized));
+        Assert.Throws<ArgumentException>(() => Service().Create("subject-a", request with
+            { Previous = request.Previous! with { SourceDigest = "invalid" } }, Authorized));
+    }
+
+    [Fact]
+    public void Historical_job_bytes_without_predecessor_keep_their_original_checksum()
+    {
+        var request = Request();
+        var job = Service().Create("subject-a", request, Authorized);
+        var legacy = new { job.RequestId, job.SourceDigest, job.Source, job.State, job.Provider, job.DraftText,
+            job.ProviderReceiptDigest, job.RequiresReaderReview, job.AffectsMechanics, job.PublicationAuthorized };
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        string path = Assert.Single(Directory.GetFiles(Path.Combine(_root, "origin-chapter-jobs"), "*.json"));
+        string owner = Path.GetFileName(path)[..64];
+        byte[] data = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(legacy, options);
+        string digest = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(data));
+        File.WriteAllBytes(path, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            { Schema = "chummer.origin.chapter-job/v1", OwnerDigest = owner, Job = legacy, Digest = digest }, options));
+        var restored = Service().Get("subject-a", request.RequestId)!;
+        Assert.Null(restored.Previous);
+        Assert.Null(Assert.Single(Service().PendingForWorker(20)).PreviousWorkId);
+        Assert.Equal(job.SourceDigest, restored.SourceDigest);
+    }
+
     [Fact]
     public void Same_request_survives_cold_read_and_changed_source_is_rejected()
     {

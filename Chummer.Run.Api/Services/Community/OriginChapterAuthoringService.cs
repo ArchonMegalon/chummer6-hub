@@ -44,6 +44,9 @@ public sealed class OriginChapterAuthoringService : IDisposable
         if (!request.ExternalProcessingConsent) throw new ArgumentException("External processing consent is required.");
         OriginChapterSource source = OriginChapterSourceIdentity.Capture(request.Source);
         string sourceDigest = OriginChapterSourceIdentity.Digest(source);
+        OriginChapterPredecessor? previous = OriginChapterSourceIdentity.CapturePredecessor(request.Previous);
+        if (previous?.RequestId == request.RequestId)
+            throw new ArgumentException("A chapter cannot precede itself.");
         return Locked(root =>
         {
             if (!stillAuthorized()) throw new UnauthorizedAccessException();
@@ -51,9 +54,15 @@ public sealed class OriginChapterAuthoringService : IDisposable
             string path = JobPath(root, owner, request.RequestId);
             if (Read(path, owner, request.RequestId) is { } existing)
             {
-                if (existing.SourceDigest != sourceDigest)
-                    throw new InvalidOperationException("The authoring request already belongs to a different source.");
+                if (existing.SourceDigest != sourceDigest || existing.Previous != previous)
+                    throw new InvalidOperationException("The authoring request already belongs to a different source or predecessor.");
                 return existing;
+            }
+            if (previous is not null)
+            {
+                var predecessor = Read(JobPath(root, owner, previous.RequestId), owner, previous.RequestId)
+                    ?? throw new InvalidOperationException("The reader-accepted predecessor is unavailable.");
+                RequirePredecessor(predecessor, previous, source);
             }
             if (_primarySession is not null)
                 _primarySession.Register(WorkId(owner, request.RequestId));
@@ -62,10 +71,25 @@ public sealed class OriginChapterAuthoringService : IDisposable
                 throw new InvalidOperationException("The private authoring queue is full.");
             if (!stillAuthorized()) throw new UnauthorizedAccessException();
             var job = new OriginChapterAuthoringJob(request.RequestId, sourceDigest, source,
-                OriginChapterAuthoringStates.AwaitingAuthoring, "first_book_ai", null, null);
+                OriginChapterAuthoringStates.AwaitingAuthoring, "first_book_ai", null, null) { Previous = previous };
             Write(path, owner, job);
             return job;
         });
+    }
+
+    private static void RequirePredecessor(OriginChapterAuthoringJob predecessor,
+        OriginChapterPredecessor expected, OriginChapterSource source)
+    {
+        if (predecessor.State != OriginChapterAuthoringStates.ReviewRequired
+            || predecessor.SourceDigest != expected.SourceDigest
+            || predecessor.ProviderReceiptDigest != expected.ProviderReceiptDigest
+            || predecessor.ReaderAcceptedTextDigest != expected.TextDigest
+            || predecessor.Source.WorkspaceId != source.WorkspaceId || predecessor.Source.Locale != source.Locale
+            || predecessor.Source.RunnerName != source.RunnerName
+            || predecessor.Source.ChapterId == source.ChapterId
+            || predecessor.Source.AcceptedDecisionId == source.AcceptedDecisionId
+            || predecessor.Source.Facts.Any(fact => !source.Facts.Contains(fact)))
+            throw new InvalidOperationException("The exact reader-accepted predecessor does not match this book continuation.");
     }
 
     public OriginChapterAuthoringJob? Get(string subjectId, string requestId)
@@ -102,16 +126,18 @@ public sealed class OriginChapterAuthoringService : IDisposable
 
     // Provider workers get opaque work identities, not identity subjects or
     // install credentials. This seam does not select accounts or authorize quota.
-    internal IReadOnlyList<OriginChapterWorkerItem> PendingForWorker(int limit)
+    internal IReadOnlyList<OriginChapterWorkerItem> PendingForWorker(int limit, string? bookRef = null)
     {
         if (limit is < 1 or > 20) throw new ArgumentException("Invalid worker page size.");
+        if (bookRef is not null && !IsDigest(bookRef)) throw new ArgumentException("Invalid book reference.");
         return Locked(root => WorkIds(root).Order(StringComparer.Ordinal)
             .Select(workId => ReadStored(Path.Combine(root, workId + ".json"), workId[..64], null))
             // A remote catalogue reservation may outlive an interrupted initial
             // create. Missing bytes are inert, never permission to generate.
             .Where(stored => stored is not null && stored.Job.State != OriginChapterAuthoringStates.ReviewRequired)
             .Select(stored => stored!)
-            .Take(limit).Select(WorkerItem).ToArray());
+            .Select(WorkerItem).Where(work => bookRef is null || work.BookRef == bookRef)
+            .Take(limit).ToArray());
     }
 
     private IEnumerable<string> WorkIds(string root)
@@ -306,6 +332,9 @@ public sealed class OriginChapterAuthoringService : IDisposable
             || Path.GetFileNameWithoutExtension(path) != WorkId(owner, job.RequestId)
             || stored.ExecutionAdmission is not null && (!ValidId(stored.ExecutionAdmission)
                 || job.State == OriginChapterAuthoringStates.AwaitingAuthoring)
+            || job.Previous is not null && (job.Previous.RequestId == job.RequestId
+                || !ValidId(job.Previous.RequestId) || !IsDigest(job.Previous.SourceDigest)
+                || !IsDigest(job.Previous.ProviderReceiptDigest) || !IsDigest(job.Previous.TextDigest))
             || job.SourceDigest != OriginChapterSourceIdentity.Digest(job.Source) || job.Provider != "first_book_ai"
             || job.ReaderAcceptedTextDigest is not null && (job.State != OriginChapterAuthoringStates.ReviewRequired
                 || job.DraftText is null || job.ReaderAcceptedTextDigest != TextDigest(job.DraftText))
@@ -368,7 +397,8 @@ public sealed class OriginChapterAuthoringService : IDisposable
     private static OriginChapterWorkerItem WorkerItem(StoredJob stored)
         => new(WorkId(stored.OwnerDigest, stored.Job.RequestId), stored.Job, stored.ExecutionAdmission,
             Digest(new { Scope = "origin-reader-book/v1", stored.OwnerDigest,
-                stored.Job.Source.WorkspaceId, stored.Job.Source.Locale }));
+                stored.Job.Source.WorkspaceId, stored.Job.Source.Locale }))
+        { PreviousWorkId = stored.Job.Previous is { } previous ? WorkId(stored.OwnerDigest, previous.RequestId) : null };
     private static string Owner(string subject) { RequireId(subject); return Digest(subject); }
     private static string JobPath(string root, string owner, string request) { RequireId(request); return Path.Combine(root, owner + "." + Digest(request) + ".json"); }
     private static string Digest<T>(T value) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, Json))).ToLowerInvariant();
@@ -383,5 +413,9 @@ public sealed class OriginChapterAuthoringService : IDisposable
 
 // Private worker API DTOs, not public package contracts or provider account data.
 public sealed record OriginChapterWorkerItem(string WorkId, OriginChapterAuthoringJob Job, string? ExecutionAdmission,
-    string BookRef);
+    string BookRef)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? PreviousWorkId { get; init; }
+}
 public sealed record OriginChapterWorkerAdmission(OriginChapterWorkerItem Work, bool MayStartGeneration);
