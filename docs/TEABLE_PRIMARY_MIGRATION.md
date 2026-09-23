@@ -802,3 +802,29 @@ does not prove whole-Hub recovery, live provider generation or Android UI behavi
 Only synthetic data was used. No browser/credential action, production cutover,
 provider call, signing or Play upload occurred. Restricted runtime credentials
 and complete authenticated Hub restoration remain prerequisites for live narration.
+
+## Combined account/private-book reconstruction — 2026-09-23
+
+The account-route fixture now checks the account and private document controllers
+together with explicit primary Community, support, membership, MyFirstBook usage,
+Horizon usage/receipts and publication/document adapters. It opens the account,
+consumes a synthetic allowance, previews/exports approved first-party notes, then
+disposes the service container and deletes its isolated local test root. A new
+container/root restores the same canonical user, consumed quota, document
+projection and exact Markdown bytes through the normal controller calls. An
+unauthenticated download rejects, repeat export retains the same document receipt,
+and account/participation pages remain usable. No real provider is involved.
+
+This is an existing-test extension, not new recovery infrastructure. The normal
+bounded-context registrations are used with test-injected primary transports;
+Identity admission and install-linking remain the local test fixtures. It does
+not prove Program startup, hosted workers, public ingress, real login, complete
+host recovery or production Teable credential provisioning.
+
+The new reconstruction check passed immediately. Running its 39-test account
+route class exposed one obsolete install fixture: it seeded a login subject into
+the canonical user field, so the existing strict owner-unlink check rejected it.
+The fixture now uses AccountService's actual canonical user ID. No runtime owner
+check was loosened. The corrected API/test build and all 39 account-route tests
+pass locally with network disabled. No production source, service or release
+artifact changed in this follow-up.

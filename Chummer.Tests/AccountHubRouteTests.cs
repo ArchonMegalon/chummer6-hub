@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using Chummer.Campaign.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api;
@@ -7,6 +9,9 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Teable;
+using Chummer.Storage.Teable;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Control.Contracts.Support;
 using Chummer.Run.Contracts.Billing;
@@ -18,12 +23,63 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Chummer.Tests;
 
 public sealed class AccountHubRouteTests
 {
+    [Fact]
+    public async Task PrimaryAccountBookContextRestoresQuotaAndPrivateExportAfterDiscardingTheLocalRoot()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        string userId, oldRoot;
+        OriginDossierFirstPartyDocumentProjection exported;
+        byte[] download;
+        using (var first = AccountHubRouteFixture.CreatePrimaryAccountBook(remote))
+        {
+            oldRoot = first.Root;
+            var page = Assert.IsType<ViewResult>(await first.CreateController().AccountPage(null, null, CancellationToken.None));
+            Assert.Equal("1 of 1 Origin Book left this month.", Assert.IsType<AccountHubPageViewModel>(page.Model).BookQuotaSummary);
+            userId = first.Accounts.GetBySubject("subject.account-hub-route")!.UserId;
+            first.Billing.ConsumeMyFirstBookQuota(userId, email: "account.runner@example.invalid");
+            var documents = first.CreatePrivateController<OriginDossierFirstPartyDocumentsController>();
+            var request = new OriginDossierFirstPartyDocumentRequest("Synthetic book", "Synthetic runner",
+                [new("school", "Selected a corporate school.", "player_note", "decision-one", true)], true);
+            var preview = Assert.IsType<OriginDossierFirstPartyDocumentProjection>(
+                Assert.IsType<OkObjectResult>(await documents.Preview("book", request, CancellationToken.None)).Value);
+            exported = Assert.IsType<OriginDossierFirstPartyDocumentProjection>(
+                Assert.IsType<OkObjectResult>(await documents.Export("book", preview.RevisionId, CancellationToken.None)).Value);
+            Assert.Equal("teable_primary_private_storage", exported.StoragePosture);
+            Assert.Equal("not_requested", exported.ProviderExecution);
+            download = Assert.IsType<FileContentResult>(await documents.Download("book", exported.RevisionId, "markdown", CancellationToken.None)).FileContents;
+            Assert.Equal(exported.MarkdownSha256, Convert.ToHexStringLower(SHA256.HashData(download)));
+            Assert.Equal(exported.Markdown, Encoding.UTF8.GetString(download));
+            foreach (string name in new[] { "community.json", "support.json", "bd-billing.json", "myfirstbook-usage.json" })
+                Assert.False(File.Exists(Path.Combine(first.Root, name)));
+        }
+        Assert.False(Directory.Exists(oldRoot));
+        using var cold = AccountHubRouteFixture.CreatePrimaryAccountBook(remote);
+        Assert.NotEqual(oldRoot, cold.Root);
+        Assert.Equal(userId, cold.Accounts.GetBySubject("subject.account-hub-route")!.UserId);
+        var restoredPage = Assert.IsType<ViewResult>(await cold.CreateController().AccountPage(null, null, CancellationToken.None));
+        Assert.Equal("0 of 1 Origin Book left this month.", Assert.IsType<AccountHubPageViewModel>(restoredPage.Model).BookQuotaSummary);
+        Assert.IsType<ViewResult>(await cold.CreateController().AccountPage("participation", null, CancellationToken.None));
+        var restoredDocuments = cold.CreatePrivateController<OriginDossierFirstPartyDocumentsController>();
+        Assert.Equal(exported, Assert.IsType<OriginDossierFirstPartyDocumentProjection>(
+            Assert.IsType<OkObjectResult>(await restoredDocuments.Get("book", exported.RevisionId, CancellationToken.None)).Value));
+        Assert.Equal(download, Assert.IsType<FileContentResult>(
+            await restoredDocuments.Download("book", exported.RevisionId, "markdown", CancellationToken.None)).FileContents);
+        Assert.Contains("no-store", restoredDocuments.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        Assert.Equal(exported, Assert.IsType<OriginDossierFirstPartyDocumentProjection>(
+            Assert.IsType<OkObjectResult>(await restoredDocuments.Export("book", exported.RevisionId, CancellationToken.None)).Value));
+        Assert.Equal(1, cold.Billing.GetMyFirstBookQuota(userId, email: "account.runner@example.invalid").MonthlyUsed);
+        var denied = await cold.CreatePrivateController<OriginDossierFirstPartyDocumentsController>(authenticated: false)
+            .Download("book", exported.RevisionId, "markdown", CancellationToken.None);
+        Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsAssignableFrom<ObjectResult>(denied).StatusCode);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("participation")]
@@ -631,6 +687,34 @@ public sealed class AccountHubRouteTests
         public CampaignSpineService CampaignSpine => _provider.GetRequiredService<CampaignSpineService>();
         public AccountService Accounts => _provider.GetRequiredService<AccountService>();
 
+        public static AccountHubRouteFixture CreatePrimaryAccountBook(TeableRevisionStoreTests.Remote remote)
+            => Create((services, original) =>
+            {
+                var primary = new ConfigurationBuilder().AddConfiguration(original).AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] = "teable",
+                    ["CHUMMER_SUPPORT_STORAGE_PROVIDER"] = "teable",
+                    ["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"] = "teable",
+                    ["CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER"] = "teable",
+                    ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER"] = "teable",
+                    ["CHUMMER_HORIZON_REQUEST_RECEIPT_STORAGE_PROVIDER"] = "teable",
+                    ["CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER"] = "teable",
+                    ["CHUMMER_ORIGIN_DOCUMENT_STORAGE_PROVIDER"] = "teable"
+                }).Build();
+                services.AddSingleton<IConfiguration>(primary);
+                services.AddKeyedSingleton<TeableRevisionStore>(ServiceCollectionBoundedContextExtensions.CommunityPrimaryStoreKey,
+                    (_, _) => remote.Store());
+                services.AddSingleton(provider => new SupportStore(primary, provider.GetRequiredService<ILogger<SupportStore>>(), remote.Store(), ownsPrimary: true));
+                services.AddSingleton(_ => new BrilliantDirectoriesBillingStore(primary, primary: remote.Store(), ownsPrimary: true));
+                services.AddSingleton(_ => new MyFirstBookUsageStore(primary, primary: remote.Store(), ownsPrimary: true));
+                services.AddSingleton(_ => new HorizonArtifactUsageStore(primary, remote.Store(), ownsPrimary: true));
+                services.AddSingleton(_ => new HorizonArtifactRequestReceiptStore(primary, remote.Store(), ownsPrimary: true));
+                services.AddSingleton(provider => new OriginDossierPublicationService(primary,
+                    provider.GetService<HorizonCapabilityService>(), provider.GetService<MediaArtifactHorizonsService>(),
+                    provider.GetRequiredService<ILogger<OriginDossierPublicationService>>(), new(remote.Store(), ownsStore: true)));
+                services.AddSingleton(_ => new OriginDossierFirstPartyDocumentService(primary, new(remote.Store(), ownsStore: true)));
+            });
+
         public static AccountHubRouteFixture Create(Action<IServiceCollection, IConfiguration>? configure = null)
         {
             string root = Path.Combine(Path.GetTempPath(), "chummer-account-hub-route-tests", Guid.NewGuid().ToString("N"));
@@ -675,8 +759,11 @@ public sealed class AccountHubRouteTests
         }
 
         public AccountsController CreateController(bool authenticated = true)
+            => CreatePrivateController<AccountsController>(authenticated);
+
+        public T CreatePrivateController<T>(bool authenticated = true) where T : ControllerBase
         {
-            AccountsController controller = ActivatorUtilities.CreateInstance<AccountsController>(_provider);
+            T controller = ActivatorUtilities.CreateInstance<T>(_provider);
             DefaultHttpContext httpContext = new()
             {
                 RequestServices = _provider
@@ -697,6 +784,10 @@ public sealed class AccountHubRouteTests
 
         public void SeedClaimedInstall(string installationId, string hostLabel)
         {
+            // Real account admission binds both the canonical user and login
+            // subject; treating the subject as the user makes owner revocation
+            // correctly reject this otherwise visible legacy-shaped fixture.
+            var user = Accounts.EnsureUser("subject.account-hub-route", "Account Runner", "account.runner@example.invalid");
             IssueInstallBrowserCallbackResponseDto issued = InstallLinking.IssueBrowserCallback(
                 new IssueInstallBrowserCallbackRequestDto(
                     InstallationId: installationId,
@@ -710,7 +801,7 @@ public sealed class AccountHubRouteTests
                     PublicKey: "public-key",
                     HostLabel: hostLabel,
                     InstallAccessClass: InstallAccessClasses.AccountRecommended),
-                userId: "subject.account-hub-route",
+                userId: user.UserId,
                 subjectId: "subject.account-hub-route");
 
             InstallLinking.ExchangeBrowserCallback(
