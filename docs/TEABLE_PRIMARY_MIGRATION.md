@@ -562,7 +562,7 @@ to repeat its creation phase over an existing synthetic Community snapshot.
 
 ## Remaining before production cutover
 
-1. Finish Community consumer/DI conversion and remaining document/artifact
+1. Finish Community consumer conversion and remaining document/artifact
    stores. Origin jobs, private first-party documents, linked runner snapshots,
    MyFirstBook usage, Origin credit reservations, billing membership, Horizon
    usage and request receipts have primary implementations with atomic new
@@ -648,3 +648,37 @@ nested cache lifetime. Three negative assertions initially used the wrong common
 exception base; they now check the actual exact failure types. No failed run is
 counted as passing. This is simulated-transport verification, not a live primary
 cutover, complete host reconstruction, package reseal or Play delivery.
+
+## Explicit Community runtime registration — 2026-09-23
+
+The existing primary CommunityStore is now wired into the normal account-service
+registration instead of requiring a manually constructed store. Configuration is
+explicit and independent of the legacy Teable user-projection/export credential:
+
+```text
+CHUMMER_COMMUNITY_STORAGE_PROVIDER=teable
+CHUMMER_COMMUNITY_TEABLE_TABLE_ID=<dedicated private Community table>
+CHUMMER_COMMUNITY_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+CHUMMER_TEABLE_ORIGIN=https://app.teable.ai/
+```
+
+The DI container owns a separately keyed primary transport. Resolving an account
+service loads and validates current Community state before returning it. Missing
+table/token, unknown provider, malformed primary state or an outage rejects rather
+than falling back to a local file or a broader ambient API key. Local mode retains
+its existing snapshot and does not construct a remote transport.
+
+90 focused local Docker tests pass, including seven new registration cases,
+fresh service-container account restoration, startup rejection and existing
+Community, billing, authoring, support and erasure regressions. The API/test build
+is clean. The first run was 89/90: a new assertion confused the old projection's
+enabled flag with its configured state; the corrected test verifies that no
+external projection credentials/destination were supplied. The legacy projection
+settings and defaults are unchanged and remain separate from primary storage.
+Tests substitute only the keyed transport with synthetic in-memory HTTP; no real
+Teable credential, provider call or production activation is implied.
+
+This closes the registration gap, not all Community consumer work. In particular,
+legacy Play-authorization and optional notification/external-work consumers still
+need explicit scope/transaction migration; no full-Hub cutover is authorized by
+this test. Historical erasure and complete deployment recovery remain open.

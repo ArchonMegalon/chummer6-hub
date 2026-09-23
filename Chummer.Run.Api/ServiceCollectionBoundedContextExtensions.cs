@@ -16,6 +16,8 @@ namespace Chummer.Run.Api;
 
 internal static class ServiceCollectionBoundedContextExtensions
 {
+    internal const string CommunityPrimaryStoreKey = "chummer.community.primary";
+
     public static IServiceCollection AddHubPublicGuideContext(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
@@ -84,7 +86,27 @@ internal static class ServiceCollectionBoundedContextExtensions
     public static IServiceCollection AddHubAccountsAndCommunityContext(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<CommunityStore>();
+        services.AddKeyedSingleton<TeableRevisionStore>(CommunityPrimaryStoreKey, (provider, _) =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] != "teable")
+                throw new InvalidOperationException("Community primary transport requires explicit Teable mode.");
+            return TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_COMMUNITY_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary community table is required."),
+                configuration["CHUMMER_COMMUNITY_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private community token file is required."));
+        });
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetRequiredService<ILogger<CommunityStore>>();
+            var primary = configuration["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] == "teable"
+                ? provider.GetRequiredKeyedService<TeableRevisionStore>(CommunityPrimaryStoreKey)
+                : null;
+            // The container owns the keyed transport. CommunityStore validates
+            // the current remote schema before any account service is returned.
+            return new CommunityStore(configuration, logger, primary);
+        });
         services.AddSingleton<IPlaySessionAuthorizationPersistence, CommunityStorePlaySessionAuthorizationPersistence>();
         services.AddSingleton<PlaySessionAuthorizationService>();
         services.AddSingleton<PlayAuthorizationIdempotencyCoordinator>();
