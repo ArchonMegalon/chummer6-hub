@@ -86,7 +86,7 @@ public sealed class HorizonArtifactRequestReceiptStore : IDisposable
         }
     }
 
-    private static void ValidatePrimary(IReadOnlyList<HorizonArtifactRequestReceipt> receipts)
+    internal static void ValidatePrimary(IReadOnlyList<HorizonArtifactRequestReceipt> receipts)
     {
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in receipts)

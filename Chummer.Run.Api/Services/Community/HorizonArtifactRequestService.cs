@@ -54,6 +54,11 @@ public sealed class HorizonArtifactRequestService
 
         HorizonArtifactQuotaSnapshot? quota = null;
         bool quotaTracked = capability.QuotaTracked;
+        var preparedReceipt = new HorizonArtifactRequestReceipt(
+            requestId, blocked.Count == 0 ? "accepted" : "blocked", capability.HorizonId,
+            capability.CapabilityId, capability.ArtifactKind, capability.PublicLabel, capability.CapabilitySlot,
+            Clean(request.SourceRef), Clean(request.UserId), Clean(request.Visibility), request.ExternalProcessingConsent,
+            blocked.ToArray(), createdAtUtc, quotaTracked, GovernedRenderRequest: governedRenderRequest);
         HorizonArtifactQuotaRequest quotaRequest = new(
             UserId: request.UserId,
             HorizonId: capability.HorizonId,
@@ -69,7 +74,12 @@ public sealed class HorizonArtifactRequestService
             {
                 try
                 {
-                    quota = _quota.Consume(quotaRequest, createdAtUtc);
+                    if (FindReceipt(requestId) is not null)
+                        throw new InvalidOperationException("This request already has a receipt; read it instead of resubmitting.");
+                    quota = _quota.Consume(quotaRequest, createdAtUtc, preparedReceipt);
+                    // The usage commit includes this exact receipt. No second
+                    // write can fail after consuming the user's allowance.
+                    return preparedReceipt with { Quota = quota };
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("allowance", StringComparison.OrdinalIgnoreCase))
                 {
@@ -107,10 +117,27 @@ public sealed class HorizonArtifactRequestService
         string? userId = null,
         string? artifactKindOrCapabilityId = null,
         int limit = 50)
-        => _receipts?.ListRecent(horizonId, userId, artifactKindOrCapabilityId, limit) ?? Array.Empty<HorizonArtifactRequestReceipt>();
+    {
+        var charged = (_quota?.ListChargedRequests() ?? [])
+            .Where(row => string.IsNullOrWhiteSpace(horizonId) || string.Equals(row.HorizonId, Clean(horizonId), StringComparison.OrdinalIgnoreCase))
+            .Where(row => string.IsNullOrWhiteSpace(userId) || string.Equals(row.RequestedByUserId, Clean(userId), StringComparison.OrdinalIgnoreCase))
+            .Where(row => string.IsNullOrWhiteSpace(artifactKindOrCapabilityId)
+                || string.Equals(row.ArtifactKind, Clean(artifactKindOrCapabilityId), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(row.CapabilityId, Clean(artifactKindOrCapabilityId), StringComparison.OrdinalIgnoreCase));
+        return HorizonQuotaReceipts.Merge(charged, _receipts?.ListRecent(horizonId, userId, artifactKindOrCapabilityId, limit) ?? [])
+            .OrderByDescending(row => row.CreatedAtUtc)
+            .ThenBy(row => row.RequestId, StringComparer.OrdinalIgnoreCase)
+            .Take(Math.Clamp(limit, 1, 200)).ToArray();
+    }
 
     public HorizonArtifactRequestReceipt? FindReceipt(string requestId)
-        => _receipts?.FindByRequestId(requestId);
+    {
+        if (string.IsNullOrWhiteSpace(requestId)) return null;
+        var charged = (_quota?.ListChargedRequests() ?? [])
+            .Where(row => string.Equals(row.RequestId, requestId.Trim(), StringComparison.OrdinalIgnoreCase));
+        var legacy = _receipts?.FindByRequestId(requestId);
+        return HorizonQuotaReceipts.Merge(charged, legacy is null ? [] : [legacy]).SingleOrDefault();
+    }
 
     public HorizonArtifactRequestReceipt? FindReceiptForUser(string requestId, string userId)
     {

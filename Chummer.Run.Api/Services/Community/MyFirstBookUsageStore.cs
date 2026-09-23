@@ -26,7 +26,7 @@ public sealed class MyFirstBookUsageStore : IDisposable
         string mode = configuration["CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER"]?.Trim() ?? "local";
         if (mode is not ("local" or "teable") || (mode == "teable") != (primary is not null))
             throw new InvalidOperationException("MyFirstBook usage requires an explicit matching primary configuration.");
-        _ledger = new(primary, ownsPrimary, "myfirstbook-usage", "chummer.hub.myfirstbook-usage-primary/v1", ValidatePrimary);
+        _ledger = new(primary, ownsPrimary, "myfirstbook-usage", "chummer.hub.myfirstbook-usage-primary/v1", ValidatePrimary, maxDepth: 12);
         _logger = logger ?? NullLogger<MyFirstBookUsageStore>.Instance;
         _storagePath = primary is null ? ResolveStoragePath(configuration) : string.Empty;
         if (primary is null) Load();
@@ -43,6 +43,7 @@ public sealed class MyFirstBookUsageStore : IDisposable
     private static void ValidatePrimary(IReadOnlyList<MyFirstBookUsageLedgerEntry> entries)
     {
         var users = new Dictionary<string, HashSet<DateTimeOffset>>(StringComparer.OrdinalIgnoreCase);
+        var requestIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in entries)
         {
             if (entry is null || string.IsNullOrWhiteSpace(entry.UserId) || entry.UserId != entry.UserId.Trim()
@@ -52,6 +53,8 @@ public sealed class MyFirstBookUsageStore : IDisposable
                 throw new InvalidDataException("Primary MyFirstBook usage row is invalid.");
             if (!users.TryGetValue(entry.UserId, out var windows)) users.Add(entry.UserId, windows = []);
             if (!windows.Add(entry.WindowStartUtc)) throw new InvalidDataException("Primary MyFirstBook usage is ambiguous.");
+            HorizonQuotaReceipts.Validate(entry.RequestReceipts, entry.UserId, entry.WindowStartUtc,
+                entry.WindowStartUtc.AddMonths(1), entry.MonthlyUsed, "monthly", requestIds);
         }
     }
 
@@ -138,4 +141,8 @@ internal sealed record MyFirstBookUsageLedgerEntry(
     string UserId,
     DateTimeOffset WindowStartUtc,
     int MonthlyUsed,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<HorizonArtifactRequestReceipt>? RequestReceipts { get; init; }
+}

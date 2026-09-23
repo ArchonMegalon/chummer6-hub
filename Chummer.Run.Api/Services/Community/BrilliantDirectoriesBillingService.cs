@@ -151,13 +151,17 @@ public sealed class BrilliantDirectoriesBillingService
     public MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now = null, string? email = null)
         => ConsumeMyFirstBookQuota(userId, now, email, 1);
 
-    internal MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now, string? email, int unitsRequested)
+    internal MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now, string? email, int unitsRequested,
+        Func<MyFirstBookQuotaSnapshotDto, HorizonArtifactRequestReceipt>? createReceipt = null)
     {
         if (unitsRequested <= 0) throw new InvalidOperationException("A positive MyFirstBook allowance count is required.");
         DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
         MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, effectiveNow, email);
         using (_myFirstBookUsage.Enter())
         {
+            if (createReceipt is not null)
+                HorizonQuotaReceipts.RejectDuplicate(_myFirstBookUsage.Entries.SelectMany(row => row.RequestReceipts ?? []),
+                    createReceipt(snapshot).RequestId);
             int existingIndex = _myFirstBookUsage.Entries.FindIndex(item =>
                 string.Equals(item.UserId, snapshot.UserId, StringComparison.OrdinalIgnoreCase)
                 && item.WindowStartUtc == snapshot.WindowStartUtc);
@@ -173,6 +177,19 @@ public sealed class BrilliantDirectoriesBillingService
                     UpdatedAtUtc = effectiveNow
                 }
                 : new MyFirstBookUsageLedgerEntry(snapshot.UserId, snapshot.WindowStartUtc, unitsRequested, effectiveNow);
+            MyFirstBookQuotaSnapshotDto committedQuota = snapshot with
+            {
+                MonthlyUsed = updated.MonthlyUsed,
+                MonthlyRemaining = Math.Max(0, snapshot.MonthlyLimit - updated.MonthlyUsed)
+            };
+            if (createReceipt is not null)
+            {
+                if (unitsRequested != 1) throw new InvalidOperationException("A request receipt must bind one consumption.");
+                HorizonArtifactRequestReceipt receipt = createReceipt(committedQuota);
+                updated = updated with { RequestReceipts = HorizonQuotaReceipts.Append(previous?.RequestReceipts, receipt) };
+                HorizonQuotaReceipts.Validate(updated.RequestReceipts, updated.UserId, updated.WindowStartUtc,
+                    committedQuota.WindowEndUtc, updated.MonthlyUsed, "monthly", new(StringComparer.OrdinalIgnoreCase));
+            }
             if (existingIndex >= 0)
             {
                 _myFirstBookUsage.Entries[existingIndex] = updated;
@@ -191,11 +208,19 @@ public sealed class BrilliantDirectoriesBillingService
             }
             // Do not make an acknowledged mutation look failed by performing
             // another remote read just to construct its response.
-            return new MyFirstBookQuotaConsumeResultDto("consumed", snapshot with
-            {
-                MonthlyUsed = updated.MonthlyUsed,
-                MonthlyRemaining = Math.Max(0, snapshot.MonthlyLimit - updated.MonthlyUsed)
-            });
+            return new MyFirstBookQuotaConsumeResultDto("consumed", committedQuota);
+        }
+    }
+
+    internal IReadOnlyList<HorizonArtifactRequestReceipt> ListChargedArtifactRequests()
+    {
+        using (_myFirstBookUsage.Enter())
+        {
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in _myFirstBookUsage.Entries.Where(row => row.RequestReceipts is not null))
+                HorizonQuotaReceipts.Validate(row.RequestReceipts, row.UserId, row.WindowStartUtc,
+                    row.WindowStartUtc.AddMonths(1), row.MonthlyUsed, "monthly", ids);
+            return _myFirstBookUsage.Entries.SelectMany(row => row.RequestReceipts ?? []).ToArray();
         }
     }
 

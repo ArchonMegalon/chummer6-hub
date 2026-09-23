@@ -8,15 +8,15 @@ namespace Chummer.Run.Api.Services.Community;
 // Shared custody for authoring ledgers and their membership inputs, not provider-dispatch
 // admission or a distributed lease. A new outer scope is always a remote read.
 internal sealed class TeableQuotaLedger<T>(TeableRevisionStore? primary, bool ownsPrimary,
-    string stream, string schema, Action<IReadOnlyList<T>> validate) : IDisposable
+    string stream, string schema, Action<IReadOnlyList<T>> validate, int maxDepth = 8) : IDisposable
 {
     private readonly object _gate = new();
     private TeableRevisionStore.Head? _head;
     private int _depth;
     private bool _failed;
     private const int MaximumBytes = 4 * 1024 * 1024;
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
-        { MaxDepth = 8, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
+    private readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+        { MaxDepth = maxDepth, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
     private sealed record Snapshot(string Schema, IReadOnlyList<T> Entries);
 
     internal List<T> Entries { get; } = [];

@@ -77,9 +77,13 @@ preserved; none of its unreadable records were decrypted or silently imported.
   Restored render requests do not activate a provider or assert rendered output.
   Monthly multi-unit consumption is now one allowance commit, not a loop that
   can partially charge a request. Weekly allowance checks also reject integer
-  overflow. Usage consumption and request-receipt creation remain separate
-  commits: a receipt failure after consumption still needs recovery before
-  cutover. This is not an end-to-end atomic request/dispatch transaction.
+  overflow. Charged requests now store their receipt inside the same weekly or
+  monthly usage commit: no second receipt write can fail after the charge.
+  Cold lookup/listing combines those receipts with the legacy/compose-only store.
+  Duplicate charge identities reject before consuming again. Unknown outcomes
+  require readback, not replay. This closes the charge/receipt gap for new
+  requests; it is not an end-to-end provider-dispatch transaction or a new
+  client idempotency contract.
 - Community profiles, principal mappings and groups now have an isolated primary
   implementation using the existing typed snapshot. Explicit synchronous scopes
   refresh at outer entry; nested account/group/identity-link/ledger/experience
@@ -180,6 +184,11 @@ CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TOKEN_FILE=<absolute private mounted toke
 These are stored usage and request records, not provider outputs or publication
 authority. Historical deletion remains rejected before auxiliary erasure starts.
 The existing compose-only/provider-disabled boundaries are unchanged.
+New charged receipts are part of the authoritative usage row; receipt queries
+must go through `HorizonArtifactRequestService`, not the standalone legacy store.
+Existing counts with no receipt retain that lack of historical attribution; no
+receipt is invented for them. The bounded usage JSON depth permits the nested
+receipt while retaining its byte cap and exact owner/window/count validation.
 
 API account/key custody uses distinct explicit registrations:
 
@@ -300,6 +309,18 @@ recovered with a bounded `--no-build --no-restore` test replay of the already
 compiled assembly; no unchanged build or full suite was repeated. Tests use
 synthetic simulated transport. No live data, provider, deployment or Play change.
 
+Atomic charge follow-up: the existing 23 render-path tests passed, then 122
+focused ledger/billing/reservation/erasure tests passed. Coverage includes one
+charge/receipt commit, rejected commit, uncertain acknowledgement, competing
+writers, cold owner-filtered reads, duplicate-charge rejection, hostile detached
+counts, and local-file cold restore alongside legacy receipts. The first 120-test
+run passed 118; two controller tests still read the standalone receipt store.
+They now verify the shared request query service and retain their response/header
+assertions. The analogous public landing reload test was adjusted but was not in
+this bounded execution; two new local cold-restore cases exercise the new read
+model. API and bounded test assembly compiled without warnings/errors. No live
+Teable data, public deployment, provider dispatch or Play operation was performed.
+
 Runtime credential preparation: the existing EA API token returned HTTP 403 from
 the read-only `/api/access-token` metadata endpoint. It has not been deployed to
 Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
@@ -311,8 +332,8 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
 1. Finish Community consumer/DI conversion and remaining document/artifact
    stores. Origin jobs, private first-party documents, linked runner snapshots,
    MyFirstBook usage, Origin credit reservations, billing membership, Horizon
-   usage and request receipts have primary implementations. Close the separate
-   quota-consumption/request-receipt recovery gap. Publication-index/provider-output artifacts and other
+   usage and request receipts have primary implementations with atomic new
+   charge/receipt storage. Publication-index/provider-output artifacts and other
    auxiliary stores still need custody review. The isolated Community slice is
    not a complete activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;

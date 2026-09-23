@@ -19,7 +19,7 @@ public sealed class HorizonArtifactUsageStore : IDisposable
         string mode = configuration["CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER"]?.Trim() ?? "local";
         if (mode is not ("local" or "teable") || (mode == "teable") != (primary is not null))
             throw new InvalidOperationException("Artifact usage requires an explicit matching primary configuration.");
-        _ledger = new(primary, ownsPrimary, "horizon-artifact-usage", "chummer.hub.horizon-artifact-usage-primary/v1", ValidatePrimary);
+        _ledger = new(primary, ownsPrimary, "horizon-artifact-usage", "chummer.hub.horizon-artifact-usage-primary/v1", ValidatePrimary, maxDepth: 12);
         _storagePath = primary is null ? ResolveStoragePath(configuration) : string.Empty;
         if (primary is null) Load();
     }
@@ -35,6 +35,7 @@ public sealed class HorizonArtifactUsageStore : IDisposable
     private static void ValidatePrimary(IReadOnlyList<HorizonArtifactUsageLedgerEntry> entries)
     {
         var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var requestIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in entries)
         {
             if (row is null || new[] { row.UserId, row.HorizonId, row.CapabilityId, row.ArtifactKind }
@@ -49,6 +50,8 @@ public sealed class HorizonArtifactUsageStore : IDisposable
             string key = JsonSerializer.Serialize(new[] { row.UserId.ToUpperInvariant(), row.HorizonId.ToUpperInvariant(), row.CapabilityId.ToUpperInvariant(),
                 row.ArtifactKind.ToUpperInvariant(), row.WindowStartUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture) });
             if (!keys.Add(key)) throw new InvalidDataException("Primary artifact usage is ambiguous.");
+            HorizonQuotaReceipts.Validate(row.RequestReceipts, row.UserId, row.WindowStartUtc,
+                row.WindowStartUtc.AddDays(7), row.Used, "weekly", requestIds, row.HorizonId, row.CapabilityId, row.ArtifactKind);
         }
     }
 
@@ -115,4 +118,8 @@ internal sealed record HorizonArtifactUsageLedgerEntry(
     string WindowKind,
     DateTimeOffset WindowStartUtc,
     int Used,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<HorizonArtifactRequestReceipt>? RequestReceipts { get; init; }
+}

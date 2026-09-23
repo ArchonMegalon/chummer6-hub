@@ -126,7 +126,7 @@ public sealed class HorizonTeablePersistenceTests : IDisposable
         Assert.Equal(2, cold.ListRecentReceipts("runsite", "user", "tour").Count);
         Assert.Empty(cold.ListRecentReceipts("runsite", "other"));
         Assert.Equal(1, Quota(remote).GetQuota(UsageRequest(), Now).WindowUsed);
-        Assert.Equal(3, remote.HeadPosts);
+        Assert.Equal(2, remote.HeadPosts); // One charged receipt/usage commit, one blocked receipt.
         Assert.Empty(coldStore.Receipts);
         Assert.False(Directory.Exists(_root));
     }
@@ -194,6 +194,12 @@ public sealed class HorizonTeablePersistenceTests : IDisposable
         using var receipts = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
         Requests(remote, receipts).BuildRequest(Request(), Now, consumeQuota: true);
         string stream = fault.StartsWith("receipt", StringComparison.Ordinal) ? "horizon-request-receipts" : "horizon-artifact-usage";
+        if (fault.StartsWith("receipt", StringComparison.Ordinal))
+        {
+            var observedQuota = Quota(remote).GetQuota(UsageRequest(), Now);
+            var uncharged = new HorizonArtifactRequestService(new(Config())).BuildRequest(Request(), Now.AddSeconds(1));
+            receipts.Append(uncharged with { Quota = observedQuota });
+        }
         var head = await remote.Store().ReadAsync(stream);
         var state = JsonNode.Parse(head!.Bytes)!;
         var row = state["entries"]![0]!;
@@ -223,7 +229,7 @@ public sealed class HorizonTeablePersistenceTests : IDisposable
         var service = Requests(remote, receipts);
         var saved = service.BuildRequest(Request(), Now, consumeQuota: true);
         remote.FailReads = true;
-        Assert.Throws<HttpRequestException>(() => receipts.FindByRequestId(saved.RequestId));
+        Assert.Throws<HttpRequestException>(() => service.FindReceipt(saved.RequestId));
         Assert.Throws<HttpRequestException>(() => Quota(remote).GetQuota(UsageRequest(), Now));
         Assert.Empty(receipts.Receipts);
         Assert.False(Directory.Exists(_root));
@@ -259,6 +265,118 @@ public sealed class HorizonTeablePersistenceTests : IDisposable
         Assert.NotNull(provider.GetRequiredService<HorizonArtifactUsageStore>());
         Assert.NotNull(provider.GetRequiredService<HorizonArtifactRequestReceiptStore>());
         Assert.Single(Directory.GetFiles(_root));
+    }
+
+    private static HorizonArtifactRequestCreateRequest ChargedRequest(bool monthly)
+        => monthly ? new("origin-dossier", "premium_authoring_credit", "user", "origin-dossier:synthetic", "private", true) : Request();
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Local_cold_restore_keeps_legacy_receipts_and_atomically_charged_requests(bool monthly)
+    {
+        var config = Config("local");
+        HorizonArtifactRequestService Create()
+        {
+            var billing = new BrilliantDirectoriesBillingService(new(config), new(config), config);
+            return new(new(config), new(new(config), new(config), billing), new(config));
+        }
+        var original = Create().BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true);
+        var old = new HorizonArtifactRequestService(new(config)).BuildRequest(Request("map"), Now.AddSeconds(-1));
+        using (var legacy = new HorizonArtifactRequestReceiptStore(config)) legacy.Append(old);
+        var cold = Create();
+        Assert.Equal(JsonSerializer.Serialize(original), JsonSerializer.Serialize(cold.FindReceipt(original.RequestId)));
+        Assert.Equal(JsonSerializer.Serialize(old), JsonSerializer.Serialize(cold.FindReceipt(old.RequestId)));
+        Assert.Equal(2, cold.ListRecentReceipts(userId: "user").Count);
+        Assert.Throws<InvalidOperationException>(() => cold.BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true));
+        Assert.Equal(1, cold.FindReceipt(original.RequestId)!.Quota!.WindowUsed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Successful_charge_and_receipt_have_one_commit_and_cold_owner_scoped_readback(bool monthly)
+    {
+        using var remote = new Remote();
+        using var receipts = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
+        var original = Requests(remote, receipts).BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true);
+        Assert.Equal("accepted", original.Status);
+        Assert.Equal(1, remote.HeadPosts);
+        Assert.Empty(receipts.ListRecent()); // Charged receipt lives with the usage, not a second write.
+        using var coldStore = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
+        var cold = Requests(remote, coldStore);
+        Assert.Equal(JsonSerializer.Serialize(original), JsonSerializer.Serialize(cold.FindReceiptForUser(original.RequestId, "user")));
+        Assert.Null(cold.FindReceiptForUser(original.RequestId, "other"));
+        Assert.Single(cold.ListRecentReceipts(userId: "user"));
+        Assert.Empty(cold.ListRecentReceipts(userId: "other"));
+        Assert.Throws<InvalidOperationException>(() => cold.BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true));
+        Assert.Equal(1, remote.HeadPosts);
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Lost_charge_acknowledgement_restores_receipt_without_replaying_consumption(bool monthly)
+    {
+        using var remote = new Remote { CommitThenFailHard = true };
+        using var receipts = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
+        Assert.Throws<IOException>(() => Requests(remote, receipts).BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true));
+        using var coldStore = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
+        var cold = Requests(remote, coldStore);
+        var recovered = Assert.Single(cold.ListRecentReceipts(userId: "user"));
+        Assert.Equal("accepted", recovered.Status);
+        Assert.Equal(1, recovered.Quota!.WindowUsed);
+        Assert.Equal(recovered.RequestId, cold.FindReceipt(recovered.RequestId)!.RequestId);
+        Assert.Throws<InvalidOperationException>(() => cold.BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true));
+        Assert.Equal(1, remote.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Failed_charge_admission_does_not_create_a_receipt_or_consume_allowance(bool monthly)
+    {
+        using var remote = new Remote { BeforeHeadPost = () => throw new IOException("synthetic rejected commit") };
+        using var receipts = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
+        var service = Requests(remote, receipts);
+        Assert.Throws<IOException>(() => service.BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true));
+        Assert.Empty(service.ListRecentReceipts());
+        var request = ChargedRequest(monthly);
+        Assert.Equal(0, Quota(remote).GetQuota(new(request.UserId, request.HorizonId, request.ArtifactKindOrCapabilityId), Now).WindowUsed);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Competing_charged_requests_admit_exactly_one_matching_receipt(bool monthly)
+    {
+        using var remote = new Remote();
+        using var firstStore = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
+        using var secondStore = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
+        HorizonArtifactRequestReceipt? winner = null;
+        remote.BeforeHeadPost = () => winner = Requests(remote, secondStore).BuildRequest(ChargedRequest(monthly), Now.AddSeconds(1), consumeQuota: true);
+        Assert.Throws<TeableRevisionConflictException>(() => Requests(remote, firstStore).BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true));
+        Assert.NotNull(winner);
+        Assert.Equal(winner.RequestId, Assert.Single(Requests(remote, firstStore).ListRecentReceipts()).RequestId);
+        Assert.Equal(1, remote.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Charged_receipt_is_rejected_if_detached_from_its_usage_count(bool monthly)
+    {
+        using var remote = new Remote();
+        using var receipts = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
+        Requests(remote, receipts).BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true);
+        string stream = monthly ? "myfirstbook-usage" : "horizon-artifact-usage";
+        var head = await remote.Store().ReadAsync(stream);
+        var state = JsonNode.Parse(head!.Bytes)!;
+        state["entries"]![0]![monthly ? "monthlyUsed" : "used"] = 0;
+        await remote.Store().CompareExchangeAsync(stream, head, Guid.NewGuid(), JsonSerializer.SerializeToUtf8Bytes(state));
+        Assert.Throws<InvalidDataException>(() => Requests(remote, receipts).ListRecentReceipts());
     }
 
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true); }
