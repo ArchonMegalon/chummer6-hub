@@ -144,7 +144,7 @@ preserved; none of its unreadable records were decrypted or silently imported.
   The external Core edit path remains unavailable in primary mode until a durable
   operation fence/reconciliation spans Core execution and the Community commit.
   This is not whole-Campaign activation or general delegated-edit authority.
-  This slice is **not registered for production**: remaining Community consumers,
+  This slice is **not deployed in production**: remaining Community consumers,
   other auxiliary stores and historical erasure still need conversion.
 - Support cases, crash incidents/clusters/work items and their indexes now have
   an explicit primary registration. Every outer case/crash/Campaign support read
@@ -679,6 +679,35 @@ Tests substitute only the keyed transport with synthetic in-memory HTTP; no real
 Teable credential, provider call or production activation is implied.
 
 This closes the registration gap, not all Community consumer work. In particular,
-legacy Play-authorization and optional notification/external-work consumers still
+optional notification/external-work consumers still
 need explicit scope/transaction migration; no full-Hub cutover is authorized by
 this test. Historical erasure and complete deployment recovery remain open.
+
+## Play session account authority — 2026-09-23
+
+The existing session/invite/exchange/grant service now enters fresh synchronous
+Community scopes. Its constructor no longer requires a legacy file gate. Current
+membership, revocation and time high-water state restore remotely; only secret
+hashes are persisted, and primary mode never reads or writes a local snapshot.
+The primary writer cannot be replaced by a custom persistence implementation.
+
+A conflicting or uncertain primary commit fences the instance until cold
+reconciliation. Failure returns no credential, restores only the in-memory
+candidate and never overwrites remote authority, retries redemption or restores
+a consumed secret. Existing local-file rollback behavior is preserved.
+
+This is storage compatibility, **not Play API activation**. The transport remains
+limited to its local single-writer Testing harness. Startup, runtime policy and
+the process lease reject attempted primary activation; a disabled feature creates
+no lease file. A local OS file lock cannot establish exclusive remote ownership.
+Crash-recoverable response delivery, browser proof and production admission are
+not claimed by this change.
+
+The new regressions reproduced ten failures before the patch (one disabled case
+already passed). The corrected keyless local Docker run passed 80/80 focused
+service, endpoint, Community and revision-transport tests, with clean API/test
+compilation. Cases include cold restoration, current membership/revocation,
+clock rollback, competing invite/exchange consumers, uncertain commits, no-replay,
+outage rejection and legacy local rollback/endpoint behavior. Networking was
+disabled; transport and account data were synthetic. No live account migration,
+credential issuance, production service, provider activation or Play upload ran.

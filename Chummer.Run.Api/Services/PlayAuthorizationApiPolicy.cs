@@ -6,8 +6,8 @@ namespace Chummer.Run.Api.Services;
 
 /// <summary>
 /// Activation and service-authentication boundary for the dormant Play authorization API.
-/// This policy deliberately supports only a declared single-writer deployment until the
-/// CommunityStore has a cross-process compare-and-swap persistence implementation.
+/// This policy deliberately retains the local single-writer test harness. A primary storage
+/// adapter alone does not qualify runtime activation, browser credentials or recovery semantics.
 /// </summary>
 public sealed class PlayAuthorizationApiPolicy
 {
@@ -42,7 +42,11 @@ public sealed class PlayAuthorizationApiPolicy
     }
 
     public bool Enabled => _configuration.GetValue(FeatureConfigurationKey, false)
-        && _environment.IsEnvironment(TestEnvironmentName);
+        && _environment.IsEnvironment(TestEnvironmentName)
+        && UsesLocalStore(_configuration);
+
+    internal static bool UsesLocalStore(IConfiguration configuration)
+        => string.Equals(configuration["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] ?? "local", "local", StringComparison.Ordinal);
 
     public static void ValidateStartup(IConfiguration configuration, IHostEnvironment environment)
     {
@@ -52,6 +56,13 @@ public sealed class PlayAuthorizationApiPolicy
         if (!configuration.GetValue(FeatureConfigurationKey, false))
         {
             return;
+        }
+
+        if (!UsesLocalStore(configuration))
+        {
+            throw new InvalidOperationException(
+                "Play authorization API activation is limited to the local single-writer test harness. "
+                + "Primary storage support does not authorize a deployment or a local writer lease over remote state.");
         }
 
         string? writerMode = configuration[WriterModeConfigurationKey];

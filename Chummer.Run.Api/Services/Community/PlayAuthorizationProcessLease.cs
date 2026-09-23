@@ -21,6 +21,12 @@ public sealed class PlayAuthorizationProcessLease : IHostedService, IDisposable
             return;
         }
 
+        if (!PlayAuthorizationApiPolicy.UsesLocalStore(configuration))
+        {
+            throw new InvalidOperationException(
+                "A local Play authorization writer lease cannot protect a primary remote Community store.");
+        }
+
         string storagePath = CommunityStore.ResolveStoragePath(configuration);
         string leasePath = $"{storagePath}.play-authorization.lease";
         try
