@@ -108,6 +108,24 @@ fails. A focused barrier test proves overlap and rejects invalid schema; 42
 affected transport/activation/coordinator cases pass. This reduces serial network
 latency, not the freshness or safety requirements, and is not yet live completion.
 
+### Completed bounded HTTP recovery — 2026-09-23 15:35 UTC
+
+Functional source `9b6732d2d` ran as local image
+`sha256:dca394bb027d65c591e7beb6a22773f91ee04a60f4c56f989c6cc90ee0f3129c`.
+The same previously approved synthetic operation resumed successfully (200,
+10.44s), without another account/approval. Signed status returned 200 (13.89s)
+and the private nonexistent-chapter lookup returned the expected 404 (15.91s).
+After restarting the Hub, the same grant returned status 200 (12.00s) and the
+same lookup returned 404 (15.00s). Explicit revocation returned 200 (18.26s),
+followed by a rejected signed status request (401, 2.49s). Generated temporary
+test credentials were removed only after that verified rejection.
+
+Earlier synthetic session revocations with lost responses were independently
+read back as inactive after cold Identity restart, without replaying the writes.
+This establishes bounded live install/account recovery and private route admission,
+not actual chapter generation, reading/adoption, complete host recovery, public
+cutover or Play delivery. Latency remains visible; no network SLO is claimed.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux
