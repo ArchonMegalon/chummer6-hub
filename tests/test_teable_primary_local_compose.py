@@ -30,12 +30,14 @@ def inputs() -> dict[str, str]:
     }
 
 
-def render(environment: dict[str, str], *, google: bool = False) -> subprocess.CompletedProcess[str]:
+def render(environment: dict[str, str], *, google: bool = False, tunnel: bool = False) -> subprocess.CompletedProcess[str]:
     if not shutil.which("docker"):
         pytest.skip("Docker Compose is required for actual interpolation verification")
     command = ["docker", "compose", "-p", "chummer-teable-primary-local", "--env-file", "/dev/null", "-f", str(COMPOSE)]
     if google:
         command += ["-f", str(ROOT / "docker-compose.teable-primary-google.yml")]
+    if tunnel:
+        command += ["-f", str(ROOT / "docker-compose.teable-primary-tunnel.yml"), "--profile", "account-origin-edge"]
     return subprocess.run(
         [*command, "config", "--format", "json"],
         env=environment, cwd=ROOT, capture_output=True, text=True, timeout=15, check=False,
@@ -179,3 +181,41 @@ def test_google_activation_rejects_missing_or_empty_credentials(missing: str, bl
     result = render(environment, google=True)
     assert result.returncode != 0
     assert missing in result.stderr
+
+
+def edge_inputs() -> dict[str, str]:
+    return {**google_inputs(),
+        "CHUMMER_HUB_PRIMARY_TUNNEL_IMAGE": "sha256:" + "c" * 64,
+        "CHUMMER_HUB_PRIMARY_TUNNEL_TOKEN_FILE": "/synthetic/chummer/edge/tunnel.token"}
+
+
+def test_dedicated_tunnel_publishes_no_ports_and_preserves_all_services() -> None:
+    base = render(google_inputs(), google=True)
+    result = render(edge_inputs(), google=True, tunnel=True)
+    assert base.returncode == result.returncode == 0, result.stderr
+    plain, routed = json.loads(base.stdout), json.loads(result.stdout)
+    edge = routed["services"].pop("account-origin-edge")
+    assert not edge.get("network_mode") and set(edge["networks"]) == {"primary"}
+    assert not edge.get("ports") and not edge.get("environment") and not edge.get("env_file")
+    assert edge["pull_policy"] == "never" and edge["image"] == edge_inputs()["CHUMMER_HUB_PRIMARY_TUNNEL_IMAGE"]
+    assert edge["profiles"] == ["account-origin-edge"]
+    assert edge["read_only"] is True and edge["cap_drop"] == ["ALL"]
+    assert edge["security_opt"] == ["no-new-privileges:true"]
+    assert edge["user"] == "1000:1000"
+    assert edge["command"] == ["tunnel", "--no-autoupdate", "--loglevel", "warn", "--metrics",
+        "127.0.0.1:20000", "run", "--token-file", "/run/chummer-edge/tunnel.token"]
+    assert len(edge["volumes"]) == 1
+    mount = edge["volumes"][0]
+    assert mount["read_only"] is True and mount["bind"]["create_host_path"] is False
+    assert mount["source"] == edge_inputs()["CHUMMER_HUB_PRIMARY_TUNNEL_TOKEN_FILE"]
+    assert routed == plain  # No other storage, credential, service or port change.
+
+
+@pytest.mark.parametrize("missing", [
+    "CHUMMER_HUB_PRIMARY_TUNNEL_IMAGE", "CHUMMER_HUB_PRIMARY_TUNNEL_TOKEN_FILE",
+])
+def test_tunnel_requires_each_explicit_input(missing: str) -> None:
+    environment = edge_inputs()
+    del environment[missing]
+    result = render(environment, google=True, tunnel=True)
+    assert result.returncode != 0 and missing in result.stderr

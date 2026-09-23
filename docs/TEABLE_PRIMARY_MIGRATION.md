@@ -2,8 +2,44 @@
 
 The user's 2026-09-23 decision makes Teable the primary working store for the
 fresh Hub account and Origin book/job state. This is not a backup/projection.
-Production has **not** been cut over. The original encrypted Docker volume is
-preserved; none of its unreadable records were decrypted or silently imported.
+The apex account/book routes now reach the fresh stack through a dedicated
+Chummer tunnel; this is not completion of the whole-Hub migration. The original
+encrypted Docker volume is preserved; none of its unreadable records were
+decrypted or silently imported.
+
+### Scoped public account/book routing (2026-09-23 20:03 UTC)
+
+Full inspection found unrelated Home and Media routes on the old inactive
+tunnel. It was neither started nor reconfigured. A new, Chummer-only tunnel
+routes exact host `chummer.run` to `http://hub:8080`, followed by a 404 fallback;
+WARP is disabled. Only the apex CNAME target changed. Other DNS records,
+connectors, the shared tunnel, Identity and the running Hub image/state remain
+unchanged. `www` was not migrated.
+
+`docker-compose.teable-primary-tunnel.yml` adds only `account-origin-edge` to
+the existing primary network. It publishes no ports, uses one selected
+read-only token file, drops capabilities, and requires an explicitly selected
+local image. Do not mount the global Cloudflare credential or a whole env file.
+With the explicit project and current image/state inputs, render with
+`config --quiet`, then start only `account-origin-edge` with `--no-deps`.
+25 focused Compose tests pass; no API rebuild was needed.
+
+Public health/login return 200, account access redirects to login, anonymous
+account access is 401, and the private chapter worker route remains 404. The
+Google challenge uses the canonical callback and PKCE; full sign-in is not
+claimed. Both retained synthetic chapters were read through signed public
+HTTPS in 7.49/8.44 seconds, with exact source/text and prior acceptance states.
+An earlier 503 is still unexplained: these two reads do not prove an availability
+SLO. The legacy `install-linking-authority` readiness endpoint specifically
+checks PostgreSQL; its `authority_not_configured` result is not a diagnosis of
+this Teable request path. No guard, timeout or retry was loosened.
+
+Fourteen selected deployment/configuration files have exact-byte EA/private
+Teable recovery custody and a successful independent local restore (snapshot
+SHA-256 `7fb1c52c8572343b3f61e5176ec9bcb58540844751cae0b0730445bed6f81b8b`).
+This is selected recovery, not automated host failover. Full account callback,
+Android UI adoption/export, enabled consented worker execution and remaining
+auxiliary/erasure migration still need verification. No new Play upload occurred.
 
 ### Private Google entry activation (2026-09-23)
 
@@ -29,12 +65,14 @@ Secure/HttpOnly cookies. No redirect was followed, account logged in, email sent
 or provider credit spent. Both existing synthetic chapters and their distinct
 acceptance states survived Hub recreation. This is not a complete OAuth login.
 
-Public ingress remains unchanged and unavailable. The read-only Cloudflare
+At that private-entry checkpoint, public ingress was unchanged and unavailable.
+The read-only Cloudflare
 inspection found the exact apex DNS target tunnel down with zero connectors,
 pointing to an inactive host port 8091. A generic running `cloudflared` container
 belongs to a different tunnel; do not restart or repurpose it. Public cutover,
-post-callback account/linking verification and Android UI reading/export remain
-open. Keep the ordinary Hub listener separate from the private worker listener.
+post-callback account/linking verification and Android UI reading/export were
+open. The scoped routing follow-up above supersedes only the public routing
+status. Keep the ordinary Hub listener separate from the private worker listener.
 
 ### Small-state reader optimization (2026-09-23)
 
