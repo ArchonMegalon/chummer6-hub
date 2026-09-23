@@ -26,6 +26,14 @@ preserved; none of its unreadable records were decrypted or silently imported.
   job creation; an interrupted reservation is inert. Competing admissions cannot
   both grant generation permission, and an ambiguous acknowledgement leaves the
   existing dispatch for reconciliation, never automatic paid resubmission.
+- Community profiles, principal mappings and groups now have an isolated primary
+  implementation using the existing typed snapshot. Explicit synchronous scopes
+  refresh at outer entry; nested account/group/identity-link/ledger/experience
+  operations retain that snapshot. Conflicting or uncertain writes disable the
+  instance. Unconverted legacy `Gate` callers and local-file consumers reject
+  primary mode rather than using stale authorization or creating a local shadow.
+  This slice is **not registered for production**: remaining Community consumers,
+  campaign artifact persistence and historical erasure still need conversion.
 
 Identity configuration, for an isolated migration environment only:
 
@@ -73,11 +81,26 @@ reconciliation/completion/reader acceptance, and cold text/owner/book verificati
 at 2026-09-23 05:53–05:54 UTC. No local book files or provider call. The probe links
 the actual API project; it is not a public HTTP/deployment or full book export test.
 
+The Community slice passed 31 focused primary-storage tests (9 Community,
+11 Identity, 11 Origin). The first run had one randomized test-fixture ordering
+error in the hostile principal-ownership case; the corrected test explicitly
+assigns the other row's subject. The product rejects that ambiguity. Community's
+proof is against the simulated transport, not an actual-account/live migration.
+The 47 existing affected account-capture, identity-link, group-invite, ledger,
+experience and account-erasure regressions also pass. Both bounded runs built
+the affected API and test assembly without compiler warnings/errors.
+
+Runtime credential preparation: the existing EA API token returned HTTP 403 from
+the read-only `/api/access-token` metadata endpoint. It has not been deployed to
+Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
+local Teable profile and a dedicated base-scoped credential has been requested.
+Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
+
 ## Remaining before production cutover
 
-1. Community account data and remaining document/artifact stores. Origin chapter
-   jobs are integrated in source, but full-book export artifacts/other stores are
-   not yet proven host-independent.
+1. Finish Community consumer/DI conversion and remaining document/artifact
+   stores. Origin jobs and the isolated Community account slice are implemented,
+   but full-book export artifacts/other stores are not proven host-independent.
 2. Explicit API primary activation and remote key custody.
 3. Erasure of historical private snapshots and orphan chunks. Identity account
    erasure currently rejects Teable mode rather than claiming a false deletion.

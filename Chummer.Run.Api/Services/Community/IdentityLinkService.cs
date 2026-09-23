@@ -60,7 +60,7 @@ public sealed class IdentityLinkService
     public AccountLinkSummaryDto GetSummary(string subjectId)
     {
         var user = _accounts.EnsureUser(subjectId, subjectId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var identities = _store.LinkedIdentities
                 .Where(link => string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase))
@@ -97,7 +97,7 @@ public sealed class IdentityLinkService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.LinkedIdentities.FirstOrDefault(link =>
                 string.Equals(link.Provider, normalizedProvider, StringComparison.OrdinalIgnoreCase)
@@ -115,7 +115,7 @@ public sealed class IdentityLinkService
         }
 
         var normalizedProvider = NormalizeProvider(provider);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.LinkedIdentities.FirstOrDefault(link =>
                 string.Equals(link.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
@@ -131,7 +131,7 @@ public sealed class IdentityLinkService
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var existingIndex = _store.LinkedIdentities.FindIndex(link =>
                 string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)
@@ -190,7 +190,7 @@ public sealed class IdentityLinkService
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var index = _store.LinkedIdentities.FindIndex(link =>
                 string.Equals(link.IdentityLinkId, identityLinkId, StringComparison.OrdinalIgnoreCase)
@@ -234,7 +234,7 @@ public sealed class IdentityLinkService
         var displayLabel = AccountService.NormalizeOptional(request.DisplayLabel) ?? providerSubject;
         var note = ResolveExternalIdentityNote(provider);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var conflictingIndex = _store.LinkedIdentities.FindIndex(link =>
                 string.Equals(link.Provider, provider, StringComparison.OrdinalIgnoreCase)
@@ -361,7 +361,7 @@ public sealed class IdentityLinkService
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var existingIndex = _store.ChannelLinks.FindIndex(link =>
                 string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)
@@ -438,7 +438,7 @@ public sealed class IdentityLinkService
             ? _defaults.WhatsappSupportNote
             : "Channel is now linked.";
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var existingIndex = _store.ChannelLinks.FindIndex(link =>
                 string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)
@@ -502,7 +502,7 @@ public sealed class IdentityLinkService
         var user = _accounts.EnsureUser(normalizedSubjectId, normalizedSubjectId);
 
         string? resolvedHandle;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var stored = _store.ChannelLinks.FirstOrDefault(link =>
                 string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)

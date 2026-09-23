@@ -32,7 +32,7 @@ public sealed class CommunityAccountErasureService
         string normalizedSubject = AccountService.NormalizeRequired(subjectId, nameof(subjectId));
         string? normalizedKnownUserId = AccountService.NormalizeOptional(knownUserId);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             string? userId = ResolveUserId(normalizedSubject, normalizedKnownUserId);
             return _store.ExecuteAccountErasureTransactionLocked(

@@ -29,7 +29,7 @@ public sealed class UserExperienceService
     public HubUserExperienceDto GetOrCreate(string subjectId)
     {
         var user = _accounts.EnsureUser(subjectId, subjectId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.UserExperienceByUserId.TryGetValue(user.UserId, out var existing))
             {
@@ -60,7 +60,7 @@ public sealed class UserExperienceService
         var subjectId = AccountService.NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var existing = _store.UserExperienceByUserId.TryGetValue(user.UserId, out var stored)
                 ? stored
@@ -137,7 +137,7 @@ public sealed class UserExperienceService
         var now = DateTimeOffset.UtcNow;
         HubUserExperienceDto updated;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var existing = _store.UserExperienceByUserId.TryGetValue(user.UserId, out var stored)
                 ? stored

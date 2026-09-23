@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using Chummer.Storage.Teable;
 using Chummer.Campaign.Contracts;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Boosters;
@@ -11,8 +13,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Chummer.Run.Api.Services.Community;
 
-public sealed class CommunityStore
+public sealed class CommunityStore : IDisposable
 {
+    private readonly object _gate = new();
+    private readonly TeableRevisionStore? _primary;
+    private readonly bool _ownsPrimary;
+    private TeableRevisionStore.Head? _primaryHead;
+    private int _scopeDepth;
+    private bool _primaryFailed;
+    private const string PrimaryStream = "community";
+    private const string PrimarySchema = "chummer.hub.community-primary/v1";
+    private const int MaximumPrimaryBytes = 16 * 1024 * 1024;
+    private sealed record PrimaryEnvelope(string Schema, CommunityStoreSnapshot Snapshot);
     private readonly ILogger<CommunityStore> _logger;
     private readonly string _storagePath;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
@@ -20,15 +32,122 @@ public sealed class CommunityStore
         WriteIndented = true
     };
 
-    public CommunityStore(IConfiguration configuration, ILogger<CommunityStore> logger)
+    public CommunityStore(IConfiguration configuration, ILogger<CommunityStore> logger,
+        TeableRevisionStore? primary = null, bool ownsPrimary = false)
     {
         _logger = logger;
-        _storagePath = ResolveStoragePath(configuration);
-        Load();
+        string provider = configuration["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] ?? "local";
+        if (provider is not ("local" or "teable") || (provider == "teable") != (primary is not null))
+            throw new InvalidOperationException("Community storage requires an explicit, matching provider configuration.");
+        _primary = primary;
+        _ownsPrimary = ownsPrimary;
+        _storagePath = primary is null ? ResolveStoragePath(configuration) : string.Empty;
+        if (primary is null) Load();
+        else { using var scope = Enter(); }
     }
 
-    public object Gate { get; } = new();
-    public string StoragePath => _storagePath;
+    // Legacy local callers may still lock Gate. A remote operation must enter
+    // explicitly so no unconverted caller can authorize from a cached snapshot.
+    public object Gate => _primary is null || (Monitor.IsEntered(_gate) && _scopeDepth > 0)
+        ? _gate : throw new InvalidOperationException("Primary community access requires an explicit store scope.");
+    public bool IsPrimary => _primary is not null;
+    public string StoragePath => !IsPrimary ? _storagePath
+        : throw new InvalidOperationException("Primary community storage has no authoritative local file.");
+
+    public IDisposable Enter()
+    {
+        Monitor.Enter(_gate);
+        try
+        {
+            EnsurePrimaryUsable();
+            // Nested domain operations share the outer snapshot. Reloading here
+            // would discard the outer operation's uncommitted changes.
+            if (_primary is not null && _scopeDepth == 0) LoadPrimaryLocked();
+            _scopeDepth++;
+            return new Scope(this);
+        }
+        catch { Monitor.Exit(_gate); throw; }
+    }
+
+    private sealed class Scope(CommunityStore store) : IDisposable
+    {
+        private bool _disposed;
+        public void Dispose()
+        {
+            if (_disposed) return;
+            if (!Monitor.IsEntered(store._gate))
+                throw new InvalidOperationException("Community scopes are synchronous and thread-affine.");
+            _disposed = true;
+            store._scopeDepth--;
+            Monitor.Exit(store._gate);
+        }
+    }
+
+    public void Dispose() { if (_ownsPrimary) _primary?.Dispose(); }
+
+    private void EnsurePrimaryUsable()
+    {
+        if (_primaryFailed)
+            throw new InvalidOperationException("Community primary state requires cold reconciliation.");
+    }
+
+    private void LoadPrimaryLocked()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        TeableRevisionStore.Head? head = null;
+        try
+        {
+            head = _primary!.ReadAsync(PrimaryStream, deadline.Token).GetAwaiter().GetResult();
+            if (_primaryHead is not null && (head is null || head.Revision < _primaryHead.Revision
+                || (head.Revision == _primaryHead.Revision && head.Sha256 != _primaryHead.Sha256)))
+                throw new InvalidDataException("Community primary authority regressed or changed identity.");
+            CommunityStoreSnapshot snapshot;
+            if (head is null) snapshot = EmptySnapshot();
+            else
+            {
+                if (head.Bytes.Length > MaximumPrimaryBytes) throw new InvalidDataException("Community primary state is oversized.");
+                var envelope = JsonSerializer.Deserialize<PrimaryEnvelope>(head.Bytes, _jsonOptions);
+                if (envelope is not { Schema: PrimarySchema, Snapshot: not null })
+                    throw new InvalidDataException("Community primary schema is invalid.");
+                snapshot = envelope.Snapshot;
+                ValidatePrimarySnapshot(snapshot);
+            }
+            ApplySnapshotLocked(snapshot);
+            _primaryHead = head is null ? null : head with { Bytes = [] };
+        }
+        catch { _primaryFailed = true; throw; }
+        finally { if (head is not null) CryptographicOperations.ZeroMemory(head.Bytes); }
+    }
+
+    private static CommunityStoreSnapshot EmptySnapshot() => new([], [], [], [], [], [], [], [], [], [], [], [], []);
+
+    private static void ValidatePrimarySnapshot(CommunityStoreSnapshot snapshot)
+    {
+        if (snapshot.Users is null || snapshot.Groups is null || snapshot.JoinCodes is null
+            || snapshot.Campaigns is null || snapshot.BoostCodes is null || snapshot.SponsorSessions is null
+            || snapshot.LinkedIdentities is null || snapshot.ChannelLinks is null || snapshot.Receipts is null
+            || snapshot.LedgerEntries is null || snapshot.RewardEntries is null
+            || snapshot.EntitlementEntries is null || snapshot.Badges is null)
+            throw new InvalidDataException("Community primary state is incomplete.");
+        var users = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var subjects = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var user in snapshot.Users)
+        {
+            if (user is null || string.IsNullOrWhiteSpace(user.UserId) || string.IsNullOrWhiteSpace(user.SubjectId)
+                || user.LinkedPrincipals is null || user.GroupIds is null || !users.Add(user.UserId))
+                throw new InvalidDataException("Community primary user identity is invalid.");
+            foreach (string subject in user.LinkedPrincipals.Prepend(user.SubjectId))
+            {
+                if (string.IsNullOrWhiteSpace(subject) || subject != subject.Trim()
+                    || (subjects.TryGetValue(subject, out string? owner) && owner != user.UserId))
+                    throw new InvalidDataException("Community primary principal ownership is ambiguous.");
+                subjects[subject] = user.UserId;
+            }
+        }
+        if (snapshot.Groups.Any(group => group is null || string.IsNullOrWhiteSpace(group.GroupId))
+            || snapshot.Groups.Select(group => group.GroupId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != snapshot.Groups.Count)
+            throw new InvalidDataException("Community primary group identity is invalid.");
+    }
     public Dictionary<string, HubUserDto> UsersById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> UserIdBySubjectId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, GroupDto> GroupsById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -113,6 +232,7 @@ public sealed class CommunityStore
     internal T ExecuteAccountErasureTransactionLocked<T>(Func<T> mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
+        if (IsPrimary) throw new InvalidOperationException("Primary account erasure requires historical-record cleanup before admission.");
         if (!System.Threading.Monitor.IsEntered(Gate))
         {
             throw new InvalidOperationException("Account erasure transactions require the community-store lock.");
@@ -254,6 +374,19 @@ public sealed class CommunityStore
     }
 
     public void PersistLocked()
+    {
+        EnsurePrimaryUsable();
+        if (IsPrimary && (!Monitor.IsEntered(_gate) || _scopeDepth == 0))
+            throw new InvalidOperationException("Primary community writes require a current store scope.");
+        try { PersistValidatedLocked(); }
+        catch
+        {
+            if (IsPrimary) _primaryFailed = true;
+            throw;
+        }
+    }
+
+    private void PersistValidatedLocked()
     {
         if (!System.Threading.Monitor.IsEntered(Gate))
         {
@@ -439,6 +572,28 @@ public sealed class CommunityStore
             snapshot.CampaignTeardowns ?? Array.Empty<CampaignTeardownIdempotencyState>(),
             snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>(),
             snapshot.CampaignSpines ?? Array.Empty<CampaignProjection>());
+
+        if (_primary is not null)
+        {
+            ValidatePrimarySnapshot(snapshot);
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new PrimaryEnvelope(PrimarySchema, snapshot), _jsonOptions);
+            TeableRevisionStore.Head? written = null;
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                if (bytes.Length > MaximumPrimaryBytes) throw new InvalidDataException("Community primary state is oversized.");
+                written = _primary.CompareExchangeAsync(PrimaryStream, _primaryHead, Guid.NewGuid(), bytes,
+                    deadline.Token).GetAwaiter().GetResult();
+                _primaryHead = written with { Bytes = [] };
+            }
+            catch { _primaryFailed = true; throw; }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(bytes);
+                if (written is not null) CryptographicOperations.ZeroMemory(written.Bytes);
+            }
+            return;
+        }
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var tempPath = $"{_storagePath}.tmp";
