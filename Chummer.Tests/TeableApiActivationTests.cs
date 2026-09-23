@@ -122,6 +122,17 @@ public sealed class TeableApiActivationTests : IDisposable
             var result = service.PollBrowserCallbackV2(request);
             Assert.NotNull(result.Exchange);
             Assert.False(result.Exchange.AlreadyClaimed);
+            int admissionReads = accounts.GetRequests;
+            var principal = service.ResolveAndroidLinkedV2Grant("android-probe",
+                result.Exchange.Grant.GrantId, result.Exchange.Grant.AccessToken);
+            Assert.NotNull(principal);
+            Assert.True(service.TryUseAndroidLinkedV2Proof(principal.GrantId,
+                new string('p', 43), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(1)));
+            Assert.NotNull(service.ResolveAndroidLinkedV2Principal(principal));
+            int totalAdmissionReads = accounts.GetRequests - admissionReads;
+            Console.WriteLine($"Signed request primary GETs: {totalAdmissionReads}");
+            Assert.InRange(totalAdmissionReads, 1, 45);
+            reads += totalAdmissionReads;
         }
         // Retain fresh operation admission, nonce persistence, grant CAS and
         // final authority read; do not multiply those by each field lookup.
@@ -136,12 +147,36 @@ public sealed class TeableApiActivationTests : IDisposable
         request = request with { Nonce = new string('r', 24), Signature = "" };
         request = request with { Signature = Convert.ToBase64String(rsa.SignData(AndroidInstallLinkV2BootstrapProof.CreateCanonicalPayload(request),
             HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)) };
-        var recovered = new InstallLinkingService(new InstallLinkingStoreAccess(coldActivation), Configuration("bootstrap-cold"), coldActivation)
-            .PollBrowserCallbackV2(request);
+        var coldService = new InstallLinkingService(new InstallLinkingStoreAccess(coldActivation), Configuration("bootstrap-cold"), coldActivation);
+        var recovered = coldService.PollBrowserCallbackV2(request);
         Assert.NotNull(recovered.Exchange);
         Assert.True(recovered.Exchange.AlreadyClaimed);
         Assert.Equal(grantId, recovered.Exchange.Grant.GrantId);
         Assert.Single(coldActivation.GetRequiredStore().GrantsById);
+        if (!outageAfterCommit)
+        {
+            var principal = coldService.ResolveAndroidLinkedV2Grant("android-probe", grantId, recovered.Exchange.Grant.AccessToken);
+            Assert.NotNull(principal);
+            accounts.BeforeHeadPost = () => accounts.BeforeHeadReadResponse = () => accounts.FailReads = true;
+            var proofError = Assert.Throws<InstallLinkingOperationException>(() => coldService.TryUseAndroidLinkedV2Proof(
+                grantId, new string('q', 43), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(1)));
+            Assert.Equal(503, proofError.StatusCode);
+            Assert.Null(coldService.ResolveAndroidLinkedV2Principal(principal));
+            accounts.FailReads = false;
+            Assert.False(coldService.TryUseAndroidLinkedV2Proof(grantId, new string('q', 43),
+                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(1))); // committed proof cannot replay
+
+            accounts.BeforeHeadPost = () => accounts.BeforeHeadReadResponse = () => accounts.FailReads = true;
+            int revocationReads = accounts.GetRequests;
+            var revokeError = Assert.Throws<InstallLinkingOperationException>(() => coldService.RevokeAndroidLinkedV2Grant(principal));
+            Assert.Equal(503, revokeError.StatusCode);
+            Assert.InRange(accounts.GetRequests - revocationReads, 1, 30);
+            accounts.FailReads = false;
+            using var afterRevoke = Services(keys, accounts, "after-revoke");
+            var restored = afterRevoke.GetRequiredService<InstallLinkingStoreActivation>().GetRequiredStore();
+            Assert.Equal(InstallationGrantStates.Revoked, Assert.Single(restored.GrantsById.Values).Status);
+            Assert.Null(coldService.ResolveAndroidLinkedV2Grant("android-probe", grantId, recovered.Exchange.Grant.AccessToken));
+        }
     }
 
     [Fact]

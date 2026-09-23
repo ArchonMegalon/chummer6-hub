@@ -77,6 +77,22 @@ activation compatibility tests pass locally. Bootstrap now measures 32 GETs. The
 device-link route still requires testing against this changed image; neither the
 previous health response nor these tests establish real narration or publication.
 
+The single-envelope image passed live browser approval (200, 23.28 seconds),
+bootstrap (200, 18.51 seconds) and signed grant status (200, 26.44 seconds), but
+private chapter lookup exceeded 35 seconds. The signed cleanup response was also
+lost and requires read-only reconciliation; the synthetic Identity session was
+revoked. No chapter or provider operation was created. A separate cold diagnostic
+also encountered a 15-second key-store read timeout, so network availability is
+not inferred from the earlier passing requests.
+
+The affected v2 principal resolution, replay admission and revocation now use the
+same synchronous operation-local store pattern as bootstrap, with fresh final
+authority checks. One signed admission sequence falls from 73 remote GETs to 43;
+no cross-request cache or weakened signature/owner/replay admission was added.
+134 focused local tests pass, followed by two expanded recovery cases proving
+that committed nonces cannot replay and committed revocation survives a lost
+final response and cold restore. Live retesting of this new source is still due.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux

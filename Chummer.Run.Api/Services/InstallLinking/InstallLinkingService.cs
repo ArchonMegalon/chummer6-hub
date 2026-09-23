@@ -577,18 +577,21 @@ public sealed partial class InstallLinkingService
             return null;
         }
 
-        lock (_store.Gate)
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
         {
+            var operation = new InstallLinkingService(this, store);
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            ExpireGrantsLocked(now);
-            if (!TryResolveActiveGrantLocked(
+            operation.ExpireGrantsLocked(now);
+            if (!operation.TryResolveActiveGrantLocked(
                     normalizedInstallationId,
                     normalizedGrantId,
                     now,
                     out ClaimedInstallationDto? installation,
                     out InstallationGrantDto? grant)
-                || !GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
-                || !FixedTimeEquals(grant.AccessToken, normalizedAccessToken))
+                || !operation.GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
+                || !FixedTimeEquals(grant.AccessToken, normalizedAccessToken)
+                || !operation.IsDurableStoreReady())
             {
                 return null;
             }
@@ -610,19 +613,22 @@ public sealed partial class InstallLinkingService
             return null;
         }
 
-        lock (_store.Gate)
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
         {
+            var operation = new InstallLinkingService(this, store);
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            ExpireGrantsLocked(now);
-            return TryResolveActiveGrantLocked(
+            operation.ExpireGrantsLocked(now);
+            return operation.TryResolveActiveGrantLocked(
                 principal.Installation.InstallationId,
                 principal.GrantId,
                 now,
                 out ClaimedInstallationDto? installation,
                 out InstallationGrantDto? grant)
-                && GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
+                && operation.GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
                 && string.Equals(installation!.SubjectId, principal.Installation.SubjectId, StringComparison.Ordinal)
                 && string.Equals(installation.UserId, principal.Installation.UserId, StringComparison.Ordinal)
+                && operation.IsDurableStoreReady()
                 ? installation
                 : null;
         }
@@ -643,10 +649,15 @@ public sealed partial class InstallLinkingService
             return false;
         }
 
-        return TryUseAndroidLinkedV2ProofLocked(
-            $"grant\n{normalizedGrantId}\n{normalizedPacketKey}",
-            now,
-            expiresAtUtc);
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
+        {
+            var operation = new InstallLinkingService(this, store);
+            bool accepted = operation.TryUseAndroidLinkedV2ProofLocked(
+                $"grant\n{normalizedGrantId}\n{normalizedPacketKey}", now, expiresAtUtc);
+            operation.EnsureDurableStoreReady();
+            return accepted;
+        }
     }
 
     private bool TryUseAndroidLinkedV2BootstrapProof(
@@ -961,6 +972,20 @@ public sealed partial class InstallLinkingService
     }
 
     internal AndroidLinkedV2GrantRevocationResult RevokeAndroidLinkedV2Grant(
+        AndroidLinkedV2GrantPrincipal principal)
+    {
+        EnsureDurableStoreReady();
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
+        {
+            var operation = new InstallLinkingService(this, store);
+            AndroidLinkedV2GrantRevocationResult result = operation.RevokeAndroidLinkedV2GrantCore(principal);
+            operation.EnsureDurableStoreReady();
+            return result;
+        }
+    }
+
+    private AndroidLinkedV2GrantRevocationResult RevokeAndroidLinkedV2GrantCore(
         AndroidLinkedV2GrantPrincipal principal)
     {
         EnsureDurableStoreReady();
