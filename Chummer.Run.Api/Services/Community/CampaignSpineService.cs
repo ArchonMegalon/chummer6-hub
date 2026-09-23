@@ -119,7 +119,7 @@ public sealed class CampaignSpineService
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
             WorkspaceLifecycleCleanupResult cleanup = _lifecyclePolicy.ApplyLocked(_store, now);
@@ -1046,7 +1046,7 @@ public sealed class CampaignSpineService
         string normalizedSummary = NormalizeOptional(summary, nameof(summary), MaxSummaryLength)
             ?? normalizedTitle;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (RunProjection? storedRun, _) =
                 RequireCurrentWorkspaceMutationLocked(user, workspace, run, scene: null);

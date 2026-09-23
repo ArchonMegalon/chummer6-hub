@@ -112,8 +112,18 @@ preserved; none of its unreadable records were decrypted or silently imported.
   unavailable in primary mode pending durable operation fencing/reconciliation.
   This is a read/intent migration, not complete sponsor-operation support; the
   remaining legacy external-write paths still require that conversion.
+  Campaign recap/replay metadata now shares the Community primary revision with
+  its aftermath projection. Registration refreshes the Registry-owned store from
+  that revision; nested persistence stages both parts for one final commit.
+  Callback failure restores memory without a remote write; a conflicting or
+  uncertain commit requires cold reconciliation, never a compensating overwrite.
+  This is private campaign metadata, not public release/runtime Registry authority.
+  The Community envelope is now `chummer.hub.community-primary/v2`, so old writers
+  reject rather than silently discard the added metadata. No production Community
+  primary has been activated. Existing v1 snapshots require explicit migration;
+  there is no automatic v1 conversion or local-file import.
   This slice is **not registered for production**: remaining Community consumers,
-  campaign artifact persistence and historical erasure still need conversion.
+  other auxiliary stores and historical erasure still need conversion.
 
 Identity configuration, for an isolated migration environment only:
 
@@ -382,6 +392,17 @@ auto-activation path is retained and checked with a simulated Fleet handler.
 then added and all 44 passed. API and test compilation is clean. No Teable or
 Fleet network calls, credential changes, deployment or Play operations occurred.
 
+Campaign artifact follow-up: 96 focused tests passed across the new primary
+artifact transaction, existing Campaign guardrails, Community, faction and sponsor
+storage. Cases cover one-commit aftermath/metadata restore without local files,
+fresh metadata on an existing bridge, callback rollback, competing and uncertain
+commits, malformed/incomplete/v1 snapshots and outage without local fallback.
+The existing local-file compatibility and campaign guardrail tests remain green.
+The preceding process's terminal result was unavailable after handoff; this result
+comes from a network-disabled `--no-build --no-restore` replay of its compiled
+assembly, not a new build or hosted qualification. All remote data is synthetic.
+No actual account migration, runtime activation, provider or Play operation.
+
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
@@ -394,8 +415,9 @@ Fleet network calls, credential changes, deployment or Play operations occurred.
    sponsor observations are freshly rebound after their GET, but the legacy
    Fleet mutation paths still carry mutable state over external awaits. Those
    paths remain explicitly blocked in primary mode until durable operation
-   fences and uncertain-outcome reconciliation exist. Campaign artifact and
-   other auxiliary consumers still retain local dependencies.
+   fences and uncertain-outcome reconciliation exist. Campaign recap/replay
+   metadata now co-commits with aftermath; other Campaign operations and auxiliary
+   consumers still need conversion. This is not whole-Campaign activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;
    do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary
    registration and key custody are implemented but not activated publicly.

@@ -24,9 +24,9 @@ public sealed class FactionTeablePersistenceTests : IDisposable
 
     private BlackLedgerFactionOnboardingService Factions(CommunityStore store)
     {
-        // These existing read-only dependencies still need a separate migration.
-        // No artifact/publication operation or provider is invoked by this suite.
-        var artifacts = new CampaignArtifactRegistryBridge(Path.Combine(_root, "community.json"));
+        // The artifact bridge shares primary custody with Community. The support
+        // dependency is read-only here; no provider/publication operation occurs.
+        var artifacts = new CampaignArtifactRegistryBridge(store);
         var support = new SupportStore(Configuration, NullLogger<SupportStore>.Instance);
         var campaign = new CampaignSpineService(store, new WorkspaceLifecyclePolicyService(Configuration), artifacts, support);
         return new(Configuration, new BlackLedgerPublicStatsService(), campaign, store);
