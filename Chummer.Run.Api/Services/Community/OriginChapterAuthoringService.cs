@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Api.Services.Teable;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -10,8 +11,21 @@ namespace Chummer.Run.Api.Services.Community;
 /// credits. A worker must separately obtain execution/quota authority. The
 /// durable dispatch fence is never automatically reset after a lost response.
 /// </summary>
-public sealed class OriginChapterAuthoringService(IConfiguration configuration)
+public sealed class OriginChapterAuthoringService : IDisposable
 {
+    private readonly IConfiguration configuration;
+    private readonly TeableOriginChapterStorage? _primary;
+    private TeableOriginChapterStorage.Session? _primarySession;
+    public OriginChapterAuthoringService(IConfiguration configuration, TeableOriginChapterStorage? primary = null)
+    {
+        this.configuration = configuration;
+        string provider = configuration["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"]?.Trim() ?? "local";
+        if (provider is not ("local" or "teable") || (provider == "teable") != (primary is not null))
+            throw new InvalidOperationException("Origin storage provider and registration do not match.");
+        _primary = primary;
+    }
+
+    public void Dispose() => _primary?.Dispose();
     public const int MaximumRequestBytes = 64 * 1024;
     public const int MaximumDraftBytes = 64 * 1024;
     private const int MaximumFileBytes = 512 * 1024;
@@ -21,7 +35,7 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
     private sealed record StoredJob(string Schema, string OwnerDigest, OriginChapterAuthoringJob Job, string Digest,
         string? ExecutionAdmission = null);
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["CHUMMER_RUNTIME_STATE_ROOT"]);
+    public bool IsConfigured => _primary is not null || !string.IsNullOrWhiteSpace(configuration["CHUMMER_RUNTIME_STATE_ROOT"]);
 
     public OriginChapterAuthoringJob Create(string subjectId, OriginChapterAuthoringRequest request, Func<bool> stillAuthorized)
     {
@@ -41,9 +55,12 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
                     throw new InvalidOperationException("The authoring request already belongs to a different source.");
                 return existing;
             }
-            if (Directory.EnumerateFiles(root, owner + ".*.json").Take(128).Count() >= 128
+            if (_primarySession is not null)
+                _primarySession.Register(WorkId(owner, request.RequestId));
+            else if (Directory.EnumerateFiles(root, owner + ".*.json").Take(128).Count() >= 128
                 || Directory.EnumerateFiles(root, "*.json").Take(2048).Count() >= 2048)
                 throw new InvalidOperationException("The private authoring queue is full.");
+            if (!stillAuthorized()) throw new UnauthorizedAccessException();
             var job = new OriginChapterAuthoringJob(request.RequestId, sourceDigest, source,
                 OriginChapterAuthoringStates.AwaitingAuthoring, "first_book_ai", null, null);
             Write(path, owner, job);
@@ -85,10 +102,24 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
     internal IReadOnlyList<OriginChapterWorkerItem> PendingForWorker(int limit)
     {
         if (limit is < 1 or > 20) throw new ArgumentException("Invalid worker page size.");
-        return Locked(root => Directory.EnumerateFiles(root, "*.json").Order(StringComparer.Ordinal)
-            .Select(path => ReadWorkerRecord(root, Path.GetFileNameWithoutExtension(path)))
-            .Where(stored => stored.Job.State != OriginChapterAuthoringStates.ReviewRequired)
+        return Locked(root => WorkIds(root).Order(StringComparer.Ordinal)
+            .Select(workId => ReadStored(Path.Combine(root, workId + ".json"), workId[..64], null))
+            // A remote catalogue reservation may outlive an interrupted initial
+            // create. Missing bytes are inert, never permission to generate.
+            .Where(stored => stored is not null && stored.Job.State != OriginChapterAuthoringStates.ReviewRequired)
+            .Select(stored => stored!)
             .Take(limit).Select(WorkerItem).ToArray());
+    }
+
+    private IEnumerable<string> WorkIds(string root)
+    {
+        if (_primarySession is not null) return _primarySession.WorkIds();
+        return Directory.EnumerateFiles(root, "*.json").Select(path =>
+        {
+            string workId = Path.GetFileNameWithoutExtension(path);
+            TeableOriginChapterStorage.ValidateWorkId(workId);
+            return workId;
+        });
     }
 
     internal OriginChapterWorkerItem GetForWorker(string workId)
@@ -188,6 +219,8 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
 
     public int EraseForSubject(string subjectId)
     {
+        if (_primary is not null)
+            throw new InvalidOperationException("Primary authoring erasure requires historical payload cleanup before activation.");
         if (!IsConfigured) return 0;
         return Locked(root =>
         {
@@ -210,9 +243,17 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
     private T Locked<T>(Func<string, T> operation)
     {
         if (!IsConfigured) throw new InvalidOperationException("Private authoring storage is not configured.");
-        string root = Path.GetFullPath(Path.Combine(configuration["CHUMMER_RUNTIME_STATE_ROOT"]!, "origin-chapter-jobs"));
         lock (_gate)
         {
+            if (_primary is not null)
+            {
+                if (_primarySession is not null) throw new InvalidOperationException("Primary authoring operations cannot be nested.");
+                using var session = _primary.OpenSession();
+                _primarySession = session;
+                try { return operation(string.Empty); }
+                finally { _primarySession = null; }
+            }
+            string root = Path.GetFullPath(Path.Combine(configuration["CHUMMER_RUNTIME_STATE_ROOT"]!, "origin-chapter-jobs"));
             for (string? part = root; part is not null; part = Path.GetDirectoryName(part))
                 if (Directory.Exists(part) || File.Exists(part)) RejectLink(part);
             if (OperatingSystem.IsWindows()) Directory.CreateDirectory(root);
@@ -224,11 +265,18 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
         }
     }
 
-    private static OriginChapterAuthoringJob? Read(string path, string owner, string requestId)
+    private OriginChapterAuthoringJob? Read(string path, string owner, string requestId)
         => ReadStored(path, owner, requestId)?.Job;
 
-    private static StoredJob? ReadStored(string path, string owner, string? requestId)
+    private StoredJob? ReadStored(string path, string owner, string? requestId)
     {
+        if (_primarySession is not null)
+        {
+            byte[]? primaryBytes = _primarySession.Read(Path.GetFileNameWithoutExtension(path));
+            if (primaryBytes is null) return null;
+            try { return DecodeStored(primaryBytes, path, owner, requestId); }
+            finally { CryptographicOperations.ZeroMemory(primaryBytes); }
+        }
         RejectLink(path);
         if (!File.Exists(path)) return null;
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -237,7 +285,13 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
         int used = 0, count;
         while (used < bytes.Length && (count = file.Read(bytes, used, bytes.Length - used)) != 0) used += count;
         if (used > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
-        var stored = JsonSerializer.Deserialize<StoredJob>(bytes.AsSpan(0, used), Json);
+        try { return DecodeStored(bytes.AsSpan(0, used), path, owner, requestId); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
+    }
+
+    private static StoredJob DecodeStored(ReadOnlySpan<byte> bytes, string path, string owner, string? requestId)
+    {
+        var stored = JsonSerializer.Deserialize<StoredJob>(bytes, Json);
         if (stored is null || stored.Schema != Schema || stored.OwnerDigest != owner
             || stored.Job is not { } job || !ValidId(job.RequestId) || requestId is not null && job.RequestId != requestId
             || stored.Digest != StoredDigest(job, stored.ExecutionAdmission)
@@ -256,19 +310,28 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
         return stored;
     }
 
-    private static void Write(string path, string owner, OriginChapterAuthoringJob job, string? executionAdmission = null)
+    private void Write(string path, string owner, OriginChapterAuthoringJob job, string? executionAdmission = null)
     {
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(
             new StoredJob(Schema, owner, job, StoredDigest(job, executionAdmission), executionAdmission), Json);
-        if (bytes.Length > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
-        string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
         try
         {
-            using (var file = OpenPrivate(temporary, FileMode.CreateNew)) { file.Write(bytes); file.Flush(true); }
-            RejectLink(path);
-            File.Move(temporary, path, overwrite: true);
+            if (bytes.Length > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
+            if (_primarySession is not null)
+            {
+                _primarySession.Write(Path.GetFileNameWithoutExtension(path), bytes);
+                return;
+            }
+            string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                using (var file = OpenPrivate(temporary, FileMode.CreateNew)) { file.Write(bytes); file.Flush(true); }
+                RejectLink(path);
+                File.Move(temporary, path, overwrite: true);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
     }
 
     private static FileStream OpenPrivate(string path, FileMode mode)
@@ -288,7 +351,7 @@ public sealed class OriginChapterAuthoringService(IConfiguration configuration)
     private static string StoredDigest(OriginChapterAuthoringJob job, string? admission)
         => admission is null ? Digest(job) : Digest(new { Job = job, ExecutionAdmission = admission });
     private static string WorkId(string owner, string request) => owner + "." + Digest(request);
-    private static StoredJob ReadWorkerRecord(string root, string workId)
+    private StoredJob ReadWorkerRecord(string root, string workId)
     {
         if (workId is not { Length: 129 } || workId[64] != '.' || !IsDigest(workId[..64]) || !IsDigest(workId[65..]))
             throw new ArgumentException("The worker identity is invalid.");

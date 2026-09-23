@@ -6,6 +6,8 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Api.Services.Teable;
+using Chummer.Storage.Teable;
 using Chummer.Run.Api.Services.WindowsProof;
 using Chummer.Run.Registry.Services;
 using Microsoft.Extensions.Hosting;
@@ -134,7 +136,17 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<RunsiteTourQuotaService>();
         services.AddSingleton<OriginDossierPublicationService>();
         services.AddSingleton<OriginDossierFirstPartyDocumentService>();
-        services.AddSingleton<OriginChapterAuthoringService>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new OriginChapterAuthoringService(configuration);
+            var store = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_ORIGIN_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Origin primary table is required."),
+                configuration["CHUMMER_ORIGIN_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private Origin storage token is required."));
+            return new OriginChapterAuthoringService(configuration, new TeableOriginChapterStorage(store, ownsStore: true));
+        });
         services.AddSingleton<OriginDossierProviderCreditReservationStore>();
         services.AddSingleton<OriginDossierProviderCreditReservationService>();
         services.AddSingleton<PayFunnelsBillingStore>();

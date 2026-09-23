@@ -20,6 +20,12 @@ preserved; none of its unreadable records were decrypted or silently imported.
   from mutated memory. Backend failure never falls back to local account files.
 - Email ticket consumption and session issuance share one commit. Competing
   consumers cannot both issue an admitted session.
+- Origin chapters have independent remote revision streams and a bounded opaque
+  discovery catalogue. Sources, returned prose, worker admissions and reader
+  acceptance survive cold restore without a local book file. Registration precedes
+  job creation; an interrupted reservation is inert. Competing admissions cannot
+  both grant generation permission, and an ambiguous acknowledgement leaves the
+  existing dispatch for reconciliation, never automatic paid resubmission.
 
 Identity configuration, for an isolated migration environment only:
 
@@ -35,6 +41,18 @@ The file must be a private, owned regular file, not a symlink; HTTPS is mandator
 and redirects are disabled. Default local mode is unchanged. No automatic local
 import occurs when primary mode is enabled.
 
+Origin uses a separate table/token registration:
+
+```text
+CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER=teable
+CHUMMER_ORIGIN_TEABLE_TABLE_ID=<dedicated chapter table>
+CHUMMER_ORIGIN_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+```
+
+Both primary modes remain deployment work in progress, not a switch to enable on
+the public Hub yet. Origin history erasure also deliberately rejects until its
+cleanup is implemented. No actual First Book execution was implied by a job test.
+
 ## Verified, deliberately bounded
 
 Local Docker focused tests: 58 passed, followed by 11 Identity tests after adding
@@ -48,9 +66,18 @@ All passed without local account data files. Tokens travelled only in private
 stdin/stdout captured in memory. No email or book generation was invoked.
 This proves the Identity adapter, not restoration of the complete Hub host.
 
+Origin follow-up: 28 focused chapter/worker tests passed, followed by 11 primary-
+storage tests including private-token DI configuration. Three further isolated
+processes passed a real-Teable synthetic chapter create/dispatch-fence, cold
+reconciliation/completion/reader acceptance, and cold text/owner/book verification
+at 2026-09-23 05:53–05:54 UTC. No local book files or provider call. The probe links
+the actual API project; it is not a public HTTP/deployment or full book export test.
+
 ## Remaining before production cutover
 
-1. Community account data and Origin jobs/books, including paid-dispatch fences.
+1. Community account data and remaining document/artifact stores. Origin chapter
+   jobs are integrated in source, but full-book export artifacts/other stores are
+   not yet proven host-independent.
 2. Explicit API primary activation and remote key custody.
 3. Erasure of historical private snapshots and orphan chunks. Identity account
    erasure currently rejects Teable mode rather than claiming a false deletion.
