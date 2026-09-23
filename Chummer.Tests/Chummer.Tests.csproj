@@ -102,6 +102,7 @@
     <Compile Include="OriginDossierFirstPartyDocumentServiceTests.cs" />
     <Compile Include="DataProtectionKeyProtectionConfiguratorTests.cs" />
     <Compile Include="TeableRevisionStoreTests.cs" />
+    <Compile Include="TeableRecoveryBundleTests.cs" />
     <Compile Include="TeableApiActivationTests.cs" />
     <Compile Include="InstallLinkingPostgresCoordinatorStoreTests.cs" />
     <Compile Include="InstallLinkingStoreActivationTests.cs" />

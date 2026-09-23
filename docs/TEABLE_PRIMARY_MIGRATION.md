@@ -320,6 +320,28 @@ cleanup is implemented. No actual First Book execution was implied by a job test
 
 ## Verified, deliberately bounded
 
+Configuration recovery follow-up: `Chummer.Teable.Recovery` and the shared
+`TeableRecoveryBundleStore` now capture an explicit flat allowlist of actual
+configuration/secret file bytes into a private revision stream. No directory scan,
+service execution, secret output or existing-target overwrite is supported.
+Restore binds an exact inspected receipt, validates all names/lengths/digests,
+writes owner-only files into a private staging directory, reads them back and
+then moves that directory to a new target. Identical captures reuse their head;
+concurrent changes reject and uncertain captures require readback without replay.
+Bootstrap Teable access must be independently recoverable outside this host/base.
+The usage and limitations are in `Chummer.Teable.Recovery/README.md`.
+
+62 focused local tests pass, including 26 recovery cases and existing transport,
+Identity and secure-file tests. The first 59-case run passed with platform
+warnings; those were fixed. A later FIFO timeout test was incorrectly synchronous
+and rejected by xUnit (61/62); the corrected asynchronous test and final build
+pass without compiler warnings/errors. The CLI also builds cleanly and its two
+isolated negative invocations return only usage or a bounded error, never a stack
+trace or credential material. All verification is network-disabled and synthetic.
+No real configuration/secret files were captured or restored. This tool does not
+prove complete file selection, image availability, working credentials, whole-Hub
+restoration or production cutover, and it does not purge historical secret copies.
+
 Local Docker focused tests: 58 passed, followed by 11 Identity tests after adding
 a competing email-completion case. Three Docker-context contract tests passed.
 The local diagnostic build uses the already cached Core package override and
@@ -563,7 +585,9 @@ to repeat its creation phase over an existing synthetic Community snapshot.
    registration and key custody are implemented but not activated publicly.
 3. Erasure of historical private snapshots and orphan chunks. Identity account
    erasure currently rejects Teable mode rather than claiming a false deletion.
-4. Restricted production credentials and complete configuration/secret custody.
+4. Restricted production credentials and complete actual configuration/secret custody.
+   The selected-file recovery tool is implemented and tested; inventorying and
+   capturing the real complete deployment and cold-starting it are still required.
    The bootstrap credential needs independent recovery outside its own base.
 5. A cold reconstruction of the complete fresh Hub and owner/auth/book checks,
    followed by controlled cutover. Do not deploy only the Identity half.

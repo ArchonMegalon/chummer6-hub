@@ -80,7 +80,7 @@ internal static class LinuxSecureFile
             throw new PlatformNotSupportedException("Secure no-follow file reads require Linux.");
         }
 
-        int descriptor = NativeOpen(path, OpenReadOnly | OpenCloseOnExec | OpenNoFollow);
+        int descriptor = NativeOpen(path, OpenReadOnly | OpenCloseOnExec | OpenNoFollow | OpenNonBlocking);
         if (descriptor < 0)
         {
             throw new IOException("Secure file could not be opened.");
