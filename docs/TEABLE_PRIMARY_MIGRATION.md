@@ -93,6 +93,14 @@ no cross-request cache or weakened signature/owner/replay admission was added.
 that committed nonces cannot replay and committed revocation survives a lost
 final response and cold restore. Live retesting of this new source is still due.
 
+The live follow-up also located the same repeated getter pattern in browser
+approval. That method now captures one synchronous operation-local view and
+performs a final current-authority check. 116 affected callback/activation/v2
+tests pass, including an explicit approval read bound. The live failure at this
+stage was a primary read becoming unavailable (500); separate Identity cleanup
+also timed out at a remote append and requires cold readback before another write.
+No transient failure was treated as permission to replay or widen timeouts.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux

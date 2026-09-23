@@ -96,9 +96,12 @@ public sealed class TeableApiActivationTests : IDisposable
         var service = new InstallLinkingService(new InstallLinkingStoreAccess(activation), Configuration("bootstrap"), activation);
         using var rsa = RSA.Create(2048);
         string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+        _ = activation.GetRequiredStore();
+        int approvalReads = accounts.GetRequests;
         service.IssueBrowserCallback(new(InstallationId: "android-probe", ArtifactId: "android-play-app", ApplicationVersion: "synthetic",
             ChannelId: "internal", HeadId: "android", Platform: "android", Arch: "arm64", CallbackUri: "chummer://install-link",
             PublicKey: publicKey, HostLabel: null, InstallAccessClass: InstallAccessClasses.AccountRequired), "user-probe", "subject-probe", "proof_poll_v2");
+        Assert.InRange(accounts.GetRequests - approvalReads, 1, 30);
         var request = new AndroidInstallLinkProofPollV2Request("android-probe", "android", "synthetic", "internal", "android", "arm64",
             publicKey, DateTimeOffset.UtcNow.ToUnixTimeSeconds(), new string('n', 24), "", null, new string('o', 32), "proof_poll_v2");
         request = request with { Signature = Convert.ToBase64String(rsa.SignData(AndroidInstallLinkV2BootstrapProof.CreateCanonicalPayload(request),

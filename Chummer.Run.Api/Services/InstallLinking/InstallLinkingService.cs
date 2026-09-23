@@ -1050,6 +1050,24 @@ public sealed partial class InstallLinkingService
         string? callbackTransport = null)
     {
         EnsureDurableStoreReady();
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
+        {
+            var operation = new InstallLinkingService(this, store);
+            IssueInstallBrowserCallbackResponseDto result = operation.IssueBrowserCallbackCore(
+                request, userId, subjectId, callbackTransport);
+            operation.EnsureDurableStoreReady();
+            return result;
+        }
+    }
+
+    private IssueInstallBrowserCallbackResponseDto IssueBrowserCallbackCore(
+        IssueInstallBrowserCallbackRequestDto request,
+        string? userId,
+        string? subjectId,
+        string? callbackTransport)
+    {
+        EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
 
         string? normalizedInstallationId = NormalizeOptional(request.InstallationId)
