@@ -90,6 +90,9 @@ public sealed class OriginChapterAuthoringService : IDisposable
             if (job.State != OriginChapterAuthoringStates.ReviewRequired || job.SourceDigest != sourceDigest
                 || job.ProviderReceiptDigest != providerReceiptDigest || TextDigest(job.DraftText!) != textDigest)
                 throw new InvalidOperationException("The reviewed text or source changed.");
+            // Reading primary storage may block while the install is revoked.
+            // Revalidate before accepting either a prior result or a new write.
+            if (!stillAuthorized()) throw new UnauthorizedAccessException();
             if (job.ReaderAcceptedTextDigest is not null) return job;
             var accepted = job with { ReaderAcceptedTextDigest = textDigest };
             Write(path, owner, accepted, stored.ExecutionAdmission);

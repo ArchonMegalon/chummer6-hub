@@ -774,3 +774,31 @@ synthetic, network-isolated checks, not rendered-browser or production evidence.
 Earlier migration commits through `cfc710028` were synchronized to the existing
 `feat/origin-chapter-jobs-20260922` development branch and remotely confirmed.
 That is source backup, not a main merge, package seal, Hub cutover or Play release.
+
+## Signed Android chapter access with primary storage — 2026-09-23
+
+The signed Android chapter controller now handles primary transport/deadline
+failures as a private 503 response with same-request reconciliation guidance.
+It does not invent a missing job, successful acceptance or fresh generation.
+Responses retain no-store headers and expose no backend exception detail.
+
+The primary read introduced an authorization gap: a device grant revoked while
+the read was in flight could still receive private prose or record reader
+acceptance. The controller now resolves the same current install principal again
+before returning the result. Reader acceptance also rechecks authorization after
+loading/validating the exact stored text and before its idempotent return or write.
+This closes the observed read-window race; it is not a distributed authorization
+lease or a claim of atomicity between different stores.
+
+Nine focused new cases initially produced eight failures and one passing cold
+flow. After the correction, 112/112 signed-bearer, chapter, worker and primary
+storage tests passed with clean API/test compilation in isolated local Docker.
+The successful flow uses the real request-proof middleware, a reconstructed
+install service, fresh primary chapter services, a single worker dispatch fence,
+stored prose, explicit acceptance and cold readback without redispatch. Its install
+store is the existing local test fixture and Teable transport is simulated; it
+does not prove whole-Hub recovery, live provider generation or Android UI behavior.
+
+Only synthetic data was used. No browser/credential action, production cutover,
+provider call, signing or Play upload occurred. Restricted runtime credentials
+and complete authenticated Hub restoration remain prerequisites for live narration.

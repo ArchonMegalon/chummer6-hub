@@ -40,14 +40,21 @@ public sealed class AndroidLinkedOriginChaptersController(
     private ActionResult WithOwner(string? installationId, Func<string, ActionResult> action)
     {
         AndroidLinkedV2RequestProofMiddleware.ApplyPrivateResponseHeaders(Response.Headers);
-        if (CurrentSubject(installationId) is not { Length: > 0 } subject) return Unauthorized();
-        if (!authoring.IsConfigured) return StatusCode(StatusCodes.Status503ServiceUnavailable);
-        try { return action(subject); }
+        try
+        {
+            if (CurrentSubject(installationId) is not { Length: > 0 } subject) return Unauthorized();
+            if (!authoring.IsConfigured) return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            ActionResult result = action(subject);
+            // The primary read can outlive an install revocation. Do not return
+            // private prose based only on the principal captured before I/O.
+            return CurrentSubject(installationId) == subject ? result : Unauthorized();
+        }
         catch (UnauthorizedAccessException) { return Unauthorized(); }
         catch (KeyNotFoundException) { return NotFound(); }
         catch (ArgumentException) { return BadRequest("The narrative request is invalid."); }
         catch (InvalidOperationException) { return Conflict("Reopen the existing authoring request before continuing."); }
-        catch (Exception error) when (error is IOException or InvalidDataException or JsonException)
+        catch (Exception error) when (error is IOException or InvalidDataException or JsonException
+            or HttpRequestException or OperationCanceledException)
         { return StatusCode(StatusCodes.Status503ServiceUnavailable, "Private authoring storage is unavailable. Check the same request before retrying."); }
     }
 }
