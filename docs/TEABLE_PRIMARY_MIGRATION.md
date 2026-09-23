@@ -96,6 +96,12 @@ preserved; none of its unreadable records were decrypted or silently imported.
   counts together before touching installation/publication dependencies; it no
   longer reads notification counts outside the Community scope. No scope crosses
   an asynchronous projection call, and no external projection is enabled here.
+  Faction onboarding also resolves state from the current scope instead of a
+  constructor-cached reference. Charter/allegiance admission, action allowance
+  and receipt writes, moderation and private lore use fresh revision admission.
+  Each mutation retains one synchronous outer scope across its validation and
+  commit; nested domain reads cannot replace pending state. Campaign summary
+  dependencies are not thereby declared fully migrated.
   This slice is **not registered for production**: remaining Community consumers,
   campaign artifact persistence and historical erasure still need conversion.
 
@@ -344,6 +350,17 @@ Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
 local Teable profile and a dedicated base-scoped credential has been requested.
 Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
 
+Faction follow-up: 39 focused tests passed across the primary faction and
+Community stores and existing faction onboarding/charter behavior. Cases cover
+cold charter/allegiance/lore/action restoration without local files, current
+moderation/consent, cooldown and capacity checks, competing last-action-point
+writes, uncertain commit readback without replay, nested pending state and
+outages. API/test builds completed without compiler warnings/errors after fixing
+a missing namespace in the new test fixture. This uses simulated Teable transport,
+not real account data or a production cutover. BrowserAct's current inventory was
+checked read-only: none of its 23 profiles is scoped to Teable. New isolated
+profile/login and restricted runtime-token setup still need explicit approval.
+
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
@@ -352,9 +369,10 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
    usage and request receipts have primary implementations with atomic new
    charge/receipt storage. Publication-index/provider-output artifacts and other
    auxiliary stores still need custody review. The isolated Community slice is
-   not a complete activation. In particular, faction onboarding retains a cached
-   mutable state reference, and sponsor sessions carry mutable state over external
-   awaits; neither may be converted by blindly replacing lock statements.
+   not a complete activation. Faction onboarding's cached state is now removed;
+   sponsor sessions still carry mutable state over external awaits and must not
+   be converted by blindly replacing lock statements. Campaign artifact and
+   other auxiliary consumers still retain local dependencies.
 2. Complete the runtime readiness/deployment readback for the new primary backend;
    do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary
    registration and key custody are implemented but not activated publicly.

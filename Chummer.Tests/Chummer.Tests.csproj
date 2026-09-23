@@ -107,6 +107,8 @@
     <Compile Include="InstallLinkingStoreActivationTests.cs" />
     <Compile Include="IdentityTeablePersistenceTests.cs" />
     <Compile Include="CommunityTeablePersistenceTests.cs" />
+    <Compile Include="FactionTeablePersistenceTests.cs" />
+    <Compile Include="BlackLedgerFactionOnboardingTests.cs" />
     <Compile Include="TeableUserProjectionServiceTests.cs" />
     <Compile Include="AccountCanonicalCaptureTests.cs" />
     <Compile Include="IdentityLinkServiceTests.cs" />
