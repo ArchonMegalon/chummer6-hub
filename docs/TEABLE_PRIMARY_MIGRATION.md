@@ -101,6 +101,13 @@ stage was a primary read becoming unavailable (500); separate Identity cleanup
 also timed out at a remote append and requires cold readback before another write.
 No transient failure was treated as permission to replay or widen timeouts.
 
+Readiness now overlaps the independent read-only schema and current-envelope
+observations within the same five-second deadline. Both must succeed before the
+envelope is returned, and a successful envelope is disposed if schema validation
+fails. A focused barrier test proves overlap and rejects invalid schema; 42
+affected transport/activation/coordinator cases pass. This reduces serial network
+latency, not the freshness or safety requirements, and is not yet live completion.
+
 ## Implemented
 
 - `Chummer.Storage.Teable` owns the shared revision transport and private Linux

@@ -35,8 +35,20 @@ internal sealed class TeableInstallLinkingSnapshotAuthority(TeableRevisionStore 
     internal async Task<InstallLinkingAuthoritativeEnvelope> ReadCurrentForReadinessAsync(
         CancellationToken cancellationToken = default)
     {
-        await store.VerifySchemaAsync(cancellationToken);
-        return await ReadCurrentAsync(cancellationToken);
+        Task schema = store.VerifySchemaAsync(cancellationToken);
+        Task<InstallLinkingAuthoritativeEnvelope> current = ReadCurrentAsync(cancellationToken);
+        try
+        {
+            // Independent read-only observations share the caller's deadline.
+            // Neither result authorizes anything until both have been validated.
+            await Task.WhenAll(schema, current);
+            return await current;
+        }
+        catch
+        {
+            if (current.IsCompletedSuccessfully) current.Result.Dispose();
+            throw;
+        }
     }
 
     public async Task<InstallLinkingEnvelopeCompareExchangeResult> CompareExchangeAsync(

@@ -6,6 +6,7 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Chummer.Run.Api.Services.Teable;
+using Chummer.Storage.Teable;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +59,35 @@ public sealed class TeableApiActivationTests : IDisposable
         // protected snapshots and key providers use the real registrations.
         services.Replace(ServiceDescriptor.Singleton<TeableInstallLinkingRuntime>(_ => new(accounts.Store())));
         return services.BuildServiceProvider();
+    }
+
+    [Fact]
+    public async Task Primary_readiness_overlaps_independent_reads_but_never_accepts_an_invalid_schema()
+    {
+        using var remote = new Remote();
+        using var handler = new OverlappingReadiness(remote);
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://teable.example/") };
+        using var store = new TeableRevisionStore(client, "tbl1234567890123456", "synthetic-token");
+        var authority = new TeableInstallLinkingSnapshotAuthority(store);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        using var current = await authority.ReadCurrentForReadinessAsync(deadline.Token);
+        Assert.True(handler.HeadStarted);
+        Assert.Equal(0, current.Generation);
+        remote.Unique = false;
+        await Assert.ThrowsAsync<InvalidDataException>(() => authority.ReadCurrentForReadinessAsync(deadline.Token));
+    }
+
+    private sealed class OverlappingReadiness(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        private readonly TaskCompletionSource _head = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool HeadStarted => _head.Task.IsCompletedSuccessfully;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/field", StringComparison.Ordinal))
+                await _head.Task.WaitAsync(ct);
+            else _head.TrySetResult();
+            return await base.SendAsync(request, ct);
+        }
     }
 
     [Fact]
