@@ -127,7 +127,7 @@ public sealed class BrilliantDirectoriesBillingService
         int monthlyLimit = supporterActive ? SupporterMyFirstBookMonthlyLimit : FreeMyFirstBookMonthlyLimit;
 
         int monthlyUsed;
-        lock (_myFirstBookUsage.Gate)
+        using (_myFirstBookUsage.Enter())
         {
             monthlyUsed = _myFirstBookUsage.Entries
                 .Where(item => string.Equals(item.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
@@ -150,18 +150,18 @@ public sealed class BrilliantDirectoriesBillingService
 
     public MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now = null, string? email = null)
     {
-        MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, now, email);
-        if (snapshot.MonthlyRemaining <= 0)
-        {
-            throw new InvalidOperationException("Monthly MyFirstBook allowance is exhausted for this account.");
-        }
-
         DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
-        lock (_myFirstBookUsage.Gate)
+        MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, effectiveNow, email);
+        using (_myFirstBookUsage.Enter())
         {
             int existingIndex = _myFirstBookUsage.Entries.FindIndex(item =>
                 string.Equals(item.UserId, snapshot.UserId, StringComparison.OrdinalIgnoreCase)
                 && item.WindowStartUtc == snapshot.WindowStartUtc);
+            MyFirstBookUsageLedgerEntry? previous = existingIndex >= 0 ? _myFirstBookUsage.Entries[existingIndex] : null;
+            // Re-read usage within the same scope that will commit it. A quota
+            // observation obtained before this scope is not write admission.
+            if ((previous?.MonthlyUsed ?? 0) >= snapshot.MonthlyLimit)
+                throw new InvalidOperationException("Monthly MyFirstBook allowance is exhausted for this account.");
             MyFirstBookUsageLedgerEntry updated = existingIndex >= 0
                 ? _myFirstBookUsage.Entries[existingIndex] with
                 {
@@ -178,12 +178,21 @@ public sealed class BrilliantDirectoriesBillingService
                 _myFirstBookUsage.Entries.Add(updated);
             }
 
-            _myFirstBookUsage.PersistLocked();
+            try { _myFirstBookUsage.PersistLocked(); }
+            catch
+            {
+                if (previous is null) _myFirstBookUsage.Entries.RemoveAt(_myFirstBookUsage.Entries.Count - 1);
+                else _myFirstBookUsage.Entries[existingIndex] = previous;
+                throw;
+            }
+            // Do not make an acknowledged mutation look failed by performing
+            // another remote read just to construct its response.
+            return new MyFirstBookQuotaConsumeResultDto("consumed", snapshot with
+            {
+                MonthlyUsed = updated.MonthlyUsed,
+                MonthlyRemaining = Math.Max(0, snapshot.MonthlyLimit - updated.MonthlyUsed)
+            });
         }
-
-        return new MyFirstBookQuotaConsumeResultDto(
-            Status: "consumed",
-            Quota: GetMyFirstBookQuota(userId, effectiveNow, email));
     }
 
     public BrilliantDirectoriesCheckoutResponseDto CreateSupporterCheckout(BrilliantDirectoriesCheckoutRequest request)

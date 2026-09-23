@@ -188,6 +188,7 @@ public sealed class TeableRevisionStoreTests
         public bool FailReads { get; set; }
         public bool CommitThenFailHard { get; set; }
         public Action? BeforeHeadPost { get; set; }
+        public Action? BeforeHeadReadResponse { get; set; }
         public int HeadPosts { get; private set; }
         private int _headReads;
         private readonly TaskCompletionSource _headBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -251,6 +252,11 @@ public sealed class TeableRevisionStoreTests
             {
                 if (Interlocked.Increment(ref _headReads) == 2) { HoldTwoEmptyHeadReads = false; _headBarrier.SetResult(); }
                 await _headBarrier.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);
+            }
+            if (headRead && BeforeHeadReadResponse is { } beforeResponse)
+            {
+                BeforeHeadReadResponse = null;
+                beforeResponse();
             }
             return Response(new { records = rows.Select(row => new { fields = row }).ToArray() });
         }

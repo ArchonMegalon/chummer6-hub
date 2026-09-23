@@ -89,6 +89,10 @@
     <Compile Include="OriginChapterWorkerTests.cs" />
     <Compile Include="OriginChapterTeablePersistenceTests.cs" />
     <Compile Include="OriginDocumentTeablePersistenceTests.cs" />
+    <Compile Include="AuthoringLedgerTeablePersistenceTests.cs" />
+    <Compile Include="BrilliantDirectoriesBillingTests.cs" />
+    <Compile Include="RepoPaths.cs" />
+    <Compile Include="OriginDossierProviderCreditReservationServiceTests.cs" />
     <Compile Include="OriginDossierFirstPartyDocumentServiceTests.cs" />
     <Compile Include="DataProtectionKeyProtectionConfiguratorTests.cs" />
     <Compile Include="TeableRevisionStoreTests.cs" />

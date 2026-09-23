@@ -46,7 +46,7 @@ public sealed class OriginDossierProviderCreditReservationService
         }
 
         string reservationId = BuildReservationId(userId, projectId, provider, accountAlias);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             OriginDossierProviderCreditReservationLedgerEntry? existing = _store.Entries.FirstOrDefault(item =>
                 string.Equals(item.ReservationId, reservationId, StringComparison.OrdinalIgnoreCase)
@@ -81,7 +81,12 @@ public sealed class OriginDossierProviderCreditReservationService
                 "reserved",
                 checkedAt,
                 checkedAt));
-            _store.PersistLocked();
+            try { _store.PersistLocked(); }
+            catch
+            {
+                _store.Entries.RemoveAt(_store.Entries.Count - 1);
+                throw;
+            }
         }
 
         return BuildResult("reserved", true, reservationId, userId, projectId, provider, accountAlias, request.CreditsRequested, [], checkedAt);
@@ -212,7 +217,7 @@ public sealed class OriginDossierProviderCreditReservationService
             auditOnly,
             providerBurnWouldBeAllowed || providerBurnAllowed);
 
-    private static string BuildReservationId(string userId, string projectId, string provider, string accountAlias)
+    internal static string BuildReservationId(string userId, string projectId, string provider, string accountAlias)
     {
         string material = string.Join("\n", userId, projectId, provider, accountAlias);
         string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material))).ToLowerInvariant()[..16];

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Chummer.Storage.Teable;
 using Chummer.Run.Contracts.Billing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -7,8 +8,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services.Community;
 
-public sealed class MyFirstBookUsageStore
+public sealed class MyFirstBookUsageStore : IDisposable
 {
+    private readonly TeableQuotaLedger<MyFirstBookUsageLedgerEntry> _ledger;
+    private readonly string _storagePath;
     private readonly ILogger<MyFirstBookUsageStore> _logger;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -17,19 +20,44 @@ public sealed class MyFirstBookUsageStore
 
     public MyFirstBookUsageStore(
         IConfiguration configuration,
-        ILogger<MyFirstBookUsageStore>? logger = null)
+        ILogger<MyFirstBookUsageStore>? logger = null,
+        TeableRevisionStore? primary = null, bool ownsPrimary = false)
     {
+        string mode = configuration["CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER"]?.Trim() ?? "local";
+        if (mode is not ("local" or "teable") || (mode == "teable") != (primary is not null))
+            throw new InvalidOperationException("MyFirstBook usage requires an explicit matching primary configuration.");
+        _ledger = new(primary, ownsPrimary, "myfirstbook-usage", "chummer.hub.myfirstbook-usage-primary/v1", ValidatePrimary);
         _logger = logger ?? NullLogger<MyFirstBookUsageStore>.Instance;
-        StoragePath = ResolveStoragePath(configuration);
-        Load();
+        _storagePath = primary is null ? ResolveStoragePath(configuration) : string.Empty;
+        if (primary is null) Load();
     }
 
-    public object Gate { get; } = new();
-    public string StoragePath { get; }
-    internal List<MyFirstBookUsageLedgerEntry> Entries { get; } = new();
+    public object Gate => _ledger.Gate;
+    public string StoragePath => !_ledger.IsPrimary ? _storagePath
+        : throw new InvalidOperationException("Primary MyFirstBook usage has no authoritative local file.");
+    internal List<MyFirstBookUsageLedgerEntry> Entries => _ledger.Entries;
+    public IDisposable Enter() => _ledger.Enter();
+    public void Dispose() => _ledger.Dispose();
+    internal void EnsureAccountErasureSupported() => _ledger.EnsureAccountErasureSupported();
+
+    private static void ValidatePrimary(IReadOnlyList<MyFirstBookUsageLedgerEntry> entries)
+    {
+        var users = new Dictionary<string, HashSet<DateTimeOffset>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in entries)
+        {
+            if (entry is null || string.IsNullOrWhiteSpace(entry.UserId) || entry.UserId != entry.UserId.Trim()
+                || entry.MonthlyUsed < 0 || entry.WindowStartUtc == default || entry.WindowStartUtc.Offset != TimeSpan.Zero
+                || entry.WindowStartUtc.Day != 1 || entry.WindowStartUtc.TimeOfDay != TimeSpan.Zero
+                || entry.UpdatedAtUtc < entry.WindowStartUtc)
+                throw new InvalidDataException("Primary MyFirstBook usage row is invalid.");
+            if (!users.TryGetValue(entry.UserId, out var windows)) users.Add(entry.UserId, windows = []);
+            if (!windows.Add(entry.WindowStartUtc)) throw new InvalidDataException("Primary MyFirstBook usage is ambiguous.");
+        }
+    }
 
     public void PersistLocked()
     {
+        if (_ledger.IsPrimary) { _ledger.Persist(); return; }
         Directory.CreateDirectory(Path.GetDirectoryName(StoragePath)!);
         var snapshot = new MyFirstBookUsageStoreSnapshot(
             Entries

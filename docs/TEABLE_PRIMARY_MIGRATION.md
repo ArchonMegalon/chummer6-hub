@@ -47,6 +47,18 @@ preserved; none of its unreadable records were decrypted or silently imported.
   lost acknowledgements never trigger write replay. Observed revision floors
   survive owner switches. Remote outages/invalid state return 503 and conflicts
   return 409, without a local-file fallback. Existing local mode is unchanged.
+- MyFirstBook monthly usage and Origin provider-credit reservations have explicit
+  primary registrations. Each ledger has its own revision stream/schema and
+  private token configuration. Fresh outer scopes restore all rows from Teable;
+  nested scopes retain pending edits and scope exit clears primary mutable state.
+  Invalid rows, duplicate allowance windows/reservations and regressed revisions
+  reject without resetting allowance. Quota is rechecked against the current
+  write-scope snapshot, with compare-and-exchange protecting competing instances.
+  An acknowledged consumption returns its committed count without a second remote
+  response read. Failed persistence rolls back the in-memory candidate in local
+  mode too. Reservations remain credit holds, not an exactly-once provider-dispatch
+  authorization; chapter/job admissions still own paid dispatch. No new automatic
+  mutation retry, client-request idempotency or cross-ledger transaction is claimed.
 - Community profiles, principal mappings and groups now have an isolated primary
   implementation using the existing typed snapshot. Explicit synchronous scopes
   refresh at outer entry; nested account/group/identity-link/ledger/experience
@@ -104,6 +116,22 @@ This is transport custody, not new Core rule or continuation-application authori
 No legacy file import or distributed read fence is implied. Scope entry must be
 synchronous and cannot cross an `await`. Historical workspace erasure remains
 blocked and is checked before any auxiliary-account deletion takes place.
+
+Authoring usage and reservations use distinct explicit registrations:
+
+```text
+CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER=teable
+CHUMMER_MYFIRSTBOOK_USAGE_TEABLE_TABLE_ID=<dedicated private usage table>
+CHUMMER_MYFIRSTBOOK_USAGE_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+CHUMMER_ORIGIN_PROVIDER_RESERVATION_STORAGE_PROVIDER=teable
+CHUMMER_ORIGIN_PROVIDER_RESERVATION_TEABLE_TABLE_ID=<dedicated private reservation table>
+CHUMMER_ORIGIN_PROVIDER_RESERVATION_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+```
+
+These preserve the existing case-insensitive billing-user and monthly-window
+semantics, not the separate opaque subject identity rules. Historical erasure is
+preflighted before auxiliary mutations. Billing membership and other Horizon
+artifact ledgers are still local and must not be mistaken for migrated state.
 
 API account/key custody uses distinct explicit registrations:
 
@@ -196,6 +224,16 @@ notice is not a new workload qualification. This is simulated transport, not
 live account migration or whole-host reconstruction. A final 15-case workspace
 run also passed after tightening every hostile-record assertion to require 503.
 
+Authoring ledger follow-up: 88 focused tests passed across primary usage and
+reservations, existing billing/controller and reservation-service cases, and
+auxiliary-erasure preflight. The initial test compilation lacked the existing
+`RepoPaths` helper in the bounded test group; it was included without changing
+product logic. A further 30 tests passed after adding the stale-quota-read race,
+rollback rejection and failed-local-persistence regressions, including the shared
+revision transport tests. API and test builds have no compiler warnings/errors.
+All remote data in this verification is synthetic, using simulated transport;
+no provider generation, live Teable record or production configuration changed.
+
 Runtime credential preparation: the existing EA API token returned HTTP 403 from
 the read-only `/api/access-token` metadata endpoint. It has not been deployed to
 Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
@@ -205,10 +243,11 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
 ## Remaining before production cutover
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
-   stores. Origin jobs, private first-party documents and linked runner snapshots
-   have primary implementations;
-   publication-index/provider-output artifacts and other auxiliary stores still
-   need custody review. The isolated Community slice is not a complete activation.
+   stores. Origin jobs, private first-party documents, linked runner snapshots,
+   MyFirstBook usage and Origin credit reservations have primary implementations.
+   Billing membership, publication-index/provider-output artifacts and other
+   auxiliary stores still need custody review. The isolated Community slice is
+   not a complete activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;
    do not reuse a PostgreSQL least-privilege proof as a Teable proof. API primary
    registration and key custody are implemented but not activated publicly.

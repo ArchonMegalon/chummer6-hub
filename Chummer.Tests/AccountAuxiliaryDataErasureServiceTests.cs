@@ -16,6 +16,27 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
 {
     private static readonly DateTimeOffset Baseline = new(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Primary_authoring_history_blocks_erasure_before_any_auxiliary_side_effects(bool usage)
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_ORIGIN_PROVIDER_RESERVATION_STORAGE_PROVIDER"] = "teable"
+        }).Build();
+        using var primaryUsage = usage ? new MyFirstBookUsageStore(configuration, primary: remote.Store()) : null;
+        using var primaryReservations = usage ? null : new OriginDossierProviderCreditReservationStore(configuration, remote.Store());
+        using Fixture fixture = new(usage: primaryUsage, reservations: primaryReservations);
+        fixture.HorizonUsage.Entries.Add(new HorizonArtifactUsageLedgerEntry(
+            "user-delete", "origin-dossier", "book", "epub", "month", Baseline, 1, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.HorizonUsage.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
     [Fact]
     public void Primary_workspace_history_blocks_erasure_before_auxiliary_side_effects()
     {
@@ -166,7 +187,9 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             Guid.NewGuid().ToString("N"));
 
         public Fixture(OriginDossierFirstPartyDocumentService? documents = null,
-            InstallLinkedWorkspaceSnapshotStore? workspaces = null)
+            InstallLinkedWorkspaceSnapshotStore? workspaces = null,
+            MyFirstBookUsageStore? usage = null,
+            OriginDossierProviderCreditReservationStore? reservations = null)
         {
             Directory.CreateDirectory(_directory);
             var values = new Dictionary<string, string?>
@@ -189,9 +212,9 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             };
             Configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
             Brilliant = new BrilliantDirectoriesBillingStore(Configuration);
-            MyFirstBook = new MyFirstBookUsageStore(Configuration);
+            MyFirstBook = usage ?? new MyFirstBookUsageStore(Configuration);
             HorizonUsage = new HorizonArtifactUsageStore(Configuration);
-            OriginReservations = new OriginDossierProviderCreditReservationStore(Configuration);
+            OriginReservations = reservations ?? new OriginDossierProviderCreditReservationStore(Configuration);
             ArtifactRequests = new HorizonArtifactRequestReceiptStore(Configuration);
             PayFunnels = new PayFunnelsBillingStore(Configuration);
             InstallSnapshots = workspaces ?? new InstallLinkedWorkspaceSnapshotStore(Configuration);
