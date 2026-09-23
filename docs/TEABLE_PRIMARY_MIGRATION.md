@@ -5,6 +5,33 @@ fresh Hub account and Origin book/job state. This is not a backup/projection.
 Production has **not** been cut over. The original encrypted Docker volume is
 preserved; none of its unreadable records were decrypted or silently imported.
 
+### Actual native-client/recovery follow-up (2026-09-23 17:19 UTC)
+
+The shipping managed Android account service, proof transport, owner accessor and
+chapter reader were exercised against the private local Hub using a separate
+synthetic installation. No validator was relaxed to accept the earlier Python
+probe's noncanonical installation ID. Link exchange and the exact retained First
+Book prose passed; a new process restored the native binding and read the same
+chapter in 8.91 seconds under the unchanged 20-second client deadline.
+
+An intervening live authority outage returned 503 after five seconds and retained
+the device credentials. Direct Teable reads and subsequent Hub authority readiness
+recovered without restart. Its exact cause is unresolved; no speed or availability
+SLO is inferred. The additional synthetic grant was then revoked once, rejection
+was verified and only its disposable software private key was removed. The original
+provider job/grant remain intact. This is managed-client evidence with loopback
+forwarding, not Android UI, Keystore, public HTTPS or player adoption/export proof.
+
+Six selected provider-custody files were captured under the existing writer/book
+locks as actual bytes in EA's independent private Teable recovery table. Exact
+readback restored them into a new private directory. The actual worker validated
+the restored provider receipt and current Hub source via one read, with browser
+and all mutation calls prohibited. This is a manual synthetic snapshot, not
+automatic replication, current approval authority or whole-host failover.
+
+Runtime code/image are unchanged from the prior availability fix. No generation,
+provider advance, real-user acceptance, AAB signing or Play upload occurred.
+
 ### Live restricted-access follow-up (2026-09-23)
 
 The owner approved and two separate project-restricted runtime credentials were
