@@ -31,6 +31,15 @@ observed HTTP/1.1 readiness at 0.78/2.64/2.99 seconds and HTTP/2 at 0.48/0.29/0.
 seconds. This small comparison motivates the transport change; it is not a
 whole-route SLO or a claim that every earlier timeout had the same cause.
 
+The final private image `c970694f0571…` passed real signed reads under a probe-
+enforced 20-second deadline: first chapter after restart 16.31s, second chapter
+15.15s. Exact prose and first-chapter acceptance were preserved; the second remains
+unaccepted. The inline-only predecessor still returned a 503 and a 27.79s read,
+so reduced request count alone was insufficient. 146 focused transport/storage/
+activation/chapter tests pass for the final change. This is private synthetic HTTP
+evidence, not Android UI, automatic authoring, public cutover, a response-time SLO
+or Play delivery. No provider action was repeated; Preview 28 remains unchanged.
+
 ### Actual native-client/recovery follow-up (2026-09-23 17:19 UTC)
 
 The shipping managed Android account service, proof transport, owner accessor and
