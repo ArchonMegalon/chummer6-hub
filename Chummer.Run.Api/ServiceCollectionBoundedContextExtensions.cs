@@ -121,7 +121,19 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<ReusableAccountFlowService>();
         services.AddSingleton<RewardService>();
         services.AddSingleton<EntitlementService>();
-        services.AddSingleton<BrilliantDirectoriesBillingStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetService<ILogger<BrilliantDirectoriesBillingStore>>();
+            if (configuration["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new BrilliantDirectoriesBillingStore(configuration, logger);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_BILLING_MEMBERSHIP_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary membership table is required."),
+                configuration["CHUMMER_BILLING_MEMBERSHIP_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private membership token file is required."));
+            try { return new BrilliantDirectoriesBillingStore(configuration, logger, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton(provider =>
         {
             var configuration = provider.GetRequiredService<IConfiguration>();

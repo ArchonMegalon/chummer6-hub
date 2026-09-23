@@ -16,6 +16,20 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
 {
     private static readonly DateTimeOffset Baseline = new(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
 
+    [Fact]
+    public void Primary_membership_history_blocks_erasure_before_any_auxiliary_side_effects()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var membership = new BrilliantDirectoriesBillingStore(configuration, primary: remote.Store());
+        using Fixture fixture = new(membership: membership);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -189,7 +203,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
         public Fixture(OriginDossierFirstPartyDocumentService? documents = null,
             InstallLinkedWorkspaceSnapshotStore? workspaces = null,
             MyFirstBookUsageStore? usage = null,
-            OriginDossierProviderCreditReservationStore? reservations = null)
+            OriginDossierProviderCreditReservationStore? reservations = null,
+            BrilliantDirectoriesBillingStore? membership = null)
         {
             Directory.CreateDirectory(_directory);
             var values = new Dictionary<string, string?>
@@ -211,7 +226,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
                 ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX_PATH"] = PathFor("origin-publications.json")
             };
             Configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
-            Brilliant = new BrilliantDirectoriesBillingStore(Configuration);
+            Brilliant = membership ?? new BrilliantDirectoriesBillingStore(Configuration);
             MyFirstBook = usage ?? new MyFirstBookUsageStore(Configuration);
             HorizonUsage = new HorizonArtifactUsageStore(Configuration);
             OriginReservations = reservations ?? new OriginDossierProviderCreditReservationStore(Configuration);

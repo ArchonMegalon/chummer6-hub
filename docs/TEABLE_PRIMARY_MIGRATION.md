@@ -59,6 +59,16 @@ preserved; none of its unreadable records were decrypted or silently imported.
   mode too. Reservations remain credit holds, not an exactly-once provider-dispatch
   authorization; chapter/job admissions still own paid dispatch. No new automatic
   mutation retry, client-request idempotency or cross-ledger transaction is claimed.
+- Billing membership snapshots now also have an explicit primary registration.
+  Member ID/email, plan/status and observation/sync timestamps persist remotely.
+  Sync authentication and plan/status admission happen before accessing the store.
+  Reads always enter a fresh remote scope, including email fallback and quota
+  derivation; there is no stale-memory or local-file membership fallback. Restore
+  uses the same supported/active-status configuration and canonical plans as sync.
+  Inconsistent or duplicate rows fail instead of inferring an entitlement. Changed
+  status policy requires reconciliation. A failed local sync no longer leaves an
+  uncommitted upgrade in memory. This is private billing-state custody, not a live
+  billing-provider integration, new entitlement source or payment proof.
 - Community profiles, principal mappings and groups now have an isolated primary
   implementation using the existing typed snapshot. Explicit synchronous scopes
   refresh at outer entry; nested account/group/identity-link/ledger/experience
@@ -130,8 +140,21 @@ CHUMMER_ORIGIN_PROVIDER_RESERVATION_TEABLE_TOKEN_FILE=<absolute private mounted 
 
 These preserve the existing case-insensitive billing-user and monthly-window
 semantics, not the separate opaque subject identity rules. Historical erasure is
-preflighted before auxiliary mutations. Billing membership and other Horizon
-artifact ledgers are still local and must not be mistaken for migrated state.
+preflighted before auxiliary mutations. Other Horizon artifact ledgers remain
+local and must not be mistaken for migrated state.
+
+The membership input to those quotas has its own registration:
+
+```text
+CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER=teable
+CHUMMER_BILLING_MEMBERSHIP_TEABLE_TABLE_ID=<dedicated private membership table>
+CHUMMER_BILLING_MEMBERSHIP_TEABLE_TOKEN_FILE=<absolute private mounted token file>
+```
+
+The existing provider sync secret and status configuration remain required at
+their original boundaries. Neither secret is copied into membership rows. No
+legacy billing file is imported automatically, and historical membership erasure
+is rejected before any auxiliary-account deletion begins.
 
 API account/key custody uses distinct explicit registrations:
 
@@ -234,6 +257,15 @@ revision transport tests. API and test builds have no compiler warnings/errors.
 All remote data in this verification is synthetic, using simulated transport;
 no provider generation, live Teable record or production configuration changed.
 
+Membership follow-up: 92 focused tests passed across primary membership and
+authoring ledgers, existing billing/controller behavior and auxiliary erasure.
+Cases include combined cold membership/usage restoration, a second instance's
+downgrade, rejection before I/O for bad sync credentials or plan/status inputs,
+conflicts, uncertain commit readback, local-file isolation, custom status mapping
+and incompatible policy, corrupt rows, failed-local-sync rollback, explicit DI
+and erasure preflight. API/test compilation has no compiler warnings/errors.
+This is simulated transport, not live customer migration or provider readback.
+
 Runtime credential preparation: the existing EA API token returned HTTP 403 from
 the read-only `/api/access-token` metadata endpoint. It has not been deployed to
 Hub. No existing BrowserAct profile is scoped to Teable; approval for a separate
@@ -244,8 +276,8 @@ Do not reuse a GitHub/Play/provider profile or put the broad EA token in Hub.
 
 1. Finish Community consumer/DI conversion and remaining document/artifact
    stores. Origin jobs, private first-party documents, linked runner snapshots,
-   MyFirstBook usage and Origin credit reservations have primary implementations.
-   Billing membership, publication-index/provider-output artifacts and other
+   MyFirstBook usage, Origin credit reservations and billing membership have
+   primary implementations. Publication-index/provider-output artifacts and other
    auxiliary stores still need custody review. The isolated Community slice is
    not a complete activation.
 2. Complete the runtime readiness/deployment readback for the new primary backend;

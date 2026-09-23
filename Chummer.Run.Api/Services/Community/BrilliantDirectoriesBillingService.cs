@@ -215,11 +215,18 @@ public sealed class BrilliantDirectoriesBillingService
         DateTimeOffset syncedAtUtc = DateTimeOffset.UtcNow;
         snapshot = snapshot with { SyncedAtUtc = syncedAtUtc };
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            BrilliantDirectoriesMemberSnapshotDto[] before = _store.Members.ToArray();
             _store.Members.RemoveAll(item => string.Equals(item.UserId, snapshot.UserId, StringComparison.OrdinalIgnoreCase));
             _store.Members.Add(snapshot);
-            _store.PersistLocked();
+            try { _store.PersistLocked(); }
+            catch
+            {
+                _store.Members.Clear();
+                _store.Members.AddRange(before);
+                throw;
+            }
         }
 
         return new BrilliantDirectoriesSyncResultDto(
@@ -234,7 +241,7 @@ public sealed class BrilliantDirectoriesBillingService
 
     public BrilliantDirectoriesMemberSnapshotDto? GetAccount(string userId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.Members
                 .Where(item => string.Equals(item.UserId, userId, StringComparison.OrdinalIgnoreCase))
@@ -251,7 +258,7 @@ public sealed class BrilliantDirectoriesBillingService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.Members
                 .Where(item => string.Equals(NormalizeEmail(item.Email), normalizedEmail, StringComparison.OrdinalIgnoreCase))
@@ -340,9 +347,33 @@ public sealed class BrilliantDirectoriesBillingService
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER", "BrilliantDirectories:CheckoutEmailParameter") ?? "email",
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER", "BrilliantDirectories:CheckoutPlanParameter") ?? "plan",
             ReadOptional("BRILLIANT_DIRECTORIES_SYNC_SECRET", "BrilliantDirectories:SyncSecret"),
-            ReadCsv("BRILLIANT_DIRECTORIES_SUPPORTED_MEMBERSHIP_STATUSES", "BrilliantDirectories:SupportedMembershipStatuses", ["active", "inactive", "pending", "canceled", "cancelled", "expired", "suspended", "lifetime"]),
-            ReadCsv("BRILLIANT_DIRECTORIES_ACTIVE_MEMBERSHIP_STATUSES", "BrilliantDirectories:ActiveMembershipStatuses", ["active", "lifetime"]));
+            SupportedMembershipStatuses(_configuration),
+            ActiveMembershipStatuses(_configuration));
     }
+
+    // Restore validates the same plan/status mapping used at authenticated sync.
+    // A changed mapping requires reconciliation, not silently granting a tier.
+    internal static void ValidateStoredMembership(BrilliantDirectoriesMemberSnapshotDto? member, IConfiguration configuration)
+    {
+        if (member is null || string.IsNullOrWhiteSpace(member.UserId) || member.UserId != member.UserId.Trim()
+            || member.MemberId != TrimToNull(member.MemberId) || member.Email != TrimToNull(member.Email)
+            || string.IsNullOrWhiteSpace(member.MembershipStatus)
+            || member.MembershipStatus != NormalizeStatus(member.MembershipStatus)
+            || member.ObservedAtUtc == default || member.SyncedAtUtc == default
+            || member.ObservedAtUtc.Offset != TimeSpan.Zero || member.SyncedAtUtc.Offset != TimeSpan.Zero)
+            throw new InvalidDataException("Primary membership metadata is invalid.");
+        var plan = PlanDefinitions.FirstOrDefault(item => item.PlanKey == member.PlanKey && item.Name == member.PlanName);
+        if (plan is null || !SupportedMembershipStatuses(configuration).Contains(member.MembershipStatus, StringComparer.OrdinalIgnoreCase)
+            || member.SupporterActive != (plan.IsSupporter && ActiveMembershipStatuses(configuration).Contains(member.MembershipStatus, StringComparer.OrdinalIgnoreCase)))
+            throw new InvalidDataException("Primary membership disagrees with the configured plan/status mapping.");
+    }
+
+    private static IReadOnlyList<string> SupportedMembershipStatuses(IConfiguration configuration)
+        => ReadCsv(configuration, "BRILLIANT_DIRECTORIES_SUPPORTED_MEMBERSHIP_STATUSES", "BrilliantDirectories:SupportedMembershipStatuses",
+            ["active", "inactive", "pending", "canceled", "cancelled", "expired", "suspended", "lifetime"]);
+
+    private static IReadOnlyList<string> ActiveMembershipStatuses(IConfiguration configuration)
+        => ReadCsv(configuration, "BRILLIANT_DIRECTORIES_ACTIVE_MEMBERSHIP_STATUSES", "BrilliantDirectories:ActiveMembershipStatuses", ["active", "lifetime"]);
 
     private string? ReadOptional(string environmentKey, string configurationKey)
         => TrimToNull(_configuration[environmentKey]) ?? TrimToNull(_configuration[configurationKey]);
@@ -371,9 +402,9 @@ public sealed class BrilliantDirectoriesBillingService
         }
     }
 
-    private IReadOnlyList<string> ReadCsv(string environmentKey, string configurationKey, IReadOnlyList<string> defaults)
+    private static IReadOnlyList<string> ReadCsv(IConfiguration configuration, string environmentKey, string configurationKey, IReadOnlyList<string> defaults)
     {
-        string? value = ReadOptional(environmentKey, configurationKey);
+        string? value = TrimToNull(configuration[environmentKey]) ?? TrimToNull(configuration[configurationKey]);
         string[] items = (value is null ? defaults : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Select(NormalizeStatus)
             .Distinct(StringComparer.OrdinalIgnoreCase)

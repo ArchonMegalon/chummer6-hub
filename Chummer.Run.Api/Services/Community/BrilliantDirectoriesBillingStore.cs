@@ -1,14 +1,17 @@
 using System.Text.Json;
 using System.Text;
 using Chummer.Run.Contracts.Billing;
+using Chummer.Storage.Teable;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services.Community;
 
-public sealed class BrilliantDirectoriesBillingStore
+public sealed class BrilliantDirectoriesBillingStore : IDisposable
 {
+    private readonly TeableQuotaLedger<BrilliantDirectoriesMemberSnapshotDto> _ledger;
+    private readonly string _storagePath;
     private readonly ILogger<BrilliantDirectoriesBillingStore> _logger;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -17,19 +20,40 @@ public sealed class BrilliantDirectoriesBillingStore
 
     public BrilliantDirectoriesBillingStore(
         IConfiguration configuration,
-        ILogger<BrilliantDirectoriesBillingStore>? logger = null)
+        ILogger<BrilliantDirectoriesBillingStore>? logger = null,
+        TeableRevisionStore? primary = null, bool ownsPrimary = false)
     {
+        string mode = configuration["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"]?.Trim() ?? "local";
+        if (mode is not ("local" or "teable") || (mode == "teable") != (primary is not null))
+            throw new InvalidOperationException("Membership storage requires an explicit matching primary configuration.");
+        _ledger = new(primary, ownsPrimary, "billing-membership", "chummer.hub.billing-membership-primary/v1",
+            rows => ValidatePrimary(rows, configuration));
         _logger = logger ?? NullLogger<BrilliantDirectoriesBillingStore>.Instance;
-        StoragePath = ResolveStoragePath(configuration);
-        Load();
+        _storagePath = primary is null ? ResolveStoragePath(configuration) : string.Empty;
+        if (primary is null) Load();
     }
 
-    public object Gate { get; } = new();
-    public string StoragePath { get; }
-    public List<BrilliantDirectoriesMemberSnapshotDto> Members { get; } = new();
+    public object Gate => _ledger.Gate;
+    public string StoragePath => !_ledger.IsPrimary ? _storagePath
+        : throw new InvalidOperationException("Primary membership storage has no authoritative local file.");
+    public List<BrilliantDirectoriesMemberSnapshotDto> Members => _ledger.Entries;
+    public IDisposable Enter() => _ledger.Enter();
+    public void Dispose() => _ledger.Dispose();
+    internal void EnsureAccountErasureSupported() => _ledger.EnsureAccountErasureSupported();
+
+    private static void ValidatePrimary(IReadOnlyList<BrilliantDirectoriesMemberSnapshotDto> members, IConfiguration configuration)
+    {
+        var users = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var member in members)
+        {
+            BrilliantDirectoriesBillingService.ValidateStoredMembership(member, configuration);
+            if (!users.Add(member.UserId)) throw new InvalidDataException("Primary membership has ambiguous user identities.");
+        }
+    }
 
     public void PersistLocked()
     {
+        if (_ledger.IsPrimary) { _ledger.Persist(); return; }
         Directory.CreateDirectory(Path.GetDirectoryName(StoragePath)!);
         var snapshot = new BrilliantDirectoriesBillingStoreSnapshot(
             Members

@@ -81,6 +81,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         _installSnapshots.EnsureAccountErasureSupported();
         _myFirstBookUsage.EnsureAccountErasureSupported();
         _originReservations.EnsureAccountErasureSupported();
+        _brilliantDirectories.EnsureAccountErasureSupported();
         var removed = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["brilliant_directories_projection"] = EraseSingleList(

@@ -5,7 +5,7 @@ using Chummer.Storage.Teable;
 
 namespace Chummer.Run.Api.Services.Community;
 
-// Shared custody for the two existing authoring ledgers, not provider-dispatch
+// Shared custody for authoring ledgers and their membership inputs, not provider-dispatch
 // admission or a distributed lease. A new outer scope is always a remote read.
 internal sealed class TeableQuotaLedger<T>(TeableRevisionStore? primary, bool ownsPrimary,
     string stream, string schema, Action<IReadOnlyList<T>> validate) : IDisposable

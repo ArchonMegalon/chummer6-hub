@@ -90,6 +90,7 @@
     <Compile Include="OriginChapterTeablePersistenceTests.cs" />
     <Compile Include="OriginDocumentTeablePersistenceTests.cs" />
     <Compile Include="AuthoringLedgerTeablePersistenceTests.cs" />
+    <Compile Include="MembershipTeablePersistenceTests.cs" />
     <Compile Include="BrilliantDirectoriesBillingTests.cs" />
     <Compile Include="RepoPaths.cs" />
     <Compile Include="OriginDossierProviderCreditReservationServiceTests.cs" />
