@@ -20,6 +20,22 @@ namespace Chummer.Tests;
 public sealed class TeableRevisionStoreTests
 {
     [Fact]
+    public async Task Teable_reads_and_writes_prefer_http2_with_tls_http1_fallback()
+    {
+        using var remote = new Remote();
+        int observed = 0;
+        remote.ObserveRequest = request =>
+        {
+            Assert.Equal("https", request.RequestUri!.Scheme);
+            Assert.Equal(HttpVersion.Version20, request.Version);
+            Assert.Equal(HttpVersionPolicy.RequestVersionOrLower, request.VersionPolicy);
+            observed++;
+        };
+        await remote.Store().CompareExchangeAsync("transport", null, Guid.NewGuid(), "synthetic"u8.ToArray());
+        Assert.True(observed >= 5); // Includes schema/head reads, chunks, head POST and commit readback.
+    }
+
+    [Fact]
     public void Real_account_store_and_keyring_recover_from_remote_bytes_with_a_new_empty_local_root()
     {
         using var remote = new Remote();
@@ -261,6 +277,7 @@ public sealed class TeableRevisionStoreTests
         public bool CommitThenFailHard { get; set; }
         public Action? BeforeHeadPost { get; set; }
         public Action? BeforeHeadReadResponse { get; set; }
+        public Action<HttpRequestMessage>? ObserveRequest { get; set; }
         public int HeadPosts { get; private set; }
         private int _getRequests;
         public int GetRequests => Volatile.Read(ref _getRequests);
@@ -272,6 +289,7 @@ public sealed class TeableRevisionStoreTests
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            ObserveRequest?.Invoke(request);
             if (request.Method == HttpMethod.Get) Interlocked.Increment(ref _getRequests);
             Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
             Assert.Equal("synthetic-token", request.Headers.Authorization.Parameter);

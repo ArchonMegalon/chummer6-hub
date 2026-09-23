@@ -216,7 +216,13 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
     {
         if (client.BaseAddress is not { Scheme: "https", AbsolutePath: "/", UserInfo: "" }
             || string.IsNullOrWhiteSpace(token)) throw Invalid();
-        var request = new HttpRequestMessage(method, path);
+        // Independent schema/current-state reads can share one TLS connection.
+        // Protocol fallback is negotiated, not an application-level POST retry.
+        var request = new HttpRequestMessage(method, path)
+        {
+            Version = HttpVersion.Version20,
+            VersionPolicy = HttpVersionPolicy.RequestVersionOrLower
+        };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return request;
     }

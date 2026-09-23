@@ -23,6 +23,14 @@ small heads. Signed admission, final revocation checks, nonce CAS, readback afte
 uncertain commits, remote-outage rejection and the five-second readiness deadline
 are unchanged. This does not by itself establish a latency or availability SLO.
 
+The HTTPS transport now requests HTTP/2 with standard HTTP/1.1 negotiation
+fallback, allowing independent readiness reads to share the TLS connection.
+Redirects/cookies remain disabled, TLS verification and response bounds are
+unchanged, and no application retry is added. An isolated live same-network probe
+observed HTTP/1.1 readiness at 0.78/2.64/2.99 seconds and HTTP/2 at 0.48/0.29/0.27
+seconds. This small comparison motivates the transport change; it is not a
+whole-route SLO or a claim that every earlier timeout had the same cause.
+
 ### Actual native-client/recovery follow-up (2026-09-23 17:19 UTC)
 
 The shipping managed Android account service, proof transport, owner accessor and
