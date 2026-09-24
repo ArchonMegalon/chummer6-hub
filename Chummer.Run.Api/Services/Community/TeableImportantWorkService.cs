@@ -122,7 +122,7 @@ public sealed class TeableImportantWorkService
             CreatedAtUtc: now,
             UpdatedAtUtc: now);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             int existingIndex = _store.ImportantWorkItems.FindIndex(existing => string.Equals(existing.ItemId, item.ItemId, StringComparison.OrdinalIgnoreCase));
             if (existingIndex >= 0)
@@ -210,7 +210,13 @@ public sealed class TeableImportantWorkService
     }
 
     public Task<TeableImportantWorkSyncResult> SyncAllAsync(CancellationToken cancellationToken = default)
-        => SyncItemsInternalAsync(GetStoredItems(), ResolveOptions(), cancellationToken);
+    {
+        TeableOptions options = ResolveOptions();
+        // Disabled/unconfigured projection is not a primary-store read. In
+        // particular, do not touch account state merely to report it is off.
+        IReadOnlyList<ImportantWorkItemProjection> items = options.CanAttemptSync ? GetStoredItems() : [];
+        return SyncItemsInternalAsync(items, options, cancellationToken);
+    }
 
     private async Task<TeableImportantWorkSyncResult> SyncItemsInternalAsync(
         IReadOnlyList<ImportantWorkItemProjection> items,
@@ -449,7 +455,7 @@ public sealed class TeableImportantWorkService
 
     private IReadOnlyList<ImportantWorkItemProjection> GetStoredItems()
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.ImportantWorkItems
                 .OrderByDescending(static item => item.UpdatedAtUtc)

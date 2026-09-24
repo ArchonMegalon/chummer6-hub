@@ -35,6 +35,7 @@ public sealed partial class InstallLinkingService
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
     private static readonly TimeSpan RemoteProofClockSkew = TimeSpan.FromMinutes(5);
     private readonly Func<InstallLinkingStore> _storeAccessor;
+    private readonly bool _storeAccessorChecksReadiness;
     private InstallLinkingStore _store => _storeAccessor();
     private readonly TimeSpan _claimTicketLifetime;
     private readonly TimeSpan _browserCallbackLifetime;
@@ -42,6 +43,21 @@ public sealed partial class InstallLinkingService
     private readonly int _maxDownloadReceiptsPerPrincipalPerHour;
     private readonly int _maxPendingBrowserCallbacksPerPrincipal;
     private readonly IInstallLinkingStoreReadinessProbe? _readinessProbe;
+
+    // A synchronous operation-local view, never retained by DI or shared across
+    // requests. The caller admits the exact store and holds its gate throughout.
+    // Explicit readiness checks and persistence CAS still consult the primary;
+    // individual dictionary/property lookups need not repeat remote activation.
+    private InstallLinkingService(InstallLinkingService source, InstallLinkingStore store)
+    {
+        _storeAccessor = () => store;
+        _readinessProbe = source._readinessProbe;
+        _claimTicketLifetime = source._claimTicketLifetime;
+        _browserCallbackLifetime = source._browserCallbackLifetime;
+        _maxPendingClaimTicketsPerPrincipal = source._maxPendingClaimTicketsPerPrincipal;
+        _maxDownloadReceiptsPerPrincipalPerHour = source._maxDownloadReceiptsPerPrincipalPerHour;
+        _maxPendingBrowserCallbacksPerPrincipal = source._maxPendingBrowserCallbacksPerPrincipal;
+    }
 
     public InstallLinkingService(
         InstallLinkingStore store,
@@ -63,6 +79,7 @@ public sealed partial class InstallLinkingService
             configuration,
             readinessProbe)
     {
+        _storeAccessorChecksReadiness = storeAccess.EnforcesReadiness(readinessProbe);
     }
 
     private InstallLinkingService(
@@ -529,9 +546,20 @@ public sealed partial class InstallLinkingService
         string? installationId,
         string? grantId,
         string? accessToken)
+        => ResolveAndroidLinkedV2Grant(installationId, grantId, accessToken, requireAvailableAuthority: false);
+
+    // HTTP authentication must distinguish an unavailable authority from a
+    // credential rejection, without disclosing storage details or admitting it.
+    internal AndroidLinkedV2GrantPrincipal? ResolveAndroidLinkedV2GrantForRequest(
+        string? installationId, string? grantId, string? accessToken)
+        => ResolveAndroidLinkedV2Grant(installationId, grantId, accessToken, requireAvailableAuthority: true);
+
+    private AndroidLinkedV2GrantPrincipal? ResolveAndroidLinkedV2Grant(
+        string? installationId, string? grantId, string? accessToken, bool requireAvailableAuthority)
     {
-        if (!IsDurableStoreReady())
+        if (!TryGetDurableStore(out InstallLinkingStore store))
         {
+            if (requireAvailableAuthority) throw AuthorityUnavailable();
             return null;
         }
 
@@ -562,19 +590,25 @@ public sealed partial class InstallLinkingService
             return null;
         }
 
-        lock (_store.Gate)
+        lock (store.Gate)
         {
+            var operation = new InstallLinkingService(this, store);
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            ExpireGrantsLocked(now);
-            if (!TryResolveActiveGrantLocked(
+            operation.ExpireGrantsLocked(now);
+            if (!operation.TryResolveActiveGrantLocked(
                     normalizedInstallationId,
                     normalizedGrantId,
                     now,
                     out ClaimedInstallationDto? installation,
                     out InstallationGrantDto? grant)
-                || !GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
+                || !operation.GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
                 || !FixedTimeEquals(grant.AccessToken, normalizedAccessToken))
             {
+                return null;
+            }
+            if (!operation.IsDurableStoreReady())
+            {
+                if (requireAvailableAuthority) throw AuthorityUnavailable();
                 return null;
             }
 
@@ -587,29 +621,38 @@ public sealed partial class InstallLinkingService
     }
 
     internal ClaimedInstallationDto? ResolveAndroidLinkedV2Principal(
-        AndroidLinkedV2GrantPrincipal principal)
+        AndroidLinkedV2GrantPrincipal principal, bool requireAvailableAuthority = false)
     {
         ArgumentNullException.ThrowIfNull(principal);
-        if (!IsDurableStoreReady())
+        if (!TryGetDurableStore(out InstallLinkingStore store))
         {
+            if (requireAvailableAuthority) throw AuthorityUnavailable();
             return null;
         }
 
-        lock (_store.Gate)
+        lock (store.Gate)
         {
+            var operation = new InstallLinkingService(this, store);
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            ExpireGrantsLocked(now);
-            return TryResolveActiveGrantLocked(
+            operation.ExpireGrantsLocked(now);
+            if (!operation.TryResolveActiveGrantLocked(
                 principal.Installation.InstallationId,
                 principal.GrantId,
                 now,
                 out ClaimedInstallationDto? installation,
                 out InstallationGrantDto? grant)
-                && GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
-                && string.Equals(installation!.SubjectId, principal.Installation.SubjectId, StringComparison.Ordinal)
-                && string.Equals(installation.UserId, principal.Installation.UserId, StringComparison.Ordinal)
-                ? installation
-                : null;
+                || !operation.GrantHasTransportLocked(grant!.GrantId, InstallationGrantTransports.AndroidLinkedV2)
+                || !string.Equals(installation!.SubjectId, principal.Installation.SubjectId, StringComparison.Ordinal)
+                || !string.Equals(installation.UserId, principal.Installation.UserId, StringComparison.Ordinal))
+            {
+                return null;
+            }
+            if (!operation.IsDurableStoreReady())
+            {
+                if (requireAvailableAuthority) throw AuthorityUnavailable();
+                return null;
+            }
+            return installation;
         }
     }
 
@@ -619,7 +662,12 @@ public sealed partial class InstallLinkingService
         DateTimeOffset now,
         DateTimeOffset expiresAtUtc)
     {
-        EnsureDurableStoreReady();
+        if (!TryGetDurableStore(out InstallLinkingStore store))
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status503ServiceUnavailable,
+                "Install-linking is temporarily unavailable.");
+        }
         string normalizedGrantId = NormalizeRequired(grantId, nameof(grantId), MaxGrantIdLength);
         string normalizedPacketKey = NormalizeRequired(packetKey, nameof(packetKey), 64);
         if (!AndroidLinkedV2RequestProof.IsValidPacketKey(normalizedPacketKey)
@@ -628,10 +676,14 @@ public sealed partial class InstallLinkingService
             return false;
         }
 
-        return TryUseAndroidLinkedV2ProofLocked(
-            $"grant\n{normalizedGrantId}\n{normalizedPacketKey}",
-            now,
-            expiresAtUtc);
+        lock (store.Gate)
+        {
+            var operation = new InstallLinkingService(this, store);
+            bool accepted = operation.TryUseAndroidLinkedV2ProofLocked(
+                $"grant\n{normalizedGrantId}\n{normalizedPacketKey}", now, expiresAtUtc);
+            operation.EnsureDurableStoreReady();
+            return accepted;
+        }
     }
 
     private bool TryUseAndroidLinkedV2BootstrapProof(
@@ -949,6 +1001,20 @@ public sealed partial class InstallLinkingService
         AndroidLinkedV2GrantPrincipal principal)
     {
         EnsureDurableStoreReady();
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
+        {
+            var operation = new InstallLinkingService(this, store);
+            AndroidLinkedV2GrantRevocationResult result = operation.RevokeAndroidLinkedV2GrantCore(principal);
+            operation.EnsureDurableStoreReady();
+            return result;
+        }
+    }
+
+    private AndroidLinkedV2GrantRevocationResult RevokeAndroidLinkedV2GrantCore(
+        AndroidLinkedV2GrantPrincipal principal)
+    {
+        EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(principal);
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
@@ -1008,6 +1074,24 @@ public sealed partial class InstallLinkingService
         string? userId,
         string? subjectId,
         string? callbackTransport = null)
+    {
+        EnsureDurableStoreReady();
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
+        {
+            var operation = new InstallLinkingService(this, store);
+            IssueInstallBrowserCallbackResponseDto result = operation.IssueBrowserCallbackCore(
+                request, userId, subjectId, callbackTransport);
+            operation.EnsureDurableStoreReady();
+            return result;
+        }
+    }
+
+    private IssueInstallBrowserCallbackResponseDto IssueBrowserCallbackCore(
+        IssueInstallBrowserCallbackRequestDto request,
+        string? userId,
+        string? subjectId,
+        string? callbackTransport)
     {
         EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
@@ -1391,6 +1475,23 @@ public sealed partial class InstallLinkingService
     }
 
     public PollInstallBrowserCallbackResult PollBrowserCallbackV2(
+        AndroidInstallLinkProofPollV2Request request)
+    {
+        EnsureDurableStoreReady();
+        InstallLinkingStore store = _store;
+        lock (store.Gate)
+        {
+            var operation = new InstallLinkingService(this, store);
+            PollInstallBrowserCallbackResult result = operation.PollBrowserCallbackV2Core(request);
+            // A remote writer or outage after the commit must not turn a stale
+            // local result into a successful grant response. Recovery still uses
+            // the existing immutable operation receipt, never a new grant.
+            operation.EnsureDurableStoreReady();
+            return result;
+        }
+    }
+
+    private PollInstallBrowserCallbackResult PollBrowserCallbackV2Core(
         AndroidInstallLinkProofPollV2Request request)
     {
         EnsureDurableStoreReady();
@@ -2453,6 +2554,32 @@ public sealed partial class InstallLinkingService
     private static InstallLinkingOperationException IssuanceLimitReached()
         => new(StatusCodes.Status429TooManyRequests, "install-link issuance limit reached.");
 
+    private bool TryGetDurableStore(out InstallLinkingStore store)
+    {
+        store = null!;
+        try
+        {
+            // Production access already performs this exact activation probe.
+            // Capture that admitted store once, instead of probing it and then
+            // probing again for IsHealthy and the subsequent gate lookup.
+            // Fixed stores and independent probes still require explicit admission.
+            if (!_storeAccessorChecksReadiness && _readinessProbe is not null
+                && !_readinessProbe.Evaluate().Ready)
+            {
+                return false;
+            }
+
+            InstallLinkingStore current = _store;
+            if (!current.IsHealthy) return false;
+            store = current;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private bool IsDurableStoreReady()
     {
         if (_readinessProbe is null)
@@ -2474,11 +2601,12 @@ public sealed partial class InstallLinkingService
     {
         if (!IsDurableStoreReady())
         {
-            throw new InstallLinkingOperationException(
-                StatusCodes.Status503ServiceUnavailable,
-                "Install-linking is temporarily unavailable.");
+            throw AuthorityUnavailable();
         }
     }
+
+    private static InstallLinkingOperationException AuthorityUnavailable()
+        => new(StatusCodes.Status503ServiceUnavailable, "Install-linking is temporarily unavailable.");
 
     private static int ResolveBoundedLimit(string? configured, int fallback, int maximum)
         => int.TryParse(configured, out int parsed)

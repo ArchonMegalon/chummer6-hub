@@ -69,7 +69,7 @@ public sealed class GroupService
             Memberships: new[] { membership },
             CreatedAtUtc: now,
             UpdatedAtUtc: now);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             _store.GroupsById[group.GroupId] = group;
             _store.PersistLocked();
@@ -80,7 +80,7 @@ public sealed class GroupService
 
     public GroupDto EnsurePersonalBoosterGroup(HubUserDto user)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var existing = _store.GroupsById.Values.FirstOrDefault(group =>
                 string.Equals(group.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
@@ -108,7 +108,7 @@ public sealed class GroupService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.GroupsById.TryGetValue(normalized, out var group) ? group : null;
         }
@@ -117,7 +117,7 @@ public sealed class GroupService
     public IReadOnlyList<GroupDto> ListGroupsForUser(string subjectId)
     {
         var user = _accounts.EnsureUser(subjectId, subjectId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.GroupsById.Values
                 .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)))
@@ -129,7 +129,7 @@ public sealed class GroupService
     public GroupDto UpdateGroup(string groupId, UpdateGroupRequest request)
     {
         var requester = _accounts.EnsureUser(request.SubjectId, request.SubjectId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.GroupsById.TryGetValue(AccountService.NormalizeRequired(groupId, nameof(groupId)), out var group))
             {
@@ -163,7 +163,7 @@ public sealed class GroupService
             throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm to view join codes.");
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.JoinCodesByValue.Values
                 .Where(code => string.Equals(code.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
@@ -189,7 +189,7 @@ public sealed class GroupService
         }
 
         bool canManage = CanManageGroup(group, requester.UserId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.ChronicleProjectsById.Values
                 .Where(project => string.Equals(project.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
@@ -267,7 +267,7 @@ public sealed class GroupService
             SourcePacketRevisions = [new ChronicleSourcePacketRevisionDto(1, sourcePacketSha256, now)]
         };
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             _store.ChronicleProjectsById[project.ChronicleProjectId] = project;
             _store.PersistLocked();
@@ -298,7 +298,7 @@ public sealed class GroupService
             group,
             request.IncludeRunnerRoster && request.ParticipantConsentConfirmed);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.ChronicleProjectsById.TryGetValue(AccountService.NormalizeRequired(chronicleProjectId, nameof(chronicleProjectId)), out var project)
                 || !string.Equals(project.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
@@ -380,7 +380,7 @@ public sealed class GroupService
         }
 
         string action = AccountService.NormalizeRequired(request.Action, nameof(request.Action)).ToLowerInvariant();
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.ChronicleProjectsById.TryGetValue(AccountService.NormalizeRequired(chronicleProjectId, nameof(chronicleProjectId)), out var project)
                 || !string.Equals(project.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
@@ -450,7 +450,7 @@ public sealed class GroupService
             throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm to download a source packet.");
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.ChronicleProjectsById.TryGetValue(AccountService.NormalizeRequired(chronicleProjectId, nameof(chronicleProjectId)), out var project)
                 || !string.Equals(project.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
@@ -482,7 +482,7 @@ public sealed class GroupService
             throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm to download an operator handoff.");
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.ChronicleProjectsById.TryGetValue(AccountService.NormalizeRequired(chronicleProjectId, nameof(chronicleProjectId)), out var project)
                 || !string.Equals(project.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
@@ -507,7 +507,7 @@ public sealed class GroupService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.JoinCodesByValue.GetValueOrDefault(normalized);
         }
@@ -523,7 +523,7 @@ public sealed class GroupService
         }
 
         string normalized = AccountService.NormalizeRequired(code, nameof(code)).ToUpperInvariant();
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.JoinCodesByValue.TryGetValue(normalized, out var joinCode)
                 || !string.Equals(joinCode.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
@@ -571,7 +571,7 @@ public sealed class GroupService
         {
             MaxUses = maxUses
         };
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             _store.JoinCodesByValue[joinCode.Code] = joinCode;
             _store.PersistLocked();
@@ -583,7 +583,7 @@ public sealed class GroupService
     {
         var user = _accounts.EnsureUser(request.SubjectId, request.SubjectId);
         var code = AccountService.NormalizeRequired(request.Code, nameof(request.Code)).ToUpperInvariant();
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.JoinCodesByValue.TryGetValue(code, out var joinCode))
             {
@@ -662,7 +662,7 @@ public sealed class GroupService
     public IReadOnlyList<RunnerDossierProjection> ListOwnedRunners(string subjectId)
     {
         var user = _accounts.EnsureUser(subjectId, subjectId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.DossiersById.Values
                 .Where(dossier => string.Equals(dossier.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
@@ -678,7 +678,7 @@ public sealed class GroupService
         string handle = Limit(AccountService.NormalizeRequired(request.RunnerHandle, nameof(request.RunnerHandle)), 64, nameof(request.RunnerHandle));
         string displayName = Limit(AccountService.NormalizeOptional(request.DisplayName) ?? handle, 128, nameof(request.DisplayName));
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.DossiersById.Values.Any(dossier =>
                 string.Equals(dossier.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
@@ -740,7 +740,7 @@ public sealed class GroupService
             throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm to issue boost codes.");
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var campaignId = AccountService.NormalizeOptional(request.CampaignId)
                 ?? EnsureCampaignLocked(group.GroupId, AccountService.NormalizeOptional(request.ProjectId) ?? DefaultCampaignProjectId, $"{group.Name} sponsorship").CampaignId;
@@ -764,7 +764,7 @@ public sealed class GroupService
     {
         _accounts.EnsureUser(request.SubjectId, request.SubjectId);
         var code = AccountService.NormalizeRequired(request.Code, nameof(request.Code)).ToUpperInvariant();
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.BoostCodesByValue.TryGetValue(code, out var boostCode))
             {
@@ -820,7 +820,7 @@ public sealed class GroupService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.BoostCodesByValue.TryGetValue(normalized, out var boostCode) ? boostCode : null;
         }
@@ -829,7 +829,7 @@ public sealed class GroupService
     public BoostCampaignDto GetOrCreateCampaign(string groupId, string projectId, string title)
     {
         var group = RequireGroup(groupId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return EnsureCampaignLocked(group.GroupId, projectId, title);
         }
@@ -1296,7 +1296,7 @@ public sealed class GroupService
 
     private void UpdateUserGroups(string userId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             UpdateUserGroupsLocked(userId);
         }

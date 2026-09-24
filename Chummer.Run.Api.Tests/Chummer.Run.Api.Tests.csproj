@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />
+    <ProjectReference Include="..\Chummer.Run.Identity\Chummer.Run.Identity.csproj" />
     <ProjectReference Include="..\Chummer.Campaign.Contracts\Chummer.Campaign.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Control.Contracts\Chummer.Control.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />
@@ -44,6 +45,60 @@
 
   <ItemGroup>
     <Compile Include="ReleaseBuildProvenanceValidatorTests.cs" />
+    <Compile Include="..\Chummer.Tests\AccountErasureServiceTests.cs" Link="AccountErasureServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\AccountHubRouteTests.cs" Link="AccountHubRouteTests.cs" />
+    <Compile Include="..\Chummer.Tests\AuthoringLedgerTeablePersistenceTests.cs" Link="AuthoringLedgerTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\BrilliantDirectoriesBillingTests.cs" Link="BrilliantDirectoriesBillingTests.cs" />
+    <Compile Include="..\Chummer.Tests\CampaignAdoptionLoopServiceTests.cs" Link="CampaignAdoptionLoopServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\CampaignArtifactTeablePersistenceTests.cs" Link="CampaignArtifactTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\CampaignCollaborationTeablePersistenceTests.cs" Link="CampaignCollaborationTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\CampaignMovementServiceTests.cs" Link="CampaignMovementServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\CampaignSpineTeablePersistenceTests.cs" Link="CampaignSpineTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\CodexParticipationGuardrailTests.cs" Link="CodexParticipationGuardrailTests.cs" />
+    <Compile Include="..\Chummer.Tests\CommunityAccountErasureTests.cs" Link="CommunityAccountErasureTests.cs" />
+    <Compile Include="..\Chummer.Tests\CommunityTeablePersistenceTests.cs" Link="CommunityTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\CrashSupportServiceTests.cs" Link="CrashSupportServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\DataProtectionKeyProtectionConfiguratorTests.cs" Link="DataProtectionKeyProtectionConfiguratorTests.cs" />
+    <Compile Include="..\Chummer.Tests\FactionTeablePersistenceTests.cs" Link="FactionTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\GroupInviteFlowTests.cs" Link="GroupInviteFlowTests.cs" />
+    <Compile Include="..\Chummer.Tests\HorizonCapabilityServiceTests.cs" Link="HorizonCapabilityServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\HorizonGovernedRenderRequestComposerServiceTests.cs" Link="HorizonGovernedRenderRequestComposerServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\HorizonTeablePersistenceTests.cs" Link="HorizonTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\IdentityAdminRouteAuthorizationTests.cs" Link="IdentityAdminRouteAuthorizationTests.cs" />
+    <Compile Include="..\Chummer.Tests\IdentityEmailDeliveryServiceTests.cs" Link="IdentityEmailDeliveryServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\IdentityEmailTeablePersistenceTests.cs" Link="IdentityEmailTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\IdentityEmailWebhookAuthorizationTests.cs" Link="IdentityEmailWebhookAuthorizationTests.cs" />
+    <Compile Include="..\Chummer.Tests\IdentityLinkServiceTests.cs" Link="IdentityLinkServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\IdentitySubjectErasureTests.cs" Link="IdentitySubjectErasureTests.cs" />
+    <Compile Include="..\Chummer.Tests\IdentityTeablePersistenceTests.cs" Link="IdentityTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkedWorkspaceTeablePersistenceTests.cs" Link="InstallLinkedWorkspaceTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingPostgresCoordinatorStoreTests.cs" Link="InstallLinkingPostgresCoordinatorStoreTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingStoreActivationTests.cs" Link="InstallLinkingStoreActivationTests.cs" />
+    <Compile Include="..\Chummer.Tests\MembershipTeablePersistenceTests.cs" Link="MembershipTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginChapterAuthoringServiceTests.cs" Link="OriginChapterAuthoringServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginChapterTeablePersistenceTests.cs" Link="OriginChapterTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginChapterWorkerTests.cs" Link="OriginChapterWorkerTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginDocumentTeablePersistenceTests.cs" Link="OriginDocumentTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginDossierFirstPartyDocumentServiceTests.cs" Link="OriginDossierFirstPartyDocumentServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginDossierProviderCreditReservationServiceTests.cs" Link="OriginDossierProviderCreditReservationServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginDossierPublicationServiceTests.cs" Link="OriginDossierPublicationServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginPublicationTeablePersistenceTests.cs" Link="OriginPublicationTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\ParticipationNotificationTeableTests.cs" Link="ParticipationNotificationTeableTests.cs" />
+    <Compile Include="..\Chummer.Tests\ParticipationNotificationTests.cs" Link="ParticipationNotificationTests.cs" />
+    <Compile Include="..\Chummer.Tests\PlayAuthorizationEndpointIntegrationTests.cs" Link="PlayAuthorizationEndpointIntegrationTests.cs" />
+    <Compile Include="..\Chummer.Tests\PlaySessionAuthorizationServiceTests.cs" Link="PlaySessionAuthorizationServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\PropertyquarryApartmentVideoArtifactRequestBridgeServiceTests.cs" Link="PropertyquarryApartmentVideoArtifactRequestBridgeServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\RunsiteOrientationRequestComposerServiceTests.cs" Link="RunsiteOrientationRequestComposerServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\SponsorTeablePersistenceTests.cs" Link="SponsorTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\SupportCasesControllerUploadTests.cs" Link="SupportCasesControllerUploadTests.cs" />
+    <Compile Include="..\Chummer.Tests\SupportStoreAccountErasureTests.cs" Link="SupportStoreAccountErasureTests.cs" />
+    <Compile Include="..\Chummer.Tests\SupportTeablePersistenceTests.cs" Link="SupportTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\TeableApiActivationTests.cs" Link="TeableApiActivationTests.cs" />
+    <Compile Include="..\Chummer.Tests\TeableImportantWorkServiceTests.cs" Link="TeableImportantWorkServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\TeableRecoveryBundleTests.cs" Link="TeableRecoveryBundleTests.cs" />
+    <Compile Include="..\Chummer.Tests\TeableRevisionStoreTests.cs" Link="TeableRevisionStoreTests.cs" />
+    <Compile Include="..\Chummer.Tests\TeableUserProjectionServiceTests.cs" Link="TeableUserProjectionServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\UserExperienceServiceTests.cs" Link="UserExperienceServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\HubSessionAccountAdmissionServiceTests.cs" Link="HubSessionAccountAdmissionServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\AccountCanonicalCaptureTests.cs" Link="AccountCanonicalCaptureTests.cs" />
     <Compile Include="..\Chummer.Tests\InstallSelectedContinuationCaptureTests.cs" Link="InstallSelectedContinuationCaptureTests.cs" />

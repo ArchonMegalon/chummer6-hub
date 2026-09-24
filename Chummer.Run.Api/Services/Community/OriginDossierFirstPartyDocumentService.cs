@@ -2,11 +2,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Chummer.Run.Api.Services.Teable;
 using Microsoft.Extensions.Configuration;
 
 namespace Chummer.Run.Api.Services.Community;
 
-public sealed class OriginDossierFirstPartyDocumentService
+public sealed class OriginDossierFirstPartyDocumentService : IDisposable
 {
     public const int MaxRequestBodyBytes = 128 * 1024;
 
@@ -55,18 +56,28 @@ public sealed class OriginDossierFirstPartyDocumentService
     };
 
     private readonly object _gate = new();
+    private readonly TeableOriginDocumentStorage? _primary;
     private readonly string _root;
     private readonly string _storagePosture;
     private readonly int _maxRevisionsPerOwner;
     private readonly int _maxRevisionsGlobal;
 
-    public OriginDossierFirstPartyDocumentService(IConfiguration configuration)
+    public OriginDossierFirstPartyDocumentService(IConfiguration configuration, TeableOriginDocumentStorage? primary = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        string provider = configuration["CHUMMER_ORIGIN_DOCUMENT_STORAGE_PROVIDER"]?.Trim() ?? "local";
+        if (provider is not ("local" or "teable") || (provider == "teable") != (primary is not null))
+            throw new InvalidOperationException("Origin document storage requires an explicit matching primary configuration.");
+        _primary = primary;
         string? configured = configuration["CHUMMER_ORIGIN_DOSSIER_FIRST_PARTY_ROOT"]
             ?? configuration["OriginDossier:FirstPartyDocumentRoot"];
         string? runtimeStateRoot = configuration["CHUMMER_RUNTIME_STATE_ROOT"];
-        if (!string.IsNullOrWhiteSpace(configured))
+        if (primary is not null)
+        {
+            _root = string.Empty;
+            _storagePosture = TeableOriginDocumentStorage.StoragePosture;
+        }
+        else if (!string.IsNullOrWhiteSpace(configured))
         {
             _root = Path.GetFullPath(configured.Trim());
             _storagePosture = "configured_private_storage_root";
@@ -99,6 +110,14 @@ public sealed class OriginDossierFirstPartyDocumentService
         }
     }
 
+    public void Dispose() => _primary?.Dispose();
+
+    internal void EnsureAccountErasureSupported()
+    {
+        if (_primary is not null)
+            throw new InvalidOperationException("Primary document historical erasure is not enabled; no deletion is claimed.");
+    }
+
     public OriginDossierFirstPartyDocumentProjection Preview(
         string ownerUserId,
         string ownerSubjectId,
@@ -119,13 +138,21 @@ public sealed class OriginDossierFirstPartyDocumentService
 
         lock (_gate)
         {
-            ScavengeStaleTemporaryRevisions(Path.GetDirectoryName(revisionRoot)!);
-            if (Directory.Exists(revisionRoot))
+            using var primary = _primary?.OpenSession();
+            if (primary is not null)
             {
-                return LoadProjection(revisionRoot, ownerScopeSha256, normalizedProjectId, revisionId);
+                var existing = primary.Read(ownerScopeSha256, normalizedProjectId, revisionId);
+                if (existing is not null)
+                    return ValidateDocument(existing, ownerScopeSha256, normalizedProjectId, revisionId).Projection;
+                primary.Register(ownerScopeSha256, normalizedProjectId, revisionId, _maxRevisionsPerOwner, _maxRevisionsGlobal);
             }
-
-            EnsureRevisionCapacity(ownerScopeSha256);
+            else
+            {
+                ScavengeStaleTemporaryRevisions(Path.GetDirectoryName(revisionRoot)!);
+                if (Directory.Exists(revisionRoot))
+                    return LoadProjection(revisionRoot, ownerScopeSha256, normalizedProjectId, revisionId);
+                EnsureRevisionCapacity(ownerScopeSha256);
+            }
             string markdown = RenderMarkdown(normalizedProjectId, revisionId, normalized, _storagePosture);
             string documentJson = RenderDocumentJson(
                 ownerScopeSha256,
@@ -156,6 +183,14 @@ public sealed class OriginDossierFirstPartyDocumentService
                 documentJson.Length,
                 previewReceiptSha256: null);
 
+            if (primary is not null)
+            {
+                var document = new TeableOriginDocumentStorage.Document(metadataJson, markdown, documentJson, previewReceipt);
+                // Run the same ownership, canonical-input and artifact validator before commit.
+                var projection = ValidateDocument(document, ownerScopeSha256, normalizedProjectId, revisionId).Projection;
+                primary.Write(ownerScopeSha256, normalizedProjectId, revisionId, document);
+                return projection;
+            }
             PersistNewRevision(
                 revisionRoot,
                 metadataJson,
@@ -178,6 +213,13 @@ public sealed class OriginDossierFirstPartyDocumentService
         string revisionRoot = ResolveRevisionRoot(ownerScopeSha256, normalizedProjectId, normalizedRevisionId);
         lock (_gate)
         {
+            if (_primary is not null)
+            {
+                using var primary = _primary.OpenSession();
+                var document = primary.Read(ownerScopeSha256, normalizedProjectId, normalizedRevisionId);
+                return document is null ? null
+                    : ValidateDocument(document, ownerScopeSha256, normalizedProjectId, normalizedRevisionId).Projection;
+            }
             return Directory.Exists(revisionRoot)
                 ? LoadProjection(revisionRoot, ownerScopeSha256, normalizedProjectId, normalizedRevisionId)
                 : null;
@@ -197,6 +239,7 @@ public sealed class OriginDossierFirstPartyDocumentService
 
         lock (_gate)
         {
+            EnsureAccountErasureSupported();
             if (!Directory.Exists(revisionRoot))
             {
                 return false;
@@ -228,6 +271,21 @@ public sealed class OriginDossierFirstPartyDocumentService
 
         lock (_gate)
         {
+            if (_primary is not null)
+            {
+                using var primary = _primary.OpenSession();
+                var document = primary.Read(ownerScopeSha256, normalizedProjectId, normalizedRevisionId)
+                    ?? throw new KeyNotFoundException("Origin Dossier first-party preview was not found for this owner.");
+                var validated = ValidateDocument(document, ownerScopeSha256, normalizedProjectId, normalizedRevisionId);
+                if (document.ExportReceiptJson is null)
+                {
+                    document = document with { ExportReceiptJson = RenderReceipt("exported", validated.Metadata,
+                        validated.MetadataSha256, validated.Markdown.Length, validated.DocumentJson.Length,
+                        validated.PreviewReceiptSha256) };
+                    primary.Write(ownerScopeSha256, normalizedProjectId, normalizedRevisionId, document);
+                }
+                return ValidateDocument(document, ownerScopeSha256, normalizedProjectId, normalizedRevisionId).Projection;
+            }
             if (!Directory.Exists(revisionRoot))
             {
                 throw new KeyNotFoundException("Origin Dossier first-party preview was not found for this owner.");
@@ -749,9 +807,24 @@ public sealed class OriginDossierFirstPartyDocumentService
         EnsureDirectoryIsNotLinked(ownerRoot);
         EnsureDirectoryIsNotLinked(projectRoot);
         EnsureDirectoryTreeContainsNoLinks(revisionRoot);
-        string metadataJson = File.ReadAllText(Path.Combine(revisionRoot, "metadata.json"), Encoding.UTF8);
+        string exportPath = Path.Combine(revisionRoot, "export-receipt.json");
+        return ValidateDocument(new(
+            File.ReadAllText(Path.Combine(revisionRoot, "metadata.json"), Encoding.UTF8),
+            File.ReadAllText(Path.Combine(revisionRoot, "document.md"), Encoding.UTF8),
+            File.ReadAllText(Path.Combine(revisionRoot, "document.json"), Encoding.UTF8),
+            File.ReadAllText(Path.Combine(revisionRoot, "preview-receipt.json"), Encoding.UTF8),
+            File.Exists(exportPath) ? File.ReadAllText(exportPath, Encoding.UTF8) : null),
+            expectedOwnerScopeSha256, expectedProjectId, expectedRevisionId);
+    }
+
+    private ValidatedFirstPartyDocument ValidateDocument(
+        TeableOriginDocumentStorage.Document document,
+        string expectedOwnerScopeSha256, string expectedProjectId, string expectedRevisionId)
+    {
+        string metadataJson = document.MetadataJson;
         FirstPartyDocumentMetadata metadata = DeserializeMetadata(metadataJson);
-        if (!FixedEquals(metadata.OwnerScopeSha256, expectedOwnerScopeSha256)
+        if (!IsSha256(metadata.OwnerScopeSha256)
+            || !FixedEquals(metadata.OwnerScopeSha256, expectedOwnerScopeSha256)
             || !string.Equals(metadata.ProjectId, expectedProjectId, StringComparison.Ordinal)
             || !string.Equals(metadata.RevisionId, expectedRevisionId, StringComparison.Ordinal)
             || !string.Equals(metadata.ContractName, DocumentContract, StringComparison.Ordinal)
@@ -779,8 +852,8 @@ public sealed class OriginDossierFirstPartyDocumentService
             throw new InvalidDataException("Origin Dossier first-party metadata integrity validation failed.");
         }
 
-        string markdown = File.ReadAllText(Path.Combine(revisionRoot, "document.md"), Encoding.UTF8);
-        string documentJson = File.ReadAllText(Path.Combine(revisionRoot, "document.json"), Encoding.UTF8);
+        string markdown = document.Markdown;
+        string documentJson = document.DocumentJson;
         string expectedMarkdown = RenderMarkdown(
             metadata.ProjectId,
             metadata.RevisionId,
@@ -801,8 +874,7 @@ public sealed class OriginDossierFirstPartyDocumentService
         }
 
         string metadataSha256 = Sha256(metadataJson);
-        string previewReceiptPath = Path.Combine(revisionRoot, "preview-receipt.json");
-        string previewReceiptJson = File.ReadAllText(previewReceiptPath, Encoding.UTF8);
+        string previewReceiptJson = document.PreviewReceiptJson;
         string expectedPreviewReceiptJson = RenderReceipt(
             "preview",
             metadata,
@@ -816,12 +888,11 @@ public sealed class OriginDossierFirstPartyDocumentService
         }
 
         string previewReceiptSha256 = Sha256(previewReceiptJson);
-        string exportReceiptPath = Path.Combine(revisionRoot, "export-receipt.json");
-        string state = File.Exists(exportReceiptPath) ? "exported" : "preview";
+        string state = document.ExportReceiptJson is not null ? "exported" : "preview";
         string receiptJson = previewReceiptJson;
         if (string.Equals(state, "exported", StringComparison.Ordinal))
         {
-            receiptJson = File.ReadAllText(exportReceiptPath, Encoding.UTF8);
+            receiptJson = document.ExportReceiptJson!;
             string expectedExportReceiptJson = RenderReceipt(
                 "exported",
                 metadata,

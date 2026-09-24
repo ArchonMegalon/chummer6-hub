@@ -1,0 +1,160 @@
+# Standalone LOCAL preparation, not an overlay or a public cutover.
+# Never combine with docker-compose.public-edge.yml or reuse incumbent state.
+# Supply reviewed local image IDs and a non-secret path/table env file explicitly.
+name: chummer-teable-primary-local
+
+x-primary-service: &primary-service
+  pull_policy: never
+  restart: "no"
+  user: "${CHUMMER_HUB_PRIMARY_UID:-1000}:${CHUMMER_HUB_PRIMARY_GID:-1000}"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  ulimits:
+    core: 0
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777
+  networks: [primary]
+
+services:
+  identity:
+    <<: *primary-service
+    image: "${CHUMMER_HUB_PRIMARY_IDENTITY_IMAGE:?Set the locally built Identity image ID}"
+    mem_limit: 512m
+    cpus: 0.5
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      IDENTITY_PUBLIC_BASE_URL: https://chummer.run
+      IDENTITY_ENABLE_HTTPS_REDIRECTION: "false"
+      # Delivery stays off for preparation; no login email is sent by this file.
+      IDENTITY_EMAIL_START_ENABLED: "false"
+      IDENTITY_EMAIL_PROVIDER_ORDER: none
+      CHUMMER_IDENTITY_STORAGE_PROVIDER: teable
+      CHUMMER_TEABLE_ORIGIN: "${CHUMMER_HUB_PRIMARY_TEABLE_ORIGIN:-https://app.teable.ai/}"
+      CHUMMER_TEABLE_TABLE_ID: "${CHUMMER_HUB_PRIMARY_IDENTITY_TABLE_ID:?Set the private Identity table ID}"
+      CHUMMER_TEABLE_TOKEN_FILE: /run/chummer-primary/identity.token
+      CHUMMER_IDENTITY_STORE_PATH: /app/state/identity-store.json
+      CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH: /app/state/identity-email-delivery.json
+    volumes:
+      - type: bind
+        source: "${CHUMMER_HUB_PRIMARY_IDENTITY_CONFIG_FILE:?Set the private Identity Production JSON file}"
+        target: /app/appsettings.Production.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: "${CHUMMER_HUB_PRIMARY_IDENTITY_TOKEN_FILE:?Set the restricted Identity token file}"
+        target: /run/chummer-primary/identity.token
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: "${CHUMMER_HUB_PRIMARY_IDENTITY_STATE_DIRECTORY:?Set a separate pre-provisioned Identity state directory}"
+        target: /app/state
+        bind: {create_host_path: false}
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --show-error, --max-time, "5", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 6s
+      retries: 3
+      start_period: 30s
+
+  hub:
+    <<: *primary-service
+    image: "${CHUMMER_HUB_PRIMARY_API_IMAGE:?Set the locally built Hub API image ID}"
+    mem_limit: 1536m
+    cpus: 1
+    depends_on:
+      identity: {condition: service_healthy}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080;http://+:5089
+      CHUMMER_PUBLIC_CANONICAL_ORIGIN: https://chummer.run
+      CHUMMER_PUBLIC_ALLOWED_HOSTS: chummer.run
+      AllowedHosts: chummer.run
+      CHUMMER_ENABLE_HTTPS_REDIRECTION: "false"
+      CHUMMER_PUBLIC_DOWNLOAD_ONLY: "false"
+      CHUMMER_PUBLIC_ROUTE_WARMUP_ENABLED: "false"
+      IDENTITY_SERVICE_BASE_URL: http://identity:8080
+      IDENTITY_EMAIL_START_ENABLED: "false"
+      CHUMMER_ORIGIN_CHAPTER_WORKER_PORT: "5089"
+      CHUMMER_RUNTIME_STATE_ROOT: /app/state
+      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/unused-local-keys
+      CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE: teable_primary
+      CHUMMER_TEABLE_ORIGIN: "${CHUMMER_HUB_PRIMARY_TEABLE_ORIGIN:-https://app.teable.ai/}"
+      # One dedicated Hub data table, separate from Identity. Namespaced revision
+      # streams retain their individual schemas; this is not EA credential custody.
+      CHUMMER_DATA_PROTECTION_TEABLE_TABLE_ID: &api-table "${CHUMMER_HUB_PRIMARY_API_TABLE_ID:?Set the private Hub data table ID}"
+      CHUMMER_DATA_PROTECTION_TEABLE_TOKEN_FILE: &api-token /run/chummer-primary/api.token
+      CHUMMER_INSTALL_LINKING_STORAGE_PROVIDER: teable
+      CHUMMER_INSTALL_LINKING_TEABLE_TABLE_ID: *api-table
+      CHUMMER_INSTALL_LINKING_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
+      CHUMMER_INSTALL_LINKED_WORKSPACE_STORAGE_PROVIDER: teable
+      CHUMMER_INSTALL_LINKED_WORKSPACE_TEABLE_TABLE_ID: *api-table
+      CHUMMER_INSTALL_LINKED_WORKSPACE_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_COMMUNITY_STORAGE_PROVIDER: teable
+      CHUMMER_COMMUNITY_TEABLE_TABLE_ID: *api-table
+      CHUMMER_COMMUNITY_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_SUPPORT_STORAGE_PROVIDER: teable
+      CHUMMER_SUPPORT_TEABLE_TABLE_ID: *api-table
+      CHUMMER_SUPPORT_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER: teable
+      CHUMMER_BILLING_MEMBERSHIP_TEABLE_TABLE_ID: *api-table
+      CHUMMER_BILLING_MEMBERSHIP_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER: teable
+      CHUMMER_MYFIRSTBOOK_USAGE_TEABLE_TABLE_ID: *api-table
+      CHUMMER_MYFIRSTBOOK_USAGE_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER: teable
+      CHUMMER_HORIZON_ARTIFACT_USAGE_TEABLE_TABLE_ID: *api-table
+      CHUMMER_HORIZON_ARTIFACT_USAGE_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_HORIZON_REQUEST_RECEIPT_STORAGE_PROVIDER: teable
+      CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TABLE_ID: *api-table
+      CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_ORIGIN_PROVIDER_RESERVATION_STORAGE_PROVIDER: teable
+      CHUMMER_ORIGIN_PROVIDER_RESERVATION_TEABLE_TABLE_ID: *api-table
+      CHUMMER_ORIGIN_PROVIDER_RESERVATION_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER: teable
+      CHUMMER_ORIGIN_TEABLE_TABLE_ID: *api-table
+      CHUMMER_ORIGIN_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_ORIGIN_DOCUMENT_STORAGE_PROVIDER: teable
+      CHUMMER_ORIGIN_DOCUMENT_TEABLE_TABLE_ID: *api-table
+      CHUMMER_ORIGIN_DOCUMENT_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER: teable
+      CHUMMER_ORIGIN_PUBLICATION_TEABLE_TABLE_ID: *api-table
+      CHUMMER_ORIGIN_PUBLICATION_TEABLE_TOKEN_FILE: *api-token
+      CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH: /app/state/account-erasure-journal.json
+      # Auxiliary projection workers are not the primary backend and stay off.
+      CHUMMER_TEABLE_USERS_ENABLED: "false"
+      CHUMMER_TEABLE_USERS_RECONCILE_ENABLED: "false"
+      CHUMMER_TEABLE_IMPORTANT_WORK_ENABLED: "false"
+      CHUMMER_TEABLE_IMPORTANT_WORK_RECONCILE_ENABLED: "false"
+      CHUMMER_TEABLE_IMPORTANT_WORK_AUTOSYNC_ENABLED: "false"
+      CHUMMER_BLACK_LEDGER_NEWS_EMAIL_ENABLED: "false"
+      CHUMMER_TEABLE_HEYY_SCAM_CHAT_ENABLED: "false"
+      CHUMMER_TEABLE_EXECUTIVE_ASSISTANT_CHANNEL_ENABLED: "false"
+      CHUMMER_TEABLE_BLACK_LEDGER_ENABLED: "false"
+      CHUMMER_TEABLE_KARMA_FORGE_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${CHUMMER_HUB_PRIMARY_LOCAL_PORT:-15098}:8080"
+      - "127.0.0.1:${CHUMMER_HUB_PRIMARY_WORKER_LOCAL_PORT:-15099}:5089"
+    volumes:
+      - type: bind
+        source: "${CHUMMER_HUB_PRIMARY_API_CONFIG_FILE:?Set the private Hub Production JSON file}"
+        target: /app/appsettings.Production.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: "${CHUMMER_HUB_PRIMARY_API_TOKEN_FILE:?Set the restricted Hub token file}"
+        target: /run/chummer-primary/api.token
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: "${CHUMMER_HUB_PRIMARY_API_STATE_DIRECTORY:?Set a separate pre-provisioned Hub state directory}"
+        target: /app/state
+        bind: {create_host_path: false}
+
+networks:
+  # Dedicated bridge; outbound HTTPS reaches Teable. No existing tunnel/EA/Fleet
+  # network or public-origin alias is attached by this preparation definition.
+  primary: {}

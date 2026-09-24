@@ -51,6 +51,8 @@ public sealed class SupportCaseService
         SupportProgressEmailWorkflowService progressEmails,
         ILogger<SupportCaseService> logger)
     {
+        if (!attachments.UsesStore(store))
+            throw new InvalidOperationException("Support cases and attachment bytes must share primary custody.");
         _store = store;
         _attachments = attachments;
         _rewards = rewards;
@@ -100,7 +102,7 @@ public sealed class SupportCaseService
         DateTimeOffset now = DateTimeOffset.UtcNow;
         SupportCaseProjection saved;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.CaseIdByClusterKey.TryGetValue(clusterKey, out string? existingCaseId)
                 && _store.CasesById.TryGetValue(existingCaseId, out SupportCaseProjection? existing))
@@ -202,7 +204,7 @@ public sealed class SupportCaseService
             workItem.Summary,
             incident.Envelope.ExceptionMessage + "\n" + incident.Envelope.ExceptionDetail);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.CaseIdByClusterKey.TryGetValue(clusterKey, out string? existingCaseId)
                 && _store.CasesById.TryGetValue(existingCaseId, out SupportCaseProjection? existing))
@@ -297,7 +299,7 @@ public sealed class SupportCaseService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(caseId);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.CasesById.TryGetValue(caseId.Trim(), out SupportCaseProjection? item))
             {
@@ -312,7 +314,7 @@ public sealed class SupportCaseService
 
     public SupportCaseListResponse ListForReporter(string? reporterUserId, string? reporterSubjectId, string? status = null, string? kind = null)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             IEnumerable<SupportCaseProjection> items = _store.CasesById.Values
                 .Where(item => MatchesIdentity(item.ReporterUserId, item.ReporterSubjectId, reporterUserId, reporterSubjectId));
@@ -322,13 +324,23 @@ public sealed class SupportCaseService
         }
     }
 
+    public (Stream Stream, string FileName, string ContentType)? OpenAttachmentForReporter(
+        string caseId, string attachmentId, string? reporterUserId, string? reporterSubjectId)
+    {
+        using var scope = _store.Enter();
+        var item = GetForReporter(caseId, reporterUserId, reporterSubjectId);
+        if (item?.Attachments?.Any(attachment => string.Equals(attachment.AttachmentId, attachmentId.Trim(),
+                StringComparison.OrdinalIgnoreCase)) != true) return null;
+        return _attachments.TryOpenAttachment(caseId, attachmentId);
+    }
+
     public SupportCaseListResponse ListForAutomation(
         string? status = null,
         string? kind = null,
         string? candidateOwnerRepo = null,
         bool? designImpactOnly = null)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             IEnumerable<SupportCaseProjection> items = _store.CasesById.Values;
             items = ApplyFilters(items, status, kind, candidateOwnerRepo, designImpactOnly);
@@ -358,7 +370,7 @@ public sealed class SupportCaseService
         DateTimeOffset now = DateTimeOffset.UtcNow;
         SupportCaseProjection updated;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.CasesById.TryGetValue(caseId.Trim(), out SupportCaseProjection? existing))
             {
@@ -419,7 +431,7 @@ public sealed class SupportCaseService
         SupportCaseProjection updated;
         string priorStatus;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.CasesById.TryGetValue(caseId.Trim(), out SupportCaseProjection? existing))
             {
@@ -483,7 +495,7 @@ public sealed class SupportCaseService
         string? normalizedSubjectId = NormalizeOptional(reporterSubjectId, 128);
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.CasesById.TryGetValue(caseId.Trim(), out SupportCaseProjection? existing))
             {
@@ -623,7 +635,7 @@ public sealed class SupportCaseService
         SupportProgressEmailDispatchResult receipt,
         string? actor)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.CasesById.TryGetValue(caseId, out SupportCaseProjection? existing))
             {

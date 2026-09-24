@@ -1,0 +1,39 @@
+# Dedicated chummer.run connector. Never reuse a shared home/media tunnel.
+# Compose with the local primary + Google overlays and an explicit project name.
+# Verify its exact token and remote ingress: chummer.run -> http://hub:8080,
+# HTTP Host chummer.run, catch-all 404, private-network routing disabled.
+# DNS cutover is separate and must preserve unrelated records and tunnels.
+# No new host listener is published; worker access on ordinary port stays denied.
+# Only the explicitly activated stack survives daemon/host restarts. The local
+# preparation file remains restart=no; intentional operator stops stay stopped.
+services:
+  identity:
+    restart: unless-stopped
+  hub:
+    restart: unless-stopped
+  account-origin-edge:
+    profiles: [account-origin-edge]
+    image: "${CHUMMER_HUB_PRIMARY_TUNNEL_IMAGE:?Supply the exact locally available cloudflared image ID}"
+    pull_policy: never
+    restart: unless-stopped
+    user: "${CHUMMER_HUB_PRIMARY_UID:-1000}:${CHUMMER_HUB_PRIMARY_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.25
+    ulimits:
+      core: 0
+    networks: [primary]
+    entrypoint: [cloudflared]
+    command: [tunnel, --no-autoupdate, --loglevel, warn, --metrics, "127.0.0.1:20000", run, --token-file, /run/chummer-edge/tunnel.token]
+    volumes:
+      - type: bind
+        source: "${CHUMMER_HUB_PRIMARY_TUNNEL_TOKEN_FILE:?Supply the private exact-tunnel token file}"
+        target: /run/chummer-edge/tunnel.token
+        read_only: true
+        bind: {create_host_path: false}
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}

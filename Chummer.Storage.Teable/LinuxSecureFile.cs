@@ -1,7 +1,7 @@
 using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 
-namespace Chummer.Run.Api.Services.InstallLinking;
+namespace Chummer.Storage.Teable;
 
 internal static class LinuxSecureFile
 {
@@ -80,7 +80,7 @@ internal static class LinuxSecureFile
             throw new PlatformNotSupportedException("Secure no-follow file reads require Linux.");
         }
 
-        int descriptor = NativeOpen(path, OpenReadOnly | OpenCloseOnExec | OpenNoFollow);
+        int descriptor = NativeOpen(path, OpenReadOnly | OpenCloseOnExec | OpenNoFollow | OpenNonBlocking);
         if (descriptor < 0)
         {
             throw new IOException("Secure file could not be opened.");

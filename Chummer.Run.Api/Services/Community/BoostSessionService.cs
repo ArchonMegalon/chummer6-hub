@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
@@ -48,6 +50,7 @@ public sealed class BoostSessionService
     {
         CreateSponsorSessionRequest normalizedRequest = NormalizeCreateRequest(request);
         var subjectId = NormalizeRequired(normalizedRequest.SubjectId ?? string.Empty, nameof(request.SubjectId), MaxSubjectIdLength);
+        using var scope = _store.Enter();
         var user = _accounts.EnsureUser(subjectId, normalizedRequest.SubjectLabel ?? subjectId);
         var boostCodeId = default(string);
         var campaignId = normalizedRequest.CampaignId;
@@ -99,6 +102,7 @@ public sealed class BoostSessionService
         CreateSponsorSessionRequest request,
         CancellationToken cancellationToken)
     {
+        RequireFleetMutationBackend();
         CreateSponsorSessionRequest normalizedRequest = NormalizeCreateRequest(request);
         var reusable = FindReusableContributionForRequest(normalizedRequest);
         if (reusable is not null)
@@ -140,7 +144,7 @@ public sealed class BoostSessionService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.SponsorSessionsById.TryGetValue(normalized, out var state) ? state.Snapshot() : null;
         }
@@ -154,6 +158,7 @@ public sealed class BoostSessionService
             return null;
         }
 
+        using var scope = _store.Enter();
         var user = _accounts.EnsureUser(normalizedSubjectId, normalizedSubjectId);
         lock (_store.Gate)
         {
@@ -169,27 +174,27 @@ public sealed class BoostSessionService
 
     public async Task<(SponsorSessionStatusDto Session, JsonObject? Fleet)> RefreshAsync(string sponsorSessionId, CancellationToken cancellationToken)
     {
-        var state = Require(sponsorSessionId);
-        var fleetLaneId = default(string);
-        lock (_store.Gate)
+        RefreshObservation expected;
+        using (_store.Enter())
         {
-            fleetLaneId = AccountService.NormalizeOptional(state.FleetLaneId);
+            var state = RequireScoped(sponsorSessionId);
+            if (IsTerminalContributionStatus(state.Status) || state.StoppedAtUtc is not null)
+                return (state.Snapshot(), null);
+            expected = CaptureRefreshLocked(state);
         }
 
-        JsonObject? fleet = null;
-        if (!string.IsNullOrWhiteSpace(fleetLaneId))
-        {
-            fleet = await _fleetBridge.GetParticipantLaneAsync(fleetLaneId!, cancellationToken);
-            return await ApplyFleetRefreshAsync(state, fleet, "fleet refresh", cancellationToken);
-        }
+        if (string.IsNullOrWhiteSpace(expected.Session.FleetLaneId))
+            return (expected.Session, null);
 
-        return (state.Snapshot(), null);
+        // No store scope or mutable session crosses this external wait.
+        var fleet = await _fleetBridge.GetParticipantLaneAsync(expected.Session.FleetLaneId, cancellationToken);
+        return await ApplyFleetRefreshAsync(expected, fleet, "fleet refresh", cancellationToken);
     }
 
     public IReadOnlyList<ContributionReceiptDto> ListReceipts(string sponsorSessionId)
     {
         var normalized = AccountService.NormalizeRequired(sponsorSessionId, nameof(sponsorSessionId));
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.Receipts
                 .Where(receipt => string.Equals(receipt.SponsorSessionId, normalized, StringComparison.OrdinalIgnoreCase))
@@ -200,9 +205,9 @@ public sealed class BoostSessionService
 
     public IReadOnlyList<BadgeDto> ListBadgesForSessionUser(string sponsorSessionId)
     {
-        var state = Require(sponsorSessionId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            var state = RequireScoped(sponsorSessionId);
             return _store.Badges
                 .Where(badge => string.Equals(badge.UserId, state.UserId, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(badge => badge.AwardedAtUtc)
@@ -212,9 +217,12 @@ public sealed class BoostSessionService
 
     public SponsorSessionStatusDto RecordConsent(string sponsorSessionId)
     {
-        var state = Require(sponsorSessionId);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            var state = RequireScoped(sponsorSessionId);
+            if (IsTerminalContributionStatus(state.Status) || state.StoppedAtUtc is not null)
+                throw new InvalidOperationException("A stopped sponsor session cannot be reconsented.");
+            if (state.Consented) return state.Snapshot();
             state.Consented = true;
             state.Status = "consented";
             state.ConsentedAtUtc ??= DateTimeOffset.UtcNow;
@@ -227,6 +235,7 @@ public sealed class BoostSessionService
 
     public async Task<(SponsorSessionStatusDto Session, JsonObject Fleet)> StartDeviceAuthAsync(string sponsorSessionId, CancellationToken cancellationToken)
     {
+        RequireFleetMutationBackend();
         var state = Require(sponsorSessionId);
         HubUserSubject subject;
         lock (_store.Gate)
@@ -302,6 +311,7 @@ public sealed class BoostSessionService
         var fleet = await _fleetBridge.StartDeviceAuthAsync(state.FleetLaneId!, cancellationToken);
         var verificationUri = fleet["lane"]?["device_auth"]?["verification_uri"]?.GetValue<string>();
         var userCode = fleet["lane"]?["device_auth"]?["user_code"]?.GetValue<string>();
+        RefreshObservation expected;
         lock (_store.Gate)
         {
             ApplyFleetSnapshotLocked(state, fleet);
@@ -315,13 +325,15 @@ public sealed class BoostSessionService
             state.UpdatedAtUtc = DateTimeOffset.UtcNow;
             state.Events.Add(new SponsorSessionEventDto(AccountService.NewId("evt"), "device_auth_started", "Device auth started on Fleet.", DateTimeOffset.UtcNow));
             _store.PersistLocked();
+            expected = CaptureRefreshLocked(state);
         }
 
-        return await ApplyFleetRefreshAsync(state, fleet, "device auth started", cancellationToken);
+        return await ApplyFleetRefreshAsync(expected, fleet, "device auth started", cancellationToken);
     }
 
     public async Task<(SponsorSessionStatusDto Session, JsonObject Fleet)> ActivateAsync(string sponsorSessionId, CancellationToken cancellationToken)
     {
+        RequireFleetMutationBackend();
         var state = Require(sponsorSessionId);
         if (string.IsNullOrWhiteSpace(state.FleetLaneId))
         {
@@ -373,6 +385,7 @@ public sealed class BoostSessionService
 
     public async Task<(SponsorSessionStatusDto Session, JsonObject Fleet)> StopAsync(string sponsorSessionId, bool revoke, CancellationToken cancellationToken)
     {
+        RequireFleetMutationBackend();
         var state = Require(sponsorSessionId);
         if (string.IsNullOrWhiteSpace(state.FleetLaneId))
         {
@@ -437,6 +450,7 @@ public sealed class BoostSessionService
         var projectId = normalizedRequest.ProjectId;
         var laneRole = SponsorLaneRolePolicy.Normalize(normalizedRequest.RequestedLaneRole);
         var participantCodexCode = NormalizeParticipantCodexCode(normalizedRequest.ParticipantCodexCode);
+        using var scope = _store.Enter();
         var user = _accounts.EnsureUser(subjectId, subjectId);
         lock (_store.Gate)
         {
@@ -476,6 +490,42 @@ public sealed class BoostSessionService
         }
 
         throw new KeyNotFoundException($"Unknown sponsor session: {normalized}");
+    }
+
+    private SponsorSessionState RequireScoped(string sponsorSessionId)
+    {
+        if (!Monitor.IsEntered(_store.Gate))
+            throw new InvalidOperationException("Sponsor state requires a community store scope.");
+        var normalized = AccountService.NormalizeRequired(sponsorSessionId, nameof(sponsorSessionId));
+        return _store.SponsorSessionsById.TryGetValue(normalized, out var state)
+            ? state : throw new KeyNotFoundException($"Unknown sponsor session: {normalized}");
+    }
+
+    private void RequireFleetMutationBackend()
+    {
+        // Primary reads/intents are implemented separately from external actions.
+        // An admitted, durable operation fence and uncertain-outcome reconciliation
+        // are still required before multiple Hub instances can dispatch these.
+        if (_store.IsPrimary)
+            throw new NotSupportedException("Primary sponsor Fleet mutations require migration of external-operation fencing.");
+    }
+
+    private sealed record RefreshObservation(SponsorSessionStatusDto Session, string Fingerprint);
+
+    private RefreshObservation CaptureRefreshLocked(SponsorSessionState state)
+        => new(state.Snapshot(), RefreshFingerprintLocked(state));
+
+    private string RefreshFingerprintLocked(SponsorSessionState state)
+    {
+        if (!Monitor.IsEntered(_store.Gate))
+            throw new InvalidOperationException("Sponsor refresh capture requires a community store scope.");
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            Session = SponsorSessionStateSnapshot.FromState(state),
+            User = _store.UsersById.GetValueOrDefault(state.UserId)
+        });
+        try { return Convert.ToHexString(SHA256.HashData(bytes)); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
     }
 
     private static string MapFleetLaneStatusToSessionStatus(string fleetStatus, bool authReady, bool deviceCodeIssued)
@@ -561,18 +611,26 @@ public sealed class BoostSessionService
     }
 
     private async Task<(SponsorSessionStatusDto Session, JsonObject Fleet)> ApplyFleetRefreshAsync(
-        SponsorSessionState state,
+        RefreshObservation expected,
         JsonObject fleet,
         string reason,
         CancellationToken cancellationToken)
     {
         SponsorSessionStatusDto snapshot;
         var shouldAutoActivate = false;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            var state = RequireScoped(expected.Session.SponsorSessionId);
+            if (RefreshFingerprintLocked(state) != expected.Fingerprint
+                || IsTerminalContributionStatus(state.Status) || state.StoppedAtUtc is not null)
+                throw new InvalidOperationException("Sponsor session or account changed during Fleet observation; read current state before continuing.");
+            string? returnedLane = AccountService.NormalizeOptional(fleet["lane"]?["lane_id"]?.GetValue<string>());
+            if (returnedLane is not null && returnedLane != state.FleetLaneId)
+                throw new InvalidDataException("Fleet observation belongs to a different sponsor lane.");
             ApplyFleetSnapshotLocked(state, fleet);
             SyncRecognitionStateLocked(state, reason);
-            shouldAutoActivate = ShouldAutoActivateLocked(state);
+            // Primary mode may observe a pending lane, never dispatch its activation.
+            shouldAutoActivate = !_store.IsPrimary && ShouldAutoActivateLocked(state);
             _store.PersistLocked();
             snapshot = state.Snapshot();
         }

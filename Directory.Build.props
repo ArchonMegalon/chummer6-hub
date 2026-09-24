@@ -4,11 +4,11 @@
     <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == '' and '$(CHUMMER_WORKSPACE_ROOT)' != ''">$(CHUMMER_WORKSPACE_ROOT)</ChummerWorkspaceRoot>
     <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == ''">$(MSBuildThisFileDirectory)..</ChummerWorkspaceRoot>
     <ChummerUseLocalCompatibilityTree Condition="'$(ChummerUseLocalCompatibilityTree)' == ''">false</ChummerUseLocalCompatibilityTree>
-    <ChummerPackagePlaneVersion Condition="'$(ChummerPackagePlaneVersion)' == ''">0.1.1-packageplane.20260910.1</ChummerPackagePlaneVersion>
-    <ChummerEngineContractsPackageVersion Condition="'$(ChummerEngineContractsPackageVersion)' == ''">0.0.0-packageplane.candidate.sh54398fa0dfe60</ChummerEngineContractsPackageVersion>
-    <ChummerCoreGmCharacterEditsPackageVersion Condition="'$(ChummerCoreGmCharacterEditsPackageVersion)' == ''">0.0.0-packageplane.candidate.sh54398fa0dfe60</ChummerCoreGmCharacterEditsPackageVersion>
-    <ChummerHubRegistryContractsPackageVersion Condition="'$(ChummerHubRegistryContractsPackageVersion)' == ''">0.1.1-packageplane.20260910.1</ChummerHubRegistryContractsPackageVersion>
-    <ChummerRunRegistryPackageVersion Condition="'$(ChummerRunRegistryPackageVersion)' == ''">0.1.1-packageplane.20260910.1</ChummerRunRegistryPackageVersion>
+    <ChummerPackagePlaneVersion Condition="'$(ChummerPackagePlaneVersion)' == ''">0.1.1-packageplane.20260924.3</ChummerPackagePlaneVersion>
+    <ChummerEngineContractsPackageVersion Condition="'$(ChummerEngineContractsPackageVersion)' == ''">0.0.0-packageplane.candidate.sh5160e78a60bce</ChummerEngineContractsPackageVersion>
+    <ChummerCoreGmCharacterEditsPackageVersion Condition="'$(ChummerCoreGmCharacterEditsPackageVersion)' == ''">0.0.0-packageplane.candidate.sh5160e78a60bce</ChummerCoreGmCharacterEditsPackageVersion>
+    <ChummerHubRegistryContractsPackageVersion Condition="'$(ChummerHubRegistryContractsPackageVersion)' == ''">0.1.1-packageplane.20260924.3</ChummerHubRegistryContractsPackageVersion>
+    <ChummerRunRegistryPackageVersion Condition="'$(ChummerRunRegistryPackageVersion)' == ''">0.1.1-packageplane.20260924.3</ChummerRunRegistryPackageVersion>
     <ChummerPackageFeed Condition="'$(ChummerPackageFeed)' == '' and '$(CHUMMER_PACKAGE_FEED)' != ''">$(CHUMMER_PACKAGE_FEED)</ChummerPackageFeed>
     <RestoreAdditionalProjectSources Condition="'$(ChummerPackageFeed)' != ''">$(ChummerPackageFeed);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
     <ChummerCoreEngineRoot Condition="'$(ChummerCoreEngineRoot)' == ''">$(ChummerWorkspaceRoot)/chummer-core-engine</ChummerCoreEngineRoot>

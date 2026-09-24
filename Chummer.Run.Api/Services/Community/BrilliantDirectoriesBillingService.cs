@@ -127,7 +127,7 @@ public sealed class BrilliantDirectoriesBillingService
         int monthlyLimit = supporterActive ? SupporterMyFirstBookMonthlyLimit : FreeMyFirstBookMonthlyLimit;
 
         int monthlyUsed;
-        lock (_myFirstBookUsage.Gate)
+        using (_myFirstBookUsage.Enter())
         {
             monthlyUsed = _myFirstBookUsage.Entries
                 .Where(item => string.Equals(item.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)
@@ -149,26 +149,47 @@ public sealed class BrilliantDirectoriesBillingService
     }
 
     public MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now = null, string? email = null)
-    {
-        MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, now, email);
-        if (snapshot.MonthlyRemaining <= 0)
-        {
-            throw new InvalidOperationException("Monthly MyFirstBook allowance is exhausted for this account.");
-        }
+        => ConsumeMyFirstBookQuota(userId, now, email, 1);
 
+    internal MyFirstBookQuotaConsumeResultDto ConsumeMyFirstBookQuota(string userId, DateTimeOffset? now, string? email, int unitsRequested,
+        Func<MyFirstBookQuotaSnapshotDto, HorizonArtifactRequestReceipt>? createReceipt = null)
+    {
+        if (unitsRequested <= 0) throw new InvalidOperationException("A positive MyFirstBook allowance count is required.");
         DateTimeOffset effectiveNow = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
-        lock (_myFirstBookUsage.Gate)
+        MyFirstBookQuotaSnapshotDto snapshot = GetMyFirstBookQuota(userId, effectiveNow, email);
+        using (_myFirstBookUsage.Enter())
         {
+            if (createReceipt is not null)
+                HorizonQuotaReceipts.RejectDuplicate(_myFirstBookUsage.Entries.SelectMany(row => row.RequestReceipts ?? []),
+                    createReceipt(snapshot).RequestId);
             int existingIndex = _myFirstBookUsage.Entries.FindIndex(item =>
                 string.Equals(item.UserId, snapshot.UserId, StringComparison.OrdinalIgnoreCase)
                 && item.WindowStartUtc == snapshot.WindowStartUtc);
+            MyFirstBookUsageLedgerEntry? previous = existingIndex >= 0 ? _myFirstBookUsage.Entries[existingIndex] : null;
+            // Re-read usage within the same scope that will commit it. A quota
+            // observation obtained before this scope is not write admission.
+            if ((previous?.MonthlyUsed ?? 0) < 0 || unitsRequested > (long)snapshot.MonthlyLimit - (previous?.MonthlyUsed ?? 0))
+                throw new InvalidOperationException("Monthly MyFirstBook allowance is exhausted for this account.");
             MyFirstBookUsageLedgerEntry updated = existingIndex >= 0
                 ? _myFirstBookUsage.Entries[existingIndex] with
                 {
-                    MonthlyUsed = _myFirstBookUsage.Entries[existingIndex].MonthlyUsed + 1,
+                    MonthlyUsed = checked(_myFirstBookUsage.Entries[existingIndex].MonthlyUsed + unitsRequested),
                     UpdatedAtUtc = effectiveNow
                 }
-                : new MyFirstBookUsageLedgerEntry(snapshot.UserId, snapshot.WindowStartUtc, 1, effectiveNow);
+                : new MyFirstBookUsageLedgerEntry(snapshot.UserId, snapshot.WindowStartUtc, unitsRequested, effectiveNow);
+            MyFirstBookQuotaSnapshotDto committedQuota = snapshot with
+            {
+                MonthlyUsed = updated.MonthlyUsed,
+                MonthlyRemaining = Math.Max(0, snapshot.MonthlyLimit - updated.MonthlyUsed)
+            };
+            if (createReceipt is not null)
+            {
+                if (unitsRequested != 1) throw new InvalidOperationException("A request receipt must bind one consumption.");
+                HorizonArtifactRequestReceipt receipt = createReceipt(committedQuota);
+                updated = updated with { RequestReceipts = HorizonQuotaReceipts.Append(previous?.RequestReceipts, receipt) };
+                HorizonQuotaReceipts.Validate(updated.RequestReceipts, updated.UserId, updated.WindowStartUtc,
+                    committedQuota.WindowEndUtc, updated.MonthlyUsed, "monthly", new(StringComparer.OrdinalIgnoreCase));
+            }
             if (existingIndex >= 0)
             {
                 _myFirstBookUsage.Entries[existingIndex] = updated;
@@ -178,12 +199,29 @@ public sealed class BrilliantDirectoriesBillingService
                 _myFirstBookUsage.Entries.Add(updated);
             }
 
-            _myFirstBookUsage.PersistLocked();
+            try { _myFirstBookUsage.PersistLocked(); }
+            catch
+            {
+                if (previous is null) _myFirstBookUsage.Entries.RemoveAt(_myFirstBookUsage.Entries.Count - 1);
+                else _myFirstBookUsage.Entries[existingIndex] = previous;
+                throw;
+            }
+            // Do not make an acknowledged mutation look failed by performing
+            // another remote read just to construct its response.
+            return new MyFirstBookQuotaConsumeResultDto("consumed", committedQuota);
         }
+    }
 
-        return new MyFirstBookQuotaConsumeResultDto(
-            Status: "consumed",
-            Quota: GetMyFirstBookQuota(userId, effectiveNow, email));
+    internal IReadOnlyList<HorizonArtifactRequestReceipt> ListChargedArtifactRequests()
+    {
+        using (_myFirstBookUsage.Enter())
+        {
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in _myFirstBookUsage.Entries.Where(row => row.RequestReceipts is not null))
+                HorizonQuotaReceipts.Validate(row.RequestReceipts, row.UserId, row.WindowStartUtc,
+                    row.WindowStartUtc.AddMonths(1), row.MonthlyUsed, "monthly", ids);
+            return _myFirstBookUsage.Entries.SelectMany(row => row.RequestReceipts ?? []).ToArray();
+        }
     }
 
     public BrilliantDirectoriesCheckoutResponseDto CreateSupporterCheckout(BrilliantDirectoriesCheckoutRequest request)
@@ -206,11 +244,18 @@ public sealed class BrilliantDirectoriesBillingService
         DateTimeOffset syncedAtUtc = DateTimeOffset.UtcNow;
         snapshot = snapshot with { SyncedAtUtc = syncedAtUtc };
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            BrilliantDirectoriesMemberSnapshotDto[] before = _store.Members.ToArray();
             _store.Members.RemoveAll(item => string.Equals(item.UserId, snapshot.UserId, StringComparison.OrdinalIgnoreCase));
             _store.Members.Add(snapshot);
-            _store.PersistLocked();
+            try { _store.PersistLocked(); }
+            catch
+            {
+                _store.Members.Clear();
+                _store.Members.AddRange(before);
+                throw;
+            }
         }
 
         return new BrilliantDirectoriesSyncResultDto(
@@ -225,7 +270,7 @@ public sealed class BrilliantDirectoriesBillingService
 
     public BrilliantDirectoriesMemberSnapshotDto? GetAccount(string userId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.Members
                 .Where(item => string.Equals(item.UserId, userId, StringComparison.OrdinalIgnoreCase))
@@ -242,7 +287,7 @@ public sealed class BrilliantDirectoriesBillingService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.Members
                 .Where(item => string.Equals(NormalizeEmail(item.Email), normalizedEmail, StringComparison.OrdinalIgnoreCase))
@@ -331,9 +376,33 @@ public sealed class BrilliantDirectoriesBillingService
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER", "BrilliantDirectories:CheckoutEmailParameter") ?? "email",
             ReadOptional("BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER", "BrilliantDirectories:CheckoutPlanParameter") ?? "plan",
             ReadOptional("BRILLIANT_DIRECTORIES_SYNC_SECRET", "BrilliantDirectories:SyncSecret"),
-            ReadCsv("BRILLIANT_DIRECTORIES_SUPPORTED_MEMBERSHIP_STATUSES", "BrilliantDirectories:SupportedMembershipStatuses", ["active", "inactive", "pending", "canceled", "cancelled", "expired", "suspended", "lifetime"]),
-            ReadCsv("BRILLIANT_DIRECTORIES_ACTIVE_MEMBERSHIP_STATUSES", "BrilliantDirectories:ActiveMembershipStatuses", ["active", "lifetime"]));
+            SupportedMembershipStatuses(_configuration),
+            ActiveMembershipStatuses(_configuration));
     }
+
+    // Restore validates the same plan/status mapping used at authenticated sync.
+    // A changed mapping requires reconciliation, not silently granting a tier.
+    internal static void ValidateStoredMembership(BrilliantDirectoriesMemberSnapshotDto? member, IConfiguration configuration)
+    {
+        if (member is null || string.IsNullOrWhiteSpace(member.UserId) || member.UserId != member.UserId.Trim()
+            || member.MemberId != TrimToNull(member.MemberId) || member.Email != TrimToNull(member.Email)
+            || string.IsNullOrWhiteSpace(member.MembershipStatus)
+            || member.MembershipStatus != NormalizeStatus(member.MembershipStatus)
+            || member.ObservedAtUtc == default || member.SyncedAtUtc == default
+            || member.ObservedAtUtc.Offset != TimeSpan.Zero || member.SyncedAtUtc.Offset != TimeSpan.Zero)
+            throw new InvalidDataException("Primary membership metadata is invalid.");
+        var plan = PlanDefinitions.FirstOrDefault(item => item.PlanKey == member.PlanKey && item.Name == member.PlanName);
+        if (plan is null || !SupportedMembershipStatuses(configuration).Contains(member.MembershipStatus, StringComparer.OrdinalIgnoreCase)
+            || member.SupporterActive != (plan.IsSupporter && ActiveMembershipStatuses(configuration).Contains(member.MembershipStatus, StringComparer.OrdinalIgnoreCase)))
+            throw new InvalidDataException("Primary membership disagrees with the configured plan/status mapping.");
+    }
+
+    private static IReadOnlyList<string> SupportedMembershipStatuses(IConfiguration configuration)
+        => ReadCsv(configuration, "BRILLIANT_DIRECTORIES_SUPPORTED_MEMBERSHIP_STATUSES", "BrilliantDirectories:SupportedMembershipStatuses",
+            ["active", "inactive", "pending", "canceled", "cancelled", "expired", "suspended", "lifetime"]);
+
+    private static IReadOnlyList<string> ActiveMembershipStatuses(IConfiguration configuration)
+        => ReadCsv(configuration, "BRILLIANT_DIRECTORIES_ACTIVE_MEMBERSHIP_STATUSES", "BrilliantDirectories:ActiveMembershipStatuses", ["active", "lifetime"]);
 
     private string? ReadOptional(string environmentKey, string configurationKey)
         => TrimToNull(_configuration[environmentKey]) ?? TrimToNull(_configuration[configurationKey]);
@@ -362,9 +431,9 @@ public sealed class BrilliantDirectoriesBillingService
         }
     }
 
-    private IReadOnlyList<string> ReadCsv(string environmentKey, string configurationKey, IReadOnlyList<string> defaults)
+    private static IReadOnlyList<string> ReadCsv(IConfiguration configuration, string environmentKey, string configurationKey, IReadOnlyList<string> defaults)
     {
-        string? value = ReadOptional(environmentKey, configurationKey);
+        string? value = TrimToNull(configuration[environmentKey]) ?? TrimToNull(configuration[configurationKey]);
         string[] items = (value is null ? defaults : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Select(NormalizeStatus)
             .Distinct(StringComparer.OrdinalIgnoreCase)

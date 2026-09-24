@@ -24,6 +24,88 @@ public sealed class DataProtectionKeyProtectionConfiguratorTests : IDisposable
     public DataProtectionKeyProtectionConfiguratorTests() => Directory.CreateDirectory(_root);
 
     [Fact]
+    public void Explicit_owner_only_keys_survive_restart_and_still_protect_payloads()
+    {
+        if (!IsSupportedProductionPlatform()) return;
+        string path = Path.Combine(_root, "owner-only");
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"] = "owner_only_local" }).Build();
+        var services = new ServiceCollection();
+        var status = DataProtectionKeyProtectionConfigurator.Configure(services, configuration, ProductionEnvironment(), path);
+        Assert.Equal(new DataProtectionKeyProtectionStatus(true, "owner_only_local_key_ring"), status);
+        using var first = services.BuildServiceProvider();
+        const string clear = "private-test-payload";
+        string protectedValue = first.GetRequiredService<IDataProtectionProvider>().CreateProtector("test-purpose").Protect(clear);
+        Assert.DoesNotContain(clear, protectedValue);
+        var secondServices = new ServiceCollection();
+        Assert.True(DataProtectionKeyProtectionConfigurator.Configure(secondServices, configuration, ProductionEnvironment(), path).Ready);
+        using var second = secondServices.BuildServiceProvider();
+        var provider = second.GetRequiredService<IDataProtectionProvider>();
+        Assert.Equal(clear, provider.CreateProtector("test-purpose").Unprotect(protectedValue));
+        Assert.Throws<CryptographicException>(() => provider.CreateProtector("wrong-purpose").Unprotect(protectedValue));
+        Assert.Null(DataProtectionKeyProtectionConfigurator.ValidateConfiguredKeyRing(path, status));
+        if (OperatingSystem.IsLinux())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(path));
+            foreach (string file in Directory.GetFiles(path, "*.xml"))
+            {
+                Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
+                Assert.Empty(XElement.Load(file).Descendants("encryptedSecret"));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("owner_only_local", "old.pfx", "data_protection_conflicting_key_protection_modes")]
+    [InlineData("unknown", null, "data_protection_key_protection_mode_invalid")]
+    [InlineData(null, null, "data_protection_key_encryptor_missing")]
+    public void Certificate_protection_is_never_silently_disabled(string? mode, string? certificate, string code)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"] = mode,
+              ["CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH"] = certificate }).Build();
+        string path = Path.Combine(_root, "not-created");
+        var status = DataProtectionKeyProtectionConfigurator.Configure(new ServiceCollection(), configuration, ProductionEnvironment(), path);
+        Assert.False(status.Ready);
+        Assert.Equal(code, status.Code);
+        Assert.False(Directory.Exists(path));
+    }
+
+    [Fact]
+    public void Owner_only_mode_rejects_encrypted_history_without_modifying_it()
+    {
+        if (!IsSupportedProductionPlatform() || !OperatingSystem.IsLinux()) return;
+        string path = Path.Combine(_root, "encrypted-history");
+        Directory.CreateDirectory(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        string file = Path.Combine(path, "key-original.xml");
+        byte[] before = System.Text.Encoding.UTF8.GetBytes("<key version=\"1\"><encryptedSecret>retained</encryptedSecret></key>");
+        File.WriteAllBytes(file, before);
+        File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"] = "owner_only_local" }).Build();
+        var status = DataProtectionKeyProtectionConfigurator.Configure(new ServiceCollection(), configuration, ProductionEnvironment(), path);
+        Assert.False(status.Ready);
+        Assert.Equal("data_protection_owner_only_key_ring_invalid", status.Code);
+        Assert.Equal(before, File.ReadAllBytes(file));
+        Assert.Single(Directory.GetFiles(path));
+    }
+
+    [Fact]
+    public void Owner_only_mode_rejects_a_linked_directory_without_repairing_its_target()
+    {
+        if (!IsSupportedProductionPlatform() || !OperatingSystem.IsLinux()) return;
+        string target = Path.Combine(_root, "target");
+        Directory.CreateDirectory(target, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        string link = Path.Combine(_root, "linked");
+        Directory.CreateSymbolicLink(link, target);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"] = "owner_only_local" }).Build();
+        Assert.False(DataProtectionKeyProtectionConfigurator.Configure(new ServiceCollection(), configuration, ProductionEnvironment(), link).Ready);
+        Assert.Empty(Directory.GetFiles(target));
+        Directory.Delete(link);
+    }
+
+    [Fact]
     public void Production_rsa_certificate_performs_round_trip_and_generates_encrypted_key_xml()
     {
         if (!IsSupportedProductionPlatform())

@@ -6,6 +6,8 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Api.Services.Teable;
+using Chummer.Storage.Teable;
 using Chummer.Run.Api.Services.WindowsProof;
 using Chummer.Run.Registry.Services;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +16,8 @@ namespace Chummer.Run.Api;
 
 internal static class ServiceCollectionBoundedContextExtensions
 {
+    internal const string CommunityPrimaryStoreKey = "chummer.community.primary";
+
     public static IServiceCollection AddHubPublicGuideContext(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
@@ -82,7 +86,27 @@ internal static class ServiceCollectionBoundedContextExtensions
     public static IServiceCollection AddHubAccountsAndCommunityContext(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<CommunityStore>();
+        services.AddKeyedSingleton<TeableRevisionStore>(CommunityPrimaryStoreKey, (provider, _) =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] != "teable")
+                throw new InvalidOperationException("Community primary transport requires explicit Teable mode.");
+            return TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_COMMUNITY_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary community table is required."),
+                configuration["CHUMMER_COMMUNITY_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private community token file is required."));
+        });
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetRequiredService<ILogger<CommunityStore>>();
+            var primary = configuration["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] == "teable"
+                ? provider.GetRequiredKeyedService<TeableRevisionStore>(CommunityPrimaryStoreKey)
+                : null;
+            // The container owns the keyed transport. CommunityStore validates
+            // the current remote schema before any account service is returned.
+            return new CommunityStore(configuration, logger, primary);
+        });
         services.AddSingleton<IPlaySessionAuthorizationPersistence, CommunityStorePlaySessionAuthorizationPersistence>();
         services.AddSingleton<PlaySessionAuthorizationService>();
         services.AddSingleton<PlayAuthorizationIdempotencyCoordinator>();
@@ -119,22 +143,119 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<ReusableAccountFlowService>();
         services.AddSingleton<RewardService>();
         services.AddSingleton<EntitlementService>();
-        services.AddSingleton<BrilliantDirectoriesBillingStore>();
-        services.AddSingleton<MyFirstBookUsageStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetService<ILogger<BrilliantDirectoriesBillingStore>>();
+            if (configuration["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new BrilliantDirectoriesBillingStore(configuration, logger);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_BILLING_MEMBERSHIP_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary membership table is required."),
+                configuration["CHUMMER_BILLING_MEMBERSHIP_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private membership token file is required."));
+            try { return new BrilliantDirectoriesBillingStore(configuration, logger, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetService<ILogger<MyFirstBookUsageStore>>();
+            if (configuration["CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new MyFirstBookUsageStore(configuration, logger);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_MYFIRSTBOOK_USAGE_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary usage table is required."),
+                configuration["CHUMMER_MYFIRSTBOOK_USAGE_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private usage token file is required."));
+            try { return new MyFirstBookUsageStore(configuration, logger, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<BrilliantDirectoriesBillingService>();
         services.AddSingleton<HorizonCapabilityService>();
         services.AddSingleton<HorizonArtifactAccessTokenService>();
-        services.AddSingleton<HorizonArtifactUsageStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new HorizonArtifactUsageStore(configuration);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_HORIZON_ARTIFACT_USAGE_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary artifact usage table is required."),
+                configuration["CHUMMER_HORIZON_ARTIFACT_USAGE_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private artifact usage token is required."));
+            try { return new HorizonArtifactUsageStore(configuration, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<HorizonArtifactQuotaService>();
         services.AddSingleton<OriginAuthoringAllowanceProjectionService>();
-        services.AddSingleton<HorizonArtifactRequestReceiptStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_HORIZON_REQUEST_RECEIPT_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new HorizonArtifactRequestReceiptStore(configuration);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary artifact receipt table is required."),
+                configuration["CHUMMER_HORIZON_REQUEST_RECEIPT_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private artifact receipt token is required."));
+            try { return new HorizonArtifactRequestReceiptStore(configuration, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<HorizonArtifactRequestService>();
         services.AddSingleton<SubscribrWebhookStore>();
         services.AddSingleton<SubscribrProviderWebhookService>();
         services.AddSingleton<RunsiteTourQuotaService>();
-        services.AddSingleton<OriginDossierPublicationService>();
-        services.AddSingleton<OriginDossierFirstPartyDocumentService>();
-        services.AddSingleton<OriginDossierProviderCreditReservationStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetRequiredService<ILogger<OriginDossierPublicationService>>();
+            var capabilities = provider.GetService<HorizonCapabilityService>();
+            var media = provider.GetService<MediaArtifactHorizonsService>();
+            if (configuration["CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new OriginDossierPublicationService(configuration, capabilities, media, logger);
+            var store = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_ORIGIN_PUBLICATION_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary publication table is required."),
+                configuration["CHUMMER_ORIGIN_PUBLICATION_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private publication token is required."));
+            try
+            {
+                return new OriginDossierPublicationService(configuration, capabilities, media, logger,
+                    new TeableOriginPublicationStorage(store, configuration["CHUMMER_ORIGIN_PUBLICATION_IMPORT_ROOT"], ownsStore: true));
+            }
+            catch { store.Dispose(); throw; }
+        });
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_ORIGIN_DOCUMENT_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new OriginDossierFirstPartyDocumentService(configuration);
+            var store = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_ORIGIN_DOCUMENT_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Origin document primary table is required."),
+                configuration["CHUMMER_ORIGIN_DOCUMENT_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private document storage token is required."));
+            try { return new OriginDossierFirstPartyDocumentService(configuration, new TeableOriginDocumentStorage(store, ownsStore: true)); }
+            catch { store.Dispose(); throw; }
+        });
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new OriginChapterAuthoringService(configuration);
+            var store = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_ORIGIN_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Origin primary table is required."),
+                configuration["CHUMMER_ORIGIN_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private Origin storage token is required."));
+            return new OriginChapterAuthoringService(configuration, new TeableOriginChapterStorage(store, ownsStore: true));
+        });
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_ORIGIN_PROVIDER_RESERVATION_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new OriginDossierProviderCreditReservationStore(configuration);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_ORIGIN_PROVIDER_RESERVATION_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary reservation table is required."),
+                configuration["CHUMMER_ORIGIN_PROVIDER_RESERVATION_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private reservation token file is required."));
+            try { return new OriginDossierProviderCreditReservationStore(configuration, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<OriginDossierProviderCreditReservationService>();
         services.AddSingleton<PayFunnelsBillingStore>();
         services.AddSingleton<PayFunnelsBillingService>();
@@ -204,7 +325,19 @@ internal static class ServiceCollectionBoundedContextExtensions
 
     public static IServiceCollection AddHubControlAndSupportContext(this IServiceCollection services)
     {
-        services.AddSingleton<SupportStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var logger = provider.GetRequiredService<ILogger<SupportStore>>();
+            if (configuration["CHUMMER_SUPPORT_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new SupportStore(configuration, logger);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_SUPPORT_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary support table is required."),
+                configuration["CHUMMER_SUPPORT_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private support token file is required."));
+            try { return new SupportStore(configuration, logger, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<SupportAttachmentStorageService>();
         services.AddSingleton<SupportCaseService>();
         services.AddSingleton<SupportCasePresentationService>();
@@ -249,7 +382,25 @@ internal static class ServiceCollectionBoundedContextExtensions
         ArgumentNullException.ThrowIfNull(environment);
         bool publicDownloadOnly = environment.IsProduction()
             && configuration.GetValue<bool>("CHUMMER_PUBLIC_DOWNLOAD_ONLY");
-        if (environment.IsProduction() && !publicDownloadOnly)
+        string storageProvider = configuration["CHUMMER_INSTALL_LINKING_STORAGE_PROVIDER"] ?? "postgres";
+        if (storageProvider is not ("postgres" or "teable"))
+            throw new InvalidOperationException("Install-linking storage provider is invalid.");
+        if (storageProvider == "teable")
+        {
+            if (!environment.IsProduction() || publicDownloadOnly
+                || configuration["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"]?.Trim() != TeableDataProtectionRuntime.Mode
+                || !string.IsNullOrWhiteSpace(configuration["CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE"])
+                || !string.IsNullOrWhiteSpace(configuration["CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING"]))
+                throw new InvalidOperationException("Teable install-linking requires explicit production primary key custody and no competing PostgreSQL configuration.");
+            services.AddSingleton<TeableInstallLinkingRuntime>();
+            services.AddSingleton(provider => new InstallLinkingPostgresAuthorityCoordinator(
+                provider.GetRequiredService<TeableInstallLinkingRuntime>().Authority, backend: "teable"));
+            services.AddSingleton<IInstallLinkingSnapshotAuthority>(provider =>
+                provider.GetRequiredService<InstallLinkingPostgresAuthorityCoordinator>());
+            services.AddSingleton<IInstallLinkingRollbackAuthorityReadinessProbe>(provider =>
+                provider.GetRequiredService<InstallLinkingPostgresAuthorityCoordinator>());
+        }
+        else if (environment.IsProduction() && !publicDownloadOnly)
         {
             services.AddSingleton(_ => new InstallLinkingPostgresRuntime(
                 InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
@@ -314,7 +465,18 @@ internal static class ServiceCollectionBoundedContextExtensions
             services.AddSingleton<InstallLinkingService>();
             services.AddSingleton<PersonalizedInstallScriptService>();
         }
-        services.AddSingleton<InstallLinkedWorkspaceSnapshotStore>();
+        services.AddSingleton(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            if (configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_STORAGE_PROVIDER"]?.Trim() != "teable")
+                return new InstallLinkedWorkspaceSnapshotStore(configuration);
+            var primary = TeableRevisionStore.OpenFromPrivateTokenFile(
+                new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_TEABLE_TABLE_ID"] ?? throw new InvalidOperationException("Primary workspace table is required."),
+                configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_TEABLE_TOKEN_FILE"] ?? throw new InvalidOperationException("Private workspace storage token is required."));
+            try { return new InstallLinkedWorkspaceSnapshotStore(configuration, primary, ownsPrimary: true); }
+            catch { primary.Dispose(); throw; }
+        });
         services.AddSingleton<InstallLinkedWorkspaceSnapshotService>();
         services.AddTransient<RookWorkspaceReadAdmissionService>();
         services.AddSingleton<AndroidLinkedV2RequestProofVerifier>();

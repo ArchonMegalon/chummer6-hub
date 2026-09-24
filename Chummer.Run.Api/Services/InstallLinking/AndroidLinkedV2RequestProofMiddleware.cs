@@ -418,10 +418,17 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                     bodyInspection.OperationId!,
                     body)
                 : null;
-            AndroidLinkedV2GrantPrincipal? principal = installLinking.ResolveAndroidLinkedV2Grant(
-                installationId,
-                grantId,
-                accessToken);
+            AndroidLinkedV2GrantPrincipal? principal;
+            try
+            {
+                principal = installLinking.ResolveAndroidLinkedV2GrantForRequest(
+                    installationId, grantId, accessToken);
+            }
+            catch (InstallLinkingOperationException error) when (error.StatusCode == StatusCodes.Status503ServiceUnavailable)
+            {
+                await DenyAsync(context, StatusCodes.Status503ServiceUnavailable, "grant-authority-unavailable");
+                return;
+            }
             AndroidLinkedV2RefreshRetryAuthorization? refreshRetry = null;
             if (principal is null && refreshPath)
             {

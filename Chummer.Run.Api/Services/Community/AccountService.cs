@@ -33,7 +33,7 @@ public sealed class AccountService
         var requestedDisplayName = NormalizeUserFacingDisplayName(request.DisplayName, subjectId);
         var requestedHandle = NormalizeUserFacingHandle(request.Handle, subjectId);
         HubUserDto result;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.UserIdBySubjectId.TryGetValue(subjectId, out var existingUserId)
                 && _store.UsersById.TryGetValue(existingUserId, out var existing))
@@ -94,7 +94,7 @@ public sealed class AccountService
         HubUserDto result;
         bool wasCreated;
         bool changed;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.UserIdBySubjectId.TryGetValue(normalizedSubjectId, out var existingUserId)
                 && _store.UsersById.TryGetValue(existingUserId, out var existing))
@@ -172,7 +172,7 @@ public sealed class AccountService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.UserIdBySubjectId.TryGetValue(normalized, out var userId)
                 && _store.UsersById.TryGetValue(userId, out var user))
@@ -192,7 +192,7 @@ public sealed class AccountService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.UsersById.TryGetValue(normalized, out var user) ? user : null;
         }
@@ -207,7 +207,7 @@ public sealed class AccountService
     {
         string? normalized = NormalizeOptional(subjectId);
         if (normalized is null) return null;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.UserIdBySubjectId.TryGetValue(normalized, out string? indexedUserId)
                 || string.IsNullOrWhiteSpace(indexedUserId)
@@ -249,7 +249,7 @@ public sealed class AccountService
         if (!IsExactAccountIdentity(exactSubjectId) || !IsExactAccountIdentity(expectedUserId))
             return false;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.UserIdBySubjectId.TryGetValue(exactSubjectId, out string? indexedUserId)
                 || indexedUserId is null
@@ -282,7 +282,7 @@ public sealed class AccountService
     {
         var normalizedUserId = NormalizeRequired(userId, nameof(userId));
         HubUserDto updated;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.UsersById.TryGetValue(normalizedUserId, out var user))
             {

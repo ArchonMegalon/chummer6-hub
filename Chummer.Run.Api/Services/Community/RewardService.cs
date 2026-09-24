@@ -22,7 +22,7 @@ public sealed class RewardService
             return 0;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.RewardEntries.Any(entry => string.Equals(entry.SourceReceiptId, receipt.ReceiptId, StringComparison.OrdinalIgnoreCase)))
             {
@@ -51,7 +51,7 @@ public sealed class RewardService
 
     public IReadOnlyList<RewardJournalEntryDto> ListRewardsForUser(string userId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.RewardEntries
                 .Where(entry => string.Equals(entry.UserId, userId, StringComparison.OrdinalIgnoreCase))
@@ -62,7 +62,7 @@ public sealed class RewardService
 
     public IReadOnlyList<BadgeDto> ListBadgesForUser(string userId, string? status = null, string? badgeKind = null)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.Badges
                 .Where(badge => string.Equals(badge.UserId, userId, StringComparison.OrdinalIgnoreCase))
@@ -92,7 +92,7 @@ public sealed class RewardService
             return false;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (TryFindActiveBadgeLocked(normalizedUserId, normalizedKey, normalizedSourceSessionId) is not null)
             {
@@ -127,7 +127,7 @@ public sealed class RewardService
             return false;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var badgeIndex = FindActiveBadgeIndexLocked(normalizedUserId, normalizedKey, normalizedSourceSessionId);
             if (badgeIndex < 0)
@@ -161,7 +161,7 @@ public sealed class RewardService
             return 0;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var revoked = 0;
             for (var index = 0; index < _store.Badges.Count; index++)

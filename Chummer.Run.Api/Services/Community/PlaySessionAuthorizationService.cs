@@ -73,8 +73,8 @@ public sealed class CommunityStorePlaySessionAuthorizationPersistence : IPlaySes
 }
 
 /// <summary>
-/// Dormant server-side Play authority. Runtime registration and transport surfaces intentionally
-/// remain absent until later phases provide the browser proof and service-credential boundaries.
+/// Server-side Play authority whose transport remains test-only. Primary storage support does
+/// not activate the API or replace its remaining browser-proof and deployment requirements.
 /// </summary>
 public sealed class PlaySessionAuthorizationService
 {
@@ -105,7 +105,12 @@ public sealed class PlaySessionAuthorizationService
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _persistence = persistence ?? new CommunityStorePlaySessionAuthorizationPersistence();
-        lock (_store.Gate)
+        if (_store.IsPrimary && _persistence is not CommunityStorePlaySessionAuthorizationPersistence)
+        {
+            throw new ArgumentException("Primary Play authorization requires the Community revision writer.", nameof(persistence));
+        }
+
+        using (_store.Enter())
         {
             DateTimeOffset observed = _timeProvider.GetUtcNow().ToUniversalTime();
             _monotonicAnchorUtc = observed > _store.PlayAuthorizationTimeHighWaterUtc
@@ -1089,7 +1094,7 @@ public sealed class PlaySessionAuthorizationService
     private PlaySessionAuthorizationResult<T> Mutate<T>(Func<Mutation<T>> operation)
         where T : class
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             AuthorizationStateSnapshot snapshot;
             try
@@ -1125,6 +1130,14 @@ public sealed class PlaySessionAuthorizationService
             }
             catch (Exception exception) when (IsRecoverablePersistenceException(exception))
             {
+                if (_store.IsPrimary)
+                {
+                    // The remote write may have committed. CommunityStore fences this
+                    // instance until cold reconciliation; never compensate or replay it.
+                    snapshot.RestoreMemory(_store);
+                    return Failure<T>(PlaySessionAuthorizationReasons.PersistenceFailed);
+                }
+
                 try
                 {
                     snapshot.Restore(_store);
@@ -1356,7 +1369,9 @@ public sealed class PlaySessionAuthorizationService
         => exception is IOException
             or UnauthorizedAccessException
             or System.Text.Json.JsonException
-            or InvalidOperationException;
+            or InvalidOperationException
+            or HttpRequestException
+            or OperationCanceledException;
 
     private static PlaySessionAuthorizationResult<T> Failure<T>(string reason)
         where T : class
@@ -1410,7 +1425,7 @@ public sealed class PlaySessionAuthorizationService
 
         public static AuthorizationStateSnapshot Capture(CommunityStore store)
         {
-            bool fileExisted = File.Exists(store.StoragePath);
+            bool fileExisted = !store.IsPrimary && File.Exists(store.StoragePath);
             byte[]? fileBytes = fileExisted ? File.ReadAllBytes(store.StoragePath) : null;
             return new AuthorizationStateSnapshot(
                 store.PlaySessionsById.Values.Select(static item => item with { }).ToArray(),

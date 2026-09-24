@@ -28,7 +28,7 @@ public sealed class InstallLinkedWorkspaceSnapshotService
         ArgumentNullException.ThrowIfNull(installation);
 
         string ownerKey = ResolveOwnerKey(installation);
-        lock (_store.Gate)
+        using (_store.Enter(ownerKey))
         {
             return _store.SnapshotsByKey.Values
                 .Where(item => string.Equals(item.OwnerKey, ownerKey, StringComparison.Ordinal))
@@ -75,7 +75,7 @@ public sealed class InstallLinkedWorkspaceSnapshotService
         string ownerKey = ResolveOwnerKey(installation);
         // ComposeKey trims legacy callers. The exact check above makes that a no-op here.
         string key = InstallLinkedWorkspaceSnapshotStore.ComposeKey(ownerKey, workspaceId);
-        lock (_store.Gate)
+        using (_store.Enter(ownerKey))
         {
             if (!_store.SnapshotsByKey.TryGetValue(key, out InstallLinkedWorkspaceSnapshotRecord? stored))
                 throw new InstallLinkingOperationException(StatusCodes.Status404NotFound,
@@ -142,7 +142,7 @@ public sealed class InstallLinkedWorkspaceSnapshotService
         normalized = InstallLinkedWorkspaceSnapshotTransfer.Validate(normalized,
             expectedContinuationOwnerId: ResolveContinuationOwnerId(installation, normalized));
 
-        lock (_store.Gate)
+        using (_store.Enter(ownerKey))
         {
             string key = InstallLinkedWorkspaceSnapshotStore.ComposeKey(ownerKey, normalized.WorkspaceId);
             _store.SnapshotsByKey.TryGetValue(key, out InstallLinkedWorkspaceSnapshotRecord? existing);

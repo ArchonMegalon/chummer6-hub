@@ -53,9 +53,9 @@ jobs:
           curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
             --fail --location --max-redirs 3 --connect-timeout 15 --max-time 120 \
             --silent --show-error --max-filesize 16777216 \
-            https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6/chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip \
+            https://github.com/ArchonMegalon/chummer6-core/releases/download/core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd/chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip \
             --output "${RUNNER_TEMP}/hub-observer-core.zip"
-          echo "d45350886940a3323ed72a9f7b72ad539e0383e13a55063dcf10c90d491dac1b  ${RUNNER_TEMP}/hub-observer-core.zip" \
+          echo "56a16b2c04eca5b5ab5c4949f917b148a17f3b7fb4b554020ae1156c554c07a2  ${RUNNER_TEMP}/hub-observer-core.zip" \
             | sha256sum --check --strict
           python3 -I - <<'PY'
           import importlib.util

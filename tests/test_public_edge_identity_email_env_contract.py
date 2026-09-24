@@ -31,8 +31,15 @@ def test_identity_docker_context_includes_the_identity_service() -> None:
 
     assert "!Chummer.Run.Identity/" in dockerignore
     assert "!Chummer.Run.Identity/**" in dockerignore
+    assert "!Chummer.Storage.Teable/" in dockerignore
+    assert "!Chummer.Storage.Teable/**" in dockerignore
 
     dockerfile = Path("Chummer.Run.Identity/Dockerfile").read_text(encoding="utf-8")
     assert "COPY --from=run-services-source Directory.Build.props chummer.run-services/" in dockerfile
     assert dockerfile.count("-p:ChummerUseLocalCompatibilityTree=true") >= 3
     assert dockerfile.count("-p:ChummerWorkspaceRoot=/src") >= 3
+    assert "COPY --from=run-services-source Chummer.Storage.Teable/Chummer.Storage.Teable.csproj chummer.run-services/Chummer.Storage.Teable/" in dockerfile
+    assert "COPY --from=run-services-source Chummer.Storage.Teable/ chummer.run-services/Chummer.Storage.Teable/" in dockerfile
+    api_dockerfile = Path("Chummer.Run.Api/Dockerfile").read_text(encoding="utf-8")
+    assert "COPY --from=run-services-source Chummer.Storage.Teable/Chummer.Storage.Teable.csproj chummer.run-services/Chummer.Storage.Teable/" in api_dockerfile
+    assert "COPY --from=run-services-source Chummer.Storage.Teable/ chummer.run-services/Chummer.Storage.Teable/" in api_dockerfile

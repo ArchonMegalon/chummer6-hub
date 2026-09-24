@@ -11,6 +11,7 @@ public sealed record AccountAuxiliaryDataErasureResult(
 
 public interface IAccountAuxiliaryDataErasureService
 {
+    void EnsureAccountErasureSupported();
     AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId);
 }
 
@@ -34,6 +35,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
     private readonly PromptFoundryStore _promptFoundry;
     private readonly KarmaForgeStore _karmaForge;
     private readonly OriginDossierPublicationService _originDossiers;
+    private readonly OriginChapterAuthoringService? _originChapters;
+    private readonly OriginDossierFirstPartyDocumentService? _originDocuments;
 
     public AccountAuxiliaryDataErasureService(
         BrilliantDirectoriesBillingStore brilliantDirectories,
@@ -48,7 +51,9 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         GmSessionVideoFoundryStore videoFoundry,
         PromptFoundryStore promptFoundry,
         KarmaForgeStore karmaForge,
-        OriginDossierPublicationService originDossiers)
+        OriginDossierPublicationService originDossiers,
+        OriginChapterAuthoringService? originChapters = null,
+        OriginDossierFirstPartyDocumentService? originDocuments = null)
     {
         _brilliantDirectories = brilliantDirectories;
         _myFirstBookUsage = myFirstBookUsage;
@@ -63,6 +68,22 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         _promptFoundry = promptFoundry;
         _karmaForge = karmaForge;
         _originDossiers = originDossiers;
+        _originChapters = originChapters;
+        _originDocuments = originDocuments;
+    }
+
+    public void EnsureAccountErasureSupported()
+    {
+        _originDossiers.EnsureAccountErasureSupported();
+        _originDocuments?.EnsureAccountErasureSupported();
+        _originChapters?.EnsureAccountErasureSupported();
+        _installSnapshots.EnsureAccountErasureSupported();
+        _myFirstBookUsage.EnsureAccountErasureSupported();
+        _originReservations.EnsureAccountErasureSupported();
+        _brilliantDirectories.EnsureAccountErasureSupported();
+        _horizonUsage.EnsureAccountErasureSupported();
+        _artifactRequests.EnsureAccountErasureSupported();
+        _installLinking.GetRequired().EnsureAccountErasureSupported();
     }
 
     public AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId)
@@ -71,6 +92,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
             : subjectId.Trim();
         string? normalizedUser = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
+        EnsureAccountErasureSupported();
         var removed = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["brilliant_directories_projection"] = EraseSingleList(
@@ -107,7 +129,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             ["gm_session_video_foundry"] = EraseVideoFoundry(normalizedUser),
             ["prompt_foundry"] = ErasePromptFoundry(normalizedUser),
             ["karma_forge"] = EraseKarmaForge(normalizedSubject),
-            ["origin_dossier_publications"] = _originDossiers.EraseForAccount(normalizedUser, normalizedSubject)
+            ["origin_dossier_publications"] = _originDossiers.EraseForAccount(normalizedUser, normalizedSubject),
+            ["origin_chapter_jobs"] = _originChapters?.EraseForSubject(normalizedSubject) ?? 0
         };
 
         return new AccountAuxiliaryDataErasureResult(removed.Values.Sum(), removed);

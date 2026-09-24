@@ -30,6 +30,14 @@ public sealed class OriginAuthoringAllowanceProjectionService
         {
             return null;
         }
+        catch (Exception exception) when (exception is IOException or InvalidDataException
+            or HttpRequestException or OperationCanceledException or System.Text.Json.JsonException)
+        {
+            // An optional account-page projection may be unavailable, but must
+            // never infer a free allowance or reset usage from unreadable state.
+            // GetAllowance/ConsumeAllowance deliberately retain strict failures.
+            return null;
+        }
     }
 
     public HorizonArtifactAllowanceViewModel GetAllowance(string userId, string? email = null)

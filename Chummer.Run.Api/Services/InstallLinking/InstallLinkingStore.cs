@@ -6,6 +6,8 @@ using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Microsoft.AspNetCore.DataProtection;
 
+using Chummer.Storage.Teable;
+
 namespace Chummer.Run.Api.Services.InstallLinking;
 
 public sealed record InstallLinkingPrincipalErasureResult(
@@ -67,6 +69,7 @@ public sealed class InstallLinkingStore : IDisposable
     private readonly IDataProtector _floorProtector;
     private readonly ILogger<InstallLinkingStore> _logger;
     private readonly InstallLinkingPostgresAuthorityCoordinator? _postgresAuthority;
+    private readonly bool _requiresHistoricalErasureCleanup;
     private readonly string _storagePath;
     private readonly string _floorPath;
     private readonly string _writerLeasePath;
@@ -106,6 +109,7 @@ public sealed class InstallLinkingStore : IDisposable
         _floorProtector = dataProtectionProvider.CreateProtector(FloorDataProtectionPurpose);
         _logger = logger;
         _postgresAuthority = postgresAuthority;
+        _requiresHistoricalErasureCleanup = configuration["CHUMMER_INSTALL_LINKING_STORAGE_PROVIDER"]?.Trim() == "teable";
         bool production = string.Equals(
             configuration["ASPNETCORE_ENVIRONMENT"],
             Environments.Production,
@@ -361,12 +365,22 @@ public sealed class InstallLinkingStore : IDisposable
         }
     }
 
+    public void EnsureAccountErasureSupported()
+    {
+        if (_requiresHistoricalErasureCleanup)
+            throw new InvalidOperationException("Primary install-linking erasure requires historical payload cleanup before activation.");
+        _postgresAuthority?.EnsureAccountErasureSupported();
+        if (!IsHealthy)
+            throw new InvalidOperationException("Install-linking durable store is fail-closed after a persistence failure.");
+    }
+
     public InstallLinkingPrincipalErasureResult ErasePrincipal(string? userId, string subjectId)
     {
         string normalizedSubject = string.IsNullOrWhiteSpace(subjectId)
             ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
             : subjectId.Trim();
         string? normalizedUser = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
+        EnsureAccountErasureSupported();
 
         lock (Gate)
         {

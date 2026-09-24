@@ -1,12 +1,15 @@
 using System.Security.Cryptography;
+using Chummer.Run.Api.Services.Teable;
 using Npgsql;
 
 namespace Chummer.Run.Api.Services.InstallLinking.Postgres;
 
 /// <summary>
-/// Couples every InstallLinking mutation and readiness decision to the same PostgreSQL
+/// Couples every InstallLinking mutation and readiness decision to the same primary
 /// authority instance. Readiness is green only while the live database head exactly matches
 /// the head whose protected bytes were durably mirrored and loaded into this process.
+/// The historical class name is retained for source compatibility. Teable does not
+/// acquire PostgreSQL's optional read fence and has separately named status codes.
 /// </summary>
 public sealed class InstallLinkingPostgresAuthorityCoordinator :
     IInstallLinkingSnapshotAuthority,
@@ -14,13 +17,26 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
 {
     private static readonly TimeSpan ReadinessDeadline = TimeSpan.FromSeconds(5);
     private readonly IInstallLinkingSnapshotAuthority _authority;
+    private readonly string _backend;
     private readonly object _bindingGate = new();
     private BoundAuthorityHead? _boundHead;
 
     public InstallLinkingPostgresAuthorityCoordinator(
-        IInstallLinkingSnapshotAuthority authority)
+        IInstallLinkingSnapshotAuthority authority, string backend = "postgres")
     {
         _authority = authority ?? throw new ArgumentNullException(nameof(authority));
+        _backend = backend is "postgres" or "teable" ? backend
+            : throw new ArgumentException("Unsupported install-linking authority backend.", nameof(backend));
+    }
+
+    private string Code(string suffix) => _backend + "_" + suffix;
+
+    internal void EnsureAccountErasureSupported()
+    {
+        // The Teable adapter appends snapshots. Replacing the current snapshot
+        // cannot erase its older protected payloads while the keyring is retained.
+        if (_backend == "teable" || _authority is TeableInstallLinkingSnapshotAuthority)
+            throw new InvalidOperationException("Primary install-linking erasure requires historical payload cleanup before activation.");
     }
 
     public Task<InstallLinkingAuthoritativeEnvelope> ReadCurrentAsync(
@@ -52,14 +68,14 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
         InstallLinkingReadFenceCallback.Validate(capture);
         if (_authority is not IInstallLinkingSnapshotReadFence fence)
         {
-            return new(false, "postgres_read_fence_unavailable");
+            return new(false, Code("read_fence_unavailable"));
         }
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(ReadinessDeadline);
         var result = new InstallLinkingRollbackAuthorityReadiness(
             false,
-            "postgres_authority_not_bound");
+            Code("authority_not_bound"));
         try
         {
             fence.ReadFencedAsync(current =>
@@ -74,13 +90,13 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
 
                     if (!_boundHead.Matches(current))
                     {
-                        result = new(false, "postgres_authority_head_mismatch");
+                        result = new(false, Code("authority_head_mismatch"));
                         return;
                     }
 
                     capture();
                     deadline.Token.ThrowIfCancellationRequested();
-                    result = new(true, "postgres_authority_fenced");
+                    result = new(true, Code("authority_fenced"));
                 }
             }, deadline.Token).GetAwaiter().GetResult();
             deadline.Token.ThrowIfCancellationRequested();
@@ -89,17 +105,18 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
         catch (Exception exception) when (exception is
             NpgsqlException or
             IOException or
+            HttpRequestException or
             TimeoutException or
             OperationCanceledException)
         {
-            return new(false, "postgres_unavailable");
+            return new(false, Code("unavailable"));
         }
         catch (Exception exception) when (exception is
             InvalidDataException or
             CryptographicException or
             InvalidOperationException)
         {
-            return new(false, "postgres_authority_invalid");
+            return new(false, Code("authority_invalid"));
         }
     }
 
@@ -128,12 +145,22 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
 
         if (expected is null)
         {
-            return new(false, "postgres_authority_not_bound");
+            return new(false, Code("authority_not_bound"));
         }
 
         using var deadline = new CancellationTokenSource(ReadinessDeadline);
         try
         {
+            if (_authority is TeableInstallLinkingSnapshotAuthority teable)
+            {
+                using var head = teable.ReadCurrentForReadinessAsync(deadline.Token)
+                    .GetAwaiter().GetResult();
+                deadline.Token.ThrowIfCancellationRequested();
+                return expected.Matches(head)
+                    ? new(true, Code("authority_bound"))
+                    : new(false, Code("authority_head_mismatch"));
+            }
+
             InstallLinkingPostgresReadiness readiness = CheckReadinessAsync(deadline.Token)
                 .GetAwaiter()
                 .GetResult();
@@ -146,23 +173,24 @@ public sealed class InstallLinkingPostgresAuthorityCoordinator :
                 .GetAwaiter()
                 .GetResult();
             return expected.Matches(current)
-                ? new(true, "postgres_authority_bound")
-                : new(false, "postgres_authority_head_mismatch");
+                ? new(true, Code("authority_bound"))
+                : new(false, Code("authority_head_mismatch"));
         }
         catch (Exception exception) when (exception is
             NpgsqlException or
             IOException or
+            HttpRequestException or
             TimeoutException or
             OperationCanceledException)
         {
-            return new(false, "postgres_unavailable");
+            return new(false, Code("unavailable"));
         }
         catch (Exception exception) when (exception is
             InvalidDataException or
             CryptographicException or
             InvalidOperationException)
         {
-            return new(false, "postgres_authority_invalid");
+            return new(false, Code("authority_invalid"));
         }
     }
 

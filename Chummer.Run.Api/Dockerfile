@@ -31,8 +31,9 @@ COPY --from=run-services-source global.json global.json
 COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py
 COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json
 COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json
+COPY --from=run-services-source eng/core-local-runtime-receipt.json eng/core-local-runtime-receipt.json
 COPY --from=run-services-source eng/core-runtime-bundle/core-runtime-bundle-input.json eng/core-runtime-bundle/core-runtime-bundle-input.json
-COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip
+COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip
 COPY --from=hub-package-feed-input . /opt/chummer-package-feed
 RUN ["/usr/local/bin/python3", "-I", "-S", "scripts/ai/bootstrap-hub-package-feed.py", "--repo-root", "/proof", "--feed", "/opt/chummer-package-feed", "--core-feed", "/opt/chummer-core-runtime-feed", "--core-runtime-bundle-input", "--prebuilt-hub-feed-input"]
 
@@ -45,6 +46,7 @@ COPY --from=run-services-source eng/NuGet.Container.Config /tmp/chummer-package-
 COPY --from=hub-package-feed /opt/chummer-package-feed /opt/chummer-package-feed
 COPY --from=hub-package-feed /opt/chummer-core-runtime-feed /opt/chummer-core-runtime-feed
 COPY --from=run-services-source Chummer.Run.Api/Chummer.Run.Api.csproj chummer.run-services/Chummer.Run.Api/
+COPY --from=run-services-source Chummer.Storage.Teable/Chummer.Storage.Teable.csproj chummer.run-services/Chummer.Storage.Teable/
 COPY --from=run-services-source Chummer.Run.Api/packages.lock.json chummer.run-services/Chummer.Run.Api/
 COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
 COPY --from=run-services-source Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj chummer.run-services/Chummer.Run.LoopbackProbe/
@@ -74,6 +76,7 @@ RUN dotnet restore chummer.run-services/Chummer.Run.LoopbackProbe/Chummer.Run.Lo
     -p:ChummerPackageFeed= \
     -p:RestoreAdditionalProjectSources=
 COPY --from=run-services-source Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/
+COPY --from=run-services-source Chummer.Storage.Teable/ chummer.run-services/Chummer.Storage.Teable/
 COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/ chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
 COPY --from=run-services-source Chummer.Run.LoopbackProbe/ chummer.run-services/Chummer.Run.LoopbackProbe/
 COPY --from=run-services-source Chummer.Campaign.Contracts/ chummer.run-services/Chummer.Campaign.Contracts/

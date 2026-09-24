@@ -409,10 +409,10 @@ public sealed class AccountsController : Controller
 
         string membershipLabel = allowance?.AllowanceTier switch
             {
+                null => "Membership unavailable",
                 "supporter" => "Supporter",
                 _ => "Free"
-            }
-            ?? "Free";
+            };
         string membershipSummary = allowance is not null
             ? allowance.SupporterActive
                 ? "2 books each month. Same app."
@@ -435,7 +435,8 @@ public sealed class AccountsController : Controller
             : $"{supportCases.Count} support case{(supportCases.Count == 1 ? string.Empty : "s")}.";
         string campaignSummary = $"{campaignSpine.Dossiers.Count} runner{(campaignSpine.Dossiers.Count == 1 ? string.Empty : "s")}, {campaignSpine.Campaigns.Count} campaign{(campaignSpine.Campaigns.Count == 1 ? string.Empty : "s")}.";
         bool supporterActive = allowance?.SupporterActive ?? false;
-        string supporterPrimaryLabel = supporterActive ? "Manage supporter" : "Become supporter";
+        string supporterPrimaryLabel = allowance is null ? "Check membership"
+            : supporterActive ? "Manage supporter" : "Become supporter";
         string supporterPrimaryHref = "/account/billing";
         string supporterSecondaryLabel = "Details";
         string supporterSecondaryHref = "/account/billing";
@@ -703,8 +704,8 @@ public sealed class AccountsController : Controller
         int followAndVoteCount = participationPackageReceipts.Count(item =>
             string.Equals(item.ActionKind, "follow", StringComparison.OrdinalIgnoreCase)
             || string.Equals(item.ActionKind, "vote", StringComparison.OrdinalIgnoreCase));
-        string supporterSummary = allowance?.SupporterActive ?? false
-            ? "2 books each month. Same app."
+        string supporterSummary = allowance is null ? "Membership details unavailable right now."
+            : allowance.SupporterActive ? "2 books each month. Same app."
             : "1 book each month. Same app.";
         bool supporterActive = allowance?.SupporterActive ?? false;
         string participateSummary = followAndVoteCount > 0
@@ -742,7 +743,7 @@ public sealed class AccountsController : Controller
                     "Membership",
                     "Membership",
                     supporterSummary,
-                    supporterActive ? "Manage supporter" : "Become supporter",
+                    allowance is null ? "Check membership" : supporterActive ? "Manage supporter" : "Become supporter",
                     "/account/billing",
                     "Details",
                     "/account/billing"),
@@ -1331,7 +1332,9 @@ public sealed class AccountsController : Controller
                 resolvedArtifactKind);
             return artifact is null
                 ? NotFound()
-                : PhysicalFile(artifact.Path, artifact.ContentType, enableRangeProcessing: true);
+                : artifact.Content is not null
+                    ? File(artifact.Content, artifact.ContentType, enableRangeProcessing: true)
+                    : PhysicalFile(artifact.Path, artifact.ContentType, enableRangeProcessing: true);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {

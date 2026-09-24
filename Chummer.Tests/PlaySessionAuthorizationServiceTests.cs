@@ -9,6 +9,7 @@ using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Remote = Chummer.Tests.TeableRevisionStoreTests.Remote;
 
 namespace Chummer.Tests;
 
@@ -19,6 +20,157 @@ public sealed class PlaySessionAuthorizationServiceTests
     private const string PlayerUserId = "player-user";
     private static readonly string DeviceThumbprint = new('d', 64);
     private static readonly DateTimeOffset BaselineUtc = new(2026, 7, 14, 8, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void Primary_flow_restores_all_authority_without_local_files_and_observes_revocation()
+    {
+        using var remote = new Remote();
+        using var fixture = new ServiceFixture(remote);
+        var invite = fixture.IssueInvite();
+        var exchange = fixture.Redeem(invite);
+        var grant = fixture.Consume(exchange);
+        using var cold = fixture.Reload();
+        var restored = new PlaySessionAuthorizationService(cold, fixture.Time);
+        Assert.True(restored.IntrospectGrant(grant.Grant.GrantId, grant.Secret, SessionId,
+            PlayerUserId, PlaySessionRoles.Player, DeviceThumbprint).Succeeded);
+        using (cold.Enter())
+        {
+            Assert.Equal(Hash(invite.Secret), cold.PlayInvitesById[invite.Invite.InviteId].SecretHashSha256);
+            Assert.Equal(Hash(exchange.Secret), cold.PlayExchangesById[exchange.Exchange.ExchangeId].SecretHashSha256);
+            Assert.Equal(Hash(grant.Secret), cold.PlayGrantsById[grant.Grant.GrantId].SecretHashSha256);
+            string json = JsonSerializer.Serialize(new
+            {
+                Invites = cold.PlayInvitesById.Values, Exchanges = cold.PlayExchangesById.Values,
+                Grants = cold.PlayGrantsById.Values
+            });
+            foreach (string secret in new[] { invite.Secret, exchange.Secret, grant.Secret })
+                Assert.DoesNotContain(secret, json, StringComparison.Ordinal);
+        }
+        Assert.True(fixture.Service.RevokeGrant(grant.Grant.GrantId, SessionId, GameMasterUserId).Succeeded);
+        Assert.False(restored.IntrospectGrant(grant.Grant.GrantId, grant.Secret, SessionId,
+            PlayerUserId, PlaySessionRoles.Player, DeviceThumbprint).Succeeded);
+        Assert.False(Directory.Exists(fixture.RootPath));
+    }
+
+    [Fact]
+    public void Primary_reader_rechecks_current_membership()
+    {
+        using var remote = new Remote();
+        using var fixture = new ServiceFixture(remote);
+        var grant = fixture.Consume(fixture.Redeem(fixture.IssueInvite()));
+        using var other = fixture.Reload();
+        var reader = new PlaySessionAuthorizationService(other, fixture.Time);
+        using (fixture.Store.Enter())
+        {
+            var crew = fixture.Store.CrewsById["crew-1"];
+            fixture.Store.CrewsById[crew.CrewId] = crew with { Members = [] };
+            fixture.Store.PersistLocked();
+        }
+        Assert.Equal(PlaySessionAuthorizationReasons.MembershipDrift,
+            reader.IntrospectGrant(grant.Grant.GrantId, grant.Secret, SessionId,
+                PlayerUserId, PlaySessionRoles.Player, DeviceThumbprint).Reason);
+    }
+
+    [Fact]
+    public void Primary_cold_restore_preserves_time_high_water_after_clock_rollback()
+    {
+        using var remote = new Remote();
+        using var fixture = new ServiceFixture(remote);
+        var invite = fixture.IssueInvite();
+        fixture.Time.Advance(TimeSpan.FromHours(1));
+        Assert.Equal(PlaySessionAuthorizationReasons.InviteExpired, fixture.Service.RedeemInvite(
+            invite.Invite.InviteId, invite.Secret, SessionId, PlayerUserId,
+            PlaySessionRoles.Player, DeviceThumbprint).Reason);
+        fixture.Time.SetUtcNow(BaselineUtc);
+        using var cold = fixture.Reload();
+        using (cold.Enter()) Assert.True(cold.PlayAuthorizationTimeHighWaterUtc > BaselineUtc);
+        Assert.False(new PlaySessionAuthorizationService(cold, fixture.Time).RedeemInvite(
+            invite.Invite.InviteId, invite.Secret, SessionId, PlayerUserId,
+            PlaySessionRoles.Player, DeviceThumbprint).Succeeded);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Primary_competing_consumers_commit_exactly_one_result(bool exchangeConsumption)
+    {
+        using var remote = new Remote();
+        using var fixture = new ServiceFixture(remote);
+        var invite = fixture.IssueInvite();
+        var exchange = exchangeConsumption ? fixture.Redeem(invite) : null;
+        using var contender = fixture.Reload();
+        var rival = new PlaySessionAuthorizationService(contender, fixture.Time);
+        (bool Succeeded, string Reason) Consume(PlaySessionAuthorizationService service) => exchange is null
+            ? Summarize(service.RedeemInvite(invite.Invite.InviteId, invite.Secret, SessionId,
+                PlayerUserId, PlaySessionRoles.Player, DeviceThumbprint))
+            : Summarize(service.ConsumeExchange(exchange.Exchange.ExchangeId, exchange.Secret, SessionId,
+                PlayerUserId, PlaySessionRoles.Player, DeviceThumbprint));
+        int posts = remote.HeadPosts;
+        remote.BeforeHeadPost = () => Assert.True(Consume(rival).Succeeded);
+        Assert.Equal((false, PlaySessionAuthorizationReasons.PersistenceFailed), Consume(fixture.Service));
+        Assert.Equal(posts + 1, remote.HeadPosts);
+        Assert.Throws<InvalidOperationException>(() => Consume(fixture.Service));
+        using var cold = fixture.Reload();
+        using (cold.Enter())
+        {
+            Assert.Single(cold.PlayExchangesById);
+            Assert.Equal(exchangeConsumption ? 1 : 0, cold.PlayGrantsById.Count);
+        }
+        Assert.False(Directory.Exists(fixture.RootPath));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Primary_uncertain_redemption_does_not_rollback_or_replay(bool exchangeConsumption)
+    {
+        using var remote = new Remote();
+        using var fixture = new ServiceFixture(remote);
+        var invite = fixture.IssueInvite();
+        var exchange = exchangeConsumption ? fixture.Redeem(invite) : null;
+        (bool Succeeded, string Reason) Consume(PlaySessionAuthorizationService service) => exchange is null
+            ? Summarize(service.RedeemInvite(invite.Invite.InviteId, invite.Secret, SessionId,
+                PlayerUserId, PlaySessionRoles.Player, DeviceThumbprint))
+            : Summarize(service.ConsumeExchange(exchange.Exchange.ExchangeId, exchange.Secret, SessionId,
+                PlayerUserId, PlaySessionRoles.Player, DeviceThumbprint));
+        int posts = remote.HeadPosts;
+        remote.CommitThenFailHard = true;
+        Assert.Equal((false, PlaySessionAuthorizationReasons.PersistenceFailed), Consume(fixture.Service));
+        Assert.Throws<InvalidOperationException>(() => Consume(fixture.Service));
+        Assert.Equal(posts + 1, remote.HeadPosts);
+        using var cold = fixture.Reload();
+        Assert.Equal((false, exchangeConsumption ? PlaySessionAuthorizationReasons.ExchangeReplayed
+            : PlaySessionAuthorizationReasons.InviteReplayed),
+            Consume(new PlaySessionAuthorizationService(cold, fixture.Time)));
+        using (cold.Enter())
+        {
+            Assert.Single(cold.PlayExchangesById);
+            Assert.Equal(exchangeConsumption ? 1 : 0, cold.PlayGrantsById.Count);
+        }
+        Assert.Equal(posts + 1, remote.HeadPosts);
+        Assert.False(Directory.Exists(fixture.RootPath));
+    }
+
+    [Fact]
+    public void Primary_outage_cannot_return_a_previously_active_grant()
+    {
+        using var remote = new Remote();
+        using var fixture = new ServiceFixture(remote);
+        var grant = fixture.Consume(fixture.Redeem(fixture.IssueInvite()));
+        remote.FailReads = true;
+        Assert.Throws<HttpRequestException>(() => fixture.Service.IntrospectGrant(grant.Grant.GrantId,
+            grant.Secret, SessionId, PlayerUserId, PlaySessionRoles.Player, DeviceThumbprint));
+        Assert.False(Directory.Exists(fixture.RootPath));
+    }
+
+    [Fact]
+    public void Primary_disallows_replacement_persistence_that_could_bypass_remote_admission()
+    {
+        using var remote = new Remote();
+        using var fixture = new ServiceFixture(remote);
+        Assert.Throws<ArgumentException>(() => fixture.WithPersistence(new PersistThenThrow()));
+        _ = fixture.WithPersistence(new CommunityStorePlaySessionAuthorizationPersistence());
+    }
 
     [Fact]
     public void FullFlowReturnsEachOpaqueSecretOnceAndPersistsOnlyHashes()
@@ -669,14 +821,20 @@ public sealed class PlaySessionAuthorizationServiceTests
 
     private sealed class ServiceFixture : IDisposable
     {
-        public ServiceFixture()
+        private readonly Remote? _remote;
+
+        public ServiceFixture(Remote? remote = null)
         {
+            _remote = remote;
             RootPath = Path.Combine(Path.GetTempPath(), $"chummer-play-service-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(RootPath);
+            if (remote is null) Directory.CreateDirectory(RootPath);
             StoragePath = Path.Combine(RootPath, "community-store.json");
-            Store = CreateStore(StoragePath);
-            SeedCanonicalAuthority(Store);
-            Store.PersistLocked();
+            Store = CreateStore(StoragePath, remote);
+            using (Store.Enter())
+            {
+                SeedCanonicalAuthority(Store);
+                Store.PersistLocked();
+            }
             Time = new ManualTimeProvider(BaselineUtc);
             Service = new PlaySessionAuthorizationService(Store, Time);
 
@@ -748,25 +906,27 @@ public sealed class PlaySessionAuthorizationServiceTests
         public PlaySessionAuthorizationService WithPersistence(IPlaySessionAuthorizationPersistence persistence)
             => new(Store, Time, persistence);
 
-        public CommunityStore Reload() => CreateStore(StoragePath);
+        public CommunityStore Reload() => CreateStore(StoragePath, _remote);
 
         public void Dispose()
         {
+            Store.Dispose();
             if (Directory.Exists(RootPath))
             {
                 Directory.Delete(RootPath, recursive: true);
             }
         }
 
-        private static CommunityStore CreateStore(string storagePath)
+        private static CommunityStore CreateStore(string storagePath, Remote? remote)
         {
             IConfiguration configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["CHUMMER_COMMUNITY_STORE_PATH"] = storagePath
+                    ["CHUMMER_COMMUNITY_STORE_PATH"] = storagePath,
+                    ["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] = remote is null ? "local" : "teable"
                 })
                 .Build();
-            return new CommunityStore(configuration, NullLogger<CommunityStore>.Instance);
+            return new CommunityStore(configuration, NullLogger<CommunityStore>.Instance, remote?.Store());
         }
 
         private static void SeedCanonicalAuthority(CommunityStore store)

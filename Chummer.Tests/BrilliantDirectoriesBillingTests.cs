@@ -545,14 +545,14 @@ public sealed class BrilliantDirectoriesBillingTests
     public async Task SignedInMyFirstBookConsumeEndpointCreatesSharedArtifactReceipt()
     {
         BrilliantDirectoriesBillingService service = CreateService();
-        (BrilliantDirectoriesBillingController controller, HubUserDto user, HorizonArtifactRequestReceiptStore receipts) =
+        (BrilliantDirectoriesBillingController controller, HubUserDto user, HorizonArtifactRequestService receipts) =
             CreateAuthenticatedControllerWithArtifacts(service, email: "runner@example.com");
 
         ActionResult<MyFirstBookQuotaConsumeResultDto> result = await controller.ConsumeMyFirstBookQuotaForCurrentUser();
 
         OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
         MyFirstBookQuotaConsumeResultDto payload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(ok.Value);
-        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts.ListRecent("origin-dossier", user.UserId, "premium_authoring_credit", 10));
+        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts.ListRecentReceipts("origin-dossier", user.UserId, "premium_authoring_credit", 10));
 
         Assert.Equal("consumed", payload.Status);
         Assert.Equal("accepted", receipt.Status);
@@ -570,7 +570,7 @@ public sealed class BrilliantDirectoriesBillingTests
     public void DirectMyFirstBookConsumeApiCreatesSharedArtifactReceiptWhenRequestServiceIsAvailable()
     {
         BrilliantDirectoriesBillingService service = CreateService();
-        (BrilliantDirectoriesBillingController controller, HubUserDto user, HorizonArtifactRequestReceiptStore receipts) =
+        (BrilliantDirectoriesBillingController controller, HubUserDto user, HorizonArtifactRequestService receipts) =
             CreateControllerWithAccountContextAndArtifacts(service, "runner@example.com");
         controller.ControllerContext.HttpContext.Request.Headers["X-Chummer-Billing-Secret"] = "sync-secret";
 
@@ -578,7 +578,7 @@ public sealed class BrilliantDirectoriesBillingTests
 
         OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
         MyFirstBookQuotaConsumeResultDto payload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(ok.Value);
-        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts.ListRecent("origin-dossier", user.UserId, "premium_authoring_credit", 10));
+        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts.ListRecentReceipts("origin-dossier", user.UserId, "premium_authoring_credit", 10));
 
         Assert.Equal("accepted", receipt.Status);
         Assert.Equal("origin-dossier:guided-authoring", receipt.SourceRef);
@@ -1238,7 +1238,7 @@ public sealed class BrilliantDirectoriesBillingTests
         return (controller, ensured!);
     }
 
-    private static (BrilliantDirectoriesBillingController Controller, HubUserDto User, HorizonArtifactRequestReceiptStore Receipts) CreateAuthenticatedControllerWithArtifacts(
+    private static (BrilliantDirectoriesBillingController Controller, HubUserDto User, HorizonArtifactRequestService Receipts) CreateAuthenticatedControllerWithArtifacts(
         BrilliantDirectoriesBillingService service,
         string email)
     {
@@ -1291,7 +1291,7 @@ public sealed class BrilliantDirectoriesBillingTests
             }
         };
 
-        return (controller, ensured!, receipts);
+        return (controller, ensured!, artifactRequests);
     }
 
     private static (BrilliantDirectoriesBillingController Controller, HubUserDto User) CreateControllerWithAccountContext(
@@ -1323,7 +1323,7 @@ public sealed class BrilliantDirectoriesBillingTests
         return (controller, ensured);
     }
 
-    private static (BrilliantDirectoriesBillingController Controller, HubUserDto User, HorizonArtifactRequestReceiptStore Receipts) CreateControllerWithAccountContextAndArtifacts(
+    private static (BrilliantDirectoriesBillingController Controller, HubUserDto User, HorizonArtifactRequestService Receipts) CreateControllerWithAccountContextAndArtifacts(
         BrilliantDirectoriesBillingService service,
         string email,
         string subjectId = "sub-auth")
@@ -1356,7 +1356,7 @@ public sealed class BrilliantDirectoriesBillingTests
             }
         };
 
-        return (controller, ensured, receipts);
+        return (controller, ensured, artifactRequests);
     }
 
     private static AuthController CreateAuthControllerWithNoInteractiveAuth()

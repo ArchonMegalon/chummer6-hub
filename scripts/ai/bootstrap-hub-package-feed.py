@@ -125,6 +125,7 @@ CORE_RUNTIME_BUNDLE_INPUT_CONTRACT = (
 CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH = Path(
     "eng/core-runtime-bundle/core-runtime-bundle-input.json"
 )
+LOCAL_CORE_RECEIPT_PATH = "eng/core-local-runtime-receipt.json"
 
 
 class PackagePlaneError(RuntimeError):
@@ -235,7 +236,7 @@ def _validate_core_runtime(payload: Any) -> CoreRuntimeAuthority:
     authority_path = _safe_relative_path(
         _required_string(payload, "authority_path"), "core_runtime.authority_path"
     )
-    if authority_path != "eng/core-main-runtime-artifact-authority.json":
+    if authority_path not in {"eng/core-main-runtime-artifact-authority.json", LOCAL_CORE_RECEIPT_PATH}:
         raise PackagePlaneError("core_runtime.authority_path is not approved")
     authority_sha256 = _required_string(payload, "authority_sha256")
     repository = _required_string(payload, "repository")
@@ -295,6 +296,8 @@ def _validate_core_runtime(payload: Any) -> CoreRuntimeAuthority:
             raise PackagePlaneError(f"core runtime metadata file must be {expected_name}")
         if SHA256_PATTERN.fullmatch(_required_string(binding, "sha256")) is None:
             raise PackagePlaneError("core runtime metadata SHA256 must be canonical")
+    if authority_path == LOCAL_CORE_RECEIPT_PATH and authority_sha256 != receipt["sha256"]:
+        raise PackagePlaneError("local Core receipt must be the exact bundled receipt")
 
     package_rows = payload.get("packages")
     if not isinstance(package_rows, list):
@@ -560,8 +563,65 @@ def validate_build_recipe(repo_root: Path, lock: PackagePlaneLock) -> None:
         or _sha256(core_authority) != lock.core_runtime.authority_sha256
     ):
         raise PackagePlaneError(
-            "Core public runtime authority does not match the package-plane lock"
+            "Core runtime authority does not match the package-plane lock"
         )
+    if lock.core_runtime.authority_path == LOCAL_CORE_RECEIPT_PATH:
+        _validate_local_core_receipt(core_authority, lock.core_runtime)
+
+
+def _validate_local_core_receipt(path: Path, authority: CoreRuntimeAuthority) -> None:
+    """Consume the existing exact Core result without inventing hosted identity.
+
+    The reviewed lock pins the whole receipt, inventory, runtime lock and eight
+    package byte identities. This is local package evidence only, not public
+    release, signing, deployment or provider activation authority.
+    """
+    metadata = path.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or not 0 < metadata.st_size <= 65536:
+        raise PackagePlaneError("local Core receipt must be one bounded regular file")
+    with path.open("rb") as source:
+        raw = source.read(65537)
+    if len(raw) > 65536 or hashlib.sha256(raw).hexdigest() != authority.receipt_sha256:
+        raise PackagePlaneError("local Core receipt bytes differ from the bundled receipt")
+
+    def unique_fields(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise PackagePlaneError("local Core receipt contains duplicate fields")
+            result[key] = value
+        return result
+
+    try:
+        receipt = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_fields)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PackagePlaneError("local Core receipt is not valid JSON") from exc
+    expected = {
+        "contract": "chummer-core.no-siblings-package-plane/v3",
+        "status": "pass",
+        "core_commit": authority.package_recipe_commit,
+        "package_recipe_commit": authority.package_recipe_commit,
+        "runtime_source_commit": authority.runtime_source_commit,
+        "candidate_package_version": authority.package_version,
+        "runtime_package_inventory_sha256": authority.inventory_sha256,
+        "runtime_package_plane_lock_sha256": authority.runtime_lock_sha256,
+        "no_sibling_directories": True,
+        "isolated_package_cache": True,
+        "package_source_mapping": {"Chummer.*": "locked-owner-contracts",
+                                   "other": "https://api.nuget.org/v3/index.json"},
+        **{name: "pass" for name in (
+            "normal_local_engine_dependency_graph", "build", "package_plane_runtime_test",
+            "local_owner_isolation_tests", "candidate_engine_contract_pack",
+            "candidate_gm_edit_runtime_pack", "candidate_gm_edit_runtime_consumer",
+            "eight_package_runtime_plane")},
+    }
+    if not isinstance(receipt, dict) or any(
+        type(receipt.get(key)) is not type(value) or receipt[key] != value
+        for key, value in expected.items()
+    ):
+        raise PackagePlaneError("local Core receipt is failed, incomplete or bound to another graph")
+    # Preserve the actual producer serialization. Its whole-byte digest, not a
+    # newly sorted/reformatted JSON representation, is the reviewed authority.
 
 
 def _run(

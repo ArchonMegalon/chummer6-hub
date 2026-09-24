@@ -4,6 +4,7 @@ ARG CHUMMER_BUILD_CONCURRENCY=1
 WORKDIR /src
 COPY --from=run-services-source Directory.Build.props chummer.run-services/
 COPY --from=run-services-source Chummer.Run.Identity/Chummer.Run.Identity.csproj chummer.run-services/Chummer.Run.Identity/
+COPY --from=run-services-source Chummer.Storage.Teable/Chummer.Storage.Teable.csproj chummer.run-services/Chummer.Storage.Teable/
 COPY --from=run-services-source Chummer.Control.Contracts/Chummer.Control.Contracts.csproj chummer.run-services/Chummer.Control.Contracts/
 COPY --from=run-services-source Chummer.Run.Contracts/Chummer.Run.Contracts.csproj chummer.run-services/Chummer.Run.Contracts/
 COPY --from=run-services-source Chummer.Play.Contracts/Chummer.Play.Contracts.csproj chummer.run-services/Chummer.Play.Contracts/
@@ -14,6 +15,7 @@ RUN dotnet restore chummer.run-services/Chummer.Run.Identity/Chummer.Run.Identit
     -p:ChummerUseLocalCompatibilityTree=true \
     -p:ChummerWorkspaceRoot=/src
 COPY --from=run-services-source Chummer.Run.Identity/ chummer.run-services/Chummer.Run.Identity/
+COPY --from=run-services-source Chummer.Storage.Teable/ chummer.run-services/Chummer.Storage.Teable/
 COPY --from=run-services-source Chummer.Control.Contracts/ chummer.run-services/Chummer.Control.Contracts/
 COPY --from=run-services-source Chummer.Run.Contracts/ chummer.run-services/Chummer.Run.Contracts/
 COPY --from=run-services-source Chummer.Play.Contracts/ chummer.run-services/Chummer.Play.Contracts/
