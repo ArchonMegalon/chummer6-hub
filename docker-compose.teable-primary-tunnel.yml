@@ -4,7 +4,13 @@
 # HTTP Host chummer.run, catch-all 404, private-network routing disabled.
 # DNS cutover is separate and must preserve unrelated records and tunnels.
 # No new host listener is published; worker access on ordinary port stays denied.
+# Only the explicitly activated stack survives daemon/host restarts. The local
+# preparation file remains restart=no; intentional operator stops stay stopped.
 services:
+  identity:
+    restart: unless-stopped
+  hub:
+    restart: unless-stopped
   account-origin-edge:
     profiles: [account-origin-edge]
     image: "${CHUMMER_HUB_PRIMARY_TUNNEL_IMAGE:?Supply the exact locally available cloudflared image ID}"

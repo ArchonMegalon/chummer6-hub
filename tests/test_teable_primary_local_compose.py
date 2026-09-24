@@ -189,7 +189,7 @@ def edge_inputs() -> dict[str, str]:
         "CHUMMER_HUB_PRIMARY_TUNNEL_TOKEN_FILE": "/synthetic/chummer/edge/tunnel.token"}
 
 
-def test_dedicated_tunnel_publishes_no_ports_and_preserves_all_services() -> None:
+def test_dedicated_tunnel_only_enables_service_restart_without_widening_access() -> None:
     base = render(google_inputs(), google=True)
     result = render(edge_inputs(), google=True, tunnel=True)
     assert base.returncode == result.returncode == 0, result.stderr
@@ -198,6 +198,7 @@ def test_dedicated_tunnel_publishes_no_ports_and_preserves_all_services() -> Non
     assert not edge.get("network_mode") and set(edge["networks"]) == {"primary"}
     assert not edge.get("ports") and not edge.get("environment") and not edge.get("env_file")
     assert edge["pull_policy"] == "never" and edge["image"] == edge_inputs()["CHUMMER_HUB_PRIMARY_TUNNEL_IMAGE"]
+    assert edge["restart"] == "unless-stopped"
     assert edge["profiles"] == ["account-origin-edge"]
     assert edge["read_only"] is True and edge["cap_drop"] == ["ALL"]
     assert edge["security_opt"] == ["no-new-privileges:true"]
@@ -208,7 +209,11 @@ def test_dedicated_tunnel_publishes_no_ports_and_preserves_all_services() -> Non
     mount = edge["volumes"][0]
     assert mount["read_only"] is True and mount["bind"]["create_host_path"] is False
     assert mount["source"] == edge_inputs()["CHUMMER_HUB_PRIMARY_TUNNEL_TOKEN_FILE"]
-    assert routed == plain  # No other storage, credential, service or port change.
+    for service in ("hub", "identity"):
+        assert plain["services"][service]["restart"] == "no"
+        assert routed["services"][service]["restart"] == "unless-stopped"
+        routed["services"][service]["restart"] = "no"
+    assert routed == plain  # Only restart changes; no storage, credentials or ports.
 
 
 @pytest.mark.parametrize("missing", [
