@@ -847,7 +847,7 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE_INSTRUCTIONS = (
     "COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json",
     "COPY --from=run-services-source eng/core-local-runtime-receipt.json eng/core-local-runtime-receipt.json",
     "COPY --from=run-services-source eng/core-runtime-bundle/core-runtime-bundle-input.json eng/core-runtime-bundle/core-runtime-bundle-input.json",
-    "COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-54e36255dccbbf3a786511dbdbd19d1ee532f75f.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-54e36255dccbbf3a786511dbdbd19d1ee532f75f.zip",
+    "COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-bd955ad8e5ef4344ec6f87180b872d563f081ac8.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-bd955ad8e5ef4344ec6f87180b872d563f081ac8.zip",
     "COPY --from=hub-package-feed-input . /opt/chummer-package-feed",
     PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN,
 )

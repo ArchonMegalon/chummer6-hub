@@ -4,15 +4,15 @@
     "net10.0": {
       "Chummer.Engine.Contracts": {
         "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.sh524b2f42b0626, )",
-        "resolved": "0.0.0-packageplane.candidate.sh524b2f42b0626",
-        "contentHash": "QTLEvfwusqvYjNzQvxXCV9tqM25ZUhJ9IePdZfgM6/6zCTuoYhhbpP2V7LvI5MqRQ/nQYrHZ/dOalOUPDWN09g=="
+        "requested": "[0.0.0-packageplane.candidate.shd9051e0d214a5, )",
+        "resolved": "0.0.0-packageplane.candidate.shd9051e0d214a5",
+        "contentHash": "KWizEjpuJZ4q3NsG8a7nkgyNAbOJor9p10EdkI+BtLCzhTnDqbIxX8klIuJejiTJDvex0YuQgNuTUQAhk33U1A=="
       },
       "Chummer.Hub.Registry.Contracts": {
         "type": "Direct",
-        "requested": "[0.1.1-packageplane.20260924.1, )",
-        "resolved": "0.1.1-packageplane.20260924.1",
-        "contentHash": "5U2yainTczstLQba/UVel8pFukmqzHub1pdbkQZy6SR9vDrtrhdCCGjf2MS/vD1XIlWhaW6wk5pexVM3qqrTtA=="
+        "requested": "[0.1.1-packageplane.20260924.2, )",
+        "resolved": "0.1.1-packageplane.20260924.2",
+        "contentHash": "J/or+U2eyw+DMeyuW0ZstJE98tH6d5n2vPGFr3GKYoIDCT8rL1wKOpWMn/oViRofYI4C1+rpjbDA2TfQ5Qhq4A=="
       },
       "chummer.play.contracts": {
         "type": "Project"
