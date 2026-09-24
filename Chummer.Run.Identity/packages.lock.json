@@ -4,13 +4,13 @@
     "net10.0": {
       "Chummer.Engine.Contracts": {
         "type": "Transitive",
-        "resolved": "0.0.0-packageplane.candidate.shd9051e0d214a5",
-        "contentHash": "KWizEjpuJZ4q3NsG8a7nkgyNAbOJor9p10EdkI+BtLCzhTnDqbIxX8klIuJejiTJDvex0YuQgNuTUQAhk33U1A=="
+        "resolved": "0.0.0-packageplane.candidate.sh5160e78a60bce",
+        "contentHash": "9OeKSP0Fqn/niuRhPKEAlB+ZceoRnFOuMEW8FzvGgUkSjsWVQz7vNwplJ3GPNyiEtmKnrnGW3GK9lVoMmqlAUA=="
       },
       "Chummer.Hub.Registry.Contracts": {
         "type": "Transitive",
-        "resolved": "0.1.1-packageplane.20260924.2",
-        "contentHash": "J/or+U2eyw+DMeyuW0ZstJE98tH6d5n2vPGFr3GKYoIDCT8rL1wKOpWMn/oViRofYI4C1+rpjbDA2TfQ5Qhq4A=="
+        "resolved": "0.1.1-packageplane.20260924.3",
+        "contentHash": "ioAZcaEWmT8XKhZXy3plM0PZ6o/JZxXe42lmLBT+QVFDheyTxgV3xOnl4vSv3MM9ZRb6NxnuUWsCemYVnG7nMw=="
       },
       "chummer.control.contracts": {
         "type": "Project"
@@ -21,9 +21,9 @@
       "chummer.run.contracts": {
         "type": "Project",
         "dependencies": {
-          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.shd9051e0d214a5, )",
-          "Chummer.Hub.Registry.Contracts": "[0.1.1-packageplane.20260924.2, )",
-          "Chummer.Play.Contracts": "[0.1.1-packageplane.20260924.2, )"
+          "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sh5160e78a60bce, )",
+          "Chummer.Hub.Registry.Contracts": "[0.1.1-packageplane.20260924.3, )",
+          "Chummer.Play.Contracts": "[0.1.1-packageplane.20260924.3, )"
         }
       },
       "chummer.storage.teable": {
