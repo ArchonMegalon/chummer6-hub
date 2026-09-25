@@ -32,8 +32,13 @@ public sealed class OriginChapterAuthoringService : IDisposable
     private const string Schema = "chummer.origin.chapter-job/v1";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 16 };
     private readonly object _gate = new();
+    private sealed record StoredDraft(string Text, string ProviderReceiptDigest);
     private sealed record StoredJob(string Schema, string OwnerDigest, OriginChapterAuthoringJob Job, string Digest,
-        string? ExecutionAdmission = null);
+        string? ExecutionAdmission = null)
+    {
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public StoredDraft[]? SupersededDrafts { get; init; }
+    }
 
     public bool IsConfigured => _primary is not null || !string.IsNullOrWhiteSpace(configuration["CHUMMER_RUNTIME_STATE_ROOT"]);
 
@@ -119,7 +124,7 @@ public sealed class OriginChapterAuthoringService : IDisposable
             if (!stillAuthorized()) throw new UnauthorizedAccessException();
             if (job.ReaderAcceptedTextDigest is not null) return job;
             var accepted = job with { ReaderAcceptedTextDigest = textDigest };
-            Write(path, owner, accepted, stored.ExecutionAdmission);
+            Write(path, owner, accepted, stored.ExecutionAdmission, stored.SupersededDrafts);
             return accepted;
         });
     }
@@ -188,7 +193,44 @@ public sealed class OriginChapterAuthoringService : IDisposable
             if (stored.ExecutionAdmission != executionAdmission || stored.Job.SourceDigest != sourceDigest)
                 throw new InvalidOperationException("The admitted chapter source does not match.");
             OriginChapterAuthoringJob completed = Completed(stored.Job, draftText, providerReceiptDigest);
-            Write(JobPath(root, stored.OwnerDigest, completed.RequestId), stored.OwnerDigest, completed, executionAdmission);
+            Write(JobPath(root, stored.OwnerDigest, completed.RequestId), stored.OwnerDigest, completed, executionAdmission,
+                stored.SupersededDrafts);
+            return WorkerItem(ReadWorkerRecord(root, workId));
+        });
+    }
+
+    // Explicit editorial handoff only. Ordinary completion remains immutable;
+    // this does not reset dispatch, generate, accept a reading or alter source.
+    // The trusted worker must retain a fresh capture of the exact edited page.
+    internal OriginChapterWorkerItem ReviseUnacceptedForWorker(string workId, string sourceDigest,
+        string executionAdmission, string expectedProviderReceiptDigest, string expectedTextDigest,
+        string draftText, string providerReceiptDigest)
+    {
+        RequireId(executionAdmission);
+        ValidateResult(draftText, providerReceiptDigest);
+        if (!IsDigest(sourceDigest) || !IsDigest(expectedProviderReceiptDigest) || !IsDigest(expectedTextDigest))
+            throw new ArgumentException("An exact previous draft is required.");
+        return Locked(root =>
+        {
+            StoredJob stored = ReadWorkerRecord(root, workId);
+            var job = stored.Job;
+            if (stored.ExecutionAdmission != executionAdmission || job.SourceDigest != sourceDigest
+                || job.State != OriginChapterAuthoringStates.ReviewRequired || job.ReaderAcceptedTextDigest is not null)
+                throw new InvalidOperationException("Only the exact unaccepted chapter may be revised.");
+            StoredDraft[] history = stored.SupersededDrafts ?? [];
+            // A lost response can read back the same revision, never append it
+            // twice or replace a newer revision with an old request.
+            if (job.DraftText == draftText && job.ProviderReceiptDigest == providerReceiptDigest
+                && history.LastOrDefault() is { } prior && prior.ProviderReceiptDigest == expectedProviderReceiptDigest
+                && TextDigest(prior.Text) == expectedTextDigest)
+                return WorkerItem(stored);
+            if (job.ProviderReceiptDigest != expectedProviderReceiptDigest || TextDigest(job.DraftText!) != expectedTextDigest
+                || draftText == job.DraftText || providerReceiptDigest == job.ProviderReceiptDigest
+                || history.Length >= 3 || history.Any(d => d.ProviderReceiptDigest == providerReceiptDigest || d.Text == draftText))
+                throw new InvalidOperationException("The previous draft changed or the revision is not new.");
+            var revised = job with { DraftText = draftText, ProviderReceiptDigest = providerReceiptDigest };
+            Write(JobPath(root, stored.OwnerDigest, job.RequestId), stored.OwnerDigest, revised, executionAdmission,
+                [..history, new(job.DraftText!, job.ProviderReceiptDigest!)]);
             return WorkerItem(ReadWorkerRecord(root, workId));
         });
     }
@@ -328,7 +370,8 @@ public sealed class OriginChapterAuthoringService : IDisposable
         var stored = JsonSerializer.Deserialize<StoredJob>(bytes, Json);
         if (stored is null || stored.Schema != Schema || stored.OwnerDigest != owner
             || stored.Job is not { } job || !ValidId(job.RequestId) || requestId is not null && job.RequestId != requestId
-            || stored.Digest != StoredDigest(job, stored.ExecutionAdmission)
+            || stored.Digest != StoredDigest(job, stored.ExecutionAdmission, stored.SupersededDrafts)
+            || !ValidHistory(stored)
             || Path.GetFileNameWithoutExtension(path) != WorkId(owner, job.RequestId)
             || stored.ExecutionAdmission is not null && (!ValidId(stored.ExecutionAdmission)
                 || job.State == OriginChapterAuthoringStates.AwaitingAuthoring)
@@ -347,10 +390,12 @@ public sealed class OriginChapterAuthoringService : IDisposable
         return stored;
     }
 
-    private void Write(string path, string owner, OriginChapterAuthoringJob job, string? executionAdmission = null)
+    private void Write(string path, string owner, OriginChapterAuthoringJob job, string? executionAdmission = null,
+        StoredDraft[]? history = null)
     {
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(
-            new StoredJob(Schema, owner, job, StoredDigest(job, executionAdmission), executionAdmission), Json);
+            new StoredJob(Schema, owner, job, StoredDigest(job, executionAdmission, history), executionAdmission)
+                { SupersededDrafts = history }, Json);
         try
         {
             if (bytes.Length > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
@@ -385,8 +430,18 @@ public sealed class OriginChapterAuthoringService : IDisposable
     }
     private static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 256
         && value == value.Trim() && !value.Any(char.IsControl);
-    private static string StoredDigest(OriginChapterAuthoringJob job, string? admission)
-        => admission is null ? Digest(job) : Digest(new { Job = job, ExecutionAdmission = admission });
+    private static bool ValidHistory(StoredJob stored)
+        => stored.SupersededDrafts is null || stored.ExecutionAdmission is not null
+            && stored.Job.State == OriginChapterAuthoringStates.ReviewRequired
+            && stored.SupersededDrafts.Length is > 0 and <= 3
+            && stored.SupersededDrafts.All(d => d is not null && !string.IsNullOrWhiteSpace(d.Text)
+                && Encoding.UTF8.GetByteCount(d.Text) <= MaximumDraftBytes && IsDigest(d.ProviderReceiptDigest)
+                && d.ProviderReceiptDigest != stored.Job.ProviderReceiptDigest && d.Text != stored.Job.DraftText)
+            && stored.SupersededDrafts.Select(d => d.ProviderReceiptDigest).Distinct(StringComparer.Ordinal).Count()
+                == stored.SupersededDrafts.Length;
+    private static string StoredDigest(OriginChapterAuthoringJob job, string? admission, StoredDraft[]? history = null)
+        => history is not null ? Digest(new { Job = job, ExecutionAdmission = admission, SupersededDrafts = history })
+            : admission is null ? Digest(job) : Digest(new { Job = job, ExecutionAdmission = admission });
     private static string WorkId(string owner, string request) => owner + "." + Digest(request);
     private StoredJob ReadWorkerRecord(string root, string workId)
     {

@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
@@ -31,6 +34,7 @@ public sealed class OriginChapterWorkerTests : IDisposable
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
     }
     private OriginChapterAuthoringService Service() => new(Configuration());
+    private static string Hash(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     private static OriginChapterAuthoringRequest Request() => new("same-local-request",
         new("runner", "chapter", new string('a', 64), "decision", "de", "Nera",
             [new("fact", "decision", "Nera is an elf.")]), true);
@@ -120,6 +124,90 @@ public sealed class OriginChapterWorkerTests : IDisposable
     }
 
     [Fact]
+    public void Editorial_revision_keeps_original_custody_and_cannot_change_an_accepted_chapter()
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), () => true);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        string originalReceipt = new('d', 64), revisedReceipt = new('e', 64);
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", "Original draft", originalReceipt);
+        var result = service.ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest, "admission",
+            originalReceipt, Hash("Original draft"), "Edited draft", revisedReceipt);
+        Assert.Equal("Edited draft", result.Job.DraftText);
+        Assert.Equal(work.BookRef, result.BookRef);
+        Assert.Equal(job.SourceDigest, result.Job.SourceDigest);
+        Assert.Null(result.Job.ReaderAcceptedTextDigest);
+        Assert.Empty(service.PendingForWorker(20));
+        Assert.False(Service().AdmitForWorker(work.WorkId, job.SourceDigest, "admission").MayStartGeneration);
+        var repeated = Service().ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest, "admission",
+            originalReceipt, Hash("Original draft"), "Edited draft", revisedReceipt);
+        Assert.Equal(JsonSerializer.Serialize(result.Job), JsonSerializer.Serialize(repeated.Job));
+        string path = Directory.GetFiles(Path.Combine(_root, "origin-chapter-jobs"), "*.json").Single();
+        using (var saved = JsonDocument.Parse(File.ReadAllBytes(path)))
+        {
+            var history = saved.RootElement.GetProperty("supersededDrafts");
+            Assert.Equal(1, history.GetArrayLength());
+            Assert.Equal("Original draft", history[0].GetProperty("text").GetString());
+            Assert.Equal(originalReceipt, history[0].GetProperty("providerReceiptDigest").GetString());
+        }
+        Assert.Throws<InvalidOperationException>(() => service.CompleteForWorker(work.WorkId, job.SourceDigest,
+            "admission", "Original draft", originalReceipt));
+        Assert.Throws<InvalidOperationException>(() => service.ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest,
+            "admission", originalReceipt, Hash("Original draft"), "Stale edit", new string('f', 64)));
+        Service().AcceptReading("subject", job.RequestId, job.SourceDigest, revisedReceipt, Hash("Edited draft"), true, () => true);
+        Assert.Throws<InvalidOperationException>(() => Service().ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest,
+            "admission", revisedReceipt, Hash("Edited draft"), "Too late", new string('f', 64)));
+        Assert.Equal(Hash("Edited draft"), Service().GetForWorker(work.WorkId).Job.ReaderAcceptedTextDigest);
+        Assert.Contains("Original draft", File.ReadAllText(path), StringComparison.Ordinal);
+        File.WriteAllText(path, File.ReadAllText(path).Replace("Original draft", "Tampered draft", StringComparison.Ordinal));
+        Assert.Throws<InvalidDataException>(() => Service().GetForWorker(work.WorkId));
+    }
+
+    [Theory]
+    [InlineData("source")]
+    [InlineData("admission")]
+    [InlineData("receipt")]
+    [InlineData("text")]
+    [InlineData("same-receipt")]
+    [InlineData("same-text")]
+    public void Revision_rejects_mismatched_or_replayed_bindings(string change)
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), () => true);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        string receipt = new('d', 64);
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", "Original draft", receipt);
+        Assert.Throws<InvalidOperationException>(() => service.ReviseUnacceptedForWorker(work.WorkId,
+            change == "source" ? new string('f', 64) : job.SourceDigest,
+            change == "admission" ? "different" : "admission",
+            change == "receipt" ? new string('f', 64) : receipt,
+            Hash(change == "text" ? "Wrong" : "Original draft"),
+            change == "same-text" ? "Original draft" : "Edited draft",
+            change == "same-receipt" ? receipt : new string('e', 64)));
+        Assert.Equal("Original draft", Service().GetForWorker(work.WorkId).Job.DraftText);
+        Assert.Null(Service().GetForWorker(work.WorkId).Job.ReaderAcceptedTextDigest);
+    }
+
+    [Fact]
+    public void Revision_history_is_bounded_and_cannot_roll_back_to_superseded_text()
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), () => true);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", "Draft 0", Hash("receipt 0"));
+        for (int i = 1; i <= 3; i++)
+            Service().ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest, "admission",
+                Hash($"receipt {i - 1}"), Hash($"Draft {i - 1}"), $"Draft {i}", Hash($"receipt {i}"));
+        foreach (string text in new[] { "Draft 0", "Draft 4" })
+            Assert.Throws<InvalidOperationException>(() => Service().ReviseUnacceptedForWorker(work.WorkId,
+                job.SourceDigest, "admission", Hash("receipt 3"), Hash("Draft 3"), text, Hash("receipt 4")));
+        Assert.Equal("Draft 3", Service().GetForWorker(work.WorkId).Job.DraftText);
+    }
+
+    [Fact]
     public void Account_erasure_fences_late_worker_results_and_does_not_delete_other_owners()
     {
         var service = Service();
@@ -199,6 +287,7 @@ public sealed class OriginChapterWorkerTests : IDisposable
         var work = Assert.Single(service.PendingForWorker(20));
         var outside = new InternalOriginChaptersController(service) { ControllerContext = new() { HttpContext = Context() } };
         Assert.IsType<NotFoundResult>(outside.Pending());
+        Assert.IsType<NotFoundResult>(outside.ReviseUnaccepted(work.WorkId, null));
         var context = Context();
         await new OriginChapterWorkerGateMiddleware(http =>
         {
@@ -266,6 +355,13 @@ public sealed class OriginChapterWorkerTests : IDisposable
             new OriginChapterWorkerCompletionRequest(job.SourceDigest, "socket-admission", "Socket result", new string('e', 64)));
         completed.EnsureSuccessStatusCode();
         Assert.Equal("Socket result", Service().Get("subject", job.RequestId)!.DraftText);
+        var revision = new OriginChapterWorkerRevisionRequest(job.SourceDigest, "socket-admission",
+            new string('e', 64), Hash("Socket result"), "Edited socket result", new string('f', 64));
+        using var deniedRevision = await client.PostAsJsonAsync(addresses[1] + route + "/" + work.WorkId + "/revise-unaccepted", revision);
+        Assert.Equal(HttpStatusCode.NotFound, deniedRevision.StatusCode);
+        using var revised = await client.PostAsJsonAsync(route + "/" + work.WorkId + "/revise-unaccepted", revision);
+        revised.EnsureSuccessStatusCode();
+        Assert.Equal("Edited socket result", Service().Get("subject", job.RequestId)!.DraftText);
         using var publicResponse = await client.GetAsync(addresses[1] + route + "/pending");
         Assert.Equal(HttpStatusCode.NotFound, publicResponse.StatusCode);
         await app.StopAsync();

@@ -29,6 +29,13 @@ public sealed class InternalOriginChaptersController(OriginChapterAuthoringServi
         => Guard(() => request is null ? BadRequest() : Ok(authoring.CompleteForWorker(workId,
             request.SourceDigest, request.ExecutionAdmission, request.DraftText, request.ProviderReceiptDigest)));
 
+    [HttpPost("{workId}/revise-unaccepted")]
+    [RequestSizeLimit(OriginChapterAuthoringService.MaximumRequestBytes * 2)]
+    public ActionResult ReviseUnaccepted(string workId, [FromBody] OriginChapterWorkerRevisionRequest? request)
+        => Guard(() => request is null ? BadRequest() : Ok(authoring.ReviseUnacceptedForWorker(workId,
+            request.SourceDigest, request.ExecutionAdmission, request.ExpectedProviderReceiptDigest,
+            request.ExpectedTextDigest, request.DraftText, request.ProviderReceiptDigest)));
+
     private ActionResult Guard(Func<ActionResult> action)
     {
         AndroidLinkedV2RequestProofMiddleware.ApplyPrivateResponseHeaders(Response.Headers);
@@ -46,3 +53,5 @@ public sealed class InternalOriginChaptersController(OriginChapterAuthoringServi
 public sealed record OriginChapterWorkerAdmissionRequest(string SourceDigest, string ExecutionAdmission);
 public sealed record OriginChapterWorkerCompletionRequest(string SourceDigest, string ExecutionAdmission,
     string DraftText, string ProviderReceiptDigest);
+public sealed record OriginChapterWorkerRevisionRequest(string SourceDigest, string ExecutionAdmission,
+    string ExpectedProviderReceiptDigest, string ExpectedTextDigest, string DraftText, string ProviderReceiptDigest);
