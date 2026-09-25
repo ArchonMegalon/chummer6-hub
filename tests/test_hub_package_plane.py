@@ -30,21 +30,21 @@ CORE_RUNTIME_BUNDLE = (
             "CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE",
             str(
                 ROOT.parent
-                / "core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6-input"
+                / "core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd-input"
             ),
         )
     )
     /
-    "chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip"
+    "chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip"
 )
-PACKAGE_VERSION = "0.1.1-packageplane.20260910.1"
+PACKAGE_VERSION = "0.1.1-packageplane.20260924.3"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh54398fa0dfe60",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh5160e78a60bce",
     "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
     "Chummer.Run.Registry": PACKAGE_VERSION,
     "Chummer.Play.Contracts": PACKAGE_VERSION,
     "Chummer.Run.Contracts": PACKAGE_VERSION,
-    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sh54398fa0dfe60",
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sh5160e78a60bce",
 }
 CORE_RUNTIME_PACKAGE_IDS = {
     "Chummer.Engine.Contracts",
@@ -153,6 +153,18 @@ def test_hosted_api_suite_includes_every_focused_android_linked_test() -> None:
         for item in group.findall("Compile") if "Condition" not in item.attrib
     }
     assert expected <= included, f"Focused linked tests missing from hosted suite: {expected - included}"
+    expected_projects = {
+        (focused_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for item in focused_groups[0].findall("ProjectReference")
+    }
+    included_projects = {
+        (hosted_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for group in hosted.findall("ItemGroup") if "Condition" not in group.attrib
+        for item in group.findall("ProjectReference") if "Condition" not in item.attrib
+    }
+    assert expected_projects <= included_projects, (
+        f"Focused linked test dependencies missing from hosted suite: {expected_projects - included_projects}"
+    )
 
 
 def test_lock_pins_exact_owner_commits_and_package_version() -> None:
@@ -176,13 +188,13 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
         "Chummer.Engine.GmCharacterEdits",
     ]
     assert lock.core_runtime.package_version == (
-        "0.0.0-packageplane.candidate.sh54398fa0dfe60"
+        "0.0.0-packageplane.candidate.sh5160e78a60bce"
     )
     assert lock.core_runtime.runtime_source_commit == (
-        "54398fa0dfe60b4f00aac40d333882b7f7cc2886"
+        "5160e78a60bcefd952e8720aae6032a127c3a755"
     )
     assert lock.core_runtime.package_recipe_commit == (
-        "fe642d59a2899e1f1298271a0ffb80e91355aaf6"
+        "1e477c0f5e036eed241f4fe723a0e2eda30c51dd"
     )
     assert all(len(spec.commit) == 40 for spec in lock.packages)
     assert {spec.package_id: spec.version for spec in lock.packages} == {
@@ -219,6 +231,95 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
         payload["packages"][0][key] = value
         with pytest.raises(module.PackagePlaneError, match="immutable authority mismatch"):
             module.validate_lock_payload(payload)
+
+
+def _local_core_receipt_fixture(tmp_path: Path):
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    core = lock.core_runtime
+    receipt = {
+        "contract": "chummer-core.no-siblings-package-plane/v3",
+        "status": "pass",
+        "core_commit": core.package_recipe_commit,
+        "package_recipe_commit": core.package_recipe_commit,
+        "runtime_source_commit": core.runtime_source_commit,
+        "candidate_package_version": core.package_version,
+        "runtime_package_inventory_sha256": core.inventory_sha256,
+        "runtime_package_plane_lock_sha256": core.runtime_lock_sha256,
+        "no_sibling_directories": True,
+        "isolated_package_cache": True,
+        "package_source_mapping": {"Chummer.*": "locked-owner-contracts",
+                                   "other": "https://api.nuget.org/v3/index.json"},
+        **{name: "pass" for name in (
+            "normal_local_engine_dependency_graph", "build", "package_plane_runtime_test",
+            "local_owner_isolation_tests", "candidate_engine_contract_pack",
+            "candidate_gm_edit_runtime_pack", "candidate_gm_edit_runtime_consumer",
+            "eight_package_runtime_plane")},
+    }
+    (tmp_path / "eng").mkdir()
+    (tmp_path / "scripts/ai").mkdir(parents=True)
+    shutil.copyfile(SCRIPT_PATH, tmp_path / lock.build_recipe_path)
+    path = tmp_path / "eng/core-local-runtime-receipt.json"
+    raw = (json.dumps(receipt, sort_keys=True, indent=2) + "\n").encode()
+    path.write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    lock = replace(lock, build_recipe_sha256=hashlib.sha256(SCRIPT_PATH.read_bytes()).hexdigest(),
+                   core_runtime=replace(core, authority_path="eng/core-local-runtime-receipt.json",
+                                        authority_sha256=digest, receipt_sha256=digest))
+    return module, lock, path, receipt
+
+
+def test_local_core_receipt_admits_exact_bytes_without_a_hosted_producer(tmp_path: Path) -> None:
+    module, lock, _, _ = _local_core_receipt_fixture(tmp_path)
+    module.validate_build_recipe(tmp_path, lock)
+    payload = json.loads(LOCK_PATH.read_text())
+    payload["core_runtime"]["authority_path"] = lock.core_runtime.authority_path
+    payload["core_runtime"]["authority_sha256"] = lock.core_runtime.authority_sha256
+    payload["core_runtime"]["receipt"]["sha256"] = lock.core_runtime.receipt_sha256
+    assert module.validate_lock_payload(payload).core_runtime == lock.core_runtime
+
+
+def test_local_core_receipt_preserves_the_actual_producer_serialization() -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    lock = replace(lock, build_recipe_sha256=hashlib.sha256(SCRIPT_PATH.read_bytes()).hexdigest())
+    module.validate_build_recipe(ROOT, lock)
+
+
+@pytest.mark.parametrize(("field", "value"), (
+    ("status", "failed"), ("build", "pending"), ("local_owner_isolation_tests", "failed"),
+    ("core_commit", "0" * 40), ("runtime_source_commit", "0" * 40),
+    ("candidate_package_version", "0.0.0-wrong"),
+    ("runtime_package_inventory_sha256", "0" * 64),
+    ("runtime_package_plane_lock_sha256", "0" * 64),
+    ("no_sibling_directories", 1), ("isolated_package_cache", False),
+    ("package_source_mapping", {}),
+))
+def test_local_core_receipt_rejects_rehashed_failed_or_foreign_evidence(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    module, lock, path, receipt = _local_core_receipt_fixture(tmp_path)
+    receipt[field] = value
+    raw = (json.dumps(receipt, sort_keys=True, indent=2) + "\n").encode()
+    path.write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    lock = replace(lock, core_runtime=replace(lock.core_runtime, authority_sha256=digest,
+                                             receipt_sha256=digest))
+    with pytest.raises(module.PackagePlaneError, match="local Core receipt"):
+        module.validate_build_recipe(tmp_path, lock)
+
+
+def test_local_core_receipt_rejects_duplicate_fields_and_unbound_digest(tmp_path: Path) -> None:
+    module, lock, path, _ = _local_core_receipt_fixture(tmp_path)
+    raw = path.read_bytes().replace(b'"status": "pass"', b'"status": "failed", "status": "pass"')
+    path.write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    with pytest.raises(module.PackagePlaneError):
+        module.validate_build_recipe(tmp_path, lock)
+    lock = replace(lock, core_runtime=replace(lock.core_runtime, authority_sha256=digest,
+                                             receipt_sha256=digest))
+    with pytest.raises(module.PackagePlaneError, match="local Core receipt"):
+        module.validate_build_recipe(tmp_path, lock)
 
 
 def _copy_core_runtime_bundle_input(tmp_path: Path) -> Path:
@@ -1140,6 +1241,7 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         "!global.json",
         "!eng/package-plane.lock.json",
         "!eng/core-main-runtime-artifact-authority.json",
+        "!eng/core-local-runtime-receipt.json",
         "!eng/core-runtime-bundle/",
         "!eng/core-runtime-bundle/core-runtime-bundle-input.json",
         "!eng/NuGet.Container.Config",
@@ -1176,9 +1278,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert (
         "COPY --from=core-runtime-bundle "
         "chummer-core-runtime-package-plane-"
-        "fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip "
+        "1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip "
         "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
-        "fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip"
+        "1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip"
     ) in dockerfile
     assert (
         "COPY --from=hub-package-feed-input . /opt/chummer-package-feed"
@@ -1293,9 +1395,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         lambda text: text.replace(
             "COPY --from=core-runtime-bundle "
             "chummer-core-runtime-package-plane-"
-            "fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip "
+            "1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip "
             "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
-            "fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip\n",
+            "1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip\n",
             "",
             1,
         ),

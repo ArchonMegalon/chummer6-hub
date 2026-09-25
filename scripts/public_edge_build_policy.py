@@ -311,9 +311,11 @@ PUBLIC_EDGE_DOCKER_STAGE_ORDER = (
     "install-linking-postgres-tool-final",
     "final",
 )
-PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT = 44
+# Includes the explicit Teable project/source copies used by the account and
+# Origin stores; all other stage instructions remain exactly bound.
+PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT = 46
 PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256 = (
-    "32e5233a0e849a1ca0532704feed4feef353d50d31fdeefa84b9cb043d7bed8c"
+    "cec7889fd203c31d1236b484208a27b608456f23d87385ced25786aaa14296b6"
 )
 PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE = {
     "public-pwa-proof": frozenset({"run-services-source"}),
@@ -372,8 +374,9 @@ PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
             "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
             "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
             "COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json",
+            "COPY --from=run-services-source eng/core-local-runtime-receipt.json eng/core-local-runtime-receipt.json",
             "COPY --from=run-services-source eng/core-runtime-bundle/core-runtime-bundle-input.json eng/core-runtime-bundle/core-runtime-bundle-input.json",
-            "COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6.zip",
+            "COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip",
             "COPY --from=hub-package-feed-input . /opt/chummer-package-feed",
         }
     ),
@@ -382,6 +385,7 @@ PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
             "COPY --from=run-services-source Directory.Build.props chummer.run-services/",
             "COPY --from=run-services-source eng/NuGet.Container.Config /tmp/chummer-package-feed.NuGet.Config",
             "COPY --from=run-services-source Chummer.Run.Api/Chummer.Run.Api.csproj chummer.run-services/Chummer.Run.Api/",
+            "COPY --from=run-services-source Chummer.Storage.Teable/Chummer.Storage.Teable.csproj chummer.run-services/Chummer.Storage.Teable/",
             "COPY --from=run-services-source Chummer.Run.Api/packages.lock.json chummer.run-services/Chummer.Run.Api/",
             "COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj chummer.run-services/Chummer.InstallLinking.Postgres.Tool/",
             "COPY --from=run-services-source Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj chummer.run-services/Chummer.Run.LoopbackProbe/",
@@ -397,6 +401,7 @@ PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
             "COPY --from=run-services-source Chummer.World.Contracts/Chummer.World.Contracts.csproj chummer.run-services/Chummer.World.Contracts/",
             "COPY --from=run-services-source Chummer.World.Contracts/packages.lock.json chummer.run-services/Chummer.World.Contracts/",
             "COPY --from=run-services-source Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/",
+            "COPY --from=run-services-source Chummer.Storage.Teable/ chummer.run-services/Chummer.Storage.Teable/",
             "COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/ chummer.run-services/Chummer.InstallLinking.Postgres.Tool/",
             "COPY --from=run-services-source Chummer.Run.LoopbackProbe/ chummer.run-services/Chummer.Run.LoopbackProbe/",
             "COPY --from=run-services-source Chummer.Campaign.Contracts/ chummer.run-services/Chummer.Campaign.Contracts/",
