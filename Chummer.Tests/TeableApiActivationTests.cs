@@ -117,6 +117,60 @@ public sealed class TeableApiActivationTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Account_summary_checks_primary_at_operation_boundaries_not_per_field(bool expireGrant)
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "summary");
+        var activation = services.GetRequiredService<InstallLinkingStoreActivation>();
+        var store = activation.GetRequiredStore();
+        lock (store.Gate)
+        {
+            store.GrantsById["mine"] = new("mine", "install", InstallationGrantStates.Active,
+                "secret-mine", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(5), "user", "subject");
+            store.GrantsById["other"] = new("other", "other-install", InstallationGrantStates.Active,
+                "secret-other", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(5), "other", "other-subject");
+            if (expireGrant)
+                store.GrantsById["expired"] = new("expired", "install", InstallationGrantStates.Active,
+                    "secret-expired", DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddMinutes(-1), "user", "subject");
+            store.PersistLocked();
+        }
+        var service = services.GetRequiredService<InstallLinkingService>();
+        int reads = accounts.GetRequests;
+        var summary = service.GetSummary("user", "subject");
+        var grant = Assert.Single(summary.ActiveGrants!);
+        Assert.Equal("mine", grant.GrantId);
+        Assert.Equal(string.Empty, grant.AccessToken);
+        Assert.InRange(accounts.GetRequests - reads, 4, expireGrant ? 10 : 4);
+        if (expireGrant)
+            Assert.Equal(InstallationGrantStates.Expired, store.GrantsById["expired"].Status);
+        accounts.FailReads = true;
+        Assert.Empty(service.GetSummary("user", "subject").ActiveGrants!);
+    }
+
+    [Fact]
+    public void Account_summary_does_not_return_a_snapshot_if_the_final_authority_read_fails()
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "summary-outage");
+        var activation = services.GetRequiredService<InstallLinkingStoreActivation>();
+        var store = activation.GetRequiredStore();
+        lock (store.Gate)
+        {
+            store.GrantsById["mine"] = new("mine", "install", InstallationGrantStates.Active,
+                "secret-mine", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(5), "user", "subject");
+            store.PersistLocked();
+        }
+        accounts.BeforeHeadReadResponse = () => accounts.BeforeHeadReadResponse = () =>
+            throw new HttpRequestException("synthetic final authority read failure");
+        Assert.Empty(services.GetRequiredService<InstallLinkingService>().GetSummary("user", "subject").ActiveGrants!);
+        Assert.Single(store.GrantsById);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void V2_bootstrap_does_not_recheck_remote_authority_for_every_dictionary_access(bool outageAfterCommit)
     {
         using var keys = new Remote();
