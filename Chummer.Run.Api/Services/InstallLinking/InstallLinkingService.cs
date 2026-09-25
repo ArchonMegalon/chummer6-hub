@@ -197,11 +197,28 @@ public sealed partial class InstallLinkingService
 
     public InstallLinkingSummaryDto GetSummary(string? userId, string? subjectId, int maxItems = 8)
     {
-        if (!IsDurableStoreReady())
+        if (!TryGetDurableStore(out InstallLinkingStore store))
         {
             return new InstallLinkingSummaryDto([], [], [], [], []);
         }
 
+        lock (store.Gate)
+        {
+            // Keep one admitted store for this synchronous projection. Rechecking
+            // remote activation on every field turns a single account page into
+            // many primary reads and can throw halfway through a healthy snapshot.
+            // Expiry writes still use primary CAS; validate the authority again
+            // before returning anything, including after an expiry was persisted.
+            var operation = new InstallLinkingService(this, store);
+            InstallLinkingSummaryDto summary = operation.GetSummaryLocked(userId, subjectId, maxItems);
+            return operation.IsDurableStoreReady()
+                ? summary
+                : new InstallLinkingSummaryDto([], [], [], [], []);
+        }
+    }
+
+    private InstallLinkingSummaryDto GetSummaryLocked(string? userId, string? subjectId, int maxItems)
+    {
         var normalizedUserId = NormalizeOptional(userId);
         var normalizedSubjectId = NormalizeOptional(subjectId);
         lock (_store.Gate)
