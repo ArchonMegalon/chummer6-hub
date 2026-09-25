@@ -60,6 +60,34 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
     }
 
     [Fact]
+    public void Unaccepted_revision_survives_remote_restart_and_reader_acceptance_wins_a_race()
+    {
+        using var remote = new Remote();
+        var job = Service(remote).Create("owner", Request(), Authorized);
+        var work = Assert.Single(Service(remote).PendingForWorker(20));
+        string original = new('c', 64), revised = new('d', 64);
+        Service(remote).AdmitForWorker(work.WorkId, job.SourceDigest, "execution");
+        Service(remote).CompleteForWorker(work.WorkId, job.SourceDigest, "execution", "Original draft", original);
+        Service(remote).ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest, "execution",
+            original, Hash("Original draft"), "Edited draft", revised);
+        var cold = Service(remote).GetForWorker(work.WorkId);
+        Assert.Equal("Edited draft", cold.Job.DraftText);
+        Assert.Null(cold.Job.ReaderAcceptedTextDigest);
+        Assert.Equal(work.BookRef, cold.BookRef);
+        Assert.Null(Service(remote).Get("different-owner", job.RequestId));
+        remote.BeforeHeadPost = () => Service(remote).AcceptReading("owner", job.RequestId,
+            job.SourceDigest, revised, Hash("Edited draft"), true, Authorized);
+        Assert.Throws<TeableRevisionConflictException>(() => Service(remote).ReviseUnacceptedForWorker(work.WorkId,
+            job.SourceDigest, "execution", revised, Hash("Edited draft"), "Losing revision", new string('e', 64)));
+        cold = Service(remote).GetForWorker(work.WorkId);
+        Assert.Equal("Edited draft", cold.Job.DraftText);
+        Assert.Equal(Hash("Edited draft"), cold.Job.ReaderAcceptedTextDigest);
+        Assert.Throws<InvalidOperationException>(() => Service(remote).ReviseUnacceptedForWorker(work.WorkId,
+            job.SourceDigest, "execution", revised, Hash("Edited draft"), "Late revision", new string('e', 64)));
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Fact]
     public void Pending_book_filter_precedes_page_limit_and_does_not_cross_owners()
     {
         using var remote = new Remote();
