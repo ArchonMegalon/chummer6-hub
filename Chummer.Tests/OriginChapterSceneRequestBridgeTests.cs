@@ -88,7 +88,7 @@ public sealed class OriginChapterSceneRequestBridgeTests : IDisposable
             "owner-a", "request", Sha(Prose), () => true));
     }
 
-    private IConfiguration AdmissionConfig(bool enabled = true) => new ConfigurationBuilder().AddInMemoryCollection(
+    private IConfiguration AdmissionConfig(bool enabled = true, Dictionary<string, string?>? overrides = null) => new ConfigurationBuilder().AddInMemoryCollection(
         new Dictionary<string, string?>
         {
             ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER"] = "teable",
@@ -97,14 +97,117 @@ public sealed class OriginChapterSceneRequestBridgeTests : IDisposable
             ["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"] = "teable",
             ["HorizonCapabilities:origin-dossier:origin-dossier-media:Enabled"] = enabled.ToString(),
             ["HorizonCapabilities:origin-dossier:origin-dossier-media:FreeWeeklyLimit"] = "2"
-        }).Build();
+        }).AddInMemoryCollection(overrides ?? []).Build();
 
-    private HorizonArtifactRequestService Admission(TeableRevisionStoreTests.Remote remote, bool enabled = true)
+    private HorizonArtifactRequestService Admission(TeableRevisionStoreTests.Remote remote, bool enabled = true,
+        Dictionary<string, string?>? overrides = null)
     {
-        var config = AdmissionConfig(enabled);
+        var config = AdmissionConfig(enabled, overrides);
         var billing = new BrilliantDirectoriesBillingService(new(config, primary: remote.Store()),
             new(config, primary: remote.Store()), config);
         return new(new(config), new(new(config, remote.Store()), new(config), billing), new(config, remote.Store()));
+    }
+
+    private static Dictionary<string, string?> Sponsored(DateTimeOffset now)
+    {
+        var monday = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero)
+            .AddDays(-((7 + (int)now.DayOfWeek - (int)DayOfWeek.Monday) % 7));
+        return new()
+        {
+            ["HorizonCapabilities:origin-dossier:origin-dossier-media:FreeWeeklyLimit"] = "0",
+            ["CHUMMER_ORIGIN_SCENE_SPONSOR_USER_SHA256"] = Sha("HUB-USER-A"),
+            ["CHUMMER_ORIGIN_SCENE_SPONSOR_LIMIT"] = "1",
+            ["CHUMMER_ORIGIN_SCENE_SPONSOR_WEEK_START_UTC"] = monday.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+            ["CHUMMER_ORIGIN_SCENE_SPONSOR_EXPIRES_AT_UTC"] = monday.AddDays(7).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+        };
+    }
+
+    [Fact]
+    public void Private_sponsored_scene_is_not_membership_and_cold_reopen_cannot_charge_twice()
+    {
+        using var chapters = Prepare();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var request = new OriginChapterSceneRequestBridge(chapters).Compose("owner-a", "request", Sha(Prose),
+            Prose, "Scene", true, () => true) with { UserId = "hub-user-a" };
+        var config = Sponsored(DateTimeOffset.UtcNow);
+        var first = Admission(remote, overrides: config).AdmitPrivateOriginScene(request);
+        Assert.False(first.Quota!.SupporterActive);
+        Assert.Equal("sponsored_test", first.Quota.AllowanceTier);
+        Assert.Equal("operator_approved_private_scene_trial", first.Quota.EntitlementBasis);
+        Assert.Equal("private_origin_scene", first.Quota.EntitlementScope);
+        Assert.Equal(1, first.Quota.WindowUsed);
+        Assert.Equal(0, first.Quota.WindowRemaining);
+        var restored = Admission(remote, overrides: config).AdmitPrivateOriginScene(request);
+        Assert.Equal(JsonSerializer.Serialize(first), JsonSerializer.Serialize(restored));
+        Assert.Equal(1, remote.HeadPosts);
+        // Removing the trial does not remove an already-paid exact order or
+        // reset the usage ledger. A new scene still has no remaining allowance.
+        config.Remove("CHUMMER_ORIGIN_SCENE_SPONSOR_LIMIT");
+        Assert.Equal(JsonSerializer.Serialize(first), JsonSerializer.Serialize(
+            Admission(remote, overrides: config).AdmitPrivateOriginScene(request)));
+        var otherId = new string('f', 64);
+        var next = request with { SourceRef = "origin-dossier:scene:" + otherId,
+            GovernedRenderRequest = request.GovernedRenderRequest! with { WorkItemId = otherId } };
+        var denied = Admission(remote, overrides: Sponsored(DateTimeOffset.UtcNow)).BuildRequest(next, consumeQuota: true);
+        Assert.Equal("blocked", denied.Status);
+        Assert.Contains("artifact allowance", denied.BlockedReasons);
+    }
+
+    [Theory]
+    [InlineData("owner")]
+    [InlineData("public")]
+    [InlineData("consent")]
+    [InlineData("missing-limit")]
+    [InlineData("zero")]
+    [InlineData("oversized")]
+    [InlineData("bad-owner")]
+    [InlineData("wrong-week")]
+    [InlineData("no-timezone")]
+    [InlineData("expired")]
+    [InlineData("future")]
+    public void Sponsored_trial_does_not_admit_another_owner_visibility_or_invalid_window(string change)
+    {
+        using var chapters = Prepare();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var now = new DateTimeOffset(2026, 9, 26, 12, 0, 0, TimeSpan.Zero);
+        var config = Sponsored(now);
+        switch (change)
+        {
+            case "missing-limit": config.Remove("CHUMMER_ORIGIN_SCENE_SPONSOR_LIMIT"); break;
+            case "zero": config["CHUMMER_ORIGIN_SCENE_SPONSOR_LIMIT"] = "0"; break;
+            case "oversized": config["CHUMMER_ORIGIN_SCENE_SPONSOR_LIMIT"] = "9"; break;
+            case "bad-owner": config["CHUMMER_ORIGIN_SCENE_SPONSOR_USER_SHA256"] = "not-a-digest"; break;
+            case "wrong-week": config["CHUMMER_ORIGIN_SCENE_SPONSOR_WEEK_START_UTC"] = "2026-09-22T00:00:00Z"; break;
+            case "no-timezone": config["CHUMMER_ORIGIN_SCENE_SPONSOR_EXPIRES_AT_UTC"] = "2026-09-27T00:00:00"; break;
+            case "expired": config["CHUMMER_ORIGIN_SCENE_SPONSOR_EXPIRES_AT_UTC"] = "2026-09-26T12:00:00Z"; break;
+            case "future": config = Sponsored(now.AddDays(7)); break;
+        }
+        var request = new OriginChapterSceneRequestBridge(chapters).Compose("owner-a", "request", Sha(Prose),
+            Prose, "Scene", true, () => true) with
+        {
+            UserId = change == "owner" ? "hub-user-b" : "hub-user-a",
+            Visibility = change == "public" ? "public" : "private",
+            ExternalProcessingConsent = change != "consent"
+        };
+        var denied = Admission(remote, overrides: config).BuildRequest(request, now, consumeQuota: true);
+        Assert.Equal("blocked", denied.Status);
+        Assert.NotEmpty(denied.BlockedReasons);
+        Assert.Equal(0, denied.Quota?.WindowUsed ?? 0);
+    }
+
+    [Fact]
+    public void Sponsored_allowance_cannot_be_consumed_without_a_private_scene_receipt()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var now = new DateTimeOffset(2026, 9, 26, 12, 0, 0, TimeSpan.Zero);
+        var config = AdmissionConfig(overrides: Sponsored(now));
+        var billing = new BrilliantDirectoriesBillingService(new(config, primary: remote.Store()),
+            new(config, primary: remote.Store()), config);
+        var quota = new HorizonArtifactQuotaService(new(config, remote.Store()), new(config), billing);
+        var request = new HorizonArtifactQuotaRequest("hub-user-a", "origin-dossier", "origin-dossier-media");
+        Assert.Equal(1, quota.GetQuota(request, now).WindowRemaining);
+        Assert.Throws<InvalidOperationException>(() => quota.Consume(request, now));
+        Assert.Equal(0, remote.HeadPosts);
     }
 
     [Fact]
