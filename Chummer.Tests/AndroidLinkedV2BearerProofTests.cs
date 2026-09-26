@@ -22,6 +22,55 @@ public sealed class AndroidLinkedV2BearerProofTests
 {
     private static readonly JsonSerializerOptions ContinuationWebJson = new(JsonSerializerDefaults.Web);
 
+    [Theory]
+    [InlineData("request")]
+    [InlineData("read")]
+    [InlineData("decide")]
+    public async Task Origin_scene_routes_require_exact_signed_install_proof(string action)
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\"}";
+        var signed = fixture.Sign("/api/v2/android/linked/origin/scenes/" + action, body);
+        int dispatches = 0;
+        var accepted = signed.CreateContext();
+        await fixture.InvokeAsync(accepted, _ => dispatches++);
+        Assert.Equal(1, dispatches);
+        var replay = signed.CreateContext();
+        await fixture.InvokeAsync(replay, _ => dispatches++);
+        Assert.Equal(1, dispatches);
+        Assert.Equal(StatusCodes.Status409Conflict, replay.Response.StatusCode);
+        var substituted = fixture.Sign("/api/v2/android/linked/origin/scenes/" + action, body).CreateContext();
+        substituted.Request.Path = "/api/v2/android/linked/origin/scenes/different";
+        await fixture.InvokeAsync(substituted, _ => dispatches++);
+        Assert.Equal(1, dispatches);
+        Assert.Equal(StatusCodes.Status401Unauthorized, substituted.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Origin_scene_controller_rejects_unsigned_and_revoked_installs_before_any_media_access()
+    {
+        using Fixture fixture = new();
+        var config = new ConfigurationBuilder().Build();
+        using var chapters = fixture.CreateChapterAuthoring();
+        var request = new AndroidOriginSceneRead("android-v2", "request", new string('a', 64));
+        AndroidLinkedOriginScenesController Controller(HttpContext context) => new(fixture.Service,
+            null!, new(chapters), new(new(config)), new(config)) { ControllerContext = new() { HttpContext = context } };
+        Assert.IsType<UnauthorizedResult>(await Controller(new DefaultHttpContext()).ReadScene(request, default));
+        Task<ActionResult>? revoked = null;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/read",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            lock (fixture.Store.Gate)
+            {
+                var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+            }
+            revoked = Controller(http).ReadScene(request, default);
+        });
+        Assert.NotNull(revoked);
+        Assert.IsType<UnauthorizedResult>(await revoked);
+    }
+
     private static OriginChapterAuthoringService PrimaryChapters(TeableRevisionStoreTests.Remote remote)
         => new(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {

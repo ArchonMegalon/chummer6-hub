@@ -87,6 +87,7 @@
     <Compile Include="AccountAuxiliaryDataErasureServiceTests.cs" />
     <Compile Include="OriginChapterAuthoringServiceTests.cs" />
     <Compile Include="OriginChapterSceneRequestBridgeTests.cs" />
+    <Compile Include="OriginChapterSceneMediaClientTests.cs" />
     <Compile Include="OriginChapterWorkerTests.cs" />
     <Compile Include="OriginChapterTeablePersistenceTests.cs" />
     <Compile Include="OriginDocumentTeablePersistenceTests.cs" />

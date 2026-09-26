@@ -82,6 +82,14 @@ public sealed class HorizonArtifactQuotaService
 
         using (_store.Enter())
         {
+            // The same accepted Origin chapter scene must not consume another
+            // allowance when a phone reconnects, even in a later quota window.
+            if (requestReceipt is { CapabilityId: "origin-dossier-media" }
+                && requestReceipt.SourceRef.StartsWith("origin-dossier:scene:", StringComparison.Ordinal)
+                && _store.Entries.SelectMany(row => row.RequestReceipts ?? []).Any(row =>
+                    row.CapabilityId == requestReceipt.CapabilityId && row.SourceRef == requestReceipt.SourceRef
+                    && string.Equals(row.RequestedByUserId, userId, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("This private scene was already admitted; read its receipt.");
             if (requestReceipt is not null)
                 HorizonQuotaReceipts.RejectDuplicate(_store.Entries.SelectMany(row => row.RequestReceipts ?? []), requestReceipt.RequestId);
             int existingIndex = _store.Entries.FindIndex(item => Matches(item, userId, capability, weekStartUtc));

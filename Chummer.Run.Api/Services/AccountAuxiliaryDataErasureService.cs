@@ -37,6 +37,7 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
     private readonly OriginDossierPublicationService _originDossiers;
     private readonly OriginChapterAuthoringService? _originChapters;
     private readonly OriginDossierFirstPartyDocumentService? _originDocuments;
+    private readonly IOriginSceneAccountErasure? _originScenes;
 
     public AccountAuxiliaryDataErasureService(
         BrilliantDirectoriesBillingStore brilliantDirectories,
@@ -53,7 +54,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         KarmaForgeStore karmaForge,
         OriginDossierPublicationService originDossiers,
         OriginChapterAuthoringService? originChapters = null,
-        OriginDossierFirstPartyDocumentService? originDocuments = null)
+        OriginDossierFirstPartyDocumentService? originDocuments = null,
+        IOriginSceneAccountErasure? originScenes = null)
     {
         _brilliantDirectories = brilliantDirectories;
         _myFirstBookUsage = myFirstBookUsage;
@@ -70,10 +72,12 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         _originDossiers = originDossiers;
         _originChapters = originChapters;
         _originDocuments = originDocuments;
+        _originScenes = originScenes;
     }
 
     public void EnsureAccountErasureSupported()
     {
+        _originScenes?.EnsureAccountErasureSupported();
         _originDossiers.EnsureAccountErasureSupported();
         _originDocuments?.EnsureAccountErasureSupported();
         _originChapters?.EnsureAccountErasureSupported();
@@ -95,6 +99,9 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         EnsureAccountErasureSupported();
         var removed = new Dictionary<string, int>(StringComparer.Ordinal)
         {
+            // Media commits its deletion fence before other auxiliary stores are
+            // erased. An in-flight render cannot recreate that owner's images.
+            ["origin_scene_media"] = _originScenes?.EraseForSubject(normalizedSubject) ?? 0,
             ["brilliant_directories_projection"] = EraseSingleList(
                 _brilliantDirectories.Gate,
                 _brilliantDirectories.Members,

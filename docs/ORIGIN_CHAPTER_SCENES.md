@@ -11,14 +11,44 @@ a provider, execute a render, persist image bytes or grant publication. The medi
 payload binds opaque owner, workspace, chapter, canonical chapter digest and
 selected prose. Alt text is bounded and must be escaped by clients.
 
-This is not registered as a live endpoint. The authenticated admission/readback
-flow and atomic quota decision must be connected before dispatch. Media Factory
-owns execution/retention, including the no-replay fence and private provider
-receipt. Android must download through a private owner-authorized route and use
-its existing immutable scene store for in-app display and EPUB embedding. No
-provider URL, API key or raw credential belongs in the phone response.
+## Private delivery boundary
 
-Focused local verification: affected API build, then `OriginChapter` tests,
-including the new bridge's accepted, unaccepted, stale-text, invented-excerpt,
-wrong-owner, missing-consent and post-read revocation cases. This does not prove
-an automatic illustrated book or a Play-installed app.
+`AndroidLinkedOriginScenesController` now implements signed-install POST routes
+under `/api/v2/android/linked/origin/scenes`: `request`, `read`, and `decide`.
+The existing Android v2 proof middleware binds the exact route, body and install.
+The request resolves a real Hub user for allowance accounting, composes from
+accepted prose, checks the private worker, admits one exact governed request,
+then dispatches it. Reconnection reuses that same charged receipt; a concurrent
+Teable writer is reread, never blindly charged again. A changed scene request
+cannot replace an admitted one, including after a weekly allowance reset.
+Read/review identity is derived from the authenticated owner's accepted chapter,
+not a phone-supplied asset ID. Authorization is rechecked after I/O.
+
+`OriginSceneMediaClient` uses a private Unix-domain socket, no public TCP route,
+no redirects/proxy/cookies, a dedicated file-mounted bearer token and bounded
+streamed JSON. Media Factory owns provider execution, image retention and the
+no-replay fence. The client never receives provider credentials or download URLs.
+Hub does not start a second renderer or store image blobs in its application tree.
+
+Local Docker configuration requires absolute `CHUMMER_ORIGIN_SCENE_MEDIA_SOCKET`
+and `CHUMMER_ORIGIN_SCENE_MEDIA_TOKEN_FILE` paths in a private shared mount. The
+token must be a separate owner-only file, 32–256 printable ASCII bytes, not an
+account credential. Set `CHUMMER_ORIGIN_SCENE_MEDIA_REQUIRED=true` once enabled
+and retain it even during outages: account erasure then fails closed if the media
+worker is unavailable. Never-enabled installations may omit all three settings.
+Partial configuration is not a silent erasure bypass. Account deletion removes
+media before other auxiliary stores and retains an owner tombstone against
+in-flight completion. Existing primary-store erasure restrictions still apply.
+
+The capability remains disabled by default. This source change does not configure
+or deploy the service. Android must still obtain explicit scene consent, call
+these routes, review/download and adopt bytes into its existing immutable scene
+store for offline reading and EPUB embedding. No automatic illustrated-book or
+Play delivery claim follows from server tests.
+
+Focused local verification: affected API build; Origin chapter, Horizon allowance,
+scene signed-install and account-erasure tests. These cover accepted/unaccepted
+text, literal excerpt, consent, owner/revocation, cold/concurrent admission,
+bounded private transport and recovery-only dispatch refusal. No paid provider
+calls are used by these tests. Reuse the unchanged Android EPUB checks; device
+and complete actual narrative/illustration delivery remain separate work.
