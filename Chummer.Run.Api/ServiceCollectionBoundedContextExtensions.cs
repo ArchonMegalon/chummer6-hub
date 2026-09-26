@@ -494,6 +494,9 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHttpClient<HubIdentityClient>();
         services.AddHttpClient<IHostedBuildAccountErasureClient, HostedBuildAccountErasureClient>();
         services.AddSingleton<AccountErasureJournalStore>();
+        services.AddSingleton<OriginChapterSceneRequestBridge>();
+        services.AddSingleton<OriginSceneMediaClient>();
+        services.AddSingleton<IOriginSceneAccountErasure>(static provider => provider.GetRequiredService<OriginSceneMediaClient>());
         services.AddTransient<IAccountAuxiliaryDataErasureService, AccountAuxiliaryDataErasureService>();
         services.AddTransient<AccountErasureService>();
         services.AddTransient<IAccountErasureService>(static provider =>

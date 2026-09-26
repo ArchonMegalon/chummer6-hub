@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -110,6 +111,48 @@ public sealed class HorizonArtifactRequestService
             GovernedRenderRequest: governedRenderRequest);
         _receipts?.Append(receipt);
         return receipt;
+    }
+
+    public HorizonArtifactRequestReceipt AdmitPrivateOriginScene(HorizonArtifactRequestCreateRequest request)
+    {
+        // Called only after composing from current reader-accepted prose and
+        // resolving a real Hub user. The charged receipt is the durable key;
+        // this is not a new Hub-owned render queue or provider-spend ledger.
+        if (request.HorizonId != "origin-dossier" || request.ArtifactKindOrCapabilityId != "origin-dossier-media"
+            || request.Visibility != "private" || request.GovernedRenderRequest is not { } render
+            || render.WorkItemId is not { Length: 64 } || request.SourceRef != "origin-dossier:scene:" + render.WorkItemId)
+            throw new ArgumentException("An exact private Origin scene is required.");
+        var capability = _capabilities.GetCapability(request.HorizonId, request.ArtifactKindOrCapabilityId);
+        var composed = _governedRenderRequests.Compose(capability, request.SourceRef, render);
+        if (Validate(request, capability, true, true).Count != 0 || !composed.Accepted)
+            throw new InvalidOperationException("Private scene admission is unavailable or lacks consent.");
+
+        HorizonArtifactRequestReceipt? Existing()
+        {
+            var rows = (_quota?.ListChargedRequests() ?? []).Where(row => row.CapabilityId == capability.CapabilityId
+                && row.SourceRef == request.SourceRef && row.RequestedByUserId == request.UserId).ToArray();
+            if (rows.Length == 0) return null;
+            if (rows.Length != 1 || rows[0].Status != "accepted" || rows[0].Quota is null
+                || JsonSerializer.Serialize(rows[0].GovernedRenderRequest) != JsonSerializer.Serialize(composed.Contract))
+                throw new InvalidOperationException("Reopen the already-admitted scene; its exact request cannot be replaced.");
+            return rows[0];
+        }
+
+        if (Existing() is { } previous) return previous;
+        try
+        {
+            var admitted = BuildRequest(request, consumeQuota: true);
+            if (admitted.Status != "accepted" || admitted.Quota is null)
+                throw new InvalidOperationException("No scene allowance is available.");
+            return admitted;
+        }
+        catch (Exception error) when (error is InvalidOperationException or Chummer.Storage.Teable.TeableRevisionConflictException)
+        {
+            // A concurrent caller may have committed the one allowance first.
+            // Return only the identical admitted request; never blind reconsume.
+            if (Existing() is { } concurrent) return concurrent;
+            throw;
+        }
     }
 
     public IReadOnlyList<HorizonArtifactRequestReceipt> ListRecentReceipts(

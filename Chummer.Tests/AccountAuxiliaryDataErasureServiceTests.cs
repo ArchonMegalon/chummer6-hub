@@ -16,6 +16,42 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
 {
     private static readonly DateTimeOffset Baseline = new(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Scene_media_failure_blocks_auxiliary_deletion(bool preflight)
+    {
+        var media = new SceneErasure { FailPreflight = preflight, FailErase = !preflight };
+        using Fixture fixture = new(scenes: media);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<IOException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+    }
+
+    [Fact]
+    public void Account_erasure_includes_media_and_exact_subject_binding()
+    {
+        var media = new SceneErasure();
+        using Fixture fixture = new(scenes: media);
+        var result = fixture.Service.Erase("user-delete", "subject-delete");
+        Assert.Equal("subject-delete", media.ErasedSubject);
+        Assert.Equal(2, result.RecordsRemovedByComponent["origin_scene_media"]);
+    }
+
+    private sealed class SceneErasure : IOriginSceneAccountErasure
+    {
+        public bool FailPreflight { get; init; }
+        public bool FailErase { get; init; }
+        public string? ErasedSubject { get; private set; }
+        public void EnsureAccountErasureSupported() { if (FailPreflight) throw new IOException(); }
+        public int EraseForSubject(string subjectId)
+        {
+            if (FailErase) throw new IOException();
+            ErasedSubject = subjectId;
+            return 2;
+        }
+    }
+
     [Fact]
     public void Primary_publication_history_blocks_erasure_before_auxiliary_mutations()
     {
@@ -197,7 +233,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
         AccountAuxiliaryDataErasureResult result = fixture.Service.Erase("user-delete", "subject-delete");
 
         Assert.True(result.RecordsRemoved >= 11);
-        Assert.Equal(14, result.RecordsRemovedByComponent.Count);
+        Assert.Equal(15, result.RecordsRemovedByComponent.Count);
+        Assert.Equal(0, result.RecordsRemovedByComponent["origin_scene_media"]);
         Assert.Equal(1, result.RecordsRemovedByComponent["origin_chapter_jobs"]);
         Assert.Null(fixture.OriginChapters.Get("subject-delete", "chapter-request"));
         Assert.Empty(fixture.Brilliant.Members);
@@ -262,7 +299,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             HorizonArtifactUsageStore? horizonUsage = null,
             HorizonArtifactRequestReceiptStore? artifactReceipts = null,
             OriginChapterAuthoringService? chapters = null,
-            OriginDossierPublicationService? publications = null)
+            OriginDossierPublicationService? publications = null,
+            IOriginSceneAccountErasure? scenes = null)
         {
             Directory.CreateDirectory(_directory);
             var values = new Dictionary<string, string?>
@@ -318,7 +356,8 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
                 KarmaForge,
                 OriginDossiers,
                 OriginChapters,
-                documents);
+                documents,
+                scenes);
         }
 
         public IConfiguration Configuration { get; }
