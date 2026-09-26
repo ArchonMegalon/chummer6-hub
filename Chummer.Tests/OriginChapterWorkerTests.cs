@@ -164,6 +164,99 @@ public sealed class OriginChapterWorkerTests : IDisposable
         Assert.Throws<InvalidDataException>(() => Service().GetForWorker(work.WorkId));
     }
 
+    [Fact]
+    public void Separate_editorial_completion_binds_provenance_and_never_accepts_for_reader()
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), () => true);
+        var work = Assert.Single(service.PendingForWorker(20));
+        var provenance = new OriginChapterEditorialProvenance(Hash("FirstBook original"), Hash("original receipt"), "ea_ai_with_codex_edit");
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        var completed = service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", "Edited scene", Hash("editorial receipt"), provenance);
+        Assert.Equal(provenance, Service().GetForWorker(work.WorkId).Job.Editorial);
+        Assert.Equal("first_book_ai", completed.Job.Provider);
+        Assert.Null(completed.Job.ReaderAcceptedTextDigest);
+        Assert.False(completed.Job.PublicationAuthorized);
+        Assert.False(completed.Job.AffectsMechanics);
+        Assert.True(completed.Job.RequiresReaderReview);
+        Assert.Equal(JsonSerializer.Serialize(completed.Job), JsonSerializer.Serialize(Service().CompleteForWorker(
+            work.WorkId, job.SourceDigest, "admission", "Edited scene", Hash("editorial receipt"), provenance).Job));
+        Assert.Throws<InvalidOperationException>(() => service.CompleteForWorker(work.WorkId, job.SourceDigest,
+            "admission", "Edited scene", Hash("editorial receipt")));
+        Assert.Throws<InvalidOperationException>(() => service.CompleteForWorker(work.WorkId, job.SourceDigest,
+            "admission", "Edited scene", Hash("editorial receipt"), provenance with { Method = "ea_ai" }));
+        var accepted = Service().AcceptReading("subject", job.RequestId, job.SourceDigest,
+            Hash("editorial receipt"), Hash("Edited scene"), true, () => true);
+        Assert.Equal(provenance, accepted.Editorial);
+        Assert.Equal(provenance, Service().GetForWorker(work.WorkId).Job.Editorial);
+        Assert.Throws<InvalidOperationException>(() => service.ReviseUnacceptedForWorker(work.WorkId,
+            job.SourceDigest, "admission", Hash("editorial receipt"), Hash("Edited scene"),
+            "Late edit", Hash("late receipt"), provenance));
+    }
+
+    [Theory]
+    [InlineData("method")]
+    [InlineData("digest")]
+    [InlineData("same-text")]
+    [InlineData("same-receipt")]
+    public void Editorial_completion_rejects_invalid_or_self_referential_provenance(string change)
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), () => true);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        var provenance = new OriginChapterEditorialProvenance(
+            change == "digest" ? "invalid" : Hash(change == "same-text" ? "Edited" : "Original"),
+            Hash(change == "same-receipt" ? "new receipt" : "original receipt"),
+            change == "method" ? "https://private-provider.invalid/account" : "ea_ai");
+        Assert.Throws<ArgumentException>(() => service.CompleteForWorker(work.WorkId, job.SourceDigest,
+            "admission", "Edited", Hash("new receipt"), provenance));
+        Assert.Equal(OriginChapterAuthoringStates.ReconciliationRequired, Service().GetForWorker(work.WorkId).Job.State);
+    }
+
+    [Fact]
+    public void Editorial_revision_retains_input_and_history_attribution_and_rejects_stripping()
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), () => true);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", "Original", Hash("original receipt"));
+        var provenance = new OriginChapterEditorialProvenance(Hash("Original"), Hash("original receipt"), "ea_ai");
+        Assert.Throws<InvalidOperationException>(() => service.ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest,
+            "admission", Hash("original receipt"), Hash("Original"), "Edited", Hash("edited receipt"),
+            provenance with { OriginalTextDigest = Hash("wrong original") }));
+        service.ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest, "admission", Hash("original receipt"),
+            Hash("Original"), "Edited", Hash("edited receipt"), provenance);
+        Service().ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest, "admission", Hash("original receipt"),
+            Hash("Original"), "Edited", Hash("edited receipt"), provenance);
+        Assert.Throws<InvalidOperationException>(() => service.ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest,
+            "admission", Hash("edited receipt"), Hash("Edited"), "Revised", Hash("revised receipt")));
+        Assert.Throws<InvalidOperationException>(() => service.ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest,
+            "admission", Hash("edited receipt"), Hash("Edited"), "Revised", Hash("revised receipt"),
+            provenance with { OriginalProviderReceiptDigest = Hash("wrong origin") }));
+        var revisedProvenance = provenance with { Method = "ea_ai_with_codex_edit" };
+        service.ReviseUnacceptedForWorker(work.WorkId, job.SourceDigest, "admission", Hash("edited receipt"),
+            Hash("Edited"), "Revised", Hash("revised receipt"), revisedProvenance);
+        Assert.Equal(revisedProvenance, Service().GetForWorker(work.WorkId).Job.Editorial);
+        string path = Directory.GetFiles(Path.Combine(_root, "origin-chapter-jobs"), "*.json").Single();
+        using var saved = JsonDocument.Parse(File.ReadAllBytes(path));
+        var history = saved.RootElement.GetProperty("supersededDrafts");
+        Assert.False(history[0].TryGetProperty("editorial", out _));
+        Assert.Equal("ea_ai", history[1].GetProperty("editorial").GetProperty("method").GetString());
+        Assert.Equal(2, history.GetArrayLength());
+        File.WriteAllText(path, File.ReadAllText(path).Replace("ea_ai_with_codex_edit", "ea_ai", StringComparison.Ordinal));
+        Assert.Throws<InvalidDataException>(() => Service().GetForWorker(work.WorkId));
+    }
+
+    [Fact]
+    public void Legacy_prose_serialization_omits_editorial_metadata()
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), () => true);
+        Assert.DoesNotContain("editorial", JsonSerializer.Serialize(job, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+    }
+
     [Theory]
     [InlineData("source")]
     [InlineData("admission")]

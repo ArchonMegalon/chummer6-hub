@@ -23,6 +23,14 @@ public sealed record OriginChapterAuthoringRequest(
 public sealed record OriginChapterPredecessor(
     string RequestId, string SourceDigest, string ProviderReceiptDigest, string TextDigest);
 
+/// <summary>
+/// Separately edited FirstBook-origin prose. The job receipt binds the delivered
+/// derivative; these digests retain its original provider input. No account or
+/// model-routing details, and no claim of reader acceptance or rules authority.
+/// </summary>
+public sealed record OriginChapterEditorialProvenance(
+    string OriginalTextDigest, string OriginalProviderReceiptDigest, string Method);
+
 /// <summary>Shared, bounded wire identity. A digest is not Core or provider authority.</summary>
 public static class OriginChapterSourceIdentity
 {
@@ -101,6 +109,10 @@ public sealed record OriginChapterAuthoringJob(
     // Absent on historical jobs: never infer a predecessor when restoring them.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public OriginChapterPredecessor? Previous { get; init; }
+    // Provider continues to name the original draft provider. Omit on historical
+    // unedited jobs so their durable checksums remain unchanged.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OriginChapterEditorialProvenance? Editorial { get; init; }
     public bool RequiresReaderReview => true;
     public bool AffectsMechanics => false;
     public bool PublicationAuthorized => false;

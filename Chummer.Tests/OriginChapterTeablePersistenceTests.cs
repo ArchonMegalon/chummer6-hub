@@ -102,6 +102,26 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
     }
 
     [Fact]
+    public void Editorial_provenance_survives_remote_only_restart_and_acceptance()
+    {
+        using var remote = new Remote();
+        var job = Service(remote).Create("owner", Request(), Authorized);
+        var work = Assert.Single(Service(remote).PendingForWorker(20));
+        Service(remote).AdmitForWorker(work.WorkId, job.SourceDigest, "execution");
+        var editorial = new OriginChapterEditorialProvenance(Hash("Original"), Hash("FirstBook receipt"), "ea_ai_with_codex_edit");
+        Service(remote).CompleteForWorker(work.WorkId, job.SourceDigest, "execution", "Edited", Hash("derivative receipt"), editorial);
+        var cold = Service(remote).GetForWorker(work.WorkId);
+        Assert.Equal(editorial, cold.Job.Editorial);
+        Assert.Null(cold.Job.ReaderAcceptedTextDigest);
+        Assert.Null(Service(remote).Get("different-owner", job.RequestId));
+        Service(remote).AcceptReading("owner", job.RequestId, job.SourceDigest, Hash("derivative receipt"), Hash("Edited"), true, Authorized);
+        cold = Service(remote).GetForWorker(work.WorkId);
+        Assert.Equal(editorial, cold.Job.Editorial);
+        Assert.Equal(Hash("Edited"), cold.Job.ReaderAcceptedTextDigest);
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Fact]
     public void Accepted_predecessor_and_worker_edge_survive_remote_only_restart()
     {
         using var remote = new Remote();
