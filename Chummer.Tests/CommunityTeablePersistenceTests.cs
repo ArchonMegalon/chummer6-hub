@@ -141,6 +141,43 @@ public sealed class CommunityTeablePersistenceTests : IDisposable
     }
 
     [Fact]
+    public void Group_access_list_uses_one_current_read_and_observes_membership_removal()
+    {
+        using var remote = new Remote();
+        using var writer = Store(remote);
+        var accounts = new AccountService(writer);
+        var user = accounts.EnsureUser("principal-a");
+        accounts.EnsureUser("principal-b");
+        var groups = new GroupService(writer, accounts);
+        for (int index = 0; index < 3; index++)
+            groups.CreateGroup(new CreateGroupRequest("principal-a", "Group " + index,
+                GroupType: "campaign", Visibility: "private", Capabilities: []));
+        using var reader = Store(remote);
+        var reads = new GroupService(reader, new AccountService(reader));
+        int baseline = remote.GetRequests;
+        int writes = remote.HeadPosts;
+        var views = reads.ListGroupAccessForUser("principal-a");
+        Assert.Equal(1, remote.GetRequests - baseline); // Small test state is inline.
+        Assert.Equal(writes, remote.HeadPosts);
+        Assert.Equal(3, views.Count);
+        Assert.All(views, view =>
+        {
+            Assert.Equal(user.UserId, view.Membership.UserId);
+            Assert.True(view.CanManage);
+        });
+        Assert.Empty(reads.ListGroupAccessForUser("principal-b"));
+        using (writer.Enter())
+        {
+            foreach (var view in views)
+                writer.GroupsById[view.Group.GroupId] = view.Group with { Memberships = [] };
+            writer.PersistLocked();
+        }
+        Assert.Empty(reads.ListGroupAccessForUser("principal-a"));
+        remote.FailReads = true;
+        Assert.Throws<HttpRequestException>(() => reads.ListGroupAccessForUser("principal-a"));
+    }
+
+    [Fact]
     public void An_existing_reader_observes_current_mapping_not_cached_authority()
     {
         using var remote = new Remote();

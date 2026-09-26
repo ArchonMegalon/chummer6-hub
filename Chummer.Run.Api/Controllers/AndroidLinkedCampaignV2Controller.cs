@@ -33,8 +33,8 @@ public sealed class AndroidLinkedCampaignV2Controller : ControllerBase
             return denied!;
         }
 
-        IReadOnlyList<AndroidLinkedGroupDto> groups = _groups.ListGroupsForUser(installation!.SubjectId!)
-            .Select(group => ToAndroidGroup(group, installation))
+        IReadOnlyList<AndroidLinkedGroupDto> groups = _groups.ListGroupAccessForUser(installation!.SubjectId!)
+            .Select(view => ToAndroidGroup(view.Group, view.Membership, view.CanManage))
             .ToArray();
         return Ok(new AndroidLinkedGroupListResponse(groups));
     }
@@ -382,6 +382,12 @@ public sealed class AndroidLinkedCampaignV2Controller : ControllerBase
         GroupMembershipDto? membership = group.Memberships.FirstOrDefault(item =>
             string.Equals(item.UserId, installation.UserId, StringComparison.OrdinalIgnoreCase));
         bool canManage = _groups.CanManageGroupForSubject(group.GroupId, installation.SubjectId!);
+        return ToAndroidGroup(group, membership, canManage);
+    }
+
+    private static AndroidLinkedGroupDto ToAndroidGroup(
+        GroupDto group, GroupMembershipDto? membership, bool canManage)
+    {
         IReadOnlyList<AndroidLinkedGroupMemberDto> members = group.Memberships
             .OrderBy(static item => item.JoinedAtUtc)
             .Select(static item => new AndroidLinkedGroupMemberDto(item.Role, item.RunnerHandle))
