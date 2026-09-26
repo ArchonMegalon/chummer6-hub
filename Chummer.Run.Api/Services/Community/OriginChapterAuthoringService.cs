@@ -32,7 +32,11 @@ public sealed class OriginChapterAuthoringService : IDisposable
     private const string Schema = "chummer.origin.chapter-job/v1";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 16 };
     private readonly object _gate = new();
-    private sealed record StoredDraft(string Text, string ProviderReceiptDigest);
+    private sealed record StoredDraft(string Text, string ProviderReceiptDigest)
+    {
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public OriginChapterEditorialProvenance? Editorial { get; init; }
+    }
     private sealed record StoredJob(string Schema, string OwnerDigest, OriginChapterAuthoringJob Job, string Digest,
         string? ExecutionAdmission = null)
     {
@@ -183,16 +187,17 @@ public sealed class OriginChapterAuthoringService : IDisposable
     }
 
     internal OriginChapterWorkerItem CompleteForWorker(string workId, string sourceDigest, string executionAdmission,
-        string draftText, string providerReceiptDigest)
+        string draftText, string providerReceiptDigest, OriginChapterEditorialProvenance? editorial = null)
     {
         RequireId(executionAdmission);
         ValidateResult(draftText, providerReceiptDigest);
+        ValidateEditorial(editorial, draftText, providerReceiptDigest);
         return Locked(root =>
         {
             StoredJob stored = ReadWorkerRecord(root, workId);
             if (stored.ExecutionAdmission != executionAdmission || stored.Job.SourceDigest != sourceDigest)
                 throw new InvalidOperationException("The admitted chapter source does not match.");
-            OriginChapterAuthoringJob completed = Completed(stored.Job, draftText, providerReceiptDigest);
+            OriginChapterAuthoringJob completed = Completed(stored.Job, draftText, providerReceiptDigest, editorial);
             Write(JobPath(root, stored.OwnerDigest, completed.RequestId), stored.OwnerDigest, completed, executionAdmission,
                 stored.SupersededDrafts);
             return WorkerItem(ReadWorkerRecord(root, workId));
@@ -201,13 +206,15 @@ public sealed class OriginChapterAuthoringService : IDisposable
 
     // Explicit editorial handoff only. Ordinary completion remains immutable;
     // this does not reset dispatch, generate, accept a reading or alter source.
-    // The trusted worker must retain a fresh capture of the exact edited page.
+    // The trusted worker retains the exact provider capture and, for a separate
+    // editorial stage, the original input and attributed derivative receipt.
     internal OriginChapterWorkerItem ReviseUnacceptedForWorker(string workId, string sourceDigest,
         string executionAdmission, string expectedProviderReceiptDigest, string expectedTextDigest,
-        string draftText, string providerReceiptDigest)
+        string draftText, string providerReceiptDigest, OriginChapterEditorialProvenance? editorial = null)
     {
         RequireId(executionAdmission);
         ValidateResult(draftText, providerReceiptDigest);
+        ValidateEditorial(editorial, draftText, providerReceiptDigest);
         if (!IsDigest(sourceDigest) || !IsDigest(expectedProviderReceiptDigest) || !IsDigest(expectedTextDigest))
             throw new ArgumentException("An exact previous draft is required.");
         return Locked(root =>
@@ -220,7 +227,7 @@ public sealed class OriginChapterAuthoringService : IDisposable
             StoredDraft[] history = stored.SupersededDrafts ?? [];
             // A lost response can read back the same revision, never append it
             // twice or replace a newer revision with an old request.
-            if (job.DraftText == draftText && job.ProviderReceiptDigest == providerReceiptDigest
+            if (job.DraftText == draftText && job.ProviderReceiptDigest == providerReceiptDigest && job.Editorial == editorial
                 && history.LastOrDefault() is { } prior && prior.ProviderReceiptDigest == expectedProviderReceiptDigest
                 && TextDigest(prior.Text) == expectedTextDigest)
                 return WorkerItem(stored);
@@ -228,9 +235,17 @@ public sealed class OriginChapterAuthoringService : IDisposable
                 || draftText == job.DraftText || providerReceiptDigest == job.ProviderReceiptDigest
                 || history.Length >= 3 || history.Any(d => d.ProviderReceiptDigest == providerReceiptDigest || d.Text == draftText))
                 throw new InvalidOperationException("The previous draft changed or the revision is not new.");
-            var revised = job with { DraftText = draftText, ProviderReceiptDigest = providerReceiptDigest };
+            // Once prose is editorially derived, its original provider input
+            // cannot be silently cleared or relabelled on a subsequent edit.
+            if (job.Editorial is { } existingEditorial
+                ? editorial is null || editorial.OriginalTextDigest != existingEditorial.OriginalTextDigest
+                    || editorial.OriginalProviderReceiptDigest != existingEditorial.OriginalProviderReceiptDigest
+                : editorial is not null && (editorial.OriginalTextDigest != TextDigest(job.DraftText!)
+                    || editorial.OriginalProviderReceiptDigest != job.ProviderReceiptDigest))
+                throw new InvalidOperationException("The original editorial input changed.");
+            var revised = job with { DraftText = draftText, ProviderReceiptDigest = providerReceiptDigest, Editorial = editorial };
             Write(JobPath(root, stored.OwnerDigest, job.RequestId), stored.OwnerDigest, revised, executionAdmission,
-                [..history, new(job.DraftText!, job.ProviderReceiptDigest!)]);
+                [..history, new(job.DraftText!, job.ProviderReceiptDigest!) { Editorial = job.Editorial }]);
             return WorkerItem(ReadWorkerRecord(root, workId));
         });
     }
@@ -275,17 +290,31 @@ public sealed class OriginChapterAuthoringService : IDisposable
             || !IsDigest(providerReceiptDigest)) throw new ArgumentException("The chapter result is invalid or oversized.");
     }
 
-    private static OriginChapterAuthoringJob Completed(OriginChapterAuthoringJob job, string text, string receipt)
+    private static void ValidateEditorial(OriginChapterEditorialProvenance? editorial, string text, string receipt)
+    {
+        if (!ValidEditorial(editorial, text, receipt))
+            throw new ArgumentException("The editorial provenance is invalid.");
+    }
+
+    private static bool ValidEditorial(OriginChapterEditorialProvenance? editorial, string? text, string? receipt)
+        => editorial is null || text is not null && IsDigest(receipt)
+            && IsDigest(editorial.OriginalTextDigest) && IsDigest(editorial.OriginalProviderReceiptDigest)
+            && editorial.OriginalTextDigest != TextDigest(text) && editorial.OriginalProviderReceiptDigest != receipt
+            && editorial.Method is "ea_ai" or "ea_ai_with_codex_edit";
+
+    private static OriginChapterAuthoringJob Completed(OriginChapterAuthoringJob job, string text, string receipt,
+        OriginChapterEditorialProvenance? editorial = null)
     {
         if (job.State == OriginChapterAuthoringStates.ReviewRequired)
         {
-            if (job.DraftText != text || job.ProviderReceiptDigest != receipt)
+            if (job.DraftText != text || job.ProviderReceiptDigest != receipt || job.Editorial != editorial)
                 throw new InvalidOperationException("A retained chapter result cannot be replaced.");
             return job;
         }
         if (job.State != OriginChapterAuthoringStates.ReconciliationRequired)
             throw new InvalidOperationException("This authoring request was not dispatched.");
-        return job with { State = OriginChapterAuthoringStates.ReviewRequired, DraftText = text, ProviderReceiptDigest = receipt };
+        return job with { State = OriginChapterAuthoringStates.ReviewRequired, DraftText = text,
+            ProviderReceiptDigest = receipt, Editorial = editorial };
     }
 
     public void EnsureAccountErasureSupported()
@@ -379,13 +408,14 @@ public sealed class OriginChapterAuthoringService : IDisposable
                 || !ValidId(job.Previous.RequestId) || !IsDigest(job.Previous.SourceDigest)
                 || !IsDigest(job.Previous.ProviderReceiptDigest) || !IsDigest(job.Previous.TextDigest))
             || job.SourceDigest != OriginChapterSourceIdentity.Digest(job.Source) || job.Provider != "first_book_ai"
+            || !ValidEditorial(job.Editorial, job.DraftText, job.ProviderReceiptDigest)
             || job.ReaderAcceptedTextDigest is not null && (job.State != OriginChapterAuthoringStates.ReviewRequired
                 || job.DraftText is null || job.ReaderAcceptedTextDigest != TextDigest(job.DraftText))
             || job.State is not (OriginChapterAuthoringStates.AwaitingAuthoring
                 or OriginChapterAuthoringStates.ReconciliationRequired or OriginChapterAuthoringStates.ReviewRequired)
             || (job.State == OriginChapterAuthoringStates.ReviewRequired
                 ? string.IsNullOrWhiteSpace(job.DraftText) || Encoding.UTF8.GetByteCount(job.DraftText) > MaximumDraftBytes || !IsDigest(job.ProviderReceiptDigest)
-                : job.DraftText is not null || job.ProviderReceiptDigest is not null))
+                : job.DraftText is not null || job.ProviderReceiptDigest is not null || job.Editorial is not null))
             throw new InvalidDataException("The private authoring record is invalid.");
         return stored;
     }
@@ -436,6 +466,7 @@ public sealed class OriginChapterAuthoringService : IDisposable
             && stored.SupersededDrafts.Length is > 0 and <= 3
             && stored.SupersededDrafts.All(d => d is not null && !string.IsNullOrWhiteSpace(d.Text)
                 && Encoding.UTF8.GetByteCount(d.Text) <= MaximumDraftBytes && IsDigest(d.ProviderReceiptDigest)
+                && ValidEditorial(d.Editorial, d.Text, d.ProviderReceiptDigest)
                 && d.ProviderReceiptDigest != stored.Job.ProviderReceiptDigest && d.Text != stored.Job.DraftText)
             && stored.SupersededDrafts.Select(d => d.ProviderReceiptDigest).Distinct(StringComparer.Ordinal).Count()
                 == stored.SupersededDrafts.Length;

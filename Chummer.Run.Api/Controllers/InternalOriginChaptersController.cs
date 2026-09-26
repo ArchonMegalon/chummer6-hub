@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -27,14 +28,14 @@ public sealed class InternalOriginChaptersController(OriginChapterAuthoringServi
     [RequestSizeLimit(OriginChapterAuthoringService.MaximumRequestBytes * 2)]
     public ActionResult Complete(string workId, [FromBody] OriginChapterWorkerCompletionRequest? request)
         => Guard(() => request is null ? BadRequest() : Ok(authoring.CompleteForWorker(workId,
-            request.SourceDigest, request.ExecutionAdmission, request.DraftText, request.ProviderReceiptDigest)));
+            request.SourceDigest, request.ExecutionAdmission, request.DraftText, request.ProviderReceiptDigest, request.Editorial)));
 
     [HttpPost("{workId}/revise-unaccepted")]
     [RequestSizeLimit(OriginChapterAuthoringService.MaximumRequestBytes * 2)]
     public ActionResult ReviseUnaccepted(string workId, [FromBody] OriginChapterWorkerRevisionRequest? request)
         => Guard(() => request is null ? BadRequest() : Ok(authoring.ReviseUnacceptedForWorker(workId,
             request.SourceDigest, request.ExecutionAdmission, request.ExpectedProviderReceiptDigest,
-            request.ExpectedTextDigest, request.DraftText, request.ProviderReceiptDigest)));
+            request.ExpectedTextDigest, request.DraftText, request.ProviderReceiptDigest, request.Editorial)));
 
     private ActionResult Guard(Func<ActionResult> action)
     {
@@ -52,6 +53,12 @@ public sealed class InternalOriginChaptersController(OriginChapterAuthoringServi
 
 public sealed record OriginChapterWorkerAdmissionRequest(string SourceDigest, string ExecutionAdmission);
 public sealed record OriginChapterWorkerCompletionRequest(string SourceDigest, string ExecutionAdmission,
-    string DraftText, string ProviderReceiptDigest);
+    string DraftText, string ProviderReceiptDigest)
+{
+    public OriginChapterEditorialProvenance? Editorial { get; init; }
+}
 public sealed record OriginChapterWorkerRevisionRequest(string SourceDigest, string ExecutionAdmission,
-    string ExpectedProviderReceiptDigest, string ExpectedTextDigest, string DraftText, string ProviderReceiptDigest);
+    string ExpectedProviderReceiptDigest, string ExpectedTextDigest, string DraftText, string ProviderReceiptDigest)
+{
+    public OriginChapterEditorialProvenance? Editorial { get; init; }
+}
