@@ -77,6 +77,158 @@ public sealed class AndroidLinkedV2BearerProofTests
             ["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"] = "teable"
         }).Build(), new(remote.Store(), ownsStore: true));
 
+    private static IConfiguration SceneAdmissionConfig() => new ConfigurationBuilder().AddInMemoryCollection(
+        new Dictionary<string, string?>
+        {
+            ["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_HORIZON_REQUEST_RECEIPT_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"] = "teable",
+            ["HorizonCapabilities:origin-dossier:origin-dossier-media:Enabled"] = "true",
+            ["HorizonCapabilities:origin-dossier:origin-dossier-media:FreeWeeklyLimit"] = "2"
+        }).Build();
+
+    private static HorizonArtifactRequestService SceneAdmission(TeableRevisionStoreTests.Remote remote)
+    {
+        var config = SceneAdmissionConfig();
+        var billing = new BrilliantDirectoriesBillingService(new(config, primary: remote.Store()),
+            new(config, primary: remote.Store()), config);
+        return new(new(config), new(new(config, remote.Store()), new(config), billing), new(config, remote.Store()));
+    }
+
+    private static AndroidOriginSceneRequest PrepareSceneChapter(OriginChapterAuthoringService chapters)
+    {
+        const string prose = "The child watches the rain through the school window.";
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "en",
+            "Synthetic runner", [new("fact", "decision", "Selected a school.")]);
+        string requestId = OriginChapterSourceIdentity.RequestId(source);
+        var job = chapters.Create("subject-v2", new(requestId, source, true), () => true);
+        var work = Assert.Single(chapters.PendingForWorker(10));
+        string receipt = new string('b', 64);
+        string digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(prose)));
+        chapters.AdmitForWorker(work.WorkId, job.SourceDigest, "synthetic-admission");
+        chapters.CompleteForWorker(work.WorkId, job.SourceDigest, "synthetic-admission", prose, receipt);
+        chapters.AcceptReading("subject-v2", requestId, job.SourceDigest, receipt, digest, true, () => true);
+        return new("android-v2", requestId, digest, prose, "A child at a window", true);
+    }
+
+    [Theory]
+    [InlineData("before-admission")]
+    [InlineData("after-admission")]
+    [InlineData("revoked-after-admission")]
+    public async Task Origin_scene_disconnect_respects_the_durable_admission_boundary(string timing)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var community = new CommunityStore(SceneAdmissionConfig(), NullLogger<CommunityStore>.Instance, remote.Store());
+        var accounts = new AccountService(community);
+        accounts.EnsureUser("subject-v2");
+        using var chapters = fixture.CreateChapterAuthoring();
+        var request = PrepareSceneChapter(chapters);
+        using var disconnected = new CancellationTokenSource();
+        int dispatches = 0, before = remote.HeadPosts;
+        remote.BeforeHeadPost = () =>
+        {
+            disconnected.Cancel(); // The atomic quota/receipt commit still completes.
+            if (timing == "revoked-after-admission")
+                lock (fixture.Store.Gate)
+                {
+                    var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                    fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+                }
+        };
+        using var peer = new OriginChapterSceneMediaClientTests.Peer(packet =>
+        {
+            if (packet.StartsWith("POST /v1/health ", StringComparison.Ordinal))
+            {
+                if (timing == "before-admission") disconnected.Cancel();
+                return "{\"schema\":\"chummer.media.origin-scene-worker/v1\",\"accountErasureSupported\":true,\"dispatchEnabled\":true}";
+            }
+            Assert.StartsWith("POST /v1/render ", packet);
+            Assert.True(disconnected.IsCancellationRequested);
+            dispatches++;
+            return "{\"state\":\"review\",\"publicationAuthorized\":false}";
+        }, requests: timing == "after-admission" ? 2 : 1, expectedDisconnect: disconnected.Token);
+        Task<ActionResult>? pending = null;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/request",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            http.RequestAborted = disconnected.Token;
+            var controller = new AndroidLinkedOriginScenesController(fixture.Service, accounts,
+                new(chapters), SceneAdmission(remote), peer.Client) { ControllerContext = new() { HttpContext = http } };
+            pending = controller.RequestScene(request, disconnected.Token);
+        });
+        Assert.NotNull(pending);
+        var result = await pending;
+        if (timing == "after-admission") Assert.IsType<OkObjectResult>(result);
+        else if (timing == "revoked-after-admission") Assert.IsType<UnauthorizedResult>(result);
+        else Assert.Equal(503, Assert.IsType<ObjectResult>(result).StatusCode);
+        Assert.Equal(timing == "before-admission" ? 0 : 1, remote.HeadPosts - before);
+        Assert.Equal(timing == "after-admission" ? 1 : 0, dispatches);
+        await peer.Completed;
+    }
+
+    [Theory]
+    [InlineData("absent")]
+    [InlineData("admitted")]
+    [InlineData("ledger-outage")]
+    [InlineData("revoked")]
+    public async Task Origin_scene_cold_read_distinguishes_missing_media_from_a_charged_order_without_dispatch(string outcome)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var community = new CommunityStore(SceneAdmissionConfig(), NullLogger<CommunityStore>.Instance, remote.Store());
+        var accounts = new AccountService(community);
+        var user = accounts.EnsureUser("subject-v2");
+        using var chapters = fixture.CreateChapterAuthoring();
+        var request = PrepareSceneChapter(chapters);
+        var bridge = new OriginChapterSceneRequestBridge(chapters);
+        if (outcome != "absent")
+            SceneAdmission(remote).AdmitPrivateOriginScene(bridge.Compose("subject-v2", request.ChapterRequestId,
+                request.TextDigest, request.SceneExcerpt, request.AltText, true, () => true) with { UserId = user.UserId });
+        int before = remote.HeadPosts;
+        using var peer = new OriginChapterSceneMediaClientTests.Peer(packet =>
+        {
+            Assert.StartsWith("POST /v1/read ", packet);
+            if (outcome == "ledger-outage") remote.FailReads = true;
+            if (outcome == "revoked")
+                lock (fixture.Store.Gate)
+                {
+                    var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                    fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+                }
+            return "{}";
+        }, "404 Not Found");
+        Task<ActionResult>? pending = null;
+        var read = new AndroidOriginSceneRead(request.InstallationId, request.ChapterRequestId, request.TextDigest);
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/read",
+            JsonSerializer.Serialize(read, ContinuationWebJson)).CreateContext(), http =>
+        {
+            var controller = new AndroidLinkedOriginScenesController(fixture.Service, accounts,
+                bridge, SceneAdmission(remote), peer.Client) { ControllerContext = new() { HttpContext = http } };
+            pending = controller.ReadScene(read, default);
+        });
+        Assert.NotNull(pending);
+        var result = await pending;
+        if (outcome == "admitted")
+        {
+            var value = JsonSerializer.SerializeToElement(Assert.IsType<OkObjectResult>(result).Value, ContinuationWebJson);
+            Assert.Equal("uncertain", value.GetProperty("state").GetString());
+            Assert.Equal(bridge.ResolveIdentity("subject-v2", request.ChapterRequestId, request.TextDigest, () => true),
+                value.GetProperty("assetId").GetString());
+            Assert.False(value.GetProperty("publicationAuthorized").GetBoolean());
+            Assert.Equal(3, value.EnumerateObject().Count()); // No receipt, prompt, account or provider details.
+        }
+        else if (outcome == "ledger-outage") Assert.Equal(503, Assert.IsType<ObjectResult>(result).StatusCode);
+        else if (outcome == "revoked") Assert.IsType<UnauthorizedResult>(result);
+        else Assert.IsType<NotFoundResult>(result);
+        Assert.Equal(before, remote.HeadPosts); // Read-only even after restart; no retry, refund or allowance reset.
+        await peer.Completed;
+    }
+
     [Fact]
     public async Task Signed_v2_primary_chapter_restores_job_prose_and_acceptance_without_replaying_work()
     {

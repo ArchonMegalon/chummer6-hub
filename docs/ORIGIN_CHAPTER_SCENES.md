@@ -24,6 +24,23 @@ cannot replace an admitted one, including after a weekly allowance reset.
 Read/review identity is derived from the authenticated owner's accepted chapter,
 not a phone-supplied asset ID. Authorization is rechecked after I/O.
 
+A disconnected phone cancels before admission. Once the exact quota/order commit
+has completed, Hub awaits one handoff with the existing Media-client deadline,
+independent of that connection's cancellation token. It still checks current
+install authorization before and after the handoff. This is not a detached job,
+a longer timeout or an automatic retry. Media's durable no-replay fence remains
+the execution authority.
+
+If Media returns not-found, `read` checks the charged ledger for the same Hub
+user, subject and scene identity. A retained admission returns the existing
+`uncertain` wire state with only the asset ID and publication=false. It does not
+claim the renderer has started or succeeded. This prevents older Android clients
+from treating the paid order as absent and creating again. A ledger outage stays
+unavailable; no admission anywhere remains not-found. Reads never consume quota,
+dispatch, refund, reset or change an order, even after the admission window ends.
+A host failure before handoff still needs explicit reconciliation of that exact
+order; this change is not a background queue or proof of end-to-end latency.
+
 `OriginSceneMediaClient` uses a private Unix-domain socket, no public TCP route,
 no redirects/proxy/cookies, a dedicated file-mounted bearer token and bounded
 streamed JSON. Media Factory owns provider execution, image retention and the

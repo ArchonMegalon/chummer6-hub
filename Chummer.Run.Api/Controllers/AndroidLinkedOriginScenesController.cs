@@ -22,8 +22,14 @@ public sealed class AndroidLinkedOriginScenesController(InstallLinkingService li
                 request.AltText, request.ExternalProcessingConsent, current) with { UserId = user.UserId, Email = user.Email };
             await media.EnsureDispatchAvailableAsync(ct);
             if (!current()) throw new UnauthorizedAccessException();
+            ct.ThrowIfCancellationRequested();
             var receipt = admission.AdmitPrivateOriginScene(composed);
-            return Ok(await media.RenderAsync(subject, receipt, current, ct));
+            // Admission atomically commits the exact order and its allowance.
+            // A phone disconnect after that boundary must not strand it before
+            // Media receives it. Await one bounded handoff (the client's existing
+            // deadline still applies), never fire-and-forget or replay a provider
+            // request. Install revocation is still checked before and after I/O.
+            return Ok(await media.RenderAsync(subject, receipt, current, CancellationToken.None));
         });
 
     [HttpPost("read")]
@@ -32,7 +38,20 @@ public sealed class AndroidLinkedOriginScenesController(InstallLinkingService li
         => WithOwner(request.InstallationId, async (subject, current) =>
         {
             string identity = bridge.ResolveIdentity(subject, request.ChapterRequestId, request.TextDigest, current);
-            return Ok(await media.ReadAsync(subject, identity, current, ct));
+            try { return Ok(await media.ReadAsync(subject, identity, current, ct)); }
+            catch (KeyNotFoundException)
+            {
+                // A missing Media row does not prove that no order was charged:
+                // Hub may have stopped after admission but before the handoff.
+                // Consult the durable ledger read-only; never dispatch from read.
+                var user = accounts.GetBySubject(subject) ?? throw new UnauthorizedAccessException();
+                if (admission.FindPrivateOriginScene(user.UserId, subject, identity) is null) throw;
+                ct.ThrowIfCancellationRequested();
+                // This existing wire state deliberately claims neither a running
+                // render nor completion. Older phones must not interpret it as
+                // NotFound and offer another consented creation automatically.
+                return Ok(new { AssetId = identity, State = "uncertain", PublicationAuthorized = false });
+            }
         });
 
     [HttpPost("decide")]
