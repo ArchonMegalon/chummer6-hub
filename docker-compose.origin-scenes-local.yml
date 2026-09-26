@@ -1,0 +1,20 @@
+# Overlay the existing local Hub; never change ingress, Identity or account storage.
+# Media owns the bytes/database. Hub receives only its private socket and token.
+services:
+  hub:
+    image: ${CHUMMER_ORIGIN_SCENE_HUB_IMAGE:?Set the locally verified Hub image ID}
+    environment:
+      CHUMMER_ORIGIN_SCENE_MEDIA_REQUIRED: "true"
+      CHUMMER_ORIGIN_SCENE_MEDIA_SOCKET: /run/chummer-origin-scene/socket/worker.sock
+      CHUMMER_ORIGIN_SCENE_MEDIA_TOKEN_FILE: /run/chummer-origin-scene/worker.token
+    volumes:
+      - type: bind
+        source: ${CHUMMER_ORIGIN_SCENE_ROOT:?Set the private Media runtime root}/socket
+        target: /run/chummer-origin-scene/socket
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${CHUMMER_ORIGIN_SCENE_ROOT}/auth/worker.token
+        target: /run/chummer-origin-scene/worker.token
+        read_only: true
+        bind: {create_host_path: false}
