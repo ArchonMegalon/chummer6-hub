@@ -76,6 +76,8 @@
     <Compile Include="..\Chummer.Tests\InstallLinkingStoreActivationTests.cs" Link="InstallLinkingStoreActivationTests.cs" />
     <Compile Include="..\Chummer.Tests\MembershipTeablePersistenceTests.cs" Link="MembershipTeablePersistenceTests.cs" />
     <Compile Include="..\Chummer.Tests\OriginChapterAuthoringServiceTests.cs" Link="OriginChapterAuthoringServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginChapterSceneRequestBridgeTests.cs" Link="OriginChapterSceneRequestBridgeTests.cs" />
+    <Compile Include="..\Chummer.Tests\OriginChapterSceneMediaClientTests.cs" Link="OriginChapterSceneMediaClientTests.cs" />
     <Compile Include="..\Chummer.Tests\OriginChapterTeablePersistenceTests.cs" Link="OriginChapterTeablePersistenceTests.cs" />
     <Compile Include="..\Chummer.Tests\OriginChapterWorkerTests.cs" Link="OriginChapterWorkerTests.cs" />
     <Compile Include="..\Chummer.Tests\OriginDocumentTeablePersistenceTests.cs" Link="OriginDocumentTeablePersistenceTests.cs" />
