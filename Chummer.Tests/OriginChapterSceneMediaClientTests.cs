@@ -105,7 +105,7 @@ public sealed class OriginChapterSceneMediaClientTests
             .RenderAsync("subject-a", receipt, () => true, default));
     }
 
-    private sealed class Peer : IDisposable
+    internal sealed class Peer : IDisposable
     {
         internal const string TestToken = "synthetic-origin-worker-test-token-only";
         private readonly string directory = Path.Combine(Path.GetTempPath(), "scene-peer-" + Guid.NewGuid().ToString("N"));
@@ -114,7 +114,8 @@ public sealed class OriginChapterSceneMediaClientTests
         public OriginSceneMediaClient Client { get; }
         public Task Completed { get; }
 
-        public Peer(Func<string, string> reply, string status = "200 OK", string extraHeaders = "")
+        public Peer(Func<string, string> reply, string status = "200 OK", string extraHeaders = "", int requests = 1,
+            CancellationToken expectedDisconnect = default)
         {
             if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
             Directory.CreateDirectory(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
@@ -132,34 +133,41 @@ public sealed class OriginChapterSceneMediaClientTests
             }).Build());
             Completed = Task.Run(async () =>
             {
-                using Socket connection = await listener.AcceptAsync(deadline.Token);
-                using var stream = new NetworkStream(connection, ownsSocket: false);
-                using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
-                var packet = new StringBuilder();
-                int length = 0;
-                string? line;
-                while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync(deadline.Token)))
+                for (int index = 0; index < requests; index++)
                 {
-                    packet.AppendLine(line);
-                    if (line.StartsWith("Content-Length: ", StringComparison.OrdinalIgnoreCase)) length = int.Parse(line[16..]);
-                    if (packet.Length > 8192) throw new InvalidDataException();
+                    using Socket connection = await listener.AcceptAsync(deadline.Token);
+                    using var stream = new NetworkStream(connection, ownsSocket: false);
+                    using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+                    var packet = new StringBuilder();
+                    int length = 0;
+                    string? line;
+                    while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync(deadline.Token)))
+                    {
+                        packet.AppendLine(line);
+                        if (line.StartsWith("Content-Length: ", StringComparison.OrdinalIgnoreCase)) length = int.Parse(line[16..]);
+                        if (packet.Length > 8192) throw new InvalidDataException();
+                    }
+                    if (length is < 0 or > 65536) throw new InvalidDataException();
+                    char[] body = new char[length];
+                    int read = 0;
+                    while (read < length)
+                    {
+                        int count = await reader.ReadAsync(body.AsMemory(read), deadline.Token);
+                        if (count == 0) throw new EndOfStreamException();
+                        read += count;
+                    }
+                    packet.Append(body);
+                    byte[] output = Encoding.UTF8.GetBytes(reply(packet.ToString()));
+                    string framing = extraHeaders.Contains("Content-Length:", StringComparison.Ordinal)
+                        ? extraHeaders : extraHeaders + $"Content-Length: {output.Length}\r\n";
+                    byte[] head = Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\nContent-Type: application/json\r\n{framing}Connection: close\r\n\r\n");
+                    try
+                    {
+                        await stream.WriteAsync(head, deadline.Token);
+                        await stream.WriteAsync(output, deadline.Token);
+                    }
+                    catch (IOException) when (expectedDisconnect.IsCancellationRequested) { }
                 }
-                if (length is < 0 or > 65536) throw new InvalidDataException();
-                char[] body = new char[length];
-                int read = 0;
-                while (read < length)
-                {
-                    int count = await reader.ReadAsync(body.AsMemory(read), deadline.Token);
-                    if (count == 0) throw new EndOfStreamException();
-                    read += count;
-                }
-                packet.Append(body);
-                byte[] output = Encoding.UTF8.GetBytes(reply(packet.ToString()));
-                string framing = extraHeaders.Contains("Content-Length:", StringComparison.Ordinal)
-                    ? extraHeaders : extraHeaders + $"Content-Length: {output.Length}\r\n";
-                byte[] head = Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\nContent-Type: application/json\r\n{framing}Connection: close\r\n\r\n");
-                await stream.WriteAsync(head, deadline.Token);
-                await stream.WriteAsync(output, deadline.Token);
             });
         }
 

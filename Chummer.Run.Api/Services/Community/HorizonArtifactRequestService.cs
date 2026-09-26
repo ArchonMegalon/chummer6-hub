@@ -155,6 +155,29 @@ public sealed class HorizonArtifactRequestService
         }
     }
 
+    public HorizonArtifactRequestReceipt? FindPrivateOriginScene(string userId, string subjectId, string assetId)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(subjectId) || subjectId.Contains('\0')
+            || assetId is not { Length: 64 }
+            || assetId.Any(static c => c is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+            throw new ArgumentException("An exact private scene identity is required.");
+        // No current allowance or enabled-capability check: retained orders stay
+        // observable after their admission window expires. An unavailable ledger
+        // must not turn into a false NotFound/permission to order again.
+        if (_quota is null) throw new IOException("Private scene admission authority is unavailable.");
+        string source = "origin-dossier:scene:" + assetId;
+        var rows = _quota.ListChargedRequests().Where(row => row.CapabilityId == "origin-dossier-media"
+            && row.SourceRef == source && row.RequestedByUserId == userId).ToArray();
+        if (rows.Length == 0) return null;
+        string owner = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(subjectId)));
+        if (rows.Length != 1 || rows[0] is not { Status: "accepted", Quota: not null, QuotaTracked: true,
+                HorizonId: "origin-dossier", Visibility: "private", ExternalProcessingConsent: true,
+                GovernedRenderRequest: { Audience: "private" } render }
+            || render.RequestedBy != "origin-owner:" + owner || render.WorkItemId != assetId || render.SourceRef != source)
+            throw new InvalidDataException("The retained private scene admission does not match its owner and source.");
+        return rows[0];
+    }
+
     public IReadOnlyList<HorizonArtifactRequestReceipt> ListRecentReceipts(
         string? horizonId = null,
         string? userId = null,

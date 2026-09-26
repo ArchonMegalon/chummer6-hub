@@ -248,6 +248,31 @@ public sealed class OriginChapterSceneRequestBridgeTests : IDisposable
     }
 
     [Fact]
+    public void Retained_scene_lookup_is_exact_read_only_and_independent_of_current_allowance()
+    {
+        using var chapters = Prepare();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var request = new OriginChapterSceneRequestBridge(chapters).Compose("owner-a", "request", Sha(Prose),
+            Prose, "Scene", true, () => true) with { UserId = "hub-user-a" };
+        string asset = request.GovernedRenderRequest!.WorkItemId;
+        Assert.Null(Admission(remote).FindPrivateOriginScene("hub-user-a", "owner-a", asset));
+        var admitted = Admission(remote).AdmitPrivateOriginScene(request);
+        var cold = Admission(remote, enabled: false, overrides: new()
+            { ["HorizonCapabilities:origin-dossier:origin-dossier-media:FreeWeeklyLimit"] = "0" });
+        Assert.Equal(JsonSerializer.Serialize(admitted), JsonSerializer.Serialize(
+            cold.FindPrivateOriginScene("hub-user-a", "owner-a", asset)));
+        Assert.Null(cold.FindPrivateOriginScene("other-user", "owner-a", asset));
+        Assert.Null(cold.FindPrivateOriginScene("hub-user-a", "owner-a", new string('f', 64)));
+        Assert.Throws<InvalidDataException>(() => cold.FindPrivateOriginScene("hub-user-a", "other-owner", asset));
+        Assert.Equal(1, remote.HeadPosts);
+        remote.FailReads = true;
+        Assert.Throws<HttpRequestException>(() => cold.FindPrivateOriginScene("hub-user-a", "owner-a", asset));
+        Assert.Throws<IOException>(() => new HorizonArtifactRequestService(new(AdmissionConfig()))
+            .FindPrivateOriginScene("hub-user-a", "owner-a", asset));
+        Assert.Equal(1, remote.HeadPosts);
+    }
+
+    [Fact]
     public void Changed_scene_consent_or_disabled_capability_cannot_reuse_or_replace_admission()
     {
         using var chapters = Prepare();
