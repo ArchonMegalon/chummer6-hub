@@ -4,6 +4,13 @@ services:
   hub:
     image: ${CHUMMER_ORIGIN_SCENE_HUB_IMAGE:?Set the locally verified Hub image ID}
     environment:
+      # Separate activation from socket availability. Defaults remain closed.
+      CHUMMER_HORIZON_ORIGIN_DOSSIER_CAPABILITY_ORIGIN_DOSSIER_MEDIA_ENABLED: ${CHUMMER_ORIGIN_SCENE_ENABLED:-false}
+      # Optional owner-approved private trial, never a synthetic paid membership.
+      CHUMMER_ORIGIN_SCENE_SPONSOR_USER_SHA256: ${CHUMMER_ORIGIN_SCENE_SPONSOR_USER_SHA256:-}
+      CHUMMER_ORIGIN_SCENE_SPONSOR_LIMIT: ${CHUMMER_ORIGIN_SCENE_SPONSOR_LIMIT:-}
+      CHUMMER_ORIGIN_SCENE_SPONSOR_WEEK_START_UTC: ${CHUMMER_ORIGIN_SCENE_SPONSOR_WEEK_START_UTC:-}
+      CHUMMER_ORIGIN_SCENE_SPONSOR_EXPIRES_AT_UTC: ${CHUMMER_ORIGIN_SCENE_SPONSOR_EXPIRES_AT_UTC:-}
       CHUMMER_ORIGIN_SCENE_MEDIA_REQUIRED: "true"
       CHUMMER_ORIGIN_SCENE_MEDIA_SOCKET: /run/chummer-origin-scene/socket/worker.sock
       CHUMMER_ORIGIN_SCENE_MEDIA_TOKEN_FILE: /run/chummer-origin-scene/worker.token

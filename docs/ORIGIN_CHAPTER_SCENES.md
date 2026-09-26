@@ -40,11 +40,28 @@ Partial configuration is not a silent erasure bypass. Account deletion removes
 media before other auxiliary stores and retains an owner tombstone against
 in-flight completion. Existing primary-store erasure restrictions still apply.
 
-The capability remains disabled by default. This source change does not configure
+The capability remains disabled by default. In the local scene overlay,
+`CHUMMER_ORIGIN_SCENE_ENABLED=true` explicitly enables admission; a healthy socket
+alone does not enable it. This source change does not configure
 or deploy the service. Android must still obtain explicit scene consent, call
 these routes, review/download and adopt bytes into its existing immutable scene
 store for offline reading and EPUB embedding. No automatic illustrated-book or
 Play delivery claim follows from server tests.
+
+An operator may sponsor a bounded private test without inventing billing
+membership. The optional `CHUMMER_ORIGIN_SCENE_SPONSOR_` settings are
+`USER_SHA256` (SHA-256 of the trimmed, uppercase invariant Hub user ID), `LIMIT`
+(1–8), `WEEK_START_UTC` (Monday midnight), and `EXPIRES_AT_UTC` (no later than the
+end of that week). Both timestamps must use `yyyy-MM-ddTHH:mm:ssZ`. All four must
+be valid and current. Missing, expired or mismatched settings leave normal limits
+unchanged. This only raises that owner's existing weekly limit for explicitly
+consented private Origin chapter scenes, never the global free tier, other
+capabilities or a receiptless quota consumption. Existing usage is not reset.
+Receipts identify `sponsored_test`, `operator_approved_private_scene_trial` and
+`private_origin_scene`; `SupporterActive` still reflects actual billing.
+Expiry stops new admissions, not fulfillment/readback of an already charged,
+exact immutable order. Media's independent attempt ceiling and no-replay fence
+still apply. This is not an assertion of provider credits or publication rights.
 
 Focused local verification: affected API build; Origin chapter, Horizon allowance,
 scene signed-install and account-erasure tests. These cover accepted/unaccepted

@@ -30,7 +30,7 @@ def inputs() -> dict[str, str]:
     }
 
 
-def render(environment: dict[str, str], *, google: bool = False, tunnel: bool = False) -> subprocess.CompletedProcess[str]:
+def render(environment: dict[str, str], *, google: bool = False, tunnel: bool = False, scenes: bool = False) -> subprocess.CompletedProcess[str]:
     if not shutil.which("docker"):
         pytest.skip("Docker Compose is required for actual interpolation verification")
     command = ["docker", "compose", "-p", "chummer-teable-primary-local", "--env-file", "/dev/null", "-f", str(COMPOSE)]
@@ -38,10 +38,37 @@ def render(environment: dict[str, str], *, google: bool = False, tunnel: bool = 
         command += ["-f", str(ROOT / "docker-compose.teable-primary-google.yml")]
     if tunnel:
         command += ["-f", str(ROOT / "docker-compose.teable-primary-tunnel.yml"), "--profile", "account-origin-edge"]
+    if scenes:
+        command += ["-f", str(ROOT / "docker-compose.origin-scenes-local.yml")]
     return subprocess.run(
         [*command, "config", "--format", "json"],
         env=environment, cwd=ROOT, capture_output=True, text=True, timeout=15, check=False,
     )
+
+
+def test_private_scene_activation_and_owner_trial_are_explicit_and_do_not_change_other_limits() -> None:
+    environment = {**inputs(), "CHUMMER_ORIGIN_SCENE_HUB_IMAGE": "sha256:" + "d" * 64,
+                   "CHUMMER_ORIGIN_SCENE_ROOT": "/synthetic/chummer/scenes"}
+    result = render(environment, scenes=True)
+    assert result.returncode == 0, result.stderr
+    baseline = json.loads(result.stdout)
+    hub = baseline["services"]["hub"]["environment"]
+    activation = "CHUMMER_HORIZON_ORIGIN_DOSSIER_CAPABILITY_ORIGIN_DOSSIER_MEDIA_ENABLED"
+    assert hub[activation] == "false"
+    sponsor = {
+        "CHUMMER_ORIGIN_SCENE_SPONSOR_USER_SHA256": "a" * 64,
+        "CHUMMER_ORIGIN_SCENE_SPONSOR_LIMIT": "1",
+        "CHUMMER_ORIGIN_SCENE_SPONSOR_WEEK_START_UTC": "2026-09-21T00:00:00Z",
+        "CHUMMER_ORIGIN_SCENE_SPONSOR_EXPIRES_AT_UTC": "2026-09-26T20:00:00Z",
+    }
+    assert all(hub[key] == "" for key in sponsor)
+    enabled = render({**environment, **sponsor, "CHUMMER_ORIGIN_SCENE_ENABLED": "true"}, scenes=True)
+    assert enabled.returncode == 0, enabled.stderr
+    changed = json.loads(enabled.stdout)
+    expected = baseline["services"]["hub"]["environment"]
+    expected.update(sponsor)
+    expected[activation] = "true"
+    assert changed == baseline  # No global free tier, credentials, ingress or storage changes.
 
 
 @pytest.fixture(scope="module")
