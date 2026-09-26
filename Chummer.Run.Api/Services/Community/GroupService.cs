@@ -7,6 +7,8 @@ using Chummer.Campaign.Contracts;
 
 namespace Chummer.Run.Api.Services.Community;
 
+public sealed record GroupAccessView(GroupDto Group, GroupMembershipDto Membership, bool CanManage);
+
 public sealed class GroupService
 {
     private static readonly IReadOnlySet<string> ChronicleBookKinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -115,13 +117,22 @@ public sealed class GroupService
     }
 
     public IReadOnlyList<GroupDto> ListGroupsForUser(string subjectId)
+        => ListGroupAccessForUser(subjectId).Select(view => view.Group).ToArray();
+
+    public IReadOnlyList<GroupAccessView> ListGroupAccessForUser(string subjectId)
     {
-        var user = _accounts.EnsureUser(subjectId, subjectId);
         using (_store.Enter())
         {
+            // One fresh primary snapshot binds account mapping, membership and
+            // display permissions. Nested reads share this synchronous scope;
+            // nothing is cached or carried into a later mutation admission.
+            var user = _accounts.EnsureUser(subjectId, subjectId);
             return _store.GroupsById.Values
                 .Where(group => group.Memberships.Any(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new GroupAccessView(group,
+                    group.Memberships.First(member => string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)),
+                    CanManageGroup(group, user.UserId)))
                 .ToArray();
         }
     }
