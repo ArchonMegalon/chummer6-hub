@@ -15,6 +15,145 @@ public sealed class OriginChapterAuthoringServiceTests : IDisposable
         [new("fact-one", "decision-one", "The player selected Renraku.")]), true);
     private static bool Authorized() => true;
 
+    private static OriginChapterNarrativeContext Possibilities() => new("next-turn", new string('f', 64),
+        [new("school", "Military school", OriginChapterOpportunityAvailability.Available),
+            new("corporate", "A corporate education", OriginChapterOpportunityAvailability.Unavailable)]);
+
+    [Fact]
+    public void Optional_possibilities_preserve_legacy_source_bytes_and_are_not_canonical_facts()
+    {
+        var original = Request().Source;
+        var legacy = new { original.WorkspaceId, original.ChapterId, original.ChapterDigest,
+            original.AcceptedDecisionId, original.Locale, original.RunnerName, original.Facts };
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(legacy, options),
+            System.Text.Json.JsonSerializer.Serialize(OriginChapterSourceIdentity.Capture(original), options));
+        var source = OriginChapterSourceIdentity.Capture(original with { NarrativeContext = Possibilities() });
+        Assert.Equal(original.Facts, source.Facts);
+        Assert.Equal(OriginChapterSourceIdentity.RequestId(original), OriginChapterSourceIdentity.RequestId(source));
+        Assert.NotEqual(OriginChapterSourceIdentity.Digest(original), OriginChapterSourceIdentity.Digest(source));
+        var restored = System.Text.Json.JsonSerializer.Deserialize<OriginChapterSource>(
+            System.Text.Json.JsonSerializer.Serialize(source, options), options)!;
+        Assert.Equal(OriginChapterSourceIdentity.RequestId(source), OriginChapterSourceIdentity.RequestId(restored));
+        Assert.Equal(source.NarrativeContext!.Opportunities, restored.NarrativeContext!.Opportunities);
+    }
+
+    [Fact]
+    public void Possibilities_are_captured_and_any_change_changes_the_approved_input_digest_not_the_lookup_key()
+    {
+        var opportunities = Possibilities().Opportunities.ToArray();
+        var input = Request().Source with { NarrativeContext = Possibilities() with { Opportunities = opportunities } };
+        var captured = OriginChapterSourceIdentity.Capture(input);
+        string expected = OriginChapterSourceIdentity.Digest(captured);
+        opportunities[0] = opportunities[0] with { Caption = "Changed school" };
+        Assert.Equal(expected, OriginChapterSourceIdentity.Digest(captured));
+        Assert.NotEqual(expected, OriginChapterSourceIdentity.Digest(input));
+        foreach (var changed in new[] {
+            captured.NarrativeContext! with { TurnId = "other-turn" },
+            captured.NarrativeContext! with { DecisionDigest = new string('e', 64) },
+            captured.NarrativeContext! with { Opportunities = [captured.NarrativeContext!.Opportunities[0] with
+                { Availability = OriginChapterOpportunityAvailability.Unavailable }] } })
+        {
+            var source = captured with { NarrativeContext = changed };
+            Assert.NotEqual(expected, OriginChapterSourceIdentity.Digest(source));
+            Assert.Equal(OriginChapterSourceIdentity.RequestId(captured), OriginChapterSourceIdentity.RequestId(source));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Different_device_or_later_possibilities_find_one_job_and_cannot_change_its_consent(bool originalHasContext)
+    {
+        var original = Request().Source with { NarrativeContext = originalHasContext ? Possibilities() : null };
+        var changed = original with { NarrativeContext = originalHasContext ? null : Possibilities() };
+        var request = new OriginChapterAuthoringRequest(OriginChapterSourceIdentity.RequestId(original), original, true);
+        using var service = Service();
+        var admitted = service.Create("subject-a", request, Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, admitted.SourceDigest, "admission-one");
+        using var restarted = Service();
+        var read = restarted.Get("subject-a", OriginChapterSourceIdentity.RequestId(changed))!;
+        Assert.Equal(admitted.SourceDigest, read.SourceDigest);
+        Assert.Throws<InvalidOperationException>(() => restarted.Create("subject-a",
+            new(OriginChapterSourceIdentity.RequestId(changed), changed, true), Authorized));
+        Assert.Single(restarted.PendingForWorker(20));
+        Assert.False(restarted.AdmitForWorker(work.WorkId, admitted.SourceDigest, "admission-one").MayStartGeneration);
+        Assert.Null(restarted.Get("subject-b", request.RequestId));
+    }
+
+    [Theory]
+    [InlineData("turn")]
+    [InlineData("digest")]
+    [InlineData("empty")]
+    [InlineData("null-list")]
+    [InlineData("null-choice")]
+    [InlineData("many")]
+    [InlineData("duplicate")]
+    [InlineData("id")]
+    [InlineData("caption")]
+    [InlineData("whitespace")]
+    [InlineData("controls")]
+    [InlineData("large")]
+    [InlineData("availability")]
+    public void Invalid_possibilities_cannot_create_a_job(string change)
+    {
+        var context = Possibilities();
+        var choice = context.Opportunities[0];
+        context = change switch
+        {
+            "turn" => context with { TurnId = "\ninvalid" },
+            "digest" => context with { DecisionDigest = "invalid" },
+            "empty" => context with { Opportunities = [] },
+            "null-list" => context with { Opportunities = null! },
+            "null-choice" => context with { Opportunities = [null!] },
+            "many" => context with { Opportunities = Enumerable.Range(0, 9).Select(n => choice with { ChoiceId = "choice-" + n }).ToArray() },
+            "duplicate" => context with { Opportunities = [choice, choice] },
+            "id" => context with { Opportunities = [choice with { ChoiceId = " " }] },
+            "caption" => context with { Opportunities = [choice with { Caption = "" }] },
+            "whitespace" => context with { Opportunities = [choice with { Caption = " untrimmed" }] },
+            "controls" => context with { Opportunities = [choice with { Caption = "School\nnew line" }] },
+            "large" => context with { Opportunities = [choice with { Caption = new string('x', 1025) }] },
+            "availability" => context with { Opportunities = [choice with { Availability = "already-graduated" }] },
+            _ => throw new InvalidOperationException()
+        };
+        var request = Request() with { Source = Request().Source with { NarrativeContext = context } };
+        using var service = Service();
+        Assert.Throws<ArgumentException>(() => service.Create("subject-a", request, Authorized));
+        Assert.Null(service.Get("subject-a", request.RequestId));
+        Assert.Empty(service.PendingForWorker(20));
+    }
+
+    [Fact]
+    public void Next_chapter_may_change_possibilities_without_rewriting_accepted_history_or_old_dispatch()
+    {
+        var request = Request() with { Source = Request().Source with { NarrativeContext = Possibilities() } };
+        using var service = Service();
+        var first = service.Create("subject-a", request, Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, first.SourceDigest, "admission-one");
+        service.CompleteForWorker(work.WorkId, first.SourceDigest, "admission-one", "Accepted scene.", new string('c', 64));
+        string text = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("Accepted scene.")));
+        first = service.AcceptReading("subject-a", first.RequestId, first.SourceDigest, new string('c', 64), text, true, Authorized);
+        string oldBytes = System.Text.Json.JsonSerializer.Serialize(first);
+        var next = Next(first);
+        next = next with { Source = next.Source with { NarrativeContext = new("later-turn", new string('e', 64),
+            [new("street", "Find a way on the streets", OriginChapterOpportunityAvailability.Available)]) } };
+        var created = service.Create("subject-a", next, Authorized);
+        Assert.Equal(OriginChapterSourceIdentity.Digest(next.Source), created.SourceDigest);
+        Assert.Equal(next.Source.NarrativeContext.TurnId, created.Source.NarrativeContext!.TurnId);
+        Assert.Equal(next.Source.NarrativeContext.Opportunities, created.Source.NarrativeContext.Opportunities);
+        Assert.Equal(oldBytes, System.Text.Json.JsonSerializer.Serialize(Service().Get("subject-a", first.RequestId)));
+        Assert.Throws<InvalidOperationException>(() => service.Create("subject-a", request with
+            { Source = request.Source with { NarrativeContext = null } }, Authorized));
+        Assert.False(service.AdmitForWorker(work.WorkId, first.SourceDigest, "admission-one").MayStartGeneration);
+        var worker = service.GetForWorker(Assert.Single(service.PendingForWorker(20)).WorkId);
+        Assert.Equal(created.SourceDigest, OriginChapterSourceIdentity.Digest(worker.Job.Source));
+        Assert.Equal(created.Source.NarrativeContext.Opportunities, worker.Job.Source.NarrativeContext!.Opportunities);
+        Assert.False(worker.Job.AffectsMechanics);
+        Assert.False(worker.Job.PublicationAuthorized);
+    }
+
     private (OriginChapterAuthoringJob Job, OriginChapterWorkerItem Work) Accepted()
     {
         using var service = Service();
