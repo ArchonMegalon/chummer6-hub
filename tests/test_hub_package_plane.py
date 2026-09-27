@@ -37,7 +37,7 @@ CORE_RUNTIME_BUNDLE = (
     /
     "chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip"
 )
-PACKAGE_VERSION = "0.1.1-packageplane.20260924.3"
+PACKAGE_VERSION = "0.1.1-packageplane.20260927.1"
 OWNER_PACKAGE_VERSIONS = {
     "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh5160e78a60bce",
     "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,

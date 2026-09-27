@@ -10,9 +10,9 @@
       },
       "Chummer.Hub.Registry.Contracts": {
         "type": "Direct",
-        "requested": "[0.1.1-packageplane.20260924.3, )",
-        "resolved": "0.1.1-packageplane.20260924.3",
-        "contentHash": "ioAZcaEWmT8XKhZXy3plM0PZ6o/JZxXe42lmLBT+QVFDheyTxgV3xOnl4vSv3MM9ZRb6NxnuUWsCemYVnG7nMw=="
+        "requested": "[0.1.1-packageplane.20260927.1, )",
+        "resolved": "0.1.1-packageplane.20260927.1",
+        "contentHash": "iJAN7pcnsubw2z7ZOe0eFLv4tJHaJzDp5hrVI5z0HUN6ZzYwo25/76NtiYykvg/4cCRvbXtQkp81MIRrZ88RTg=="
       },
       "chummer.play.contracts": {
         "type": "Project"
