@@ -218,10 +218,38 @@ public sealed class RookWorkspaceToolEndpointTests
             wire += new string(' ', 8193 - Encoding.UTF8.GetByteCount(wire));
             using HttpResponseMessage response = await app.SendAsync(action, wire, chunked: chunked);
             Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+            Assert.True(response.Headers.ConnectionClose);
             await AssertSafeResponse(response);
         }
         Assert.Equal(0, app.Fixture.Identity.Calls);
         app.Fixture.AssertUnchanged(before);
+    }
+
+    [Theory]
+    [InlineData("HTTP/1.0", true)]
+    [InlineData("HTTP/1.1", true)]
+    [InlineData("HTTP/2", false)]
+    [InlineData("HTTP/3", false)]
+    public async Task Oversized_body_closes_only_http1_without_reading_or_resolving_admission(string protocol, bool closes)
+    {
+        using ServiceProvider services = new ServiceCollection()
+            .AddTransient<RookWorkspaceRuleReadService>(_ => throw new InvalidOperationException("Must not resolve."))
+            .BuildServiceProvider();
+        using var body = new MemoryStream(new byte[8193]);
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.Protocol = protocol;
+        context.Request.ContentType = "application/json";
+        context.Request.ContentLength = body.Length;
+        context.Request.Body = body;
+        var controller = new RookWorkspaceToolController(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            { [PrivateRookRuntimeConfiguration.EnabledKey] = "true" }).Build(), new TestEnvironment(), services)
+        { ControllerContext = new ControllerContext { HttpContext = context } };
+        var result = Assert.IsType<ObjectResult>(await controller.Grant());
+        Assert.Equal(StatusCodes.Status413PayloadTooLarge, result.StatusCode);
+        Assert.Equal(0, body.Position);
+        if (closes) Assert.Equal("close", context.Response.Headers.Connection.ToString());
+        else Assert.False(context.Response.Headers.ContainsKey("Connection"));
     }
 
     [Theory]

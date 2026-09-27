@@ -180,7 +180,15 @@ public sealed class RookWorkspaceToolController(
     }
 
     private ObjectResult Failure(int status)
-        => StatusCode(status, new { error = "The private Rook workspace operation could not be completed." });
+    {
+        // The Content-Length gate can reject before consuming any request bytes.
+        // Do not advertise HTTP/1 keep-alive for that unread oversized body:
+        // subsequent draining by the server is also subject to its size limit.
+        // HTTP/2 and HTTP/3 must not receive a connection-specific header.
+        if (status == StatusCodes.Status413PayloadTooLarge && Request.Protocol is "HTTP/1.0" or "HTTP/1.1")
+            Response.Headers.Connection = "close";
+        return StatusCode(status, new { error = "The private Rook workspace operation could not be completed." });
+    }
 
     private static int SafeStatus(int status)
         => status is 400 or 401 or 403 or 404 or 409 or 413 or 415 or 429 or 503 ? status : 503;
