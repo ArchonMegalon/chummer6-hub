@@ -5,12 +5,38 @@ using System.Text.Json.Serialization;
 
 namespace Chummer.Run.Contracts.Community;
 
-/// <summary>Player-approved narrative facts only; never a character file or rules packet.</summary>
+/// <summary>Player-approved narrative input; never a character file or rules packet.</summary>
 public sealed record OriginChapterSource(
     string WorkspaceId, string ChapterId, string ChapterDigest, string AcceptedDecisionId,
-    string Locale, string RunnerName, IReadOnlyList<OriginChapterSourceFact> Facts);
+    string Locale, string RunnerName, IReadOnlyList<OriginChapterSourceFact> Facts)
+{
+    // Possibilities are not accepted history. Omission preserves every old
+    // source digest/request ID; callers must retain an already issued source,
+    // not recompute its possibilities from a later turn or changed budget.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OriginChapterNarrativeContext? NarrativeContext { get; init; }
+}
 
 public sealed record OriginChapterSourceFact(string FactId, string DecisionId, string Text);
+
+/// <summary>
+/// Optional, player-approved hints at the next decision. These identifiers bind
+/// the client's snapshot, not Hub rules authority. They never select a module,
+/// promise admission/completion or grant effects. Use only when the story fits;
+/// an unsuccessful attempt may be narrated without awarding its module. An
+/// unavailable path is not necessarily unaffordable tuition or social rejection.
+/// </summary>
+public sealed record OriginChapterNarrativeContext(
+    string TurnId, string DecisionDigest, IReadOnlyList<OriginChapterStoryOpportunity> Opportunities);
+
+/// <summary>Short original label/caption only, not rulebook prose or future answers.</summary>
+public sealed record OriginChapterStoryOpportunity(string ChoiceId, string Caption, string Availability);
+
+public static class OriginChapterOpportunityAvailability
+{
+    public const string Available = "available";
+    public const string Unavailable = "unavailable";
+}
 
 public sealed record OriginChapterAuthoringRequest(
     string RequestId, OriginChapterSource Source, bool ExternalProcessingConsent)
@@ -53,18 +79,46 @@ public static class OriginChapterSourceIdentity
         }
         if (facts.Select(f => f.FactId).Distinct(StringComparer.Ordinal).Count() != facts.Length)
             throw new ArgumentException("Narrative fact IDs must be unique.");
-        var captured = source with { Facts = Array.AsReadOnly(facts) };
+        var captured = source with { Facts = Array.AsReadOnly(facts), NarrativeContext = CaptureNarrativeContext(source.NarrativeContext) };
         if (JsonSerializer.SerializeToUtf8Bytes(captured, Json).Length > 32 * 1024)
             throw new ArgumentException("The narrative source is oversized.");
         return captured;
     }
 
+    private static OriginChapterNarrativeContext? CaptureNarrativeContext(OriginChapterNarrativeContext? context)
+    {
+        if (context is null) return null;
+        RequireId(context.TurnId);
+        if (!IsDigest(context.DecisionDigest) || context.Opportunities is not { Count: > 0 and <= 8 })
+            throw new ArgumentException("The narrative possibilities are invalid.");
+        var opportunities = context.Opportunities.ToArray();
+        foreach (var opportunity in opportunities)
+        {
+            if (opportunity is null) throw new ArgumentException("The narrative possibility is invalid.");
+            RequireId(opportunity.ChoiceId);
+            if (string.IsNullOrWhiteSpace(opportunity.Caption) || opportunity.Caption.Length > 1024
+                || opportunity.Caption != opportunity.Caption.Trim() || opportunity.Caption.Any(char.IsControl)
+                || opportunity.Availability is not (OriginChapterOpportunityAvailability.Available
+                    or OriginChapterOpportunityAvailability.Unavailable))
+                throw new ArgumentException("The narrative possibility is invalid.");
+        }
+        if (opportunities.Select(o => o.ChoiceId).Distinct(StringComparer.Ordinal).Count() != opportunities.Length)
+            throw new ArgumentException("Narrative possibility IDs must be unique.");
+        return context with { Opportunities = Array.AsReadOnly(opportunities) };
+    }
+
     public static string Digest(OriginChapterSource source)
         => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(Capture(source), Json))).ToLowerInvariant();
 
-    // Same approved source resumes the same subject-scoped request on every
-    // device. A lost response or application restart never invents a paid retry.
-    public static string RequestId(OriginChapterSource source) => "chapter-" + Digest(source);
+    // Opportunities are optional input to the same chapter, not a new paid
+    // chapter identity. Legacy/no-context clients and another device must find
+    // the already admitted job. Digest still binds ALL approved input; Create,
+    // worker admission and reader acceptance reject any source-digest change.
+    public static string RequestId(OriginChapterSource source)
+    {
+        var captured = Capture(source); // Validate context before omitting it from the lookup key.
+        return "chapter-" + Digest(captured with { NarrativeContext = null });
+    }
 
     public static OriginChapterPredecessor? CapturePredecessor(OriginChapterPredecessor? previous)
     {
