@@ -11,6 +11,43 @@ a provider, execute a render, persist image bytes or grant publication. The medi
 payload binds opaque owner, workspace, chapter, canonical chapter digest and
 selected prose. Alt text is bounded and must be escaped by clients.
 
+## Growing-character continuity
+
+Automatic illustrated-book requests use `chummer.origin.chapter-scene/v3`
+with insertion policy `automatic-private-book/v1`; the manual route retains v2.
+Hub follows the exact,
+reader-accepted predecessor chain in the same owner/workspace to its opening
+chapter and binds that opening's scene as `referenceSceneId`. `protagonistId`
+is SHA-256 of the NUL-delimited subject digest, workspace ID and
+`origin-protagonist/v1`. Every later chapter retains these bindings, including
+after restart. Missing or changed predecessors cannot invent a replacement.
+
+The prompt preserves the opening character/metatype brief and uses the current
+accepted decision's facts and exact prose excerpt for age and setting. It is
+UTF-8 bounded without splitting characters; unchosen future opportunities are
+not illustrated as history. Media Factory must validate and provide the actual
+retained reference PNG to a reference-capable renderer, not merely reuse this
+prompt. Deploy that compatible Media version before this Hub bridge.
+
+This establishes reference provenance, not a biometric or exact-age guarantee.
+On 28 September, the actual compiled bridge/client and deployed Media worker
+generated child and youth PNGs from one retained reference and cold-read their
+exact bytes. Visual continuity was observed, with fine-detail and lettering
+limitations documented in Media Factory's
+`docs/evidence/origin-continuity-canary-20260928.md`. Both real images passed the
+Android managed reader/EPUB check using explicitly synthetic prose. The complete
+live illustrated FirstBook workflow and physical Play installation remain open;
+neither follows from this bounded provider check or Preview 50 Internal
+availability. Existing v1/v2 scenes are not relabelled
+and existing paid requests must not be replayed to change their contract.
+
+For the explicitly consented illustrated-book route, Hub selects an excerpt of
+the exact accepted chapter itself. No local picture upload, scene picker or
+per-image approval is needed. Requests use `RequiresApproval=false` and
+`PersistOnApproval=false`, not a fabricated human approval. Old FirstBook-only
+consent cannot enter this path. Media retains the immutable original reference
+and may automatically persist only a validated v3 private-book image.
+
 ## Private delivery boundary
 
 `AndroidLinkedOriginScenesController` now implements signed-install POST routes
@@ -60,10 +97,11 @@ in-flight completion. Existing primary-store erasure restrictions still apply.
 The capability remains disabled by default. In the local scene overlay,
 `CHUMMER_ORIGIN_SCENE_ENABLED=true` explicitly enables admission; a healthy socket
 alone does not enable it. This source change does not configure
-or deploy the service. Android must still obtain explicit scene consent, call
-these routes, review/download and adopt bytes into its existing immutable scene
-store for offline reading and EPUB embedding. No automatic illustrated-book or
-Play delivery claim follows from server tests.
+or deploy the service. Android must obtain explicit illustrated-book consent,
+call these routes, and validate/download bytes into its existing immutable scene
+store for offline reading and EPUB embedding. The legacy manual path keeps its
+review requirement. No live provider or Play delivery claim follows from server
+tests.
 
 An operator may sponsor a bounded private test without inventing billing
 membership. The optional `CHUMMER_ORIGIN_SCENE_SPONSOR_` settings are

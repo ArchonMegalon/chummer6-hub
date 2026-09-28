@@ -18,8 +18,12 @@ public sealed class AndroidLinkedOriginScenesController(InstallLinkingService li
         => WithOwner(request.InstallationId, async (subject, current) =>
         {
             var user = accounts.GetBySubject(subject) ?? throw new UnauthorizedAccessException();
-            var composed = bridge.Compose(subject, request.ChapterRequestId, request.TextDigest, request.SceneExcerpt,
-                request.AltText, request.ExternalProcessingConsent, current) with { UserId = user.UserId, Email = user.Email };
+            if (request.AutomaticInsertion && (request.SceneExcerpt != "" || request.AltText != ""))
+                throw new ArgumentException("Automatic book scenes are composed from the accepted chapter.");
+            var composed = (request.AutomaticInsertion
+                ? bridge.ComposeAutomatic(subject, request.ChapterRequestId, request.TextDigest, request.ExternalProcessingConsent, current)
+                : bridge.Compose(subject, request.ChapterRequestId, request.TextDigest, request.SceneExcerpt,
+                    request.AltText, request.ExternalProcessingConsent, current)) with { UserId = user.UserId, Email = user.Email };
             await media.EnsureDispatchAvailableAsync(ct);
             if (!current()) throw new UnauthorizedAccessException();
             ct.ThrowIfCancellationRequested();
@@ -92,7 +96,7 @@ public sealed class AndroidLinkedOriginScenesController(InstallLinkingService li
 }
 
 public sealed record AndroidOriginSceneRequest(string InstallationId, string ChapterRequestId, string TextDigest,
-    string SceneExcerpt, string AltText, bool ExternalProcessingConsent);
+    string SceneExcerpt, string AltText, bool ExternalProcessingConsent, bool AutomaticInsertion = false);
 public sealed record AndroidOriginSceneRead(string InstallationId, string ChapterRequestId, string TextDigest);
 public sealed record AndroidOriginSceneDecision(string InstallationId, string ChapterRequestId, string TextDigest,
     string ExpectedImageHash, bool Approve, bool ExplicitlyConfirmed);
