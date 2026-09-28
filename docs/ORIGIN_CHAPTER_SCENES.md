@@ -13,7 +13,9 @@ selected prose. Alt text is bounded and must be escaped by clients.
 
 ## Growing-character continuity
 
-New requests use `chummer.origin.chapter-scene/v2`. Hub follows the exact,
+Automatic illustrated-book requests use `chummer.origin.chapter-scene/v3`
+with insertion policy `automatic-private-book/v1`; the manual route retains v2.
+Hub follows the exact,
 reader-accepted predecessor chain in the same owner/workspace to its opening
 chapter and binds that opening's scene as `referenceSceneId`. `protagonistId`
 is SHA-256 of the NUL-delimited subject digest, workspace ID and
@@ -28,9 +30,17 @@ retained reference PNG to a reference-capable renderer, not merely reuse this
 prompt. Deploy that compatible Media version before this Hub bridge.
 
 This establishes reference provenance, not a measured visual-similarity result.
-Real multi-stage image review and automatic book-level generation/insertion are
-still separate delivery work. Existing v1 scenes are not relabelled v2 and
-existing paid requests must not be replayed to change their reference contract.
+Real multi-stage visual similarity remains unverified. Automatic private
+generation/insertion is implemented and locally tested, but is not itself a
+live provider or Play-delivery claim. Existing v1/v2 scenes are not relabelled
+and existing paid requests must not be replayed to change their contract.
+
+For the explicitly consented illustrated-book route, Hub selects an excerpt of
+the exact accepted chapter itself. No local picture upload, scene picker or
+per-image approval is needed. Requests use `RequiresApproval=false` and
+`PersistOnApproval=false`, not a fabricated human approval. Old FirstBook-only
+consent cannot enter this path. Media retains the immutable original reference
+and may automatically persist only a validated v3 private-book image.
 
 ## Private delivery boundary
 
@@ -81,10 +91,11 @@ in-flight completion. Existing primary-store erasure restrictions still apply.
 The capability remains disabled by default. In the local scene overlay,
 `CHUMMER_ORIGIN_SCENE_ENABLED=true` explicitly enables admission; a healthy socket
 alone does not enable it. This source change does not configure
-or deploy the service. Android must still obtain explicit scene consent, call
-these routes, review/download and adopt bytes into its existing immutable scene
-store for offline reading and EPUB embedding. No automatic illustrated-book or
-Play delivery claim follows from server tests.
+or deploy the service. Android must obtain explicit illustrated-book consent,
+call these routes, and validate/download bytes into its existing immutable scene
+store for offline reading and EPUB embedding. The legacy manual path keeps its
+review requirement. No live provider or Play delivery claim follows from server
+tests.
 
 An operator may sponsor a bounded private test without inventing billing
 membership. The optional `CHUMMER_ORIGIN_SCENE_SPONSOR_` settings are
