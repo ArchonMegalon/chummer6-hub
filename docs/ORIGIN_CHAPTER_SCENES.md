@@ -29,10 +29,16 @@ not illustrated as history. Media Factory must validate and provide the actual
 retained reference PNG to a reference-capable renderer, not merely reuse this
 prompt. Deploy that compatible Media version before this Hub bridge.
 
-This establishes reference provenance, not a measured visual-similarity result.
-Real multi-stage visual similarity remains unverified. Automatic private
-generation/insertion is implemented and locally tested, but is not itself a
-live provider or Play-delivery claim. Existing v1/v2 scenes are not relabelled
+This establishes reference provenance, not a biometric or exact-age guarantee.
+On 28 September, the actual compiled bridge/client and deployed Media worker
+generated child and youth PNGs from one retained reference and cold-read their
+exact bytes. Visual continuity was observed, with fine-detail and lettering
+limitations documented in Media Factory's
+`docs/evidence/origin-continuity-canary-20260928.md`. Both real images passed the
+Android managed reader/EPUB check using explicitly synthetic prose. The complete
+live illustrated FirstBook workflow and physical Play installation remain open;
+neither follows from this bounded provider check or Preview 50 Internal
+availability. Existing v1/v2 scenes are not relabelled
 and existing paid requests must not be replayed to change their contract.
 
 For the explicitly consented illustrated-book route, Hub selects an excerpt of
