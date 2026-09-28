@@ -53,9 +53,83 @@ public sealed class OriginChapterSceneRequestBridgeTests : IDisposable
         Assert.False(artifact.AllowPersistentPinning);
         Assert.Equal(4 * 1024 * 1024, artifact.MaxBytes);
         using var payload = JsonDocument.Parse(artifact.Payload);
+        Assert.Equal("chummer.origin.chapter-scene/v2", payload.RootElement.GetProperty("schema").GetString());
+        Assert.Equal(identity, payload.RootElement.GetProperty("referenceSceneId").GetString());
+        Assert.Equal(Sha(string.Join('\0', Sha("owner-a"), "workspace", "origin-protagonist/v1")),
+            payload.RootElement.GetProperty("protagonistId").GetString());
         Assert.Equal(Sha(Prose), payload.RootElement.GetProperty("textDigest").GetString());
         Assert.Contains(Prose, payload.RootElement.GetProperty("prompt").GetString());
         Assert.Equal(before, JsonSerializer.Serialize(service.Get("owner-a", "request")));
+    }
+
+    private static OriginChapterAuthoringJob Continue(OriginChapterAuthoringService service,
+        OriginChapterAuthoringJob previous, string chapter, string stage, string prose)
+    {
+        var source = previous.Source with { ChapterId = chapter, ChapterDigest = Sha(chapter),
+            AcceptedDecisionId = chapter, Facts = [.. previous.Source.Facts, new(chapter, chapter, stage)] };
+        var job = service.Create("owner-a", new(chapter, source, true) { Previous = new(previous.RequestId,
+            previous.SourceDigest, previous.ProviderReceiptDigest!, previous.ReaderAcceptedTextDigest!) }, () => true);
+        var work = Assert.Single(service.PendingForWorker(10));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", prose, Sha(prose + "receipt"));
+        return service.AcceptReading("owner-a", job.RequestId, job.SourceDigest, Sha(prose + "receipt"),
+            Sha(prose), true, () => true);
+    }
+
+    [Fact]
+    public void Every_life_stage_uses_the_original_protagonist_reference_after_cold_reopen()
+    {
+        string anchor;
+        string protagonist;
+        using (var service = Prepare())
+        {
+            var bridge = new OriginChapterSceneRequestBridge(service);
+            var first = bridge.Compose("owner-a", "request", Sha(Prose), Prose, "Childhood", true, () => true);
+            using var rootPayload = JsonDocument.Parse(Assert.Single(first.GovernedRenderRequest!.Artifacts!).Payload);
+            anchor = rootPayload.RootElement.GetProperty("referenceSceneId").GetString()!;
+            protagonist = rootPayload.RootElement.GetProperty("protagonistId").GetString()!;
+            var teen = Continue(service, service.Get("owner-a", "request")!, "school", "A teenager at school.",
+                "As a teenager, she crossed the school courtyard.");
+            Continue(service, teen, "work", "A young adult at her first job.",
+                "Now a young adult, she stepped into the workshop.");
+        }
+        using var cold = Service();
+        foreach (var chapter in new[] { "school", "work" })
+        {
+            var job = cold.Get("owner-a", chapter)!;
+            var request = new OriginChapterSceneRequestBridge(cold).Compose("owner-a", chapter,
+                job.ReaderAcceptedTextDigest!, job.DraftText!, "Scene", true, () => true);
+            using var payload = JsonDocument.Parse(Assert.Single(request.GovernedRenderRequest!.Artifacts!).Payload);
+            Assert.Equal(anchor, payload.RootElement.GetProperty("referenceSceneId").GetString());
+            Assert.Equal(protagonist, payload.RootElement.GetProperty("protagonistId").GetString());
+            string prompt = payload.RootElement.GetProperty("prompt").GetString()!;
+            Assert.Contains("Keep the SAME person", prompt);
+            Assert.Contains(job.Source.Facts.Last().Text, prompt);
+            Assert.Contains(job.DraftText!, prompt);
+            Assert.DoesNotContain("Invented future", prompt);
+            Assert.NotEqual(anchor, request.GovernedRenderRequest.WorkItemId);
+        }
+    }
+
+    [Fact]
+    public void Unicode_protagonist_brief_and_stage_stay_bounded_without_breaking_characters()
+    {
+        using var service = Service();
+        string text = string.Concat(Enumerable.Repeat("🌲", 700));
+        var source = new OriginChapterSource("workspace", "chapter", Sha("chapter"), "decision", "de-DE",
+            new string('名', 256), [new("metatype", "decision", new string('界', 2048)),
+                new("player-story-brief-profile", "profile", new string('界', 2048))]);
+        var job = service.Create("owner-a", new("request", source, true), () => true);
+        var work = Assert.Single(service.PendingForWorker(10));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", text, Sha("receipt"));
+        service.AcceptReading("owner-a", "request", job.SourceDigest, Sha("receipt"), Sha(text), true, () => true);
+        var request = new OriginChapterSceneRequestBridge(service).Compose("owner-a", "request", Sha(text), text,
+            "Scene", true, () => true);
+        using var payload = JsonDocument.Parse(Assert.Single(request.GovernedRenderRequest!.Artifacts!).Payload);
+        string prompt = payload.RootElement.GetProperty("prompt").GetString()!;
+        Assert.True(Encoding.UTF8.GetByteCount(prompt) <= 4096);
+        Assert.DoesNotContain("\uFFFD", prompt);
     }
 
     [Fact]

@@ -11,6 +11,27 @@ a provider, execute a render, persist image bytes or grant publication. The medi
 payload binds opaque owner, workspace, chapter, canonical chapter digest and
 selected prose. Alt text is bounded and must be escaped by clients.
 
+## Growing-character continuity
+
+New requests use `chummer.origin.chapter-scene/v2`. Hub follows the exact,
+reader-accepted predecessor chain in the same owner/workspace to its opening
+chapter and binds that opening's scene as `referenceSceneId`. `protagonistId`
+is SHA-256 of the NUL-delimited subject digest, workspace ID and
+`origin-protagonist/v1`. Every later chapter retains these bindings, including
+after restart. Missing or changed predecessors cannot invent a replacement.
+
+The prompt preserves the opening character/metatype brief and uses the current
+accepted decision's facts and exact prose excerpt for age and setting. It is
+UTF-8 bounded without splitting characters; unchosen future opportunities are
+not illustrated as history. Media Factory must validate and provide the actual
+retained reference PNG to a reference-capable renderer, not merely reuse this
+prompt. Deploy that compatible Media version before this Hub bridge.
+
+This establishes reference provenance, not a measured visual-similarity result.
+Real multi-stage image review and automatic book-level generation/insertion are
+still separate delivery work. Existing v1 scenes are not relabelled v2 and
+existing paid requests must not be replayed to change their reference contract.
+
 ## Private delivery boundary
 
 `AndroidLinkedOriginScenesController` now implements signed-install POST routes
