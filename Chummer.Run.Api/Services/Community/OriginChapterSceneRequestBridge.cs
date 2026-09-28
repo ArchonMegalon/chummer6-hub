@@ -14,6 +14,32 @@ public sealed class OriginChapterSceneRequestBridge(OriginChapterAuthoringServic
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    public HorizonArtifactRequestCreateRequest ComposeAutomatic(string subjectId, string requestId,
+        string expectedTextDigest, bool externalProcessingConsent, Func<bool> stillAuthorized)
+    {
+        // The book's explicit external-processing consent covers its automatic
+        // illustrations. This is not an assertion that somebody reviewed an
+        // image, and old FirstBook-only consent must not call this path.
+        if (!externalProcessingConsent) throw new ArgumentException("Illustrated-book processing consent is required.");
+        ResolveIdentity(subjectId, requestId, expectedTextDigest, stillAuthorized);
+        var job = authoring.Get(subjectId, requestId) ?? throw new KeyNotFoundException();
+        string caption = job.Source.Locale.StartsWith("de", StringComparison.OrdinalIgnoreCase) ? "Kapitelillustration: "
+            : job.Source.Locale.StartsWith("es", StringComparison.OrdinalIgnoreCase) ? "Ilustración del capítulo: "
+            : "Chapter illustration: ";
+        var request = Compose(subjectId, requestId, expectedTextDigest, Clip(job.DraftText!, 1400),
+            Clip(caption + job.Source.RunnerName, 1024),
+            true, stillAuthorized);
+        var render = request.GovernedRenderRequest!;
+        var artifact = render.Artifacts!.Single();
+        var payload = System.Text.Json.Nodes.JsonNode.Parse(artifact.Payload)!.AsObject();
+        payload["schema"] = "chummer.origin.chapter-scene/v3";
+        payload["insertionPolicy"] = "automatic-private-book/v1";
+        return request with { GovernedRenderRequest = render with { Artifacts = [artifact with
+        {
+            Payload = payload.ToJsonString(Json), RequiresApproval = false, PersistOnApproval = false
+        }] } };
+    }
+
     public string ResolveIdentity(string subjectId, string requestId, string expectedTextDigest, Func<bool> stillAuthorized)
     {
         RequireText(subjectId, 256);
