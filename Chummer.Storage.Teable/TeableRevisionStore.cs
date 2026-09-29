@@ -171,17 +171,32 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
                 if (!Convert.TryFromBase64String(manifest.InlineBase64, bytes, out int used)
                     || used != manifest.Length) throw Invalid();
             }
-            else for (int index = 0; index < manifest.Chunks; index++)
+            else
             {
-                string key = ChunkKey(stream, manifest.Commit, index);
-                JsonElement part = await FindAsync(new[] { ("revision_key", key) }, latest: false, ct) ?? throw Invalid();
-                JsonElement values = part.GetProperty("fields");
-                if (values.GetProperty("stream").GetString() != stream || values.GetProperty("kind").GetString() != "chunk"
-                    || values.GetProperty("revision").GetInt64() != manifest.Revision) throw Invalid();
-                int length = Math.Min(ChunkBytes, manifest.Length - index * ChunkBytes);
-                if (!Convert.TryFromBase64String(values.GetProperty("payload").GetString() ?? "",
-                        bytes.AsSpan(index * ChunkBytes, length), out int used) || used != length) throw Invalid();
+                async Task ReadChunkAsync(int index)
+                {
+                    string key = ChunkKey(stream, manifest.Commit, index);
+                    JsonElement part = await FindAsync(new[] { ("revision_key", key) }, latest: false, ct) ?? throw Invalid();
+                    JsonElement values = part.GetProperty("fields");
+                    if (values.GetProperty("stream").GetString() != stream || values.GetProperty("kind").GetString() != "chunk"
+                        || values.GetProperty("revision").GetInt64() != manifest.Revision) throw Invalid();
+                    int length = Math.Min(ChunkBytes, manifest.Length - index * ChunkBytes);
+                    if (!Convert.TryFromBase64String(values.GetProperty("payload").GetString() ?? "",
+                            bytes.AsSpan(index * ChunkBytes, length), out int used) || used != length) throw Invalid();
+                }
+                // The fresh head fixes every chunk identity and destination.
+                // Overlap only two bounded GETs; never cache authorization or
+                // start an unbounded task per chunk. Join both even on failure
+                // before clearing their shared buffer in the outer catch.
+                for (int index = 0; index < manifest.Chunks; index += 2)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    Task first = ReadChunkAsync(index);
+                    Task second = index + 1 < manifest.Chunks ? ReadChunkAsync(index + 1) : Task.CompletedTask;
+                    await Task.WhenAll(first, second);
+                }
             }
+            ct.ThrowIfCancellationRequested();
             if (Hash(bytes) != manifest.Sha256) throw Invalid();
             return new(manifest.Revision, manifest.Commit, manifest.Sha256, bytes);
         }
