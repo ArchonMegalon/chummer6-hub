@@ -121,6 +121,96 @@ public sealed class TeableRevisionStoreTests
     }
 
     [Fact]
+    public async Task Chunk_reads_overlap_in_bounded_pairs_and_preserve_exact_order_without_writes()
+    {
+        using var remote = new Remote();
+        byte[] bytes = Enumerable.Range(0, 4 * 32 * 1024 + 7).Select(i => (byte)(i % 251)).ToArray();
+        await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
+        int posts = remote.HeadPosts, active = 0, maximum = 0, calls = 0;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        remote.BeforeChunkReadResponse = async (_, ct) =>
+        {
+            int count = Interlocked.Increment(ref active);
+            maximum = Math.Max(maximum, count);
+            if (Interlocked.Increment(ref calls) == 2) entered.TrySetResult();
+            try { await release.Task.WaitAsync(ct); }
+            finally { Interlocked.Decrement(ref active); }
+        };
+        Task<TeableRevisionStore.Head?> read = remote.Store().ReadAsync("accounts");
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(2, Volatile.Read(ref calls));
+            Assert.False(read.IsCompleted);
+        }
+        finally { release.TrySetResult(); await read; }
+        Assert.Equal(bytes, (await read)!.Bytes);
+        Assert.Equal(2, maximum);
+        Assert.Equal(5, calls);
+        Assert.Equal(0, active);
+        Assert.Equal(posts, remote.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Failed_or_canceled_chunk_read_joins_its_peer_before_returning(bool cancel)
+    {
+        using var remote = new Remote();
+        byte[] bytes = new byte[32 * 1024 + 7];
+        await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
+        int posts = remote.HeadPosts, enteredCount = 0, active = 0;
+        var both = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        remote.BeforeChunkReadResponse = async (row, ct) =>
+        {
+            Interlocked.Increment(ref active);
+            if (Interlocked.Increment(ref enteredCount) == 2) both.TrySetResult();
+            try
+            {
+                await both.Task.WaitAsync(ct);
+                if (!cancel && row["revision_key"]!.GetValue<string>().EndsWith(":0", StringComparison.Ordinal))
+                {
+                    failed.TrySetResult();
+                    throw new HttpRequestException("synthetic chunk outage");
+                }
+                await release.Task.WaitAsync(ct);
+            }
+            finally { Interlocked.Decrement(ref active); }
+        };
+        using var cancellation = new CancellationTokenSource();
+        Task<TeableRevisionStore.Head?> read = remote.Store().ReadAsync("accounts", cancellation.Token);
+        try
+        {
+            await both.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            if (cancel)
+            {
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read);
+            }
+            else
+            {
+                await failed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.False(read.IsCompleted); // The second response still owns its output slice.
+                release.TrySetResult();
+                await Assert.ThrowsAsync<HttpRequestException>(() => read);
+            }
+        }
+        finally
+        {
+            cancellation.Cancel();
+            release.TrySetResult();
+            try { await read; } catch (Exception error) when (error is HttpRequestException or OperationCanceledException) { }
+        }
+        Assert.Equal(0, active);
+        Assert.Equal(posts, remote.HeadPosts);
+        remote.BeforeChunkReadResponse = null;
+        Assert.Equal(bytes, (await remote.Store().ReadAsync("accounts"))!.Bytes);
+    }
+
+    [Fact]
     public async Task Stale_revision_cannot_overwrite_a_revocation_or_dispatch_fence()
     {
         using var remote = new Remote();
@@ -277,6 +367,7 @@ public sealed class TeableRevisionStoreTests
         public bool CommitThenFailHard { get; set; }
         public Action? BeforeHeadPost { get; set; }
         public Action? BeforeHeadReadResponse { get; set; }
+        public Func<JsonObject, CancellationToken, Task>? BeforeChunkReadResponse { get; set; }
         public Action<HttpRequestMessage>? ObserveRequest { get; set; }
         public int HeadPosts { get; private set; }
         private int _getRequests;
@@ -346,6 +437,9 @@ public sealed class TeableRevisionStoreTests
                 if (Interlocked.Increment(ref _headReads) == 2) { HoldTwoEmptyHeadReads = false; _headBarrier.SetResult(); }
                 await _headBarrier.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);
             }
+            if (!headRead && rows is [var chunk] && chunk["kind"]!.GetValue<string>() == "chunk"
+                && BeforeChunkReadResponse is { } beforeChunk)
+                await beforeChunk(chunk, ct);
             if (headRead && BeforeHeadReadResponse is { } beforeResponse)
             {
                 BeforeHeadReadResponse = null;
