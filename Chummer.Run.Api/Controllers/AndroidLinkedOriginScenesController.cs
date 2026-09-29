@@ -91,18 +91,28 @@ public sealed class AndroidLinkedOriginScenesController(InstallLinkingService li
         AndroidLinkedV2RequestProofMiddleware.ApplyPrivateResponseHeaders(Response.Headers);
         long started = Stopwatch.GetTimestamp();
         string phase = "authorization";
+        int authorityChecks = 0;
+        long authorityMilliseconds = 0;
+        string? ObserveSubject()
+        {
+            long checking = Stopwatch.GetTimestamp();
+            authorityChecks++;
+            try { return CurrentSubject(installationId); }
+            finally { authorityMilliseconds += (long)Stopwatch.GetElapsedTime(checking).TotalMilliseconds; }
+        }
         void Diagnose(string failure)
         {
             // Only code-owned labels and elapsed time: never exception objects,
             // identifiers, request bodies, manuscripts, URLs or credentials.
-            logger?.LogWarning("Private Origin scene {Operation} failed at {Phase} ({Failure}, {ElapsedMilliseconds} ms).",
-                operation, phase, failure, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            logger?.LogWarning("Private Origin scene {Operation} failed at {Phase} ({Failure}, {ElapsedMilliseconds} ms; authority {AuthorityChecks}/{AuthorityMilliseconds} ms; caller canceled {CallerCanceled}).",
+                operation, phase, failure, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds,
+                authorityChecks, authorityMilliseconds, HttpContext.RequestAborted.IsCancellationRequested);
         }
         try
         {
-            if (CurrentSubject(installationId) is not { Length: > 0 } subject) return Unauthorized();
+            if (ObserveSubject() is not { Length: > 0 } subject) return Unauthorized();
             if (!media.IsConfigured) return StatusCode(503, "Chapter illustrations are not enabled on this server.");
-            bool Current() => CurrentSubject(installationId) == subject;
+            bool Current() => ObserveSubject() == subject;
             ActionResult result = await action(subject, Current, value => phase = value);
             phase = "final-authorization";
             return Current() ? result : Unauthorized();

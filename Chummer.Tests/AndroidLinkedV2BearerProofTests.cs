@@ -32,8 +32,11 @@ public sealed class AndroidLinkedV2BearerProofTests
         {
             Assert.Null(exception); // Exception messages can contain private provider or account material.
             var fields = Assert.IsAssignableFrom<IEnumerable<KeyValuePair<string, object?>>>(state).ToDictionary();
-            Assert.Equal(new[] { "ElapsedMilliseconds", "Failure", "Operation", "Phase", "{OriginalFormat}" },
+            Assert.Equal(new[] { "AuthorityChecks", "AuthorityMilliseconds", "CallerCanceled", "ElapsedMilliseconds", "Failure", "Operation", "Phase", "{OriginalFormat}" },
                 fields.Keys.Order(StringComparer.Ordinal));
+            Assert.True(Assert.IsType<int>(fields["AuthorityChecks"]) > 0);
+            Assert.True(Assert.IsType<long>(fields["AuthorityMilliseconds"]) >= 0);
+            Assert.IsType<bool>(fields["CallerCanceled"]);
             Events.Add(fields);
         }
     }
