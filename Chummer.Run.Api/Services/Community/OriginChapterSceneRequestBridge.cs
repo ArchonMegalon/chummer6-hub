@@ -21,14 +21,11 @@ public sealed class OriginChapterSceneRequestBridge(OriginChapterAuthoringServic
         // illustrations. This is not an assertion that somebody reviewed an
         // image, and old FirstBook-only consent must not call this path.
         if (!externalProcessingConsent) throw new ArgumentException("Illustrated-book processing consent is required.");
-        ResolveIdentity(subjectId, requestId, expectedTextDigest, stillAuthorized);
-        var job = authoring.Get(subjectId, requestId) ?? throw new KeyNotFoundException();
-        string caption = job.Source.Locale.StartsWith("de", StringComparison.OrdinalIgnoreCase) ? "Kapitelillustration: "
-            : job.Source.Locale.StartsWith("es", StringComparison.OrdinalIgnoreCase) ? "Ilustración del capítulo: "
-            : "Chapter illustration: ";
-        var request = Compose(subjectId, requestId, expectedTextDigest, Clip(job.DraftText!, 1400),
-            Clip(caption + job.Source.RunnerName, 1024),
-            true, stillAuthorized);
+        // Select the excerpt from the same validated chapter used to compose
+        // the request. Re-entering ResolveIdentity and public Compose would
+        // load it three times and repeat their remote authority checks.
+        var request = ComposeAcceptedChapter(subjectId, requestId, expectedTextDigest,
+            null, null, stillAuthorized);
         var render = request.GovernedRenderRequest!;
         var artifact = render.Artifacts!.Single();
         var payload = System.Text.Json.Nodes.JsonNode.Parse(artifact.Payload)!.AsObject();
@@ -59,15 +56,32 @@ public sealed class OriginChapterSceneRequestBridge(OriginChapterAuthoringServic
         bool externalProcessingConsent, Func<bool> stillAuthorized)
     {
         if (!externalProcessingConsent) throw new ArgumentException("Image processing consent is required.");
-        RequireText(subjectId, 256);
-        RequireText(requestId, 256);
         RequireText(sceneExcerpt, 3072);
         RequireText(altText, 1024);
+        return ComposeAcceptedChapter(subjectId, requestId, expectedTextDigest, sceneExcerpt, altText, stillAuthorized);
+    }
+
+    private HorizonArtifactRequestCreateRequest ComposeAcceptedChapter(string subjectId, string requestId,
+        string expectedTextDigest, string? sceneExcerpt, string? altText, Func<bool> stillAuthorized)
+    {
+        RequireText(subjectId, 256);
+        RequireText(requestId, 256);
         if (!stillAuthorized()) throw new UnauthorizedAccessException();
         var job = authoring.Get(subjectId, requestId) ?? throw new KeyNotFoundException();
         if (job.DraftText is not { Length: > 0 } prose || job.ProviderReceiptDigest is not { Length: 64 }
-            || job.ReaderAcceptedTextDigest != expectedTextDigest || Sha(prose) != expectedTextDigest
-            || !prose.Contains(sceneExcerpt, StringComparison.Ordinal))
+            || job.ReaderAcceptedTextDigest != expectedTextDigest || Sha(prose) != expectedTextDigest)
+            throw new InvalidOperationException("Reopen the current reader-accepted chapter.");
+        if (sceneExcerpt is null)
+        {
+            string caption = job.Source.Locale.StartsWith("de", StringComparison.OrdinalIgnoreCase) ? "Kapitelillustration: "
+                : job.Source.Locale.StartsWith("es", StringComparison.OrdinalIgnoreCase) ? "Ilustración del capítulo: "
+                : "Chapter illustration: ";
+            sceneExcerpt = Clip(prose, 1400);
+            altText = Clip(caption + job.Source.RunnerName, 1024);
+        }
+        RequireText(sceneExcerpt, 3072);
+        RequireText(altText, 1024);
+        if (!prose.Contains(sceneExcerpt, StringComparison.Ordinal))
             throw new InvalidOperationException("Select a scene from the current reader-accepted chapter.");
 
         string owner = Sha(subjectId);

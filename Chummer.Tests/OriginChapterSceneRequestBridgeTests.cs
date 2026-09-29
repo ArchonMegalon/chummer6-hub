@@ -104,6 +104,51 @@ public sealed class OriginChapterSceneRequestBridgeTests : IDisposable
     }
 
     [Fact]
+    public void Automatic_scene_uses_one_fresh_authorization_pair_for_its_accepted_chapter()
+    {
+        using var service = Prepare();
+        int checks = 0;
+        var request = new OriginChapterSceneRequestBridge(service).ComposeAutomatic(
+            "owner-a", "request", Sha(Prose), true, () => { checks++; return true; });
+        Assert.NotNull(request.GovernedRenderRequest);
+        // Automatic excerpt selection and manual composition must not each
+        // traverse the same chapter through another remote authority pair.
+        Assert.Equal(2, checks);
+        var manual = new OriginChapterSceneRequestBridge(service).Compose("owner-a", "request", Sha(Prose),
+            Prose, "Kapitelillustration: Synthetic", true, () => true);
+        var expected = System.Text.Json.Nodes.JsonNode.Parse(Assert.Single(manual.GovernedRenderRequest!.Artifacts!).Payload)!;
+        expected["schema"] = "chummer.origin.chapter-scene/v3";
+        expected["insertionPolicy"] = "automatic-private-book/v1";
+        Assert.Equal(expected.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Assert.Single(request.GovernedRenderRequest.Artifacts!).Payload);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Automatic_scene_fails_if_authority_is_revoked_before_read_or_before_return(int revokeAt)
+    {
+        using var service = Prepare();
+        int checks = 0;
+        Assert.Throws<UnauthorizedAccessException>(() => new OriginChapterSceneRequestBridge(service)
+            .ComposeAutomatic("owner-a", "request", Sha(Prose), true, () => ++checks < revokeAt));
+        Assert.Equal(revokeAt, checks);
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Automatic_continuation_keeps_authority_checks_during_predecessor_read_and_before_return(int revokeAt)
+    {
+        using var service = Prepare();
+        var next = Continue(service, service.Get("owner-a", "request")!, "school", "School stage", "A school courtyard.");
+        int checks = 0;
+        Assert.Throws<UnauthorizedAccessException>(() => new OriginChapterSceneRequestBridge(service)
+            .ComposeAutomatic("owner-a", next.RequestId, next.ReaderAcceptedTextDigest!, true, () => ++checks < revokeAt));
+        Assert.Equal(revokeAt, checks);
+    }
+
+    [Fact]
     public void Automatic_book_scene_still_requires_current_owner_accepted_text_and_image_consent()
     {
         using var service = Prepare(false);
