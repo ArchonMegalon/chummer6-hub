@@ -22,6 +22,22 @@ public sealed class AndroidLinkedV2BearerProofTests
 {
     private static readonly JsonSerializerOptions ContinuationWebJson = new(JsonSerializerDefaults.Web);
 
+    private sealed class SceneDiagnosticLogger : ILogger<AndroidLinkedOriginScenesController>
+    {
+        public List<IReadOnlyDictionary<string, object?>> Events { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel level) => true;
+        public void Log<TState>(LogLevel level, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Assert.Null(exception); // Exception messages can contain private provider or account material.
+            var fields = Assert.IsAssignableFrom<IEnumerable<KeyValuePair<string, object?>>>(state).ToDictionary();
+            Assert.Equal(new[] { "ElapsedMilliseconds", "Failure", "Operation", "Phase", "{OriginalFormat}" },
+                fields.Keys.Order(StringComparer.Ordinal));
+            Events.Add(fields);
+        }
+    }
+
     [Theory]
     [InlineData("request")]
     [InlineData("read")]
@@ -203,12 +219,13 @@ public sealed class AndroidLinkedV2BearerProofTests
             return "{}";
         }, "404 Not Found");
         Task<ActionResult>? pending = null;
+        var diagnostic = new SceneDiagnosticLogger();
         var read = new AndroidOriginSceneRead(request.InstallationId, request.ChapterRequestId, request.TextDigest);
         await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/read",
             JsonSerializer.Serialize(read, ContinuationWebJson)).CreateContext(), http =>
         {
             var controller = new AndroidLinkedOriginScenesController(fixture.Service, accounts,
-                bridge, SceneAdmission(remote), peer.Client) { ControllerContext = new() { HttpContext = http } };
+                bridge, SceneAdmission(remote), peer.Client, diagnostic) { ControllerContext = new() { HttpContext = http } };
             pending = controller.ReadScene(read, default);
         });
         Assert.NotNull(pending);
@@ -226,6 +243,15 @@ public sealed class AndroidLinkedV2BearerProofTests
         else if (outcome == "revoked") Assert.IsType<UnauthorizedResult>(result);
         else Assert.IsType<NotFoundResult>(result);
         Assert.Equal(before, remote.HeadPosts); // Read-only even after restart; no retry, refund or allowance reset.
+        if (outcome == "ledger-outage")
+        {
+            var failure = Assert.Single(diagnostic.Events);
+            Assert.Equal("read", failure["Operation"]);
+            Assert.Equal("admission-read", failure["Phase"]);
+            Assert.Equal("io-unavailable", failure["Failure"]);
+            Assert.True(Assert.IsType<long>(failure["ElapsedMilliseconds"]) >= 0);
+        }
+        else if (outcome != "revoked") Assert.Empty(diagnostic.Events);
         await peer.Completed;
     }
 
