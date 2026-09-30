@@ -70,6 +70,50 @@ public sealed class AiMutationAuthorizationMiddlewareTests
     }
 
     [Theory]
+    [InlineData("POST", "/api/internal/avatar/provider/context")]
+    [InlineData("POST", "/api/internal/avatar/provider/rules/resolve")]
+    [InlineData("POST", "/api/internal/avatar/contexts")]
+    [InlineData("DELETE", "/api/internal/avatar/contexts/context-ref")]
+    public async Task ExactPrivateAvatarMutationsDelegateToTheirDistinctPreBindingFilter(
+        string method,
+        string path)
+    {
+        bool nextCalled = false;
+        var middleware = new AiMutationAuthorizationMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+        DefaultHttpContext context = CreateContext(method, path);
+        context.Request.Headers.Authorization = "Bearer avatar-lane-token";
+
+        await middleware.InvokeAsync(context, BuildConfiguration());
+
+        Assert.True(nextCalled);
+        Assert.Equal("no-store", context.Response.Headers.CacheControl.ToString());
+        Assert.False(context.Items.ContainsKey(AiMutationAuthorizationMiddleware.AuthorizationMarker));
+    }
+
+    [Theory]
+    [InlineData("GET", "/api/internal/avatar/provider/context")]
+    [InlineData("PATCH", "/api/internal/avatar/contexts/context-ref")]
+    public async Task AvatarExemptionDoesNotWidenUnsupportedMethods(string method, string path)
+    {
+        bool nextCalled = false;
+        var middleware = new AiMutationAuthorizationMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+        DefaultHttpContext context = CreateContext(method, path);
+
+        await middleware.InvokeAsync(context, BuildConfiguration());
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
+    }
+
+    [Theory]
     [InlineData("PUT", "/api/v1/ai/build-ghost/tool")]
     [InlineData("PATCH", "/api/v1/ai/build-ghost/tool")]
     [InlineData("POST", "/api/v1/ai/build-ghost/tool/")]
