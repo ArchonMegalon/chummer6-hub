@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.myexternalbrain.chummer",
+      "sha256_cert_fingerprints": [
+        "03:5D:F3:7B:31:C5:99:D3:22:1A:AB:FD:A7:D9:E3:CD:FE:65:75:2B:D6:E6:0E:70:C6:40:78:0C:51:DD:90:8F"
+      ]
+    }
+  }
+]

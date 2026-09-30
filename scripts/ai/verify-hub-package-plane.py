@@ -29,6 +29,7 @@ TEST_TRX_FILES = (
     "postgres-package-plane.trx",
 )
 HUB_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub.git"
+ANDROID_APP_LINKS_RELATIVE_PATH = Path("wwwroot/.well-known/assetlinks.json")
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
     "Chummer.Control.Contracts/Chummer.Control.Contracts.csproj",
@@ -102,6 +103,63 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _read_regular_file(path: Path, label: str) -> bytes:
+    try:
+        status = path.lstat()
+    except FileNotFoundError as exc:
+        raise VerificationError(f"{label} is missing: {path}") from exc
+    if path.is_symlink() or not stat.S_ISREG(status.st_mode):
+        raise VerificationError(f"{label} is not a regular file: {path}")
+    return path.read_bytes()
+
+
+def _publish_and_audit_android_app_links(
+    consumer: Path,
+    publish_root: Path,
+    dotnet: str,
+    common: tuple[str, ...],
+    env: Mapping[str, str],
+) -> dict[str, object]:
+    source_path = consumer / "Chummer.Run.Api" / ANDROID_APP_LINKS_RELATIVE_PATH
+    expected = _read_regular_file(source_path, "tracked Android App Links asset")
+    if publish_root.exists():
+        raise VerificationError(f"API publish output already exists: {publish_root}")
+    _run(
+        (
+            dotnet,
+            "publish",
+            str(consumer / "Chummer.Run.Api/Chummer.Run.Api.csproj"),
+            "--configuration",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "-m:1",
+            *common,
+            "--output",
+            str(publish_root),
+        ),
+        cwd=consumer,
+        env=env,
+    )
+    if _read_regular_file(source_path, "tracked Android App Links asset") != expected:
+        raise VerificationError("tracked Android App Links asset changed during publish")
+    published_path = publish_root / ANDROID_APP_LINKS_RELATIVE_PATH
+    observed = _read_regular_file(
+        published_path, "published Android App Links asset"
+    )
+    if observed != expected:
+        raise VerificationError(
+            "published Android App Links asset differs byte-for-byte from tracked source"
+        )
+    result: dict[str, object] = {
+        "relative_path": ANDROID_APP_LINKS_RELATIVE_PATH.as_posix(),
+        "sha256": hashlib.sha256(observed).hexdigest(),
+        "size_bytes": len(observed),
+    }
+    print("android-app-links-publish: " + json.dumps(result, sort_keys=True))
+    return result
 
 
 def _audit_dotnet_toolchain(
@@ -652,6 +710,13 @@ def verify(
             ),
             cwd=consumer,
             env=env,
+        )
+        _publish_and_audit_android_app_links(
+            consumer,
+            root / "api-publish",
+            dotnet,
+            common,
+            env,
         )
         _run(
             (
