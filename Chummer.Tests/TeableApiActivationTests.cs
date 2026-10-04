@@ -2,12 +2,15 @@ using System.Text.Json;
 using System.Security.Cryptography;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api;
+using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Chummer.Run.Api.Services.Teable;
 using Chummer.Storage.Teable;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -169,6 +172,62 @@ public sealed class TeableApiActivationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void V2_pending_poll_authority_outage_is_503_without_grants_or_credentials(int failedRead)
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "poll-outage");
+        var activation = services.GetRequiredService<InstallLinkingStoreActivation>();
+        var store = activation.GetRequiredStore();
+        var service = new InstallLinkingService(new InstallLinkingStoreAccess(activation), Configuration("poll-outage"), activation);
+        var controller = new InstallLinkingV2Controller(service, null!, TimeProvider.System)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+        using var rsa = RSA.Create(2048);
+        var request = new AndroidInstallLinkProofPollV2Request("android-probe", "android", "synthetic", "internal", "android", "arm64",
+            Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()), DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            new string('n', 24), "", null, new string('o', 32), "proof_poll_v2");
+        request = request with { Signature = Convert.ToBase64String(rsa.SignData(AndroidInstallLinkV2BootstrapProof.CreateCanonicalPayload(request),
+            HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)) };
+        int reads = 0;
+        void ObserveRead()
+        {
+            if (++reads == failedRead)
+            {
+                accounts.FailReads = true;
+                throw new HttpRequestException("synthetic private authority failure");
+            }
+            accounts.BeforeHeadReadResponse = ObserveRead;
+        }
+        int writes = accounts.HeadPosts;
+        accounts.BeforeHeadReadResponse = ObserveRead;
+
+        // Includes an outage after successful admission, formerly an uncaught
+        // GetRequiredStore exception instead of the controller's transient 503.
+        var response = Assert.IsType<ObjectResult>(controller.PollBrowserCallback(request).Result);
+        Assert.Equal(503, response.StatusCode);
+        Assert.Equal(failedRead, reads);
+        Assert.DoesNotContain("private authority", Assert.IsType<ProblemDetails>(response.Value).Detail!);
+        Assert.False(controller.Response.Headers.ContainsKey("Authorization"));
+        Assert.False(controller.Response.Headers.ContainsKey(AndroidLinkedV2RequestProof.GrantHeader));
+        Assert.Equal(writes, accounts.HeadPosts);
+        Assert.Empty(store.GrantsById);
+        Assert.Empty(store.InstallationsById);
+
+        // Recovery observes the existing pending operation; it creates neither
+        // a callback nor a grant, and does not need a server restart.
+        accounts.FailReads = false;
+        var recovered = Assert.IsType<AcceptedResult>(controller.PollBrowserCallback(request).Result);
+        Assert.False(Assert.IsType<AndroidInstallLinkProofPollStatus>(recovered.Value).Completed);
+        Assert.Equal(writes, accounts.HeadPosts);
+        Assert.Empty(store.GrantsById);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void V2_bootstrap_does_not_recheck_remote_authority_for_every_dictionary_access(bool outageAfterCommit)
@@ -298,6 +357,10 @@ public sealed class TeableApiActivationTests : IDisposable
             "grant", new string('p', 43), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(1)));
         Assert.Equal(503, error.StatusCode);
         Assert.Equal(2, probe.Calls);
+        Assert.Equal(writes, accounts.HeadPosts);
+        var pollError = Assert.Throws<InstallLinkingOperationException>(() => service.PollBrowserCallbackV2(null!));
+        Assert.Equal(503, pollError.StatusCode);
+        Assert.Equal(3, probe.Calls);
         Assert.Equal(writes, accounts.HeadPosts);
     }
 
