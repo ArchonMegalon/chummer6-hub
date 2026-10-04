@@ -1494,8 +1494,14 @@ public sealed partial class InstallLinkingService
     public PollInstallBrowserCallbackResult PollBrowserCallbackV2(
         AndroidInstallLinkProofPollV2Request request)
     {
-        EnsureDurableStoreReady();
-        InstallLinkingStore store = _store;
+        // Admit and capture once. A second activation lookup after a successful
+        // readiness check can fail outside the typed 503 boundary on an outage.
+        // This does not cache authority: the operation still checks the primary
+        // under the store gate and after any commit before returning credentials.
+        if (!TryGetDurableStore(out InstallLinkingStore store))
+        {
+            throw AuthorityUnavailable();
+        }
         lock (store.Gate)
         {
             var operation = new InstallLinkingService(this, store);
