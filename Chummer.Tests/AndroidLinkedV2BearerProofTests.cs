@@ -405,6 +405,108 @@ public sealed class AndroidLinkedV2BearerProofTests
         Assert.Equal(InstallationGrantStates.Active, fixture.Store.GrantsById[Fixture.GrantId].Status);
     }
 
+    [Theory]
+    [InlineData("status", false)]
+    [InlineData("list", false)]
+    [InlineData("groups", false)]
+    [InlineData("erase", false)]
+    [InlineData("status", true)]
+    [InlineData("list", true)]
+    [InlineData("groups", true)]
+    [InlineData("erase", true)]
+    public async Task Account_controller_outage_after_signed_admission_preserves_the_link(string action, bool throws)
+    {
+        // Exercise both the fresh-authority read and its final readiness check.
+        foreach (int failOnCall in new[] { 1, 2 })
+        {
+            using Fixture fixture = new();
+            var signed = fixture.Sign(AccountRoute(action), "{\"installationId\":\"android-v2\"}");
+            var context = signed.CreateContext();
+            bool dispatched = false;
+            await fixture.InvokeAsync(context, http =>
+            {
+                dispatched = true;
+                fixture.UseReadinessProbe(new ChapterReadinessProbe
+                    { FailOnCall = failOnCall, ThrowOnFailure = throws });
+                var result = DeniedAccountAction(fixture, http, action);
+                Assert.Equal(StatusCodes.Status503ServiceUnavailable, result.StatusCode);
+                string response = JsonSerializer.Serialize(result.Value);
+                Assert.Contains("temporarily unavailable", response, StringComparison.Ordinal);
+                Assert.DoesNotContain("private-backend-detail", response, StringComparison.Ordinal);
+                Assert.DoesNotContain("subject-v2", response, StringComparison.Ordinal);
+                Assert.DoesNotContain(Fixture.AccessToken, response, StringComparison.Ordinal);
+                Assert.Contains("no-store", http.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+            });
+            Assert.True(dispatched);
+            Assert.Equal(InstallationGrantStates.Active, fixture.Store.GrantsById[Fixture.GrantId].Status);
+            Assert.Equal(Fixture.AccessToken, fixture.Store.GrantsById[Fixture.GrantId].AccessToken);
+            Assert.Empty(fixture.WorkspaceSnapshots.ListForInstallation(fixture.Store.InstallationsById["android-v2"]));
+
+            // Outage recovery must neither re-link nor make the admitted proof replayable.
+            fixture.UseReadinessProbe(new ChapterReadinessProbe());
+            var replay = signed.CreateContext();
+            await fixture.InvokeAsync(replay, _ => Assert.Fail("An admitted proof must remain consumed."));
+            Assert.Equal(StatusCodes.Status409Conflict, replay.Response.StatusCode);
+            await fixture.InvokeAsync(fixture.Sign(AccountRoute("status"),
+                "{\"installationId\":\"android-v2\"}").CreateContext(), http =>
+            {
+                var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+                    { ControllerContext = new() { HttpContext = http } };
+                var result = Assert.IsType<OkObjectResult>(controller.GetGrantStatus(new("android-v2")).Result);
+                Assert.Equal("subject-v2", Assert.IsType<AndroidLinkedV2GrantStatusResponse>(result.Value).SubjectId);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData("status")]
+    [InlineData("list")]
+    [InlineData("groups")]
+    [InlineData("erase")]
+    public async Task Account_controller_still_rejects_revocation_after_signed_admission(string action)
+    {
+        using Fixture fixture = new();
+        await fixture.InvokeAsync(fixture.Sign(AccountRoute(action),
+            "{\"installationId\":\"android-v2\"}").CreateContext(), http =>
+        {
+            lock (fixture.Store.Gate)
+            {
+                fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                    with { Status = InstallationGrantStates.Revoked };
+                fixture.Store.PersistLocked();
+            }
+            Assert.Equal(StatusCodes.Status401Unauthorized, DeniedAccountAction(fixture, http, action).StatusCode);
+        });
+    }
+
+    private static string AccountRoute(string action) => action switch
+    {
+        "status" => "/api/v2/install-linking/grants/status",
+        "list" => "/api/v2/install-linking/continuation/workspaces/list",
+        "groups" => "/api/v2/android/linked/groups",
+        "erase" => "/api/v2/android/linked/account/erase",
+        _ => throw new ArgumentOutOfRangeException(nameof(action))
+    };
+
+    private static ObjectResult DeniedAccountAction(Fixture fixture, HttpContext http, string action)
+    {
+        var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new() { HttpContext = http } };
+        // Null downstream services are sentinels: no group access or erasure may run on denial.
+        ActionResult? result = action switch
+        {
+            "status" => controller.GetGrantStatus(new("android-v2")).Result,
+            "list" => controller.ListClaimedInstallWorkspaces(new("android-v2")).Result,
+            "groups" => new AndroidLinkedCampaignV2Controller(fixture.Service, null!)
+                { ControllerContext = new() { HttpContext = http } }.ListGroups(new("android-v2")).Result,
+            "erase" => new AndroidLinkedAccountV2Controller(fixture.Service, null!)
+                { ControllerContext = new() { HttpContext = http } }.Erase(new("android-v2", "ERASE"), default)
+                .GetAwaiter().GetResult().Result,
+            _ => throw new ArgumentOutOfRangeException(nameof(action))
+        };
+        return Assert.IsType<ObjectResult>(result);
+    }
+
     private sealed class ChapterReadinessProbe : IInstallLinkingStoreReadinessProbe
     {
         public int Calls { get; private set; }
