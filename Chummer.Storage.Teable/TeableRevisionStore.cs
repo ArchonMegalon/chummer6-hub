@@ -80,8 +80,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
     {
         ValidateStream(stream);
         if (commit == Guid.Empty || bytes.Length is < 1 or > MaximumBytes) throw Invalid();
-        await VerifySchemaAsync(ct);
-        Head? current = await ReadAsync(stream, ct);
+        Head? current = await ReadCommitAdmissionAsync(stream, ct);
         long revision = checked((expected?.Revision ?? 0) + 1);
         if (revision > 9_007_199_254_740_991L) throw Invalid(); // Teable number is a JS double.
         string hash = Hash(bytes.Span);
@@ -111,6 +110,29 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
         if (result.Revision != revision || result.Commit != commit || result.Sha256 != hash)
             throw new TeableRevisionConflictException();
         return result;
+    }
+
+    private async Task<Head?> ReadCommitAdmissionAsync(string stream, CancellationToken ct)
+    {
+        // Both are fresh, independent GETs. In particular, never start a chunk
+        // or head POST merely because one observation has completed. Overlap
+        // their latency under the existing deadlines, not their authority.
+        Task schema = VerifySchemaAsync(ct);
+        Task<Head?> current = ReadAsync(stream, ct);
+        try
+        {
+            await Task.WhenAll(schema, current);
+            ct.ThrowIfCancellationRequested();
+            return await current;
+        }
+        catch
+        {
+            // WhenAll joins the reader before its protected bytes are cleared.
+            // A failed schema check must not retain a successful remote payload.
+            if (current.IsCompletedSuccessfully && current.Result is { } head)
+                CryptographicOperations.ZeroMemory(head.Bytes);
+            throw;
+        }
     }
 
     private async Task CreateOnceAsync(string key, string stream, string kind, long revision, string payload,
