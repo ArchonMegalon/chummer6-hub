@@ -483,6 +483,7 @@ public sealed class TeableRevisionStoreTests
         public Action? BeforeHeadPost { get; set; }
         public Action? BeforeHeadReadResponse { get; set; }
         public Func<JsonObject, CancellationToken, Task>? BeforeChunkReadResponse { get; set; }
+        public Func<JsonObject, CancellationToken, Task>? BeforeRecordReadResponse { get; set; }
         public Action<HttpRequestMessage>? ObserveRequest { get; set; }
         public int HeadPosts { get; private set; }
         private int _getRequests;
@@ -547,6 +548,8 @@ public sealed class TeableRevisionStoreTests
                         == p["value"]!.GetValue<string>())).OrderByDescending(row => row["revision"]!.GetValue<long>())
                     .Take(headRead ? 1 : 2).Select(row => (JsonObject)row.DeepClone()).ToArray();
             }
+            if (rows is [var record] && BeforeRecordReadResponse is { } beforeRecord)
+                await beforeRecord(record, ct);
             if (headRead && HoldTwoEmptyHeadReads)
             {
                 if (Interlocked.Increment(ref _headReads) == 2) { HoldTwoEmptyHeadReads = false; _headBarrier.SetResult(); }

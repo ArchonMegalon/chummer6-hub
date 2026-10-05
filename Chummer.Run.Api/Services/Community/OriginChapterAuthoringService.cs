@@ -121,6 +121,29 @@ public sealed class OriginChapterAuthoringService : IDisposable
                 .Order(StringComparer.Ordinal).Take(129).ToArray();
             if (references.Length > 128)
                 throw new InvalidDataException("The private chapter inventory exceeds its limit.");
+            if (_primarySession is not null)
+            {
+                var chapters = new List<ReaderChapter>(references.Length);
+                foreach (string[] batch in references.Chunk(TeableOriginChapterStorage.ReaderBatchSize))
+                {
+                    byte[]?[] records = _primarySession.ReadBatchForReader(batch);
+                    try
+                    {
+                        for (int index = 0; index < batch.Length; index++)
+                            if (records[index] is { } bytes)
+                            {
+                                var stored = DecodeStored(bytes, batch[index] + ".json", owner, null);
+                                chapters.Add(new ReaderChapter(batch[index][65..], stored.Job));
+                            }
+                    }
+                    finally
+                    {
+                        foreach (byte[]? bytes in records)
+                            if (bytes is not null) CryptographicOperations.ZeroMemory(bytes);
+                    }
+                }
+                return chapters.ToArray();
+            }
             return references.Select(id => (Id: id, Stored: ReadStored(Path.Combine(root, id + ".json"), owner, null)))
                 .Where(item => item.Stored is not null)
                 .Select(item => new ReaderChapter(item.Id[65..], item.Stored!.Job)).ToArray();

@@ -29,6 +29,101 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
     private static string Hash(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     private static bool Authorized() => true;
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Account_library_reads_owned_chapters_in_bounded_batches_and_joins_failed_reads(bool fail)
+    {
+        using var remote = new Remote();
+        using var service = Service(remote);
+        for (int index = 0; index < 9; index++)
+            service.Create("owner-a", Request("owned-" + index), Authorized);
+        service.Create("owner-b", Request("foreign"), Authorized);
+        string foreignStream = TeableOriginChapterStorage.JobStream(service.PendingForWorker(20)
+            .Single(item => item.Job.RequestId == "foreign").WorkId);
+        int writes = remote.HeadPosts, calls = 0, active = 0, maximum = 0;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePeers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        remote.BeforeRecordReadResponse = async (row, ct) =>
+        {
+            string stream = row["stream"]!.GetValue<string>();
+            if (stream == TeableOriginChapterStorage.CatalogueStream) return;
+            Assert.NotEqual(foreignStream, stream);
+            int count = Interlocked.Increment(ref active);
+            int call = Interlocked.Increment(ref calls);
+            int previous;
+            do { previous = Volatile.Read(ref maximum); }
+            while (count > previous && Interlocked.CompareExchange(ref maximum, count, previous) != previous);
+            if (call == 4) entered.TrySetResult();
+            try
+            {
+                await release.Task.WaitAsync(ct);
+                if (fail && call == 1)
+                {
+                    failing.TrySetResult();
+                    throw new HttpRequestException("synthetic chapter read failure");
+                }
+                if (fail) await releasePeers.Task.WaitAsync(ct);
+            }
+            finally { Interlocked.Decrement(ref active); }
+        };
+        var read = Task.Run(() => service.ListForReader("owner-a"));
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(4, Volatile.Read(ref calls));
+            Assert.False(read.IsCompleted);
+            release.TrySetResult();
+            if (fail)
+            {
+                await failing.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.False(read.IsCompleted); // Successful peers still own their in-flight buffers.
+                releasePeers.TrySetResult();
+                await Assert.ThrowsAsync<HttpRequestException>(() => read);
+                Assert.Equal(4, calls); // No later batch, empty-success fallback or read replay.
+            }
+            else
+            {
+                var entries = await read;
+                Assert.Equal(9, entries.Count);
+                Assert.Equal(entries.Select(e => e.Reference).Order(StringComparer.Ordinal),
+                    entries.Select(e => e.Reference));
+                Assert.Equal(9, calls);
+            }
+            Assert.Equal(4, maximum);
+            Assert.Equal(0, active);
+            Assert.Equal(writes, remote.HeadPosts);
+        }
+        finally
+        {
+            release.TrySetResult();
+            releasePeers.TrySetResult();
+            try { await read; } catch (HttpRequestException) { }
+        }
+    }
+
+    [Fact]
+    public void Reader_batch_validates_before_dispatch_and_does_not_admit_a_mutation()
+    {
+        using var remote = new Remote();
+        using var service = Service(remote);
+        service.Create("owner", Request(), Authorized);
+        string id = Assert.Single(service.PendingForWorker(20)).WorkId;
+        using var storage = new TeableOriginChapterStorage(remote.Store());
+        using var session = storage.OpenSession();
+        int reads = remote.GetRequests, writes = remote.HeadPosts;
+        Assert.Throws<ArgumentException>(() => session.ReadBatchForReader([]));
+        Assert.Throws<ArgumentException>(() => session.ReadBatchForReader([id, id, id, id, id]));
+        Assert.Throws<InvalidDataException>(() => session.ReadBatchForReader([id, "invalid"]));
+        Assert.Equal(reads, remote.GetRequests);
+        byte[] bytes = Assert.IsType<byte[]>(Assert.Single(session.ReadBatchForReader([id])));
+        try { Assert.Throws<InvalidOperationException>(() => session.Write(id, bytes)); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
     [Fact]
     public void Account_reader_restores_complete_owned_text_without_local_files_or_acceptance_writes()
     {
@@ -235,6 +330,7 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
         int checks = 0;
         Assert.Throws<UnauthorizedAccessException>(() => Service(remote).Create("owner", Request(), () => ++checks == 1));
         Assert.Empty(Service(remote).PendingForWorker(20));
+        Assert.Empty(Service(remote).ListForReader("owner"));
         Assert.Null(Service(remote).Get("owner", Request().RequestId));
         var restored = Service(remote).Create("owner", Request(), Authorized);
         Assert.Equal(OriginChapterAuthoringStates.AwaitingAuthoring, restored.State);
@@ -281,6 +377,7 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
         await remote.Store().CompareExchangeAsync(stream, head, Guid.NewGuid(), "{}"u8.ToArray());
         int writes = remote.HeadPosts;
         Assert.Throws<InvalidDataException>(() => Service(remote).Get("owner", job.RequestId));
+        Assert.Throws<InvalidDataException>(() => Service(remote).ListForReader("owner"));
         Assert.Throws<InvalidDataException>(() => Service(remote).Create("owner", Request(), Authorized));
         Assert.Equal(writes, remote.HeadPosts);
     }
