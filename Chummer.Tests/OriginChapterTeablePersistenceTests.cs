@@ -30,6 +30,60 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
     private static bool Authorized() => true;
 
     [Theory]
+    [InlineData("native")]
+    [InlineData("chapter")]
+    [InlineData("library")]
+    public async Task Primary_readers_do_not_wait_for_a_blocked_worker_scan(string route)
+    {
+        using var remote = new Remote();
+        using var service = Service(remote);
+        var job = service.Create("owner", Request(), Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "execution");
+        const string prose = "A complete synthetic chapter, including its ending.";
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "execution", prose, new string('c', 64));
+        int writes = remote.HeadPosts, catalogueReads = 0;
+        var workerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseWorker = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        remote.BeforeRecordReadResponse = async (row, ct) =>
+        {
+            if (row["stream"]!.GetValue<string>() == TeableOriginChapterStorage.CatalogueStream
+                && Interlocked.Increment(ref catalogueReads) == 1)
+            {
+                workerEntered.TrySetResult();
+                await releaseWorker.Task.WaitAsync(ct);
+            }
+        };
+        var worker = Task.Run(() => service.PendingForWorker(20));
+        Task<OriginChapterAuthoringJob?>? reader = null;
+        try
+        {
+            await workerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            reader = Task.Run(() => route switch
+            {
+                "native" => service.Get("owner", job.RequestId),
+                "chapter" => service.GetForReader("owner", work.WorkId[65..]),
+                _ => Assert.Single(service.ListForReader("owner")).Job
+            });
+            var observed = await reader.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(worker.IsCompleted); // Reader completes while the worker is still blocked.
+            Assert.Equal(prose, observed!.DraftText);
+            Assert.Null(observed.ReaderAcceptedTextDigest);
+            Assert.Equal(writes, remote.HeadPosts);
+        }
+        finally
+        {
+            releaseWorker.TrySetResult();
+            Assert.Empty(await worker);
+            if (reader is not null) await reader;
+        }
+        Assert.Null(service.Get("other-owner", job.RequestId));
+        Assert.Null(service.GetForReader("other-owner", work.WorkId[65..]));
+        Assert.Empty(service.ListForReader("other-owner"));
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Account_library_reads_owned_chapters_in_bounded_batches_and_joins_failed_reads(bool fail)

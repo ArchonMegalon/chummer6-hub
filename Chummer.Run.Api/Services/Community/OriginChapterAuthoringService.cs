@@ -104,7 +104,10 @@ public sealed class OriginChapterAuthoringService : IDisposable
     public OriginChapterAuthoringJob? Get(string subjectId, string requestId)
     {
         RequireId(requestId);
-        return Locked(root => Read(JobPath(root, Owner(subjectId), requestId), Owner(subjectId), requestId));
+        string owner = Owner(subjectId);
+        return ReadOnly(
+            session => ReadPrimaryForReader(session, WorkId(owner, requestId), owner, requestId),
+            root => Read(JobPath(root, owner, requestId), owner, requestId));
     }
 
     // Account readers use an owner-bound opaque reference, never a worker ID or
@@ -114,47 +117,71 @@ public sealed class OriginChapterAuthoringService : IDisposable
     internal IReadOnlyList<ReaderChapter> ListForReader(string subjectId)
     {
         string owner = Owner(subjectId);
-        return Locked(root =>
+        return ReadOnly(session =>
         {
-            string[] references = WorkIds(root)
-                .Where(id => id.StartsWith(owner + ".", StringComparison.Ordinal))
-                .Order(StringComparer.Ordinal).Take(129).ToArray();
-            if (references.Length > 128)
-                throw new InvalidDataException("The private chapter inventory exceeds its limit.");
-            if (_primarySession is not null)
+            string[] references = OwnedReaderReferences(session.WorkIds(), owner);
+            var chapters = new List<ReaderChapter>(references.Length);
+            foreach (string[] batch in references.Chunk(TeableOriginChapterStorage.ReaderBatchSize))
             {
-                var chapters = new List<ReaderChapter>(references.Length);
-                foreach (string[] batch in references.Chunk(TeableOriginChapterStorage.ReaderBatchSize))
+                byte[]?[] records = session.ReadBatchForReader(batch);
+                try
                 {
-                    byte[]?[] records = _primarySession.ReadBatchForReader(batch);
-                    try
-                    {
-                        for (int index = 0; index < batch.Length; index++)
-                            if (records[index] is { } bytes)
-                            {
-                                var stored = DecodeStored(bytes, batch[index] + ".json", owner, null);
-                                chapters.Add(new ReaderChapter(batch[index][65..], stored.Job));
-                            }
-                    }
-                    finally
-                    {
-                        foreach (byte[]? bytes in records)
-                            if (bytes is not null) CryptographicOperations.ZeroMemory(bytes);
-                    }
+                    for (int index = 0; index < batch.Length; index++)
+                        if (records[index] is { } bytes)
+                        {
+                            var stored = DecodeStored(bytes, batch[index] + ".json", owner, null);
+                            chapters.Add(new ReaderChapter(batch[index][65..], stored.Job));
+                        }
                 }
-                return chapters.ToArray();
+                finally
+                {
+                    foreach (byte[]? bytes in records)
+                        if (bytes is not null) CryptographicOperations.ZeroMemory(bytes);
+                }
             }
-            return references.Select(id => (Id: id, Stored: ReadStored(Path.Combine(root, id + ".json"), owner, null)))
+            return chapters.ToArray();
+        }, root => OwnedReaderReferences(WorkIds(root), owner)
+                .Select(id => (Id: id, Stored: ReadStored(Path.Combine(root, id + ".json"), owner, null)))
                 .Where(item => item.Stored is not null)
-                .Select(item => new ReaderChapter(item.Id[65..], item.Stored!.Job)).ToArray();
-        });
+                .Select(item => new ReaderChapter(item.Id[65..], item.Stored!.Job)).ToArray());
     }
 
     internal OriginChapterAuthoringJob? GetForReader(string subjectId, string reference)
     {
         if (!IsDigest(reference)) return null;
         string owner = Owner(subjectId);
-        return Locked(root => ReadStored(Path.Combine(root, owner + "." + reference + ".json"), owner, null)?.Job);
+        string workId = owner + "." + reference;
+        return ReadOnly(session => ReadPrimaryForReader(session, workId, owner, null),
+            root => ReadStored(Path.Combine(root, workId + ".json"), owner, null)?.Job);
+    }
+
+    private T ReadOnly<T>(Func<TeableOriginChapterStorage.Session, T> primaryRead, Func<string, T> localRead)
+    {
+        if (_primary is null) return Locked(localRead);
+        // Remote records are immutable, digest-checked revisions. A reader owns
+        // its own bounded session, never the worker/writer session or mutation
+        // heads. Do not wait behind a whole worker scan just to read one chapter.
+        // Local files still need their existing lock; controller authorization
+        // is still checked again after storage reads before private disclosure.
+        using var session = _primary.OpenSession();
+        return primaryRead(session);
+    }
+
+    private static string[] OwnedReaderReferences(IEnumerable<string> workIds, string owner)
+    {
+        string[] references = workIds.Where(id => id.StartsWith(owner + ".", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal).Take(129).ToArray();
+        if (references.Length > 128)
+            throw new InvalidDataException("The private chapter inventory exceeds its limit.");
+        return references;
+    }
+
+    private static OriginChapterAuthoringJob? ReadPrimaryForReader(TeableOriginChapterStorage.Session session,
+        string workId, string owner, string? requestId)
+    {
+        byte[]? bytes = session.ReadBatchForReader([workId])[0];
+        try { return bytes is null ? null : DecodeStored(bytes, workId + ".json", owner, requestId).Job; }
+        finally { if (bytes is not null) CryptographicOperations.ZeroMemory(bytes); }
     }
 
     public OriginChapterAuthoringJob AcceptReading(string subjectId, string requestId, string sourceDigest,
