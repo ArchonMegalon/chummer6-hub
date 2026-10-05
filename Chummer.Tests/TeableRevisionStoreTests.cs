@@ -206,11 +206,14 @@ public sealed class TeableRevisionStoreTests
         Assert.Null(await remote.Store().ReadAsync("other-owner"));
     }
 
-    [Fact]
-    public async Task Chunk_reads_overlap_in_bounded_pairs_and_preserve_exact_order_without_writes()
+    [Theory]
+    [InlineData(3)] // The current protected account envelope requires three chunks.
+    [InlineData(5)] // A larger envelope must not start an unbounded fan-out.
+    public async Task Chunk_reads_overlap_in_bounded_batches_and_preserve_exact_order_without_writes(int chunks)
     {
         using var remote = new Remote();
-        byte[] bytes = Enumerable.Range(0, 4 * 32 * 1024 + 7).Select(i => (byte)(i % 251)).ToArray();
+        byte[] bytes = Enumerable.Range(0, (chunks - 1) * 32 * 1024 + 7).Select(i => (byte)(i % 251)).ToArray();
+        int batchSize = Math.Min(4, chunks);
         await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
         int posts = remote.HeadPosts, active = 0, maximum = 0, calls = 0;
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -219,7 +222,7 @@ public sealed class TeableRevisionStoreTests
         {
             int count = Interlocked.Increment(ref active);
             maximum = Math.Max(maximum, count);
-            if (Interlocked.Increment(ref calls) == 2) entered.TrySetResult();
+            if (Interlocked.Increment(ref calls) == batchSize) entered.TrySetResult();
             try { await release.Task.WaitAsync(ct); }
             finally { Interlocked.Decrement(ref active); }
         };
@@ -227,24 +230,26 @@ public sealed class TeableRevisionStoreTests
         try
         {
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal(2, Volatile.Read(ref calls));
+            Assert.Equal(batchSize, Volatile.Read(ref calls));
             Assert.False(read.IsCompleted);
         }
         finally { release.TrySetResult(); await read; }
         Assert.Equal(bytes, (await read)!.Bytes);
-        Assert.Equal(2, maximum);
-        Assert.Equal(5, calls);
+        Assert.Equal(batchSize, maximum);
+        Assert.Equal(chunks, calls);
         Assert.Equal(0, active);
         Assert.Equal(posts, remote.HeadPosts);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Failed_or_canceled_chunk_read_joins_its_peer_before_returning(bool cancel)
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    [InlineData(false, 4)]
+    [InlineData(true, 4)]
+    public async Task Failed_or_canceled_chunk_read_joins_its_peers_before_returning(bool cancel, int chunks)
     {
         using var remote = new Remote();
-        byte[] bytes = new byte[32 * 1024 + 7];
+        byte[] bytes = new byte[(chunks - 1) * 32 * 1024 + 7];
         await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
         int posts = remote.HeadPosts, enteredCount = 0, active = 0;
         var both = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -253,7 +258,7 @@ public sealed class TeableRevisionStoreTests
         remote.BeforeChunkReadResponse = async (row, ct) =>
         {
             Interlocked.Increment(ref active);
-            if (Interlocked.Increment(ref enteredCount) == 2) both.TrySetResult();
+            if (Interlocked.Increment(ref enteredCount) == chunks) both.TrySetResult();
             try
             {
                 await both.Task.WaitAsync(ct);
@@ -279,7 +284,7 @@ public sealed class TeableRevisionStoreTests
             else
             {
                 await failed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                Assert.False(read.IsCompleted); // The second response still owns its output slice.
+                Assert.False(read.IsCompleted); // Peer responses still own their output slices.
                 release.TrySetResult();
                 await Assert.ThrowsAsync<HttpRequestException>(() => read);
             }

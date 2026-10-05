@@ -16,6 +16,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
 {
     private bool _ownsClient;
     internal const int ChunkBytes = 32 * 1024;
+    private const int ChunkReadConcurrency = 4;
     internal const int MaximumBytes = 64 * 1024 * 1024 + 64; // Includes a bounded store-specific header.
     private const int MaximumResponseBytes = 256 * 1024;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 12 };
@@ -209,15 +210,19 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
                             bytes.AsSpan(index * ChunkBytes, length), out int used) || used != length) throw Invalid();
                 }
                 // The fresh head fixes every chunk identity and destination.
-                // Overlap only two bounded GETs; never cache authorization or
-                // start an unbounded task per chunk. Join both even on failure
+                // A protected account envelope can span three chunks. Read a
+                // bounded batch of four so fresh authorization need not wait
+                // for a second dependent round at that size. Never cache authority or
+                // start an unbounded task per chunk. Join all even on failure
                 // before clearing their shared buffer in the outer catch.
-                for (int index = 0; index < manifest.Chunks; index += 2)
+                for (int index = 0; index < manifest.Chunks; index += ChunkReadConcurrency)
                 {
                     ct.ThrowIfCancellationRequested();
-                    Task first = ReadChunkAsync(index);
-                    Task second = index + 1 < manifest.Chunks ? ReadChunkAsync(index + 1) : Task.CompletedTask;
-                    await Task.WhenAll(first, second);
+                    int count = Math.Min(ChunkReadConcurrency, manifest.Chunks - index);
+                    var reads = new Task[count];
+                    for (int offset = 0; offset < count; offset++)
+                        reads[offset] = ReadChunkAsync(index + offset);
+                    await Task.WhenAll(reads);
                 }
             }
             ct.ThrowIfCancellationRequested();
