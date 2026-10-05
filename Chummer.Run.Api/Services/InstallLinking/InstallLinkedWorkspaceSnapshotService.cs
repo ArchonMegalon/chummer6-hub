@@ -28,14 +28,10 @@ public sealed class InstallLinkedWorkspaceSnapshotService
         ArgumentNullException.ThrowIfNull(installation);
 
         string ownerKey = ResolveOwnerKey(installation);
-        using (_store.Enter(ownerKey))
-        {
-            return _store.SnapshotsByKey.Values
-                .Where(item => string.Equals(item.OwnerKey, ownerKey, StringComparison.Ordinal))
-                .OrderByDescending(static item => item.UpdatedAtUtc)
-                .Select(item => WithAuthority(item, installation))
-                .ToArray();
-        }
+        return _store.ReadForOwner(ownerKey)
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .Select(item => WithAuthority(item, installation))
+            .ToArray();
     }
 
     /// <summary>

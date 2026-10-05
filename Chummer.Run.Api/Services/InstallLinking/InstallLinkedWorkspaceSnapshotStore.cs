@@ -9,10 +9,12 @@ namespace Chummer.Run.Api.Services.InstallLinking;
 public sealed class InstallLinkedWorkspaceSnapshotStore : IDisposable
 {
     private readonly object _gate = new();
+    private readonly object _authorityGate = new();
     private readonly TeableRevisionStore? _primary;
     private readonly bool _ownsPrimary;
     private readonly Dictionary<string, TeableRevisionStore.Head> _observedHeads = new(StringComparer.Ordinal);
     private string? _scopeOwner;
+    private TeableRevisionStore.Head? _scopeHead;
     private int _scopeDepth;
     private bool _failedScope;
     private const int MaximumPrimaryBytes = 64 * 1024 * 1024;
@@ -63,7 +65,7 @@ public sealed class InstallLinkedWorkspaceSnapshotStore : IDisposable
         }
         catch (Exception exception)
         {
-            if (_scopeDepth == 0 && _primary is not null) { SnapshotsByKey.Clear(); _scopeOwner = null; }
+            if (_scopeDepth == 0 && _primary is not null) { SnapshotsByKey.Clear(); _scopeOwner = null; _scopeHead = null; }
             Monitor.Exit(_gate);
             if (_primary is not null && IsPrimaryStorageFailure(exception))
                 throw new InstallLinkingOperationException(StatusCodes.Status503ServiceUnavailable,
@@ -86,6 +88,7 @@ public sealed class InstallLinkedWorkspaceSnapshotStore : IDisposable
             {
                 store.SnapshotsByKey.Clear();
                 store._scopeOwner = null;
+                store._scopeHead = null;
             }
             Monitor.Exit(store._gate);
         }
@@ -100,6 +103,24 @@ public sealed class InstallLinkedWorkspaceSnapshotStore : IDisposable
     }
 
     public Dictionary<string, InstallLinkedWorkspaceSnapshotRecord> SnapshotsByKey { get; } = new(StringComparer.Ordinal);
+
+    // Roster reads are detached observations of the primary, never mutation
+    // scopes. A slow owner must not monopolize the shared write buffer/gate.
+    // No cached/private payload is used as a fallback or retained here.
+    internal InstallLinkedWorkspaceSnapshotRecord[] ReadForOwner(string ownerKey)
+    {
+        if (_primary is null)
+        {
+            using (Enter(ownerKey))
+                return SnapshotsByKey.Values.Where(row => row.OwnerKey == ownerKey).ToArray();
+        }
+        try { return ReadPrimary(ownerKey).Records; }
+        catch (Exception exception) when (IsPrimaryStorageFailure(exception))
+        {
+            throw new InstallLinkingOperationException(StatusCodes.Status503ServiceUnavailable,
+                "The primary workspace state is unavailable; no local fallback was used.");
+        }
+    }
 
     public void PersistLocked()
     {
@@ -130,15 +151,26 @@ public sealed class InstallLinkedWorkspaceSnapshotStore : IDisposable
 
     private void LoadPrimaryLocked(string ownerKey)
     {
+        try
+        {
+            var current = ReadPrimary(ownerKey);
+            SnapshotsByKey.Clear();
+            foreach (var record in current.Records)
+                SnapshotsByKey.Add(ComposeKey(record.OwnerKey, record.WorkspaceId), record);
+            // A concurrent detached read may observe a later head. It must never
+            // advance the CAS precondition for these older, editable bytes.
+            _scopeHead = current.Head;
+        }
+        catch { _failedScope = true; throw; }
+    }
+
+    private (TeableRevisionStore.Head? Head, InstallLinkedWorkspaceSnapshotRecord[] Records) ReadPrimary(string ownerKey)
+    {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         TeableRevisionStore.Head? head = null;
         try
         {
             head = _primary!.ReadAsync(OwnerStream(ownerKey), deadline.Token).GetAwaiter().GetResult();
-            if (_observedHeads.TryGetValue(ownerKey, out var observed)
-                && (head is null || head.Revision < observed.Revision
-                    || (head.Revision == observed.Revision && (head.Commit != observed.Commit || head.Sha256 != observed.Sha256))))
-                throw new InvalidDataException("The primary workspace authority regressed or changed identity.");
             InstallLinkedWorkspaceSnapshotRecord[] records = [];
             if (head is not null)
             {
@@ -149,11 +181,16 @@ public sealed class InstallLinkedWorkspaceSnapshotStore : IDisposable
                     throw new InvalidDataException("The primary workspace scope or schema is invalid.");
                 records = ValidatePrimaryRecords(ownerKey, snapshot.Snapshots);
             }
-            SnapshotsByKey.Clear();
-            foreach (var record in records) SnapshotsByKey.Add(ComposeKey(record.OwnerKey, record.WorkspaceId), record);
-            if (head is not null) _observedHeads[ownerKey] = head with { Bytes = [] };
+            lock (_authorityGate)
+            {
+                if (_observedHeads.TryGetValue(ownerKey, out var observed)
+                    && (head is null || head.Revision < observed.Revision
+                        || (head.Revision == observed.Revision && (head.Commit != observed.Commit || head.Sha256 != observed.Sha256))))
+                    throw new InvalidDataException("The primary workspace authority regressed or changed identity.");
+                if (head is not null) _observedHeads[ownerKey] = head with { Bytes = [] };
+            }
+            return (head is null ? null : head with { Bytes = [] }, records);
         }
-        catch { _failedScope = true; throw; }
         finally { if (head is not null) CryptographicOperations.ZeroMemory(head.Bytes); }
     }
 
@@ -170,11 +207,20 @@ public sealed class InstallLinkedWorkspaceSnapshotStore : IDisposable
                 throw new InvalidDataException("The primary workspace key and identity disagree.");
             bytes = JsonSerializer.SerializeToUtf8Bytes(new PrimarySnapshot(PrimarySchema, _scopeOwner, records), _jsonOptions);
             if (bytes.Length > MaximumPrimaryBytes) throw new InvalidDataException("The primary workspace state is oversized.");
-            _observedHeads.TryGetValue(_scopeOwner, out var expected);
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            written = _primary!.CompareExchangeAsync(OwnerStream(_scopeOwner), expected, Guid.NewGuid(), bytes,
+            written = _primary!.CompareExchangeAsync(OwnerStream(_scopeOwner), _scopeHead, Guid.NewGuid(), bytes,
                 deadline.Token).GetAwaiter().GetResult();
-            _observedHeads[_scopeOwner] = written with { Bytes = [] };
+            _scopeHead = written with { Bytes = [] };
+            lock (_authorityGate)
+            {
+                // Another read can already have observed a later remote commit
+                // while this successful write acknowledgement was in flight.
+                if (!_observedHeads.TryGetValue(_scopeOwner, out var observed) || written.Revision > observed.Revision)
+                    _observedHeads[_scopeOwner] = _scopeHead;
+                else if (written.Revision == observed.Revision
+                    && (written.Commit != observed.Commit || written.Sha256 != observed.Sha256))
+                    throw new InvalidDataException("The primary workspace authority changed identity.");
+            }
         }
         catch (Exception exception)
         {
