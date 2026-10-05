@@ -170,16 +170,33 @@ public sealed class AccountsController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            var links = _links.GetSummary(subject.SubjectId);
-            HubUserExperienceDto experience = _experience.GetOrCreate(subject.SubjectId);
+
+            // Keep identity admission first, but do not make a small account page
+            // wait for unrelated remote stores or create unused projections.
+            if (ShouldShowMinimalAccountSection(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId, prepQuery, Request.Query))
+            {
+                return View(
+                    "~/Views/Accounts/Section.cshtml",
+                    BuildAccountSectionModel(selectedSection, user, subject.SubjectId, accessNotice));
+            }
+
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
+            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            if (showHub)
+            {
+                return View(
+                    "~/Views/Accounts/Hub.cshtml",
+                    BuildAccountHubModel(user, installLinking, supportCases, campaignSpine));
+            }
+
+            var links = _links.GetSummary(subject.SubjectId);
+            HubUserExperienceDto experience = _experience.GetOrCreate(subject.SubjectId);
             var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
             var selectedSupportCase = string.IsNullOrWhiteSpace(caseId)
                 ? null
                 : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
             var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase, installLinking);
-            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var originDossierPublications = _originDossierPublications.ListForAccount(user.UserId, subject.SubjectId);
             EntitlementSyncReceiptProjection entitlementSyncReceipts = _workspaceServerPlane.GetEntitlementSyncReceiptProjection(user, installLinking);
             var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
@@ -212,28 +229,6 @@ public sealed class AccountsController : Controller
             IReadOnlyList<ContributionReceiptDto> participationReceipts = participationSession is null
                 ? Array.Empty<ContributionReceiptDto>()
                 : _sessions.ListReceipts(participationSession.SponsorSessionId);
-            if (showHub)
-            {
-                return View(
-                    "~/Views/Accounts/Hub.cshtml",
-                    BuildAccountHubModel(user, installLinking, supportCases, campaignSpine));
-            }
-
-            if (ShouldShowMinimalAccountSection(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId, prepQuery, Request.Query))
-            {
-                return View(
-                    "~/Views/Accounts/Section.cshtml",
-                    BuildAccountSectionModel(
-                        selectedSection,
-                        user,
-                        installLinking,
-                        campaignSpine,
-                        _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email),
-                        _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 8),
-                        _participationNotifications.ListReceiptsForUser(user.UserId, 6),
-                        accessNotice));
-            }
-
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
                 CurrentSection: selectedSection,
@@ -505,19 +500,26 @@ public sealed class AccountsController : Controller
     private AccountSectionPageViewModel BuildAccountSectionModel(
         string section,
         HubUserDto user,
-        InstallLinkingSummaryDto installLinking,
-        AccountCampaignSummary campaignSpine,
-        HorizonArtifactAllowanceViewModel? allowance,
-        IReadOnlyList<PublicPackageReceipt> participationPackageReceipts,
-        IReadOnlyList<ParticipationOperatorNotificationReceipt> participationActivityReceipts,
+        string subjectId,
         string? accessNotice)
-        => section switch
+    {
+        if (section == "participation")
+        {
+            return BuildAccountParticipationSectionModel(
+                user,
+                _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email),
+                _packageCatalog.ListReceiptsForSubject(subjectId, 8),
+                _participationNotifications.ListReceiptsForUser(user.UserId, 6));
+        }
+
+        var installLinking = _installLinking.GetSummary(user.UserId, subjectId);
+        return section switch
         {
             "access" => BuildAccountAccessSectionModel(user, installLinking, accessNotice),
-            "work" => BuildAccountWorkSectionModel(user, installLinking, campaignSpine),
-            "participation" => BuildAccountParticipationSectionModel(user, allowance, participationPackageReceipts, participationActivityReceipts),
+            "work" => BuildAccountWorkSectionModel(user, installLinking, _campaignSpine.GetAccountSummary(user, installLinking)),
             _ => throw new InvalidOperationException($"Unsupported account section '{section}'.")
         };
+    }
 
     private AccountSectionPageViewModel BuildAccountAccessSectionModel(
         HubUserDto user,
