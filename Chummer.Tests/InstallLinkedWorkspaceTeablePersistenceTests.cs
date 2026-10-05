@@ -35,19 +35,23 @@ public sealed class InstallLinkedWorkspaceTeablePersistenceTests : IDisposable
         using var remote = new Remote();
         using var store = Store(remote);
         var service = new InstallLinkedWorkspaceSnapshotService(store);
-        using var entered = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
         remote.BeforeHeadReadResponse = () =>
         {
-            entered.Set();
+            entered.SetResult();
             Assert.True(release.Wait(TimeSpan.FromSeconds(10)));
         };
-        var slow = Task.Run(() => service.ListForInstallation(Installation()));
+        // This read deliberately blocks. Give it its own thread so a busy test
+        // runner's pool cannot prevent the controlled interleaving from starting.
+        var slow = Task.Factory.StartNew(() => service.ListForInstallation(Installation()),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         Task<IReadOnlyList<InstallLinkedWorkspaceSnapshotRecord>>? other = null;
         try
         {
-            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
-            other = Task.Run(() => service.ListForInstallation(Installation("other")));
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            other = Task.Factory.StartNew(() => service.ListForInstallation(Installation("other")),
+                CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             Assert.Empty(await other.WaitAsync(TimeSpan.FromSeconds(2)));
             Assert.False(slow.IsCompleted);
         }
@@ -92,21 +96,23 @@ public sealed class InstallLinkedWorkspaceTeablePersistenceTests : IDisposable
         using var competitor = Store(remote);
         var service = new InstallLinkedWorkspaceSnapshotService(store);
         var initial = service.UpsertForInstallation(Installation(), Request(), 0);
-        using var entered = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
         remote.BeforeHeadReadResponse = () =>
         {
-            entered.Set();
+            entered.SetResult();
             Assert.True(release.Wait(TimeSpan.FromSeconds(10)));
         };
-        var slow = Task.Run(() => Record.Exception(() => service.ListForInstallation(Installation())));
+        var slow = Task.Factory.StartNew(() => Record.Exception(() => service.ListForInstallation(Installation())),
+            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         Task<IReadOnlyList<InstallLinkedWorkspaceSnapshotRecord>>? current = null;
         try
         {
-            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
             var winner = new InstallLinkedWorkspaceSnapshotService(competitor).UpsertForInstallation(
                 Installation(), Request() with { Name = "Newer remote edit" }, initial.RemoteRevision, initial.ServerToken);
-            current = Task.Run(() => service.ListForInstallation(Installation()));
+            current = Task.Factory.StartNew(() => service.ListForInstallation(Installation()),
+                CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             Assert.Equal(winner.ServerToken, Assert.Single(await current.WaitAsync(TimeSpan.FromSeconds(2))).ServerToken);
         }
         finally
