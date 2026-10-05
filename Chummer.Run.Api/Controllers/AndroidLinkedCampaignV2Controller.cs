@@ -363,18 +363,27 @@ public sealed class AndroidLinkedCampaignV2Controller : ControllerBase
             return false;
         }
 
-        if (!AndroidLinkedV2RequestProof.TryGetPrincipal(HttpContext, out AndroidLinkedV2GrantPrincipal? principal)
-            || !string.Equals(request.InstallationId, principal!.Installation.InstallationId, StringComparison.Ordinal)
-            || (installation = _installLinking.ResolveAndroidLinkedV2Principal(principal)) is null
-            || string.IsNullOrWhiteSpace(installation.SubjectId))
+        try
         {
-            denied = Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                detail: "linked device grant is unknown or expired.");
+            if (!AndroidLinkedV2RequestProof.TryGetPrincipal(HttpContext, out AndroidLinkedV2GrantPrincipal? principal)
+                || !string.Equals(request.InstallationId, principal!.Installation.InstallationId, StringComparison.Ordinal)
+                || (installation = _installLinking.ResolveAndroidLinkedV2Principal(principal, requireAvailableAuthority: true)) is null
+                || string.IsNullOrWhiteSpace(installation.SubjectId))
+            {
+                denied = Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    detail: "linked device grant is unknown or expired.");
+                return false;
+            }
+
+            return true;
+        }
+        catch (InstallLinkingOperationException ex) when (ex.StatusCode == StatusCodes.Status503ServiceUnavailable)
+        {
+            // A transient authority outage must not make the phone discard a valid link.
+            denied = Problem(statusCode: ex.StatusCode, detail: "Install-linking is temporarily unavailable.");
             return false;
         }
-
-        return true;
     }
 
     private AndroidLinkedGroupDto ToAndroidGroup(GroupDto group, ClaimedInstallationDto installation)

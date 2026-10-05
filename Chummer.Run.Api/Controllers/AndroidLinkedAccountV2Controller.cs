@@ -40,13 +40,26 @@ public sealed class AndroidLinkedAccountV2Controller : ControllerBase
                 detail: "linked device payload is required.");
         }
 
-        if (!AndroidLinkedV2RequestProof.TryGetPrincipal(HttpContext, out AndroidLinkedV2GrantPrincipal? principal)
-            || !string.Equals(request.InstallationId, principal!.Installation.InstallationId, StringComparison.Ordinal)
-            || _installLinking.ResolveAndroidLinkedV2Principal(principal) is not { SubjectId: { Length: > 0 } subjectId })
+        string subjectId;
+        try
         {
+            if (!AndroidLinkedV2RequestProof.TryGetPrincipal(HttpContext, out AndroidLinkedV2GrantPrincipal? principal)
+                || !string.Equals(request.InstallationId, principal!.Installation.InstallationId, StringComparison.Ordinal)
+                || _installLinking.ResolveAndroidLinkedV2Principal(principal, requireAvailableAuthority: true)
+                    is not { SubjectId: { Length: > 0 } currentSubject })
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    detail: "linked device grant is unknown or expired.");
+            }
+            subjectId = currentSubject;
+        }
+        catch (InstallLinkingOperationException ex) when (ex.StatusCode == StatusCodes.Status503ServiceUnavailable)
+        {
+            // No erasure is admitted and the phone must retain its valid credentials.
             return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                detail: "linked device grant is unknown or expired.");
+                statusCode: ex.StatusCode,
+                detail: "Install-linking is temporarily unavailable.");
         }
 
         if (!string.Equals(
