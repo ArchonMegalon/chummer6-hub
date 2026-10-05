@@ -22,6 +22,7 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class AccountsController : Controller
 {
     private const int MaxRequestBodyBytes = 16 * 1024;
+    private const string OriginLibraryPath = "/account/work/origin-dossiers";
 
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
@@ -691,7 +692,13 @@ public sealed class AccountsController : Controller
             [
                 runnerCard,
                 campaignCard,
-                browserCard
+                browserCard,
+                new AccountHubCardViewModel(
+                    "Origin",
+                    "My books",
+                    "Open your private Origin library.",
+                    "Open library",
+                    OriginLibraryPath)
             ],
             BackLabel: "Back to account",
             BackHref: "/account");
@@ -903,8 +910,66 @@ public sealed class AccountsController : Controller
                 ? "week"
                 : "window";
 
+    [HttpGet(OriginLibraryPath)]
+    [Produces("text/html")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> OriginDossierLibraryPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var publications = _originDossierPublications.ListForAccount(user.UserId, subject.SubjectId);
+            var cards = publications.Select(publication =>
+            {
+                string detailPath = $"{OriginLibraryPath}/{Uri.EscapeDataString(publication.ProjectId)}";
+                bool canRead = publication.FullStoryVerified && publication.EbookHandoffReady
+                    && !string.IsNullOrWhiteSpace(publication.AudiobookshelfDossierShareUrl);
+                return new AccountHubCardViewModel(
+                    "Origin",
+                    publication.Title,
+                    canRead ? "Your full ebook is ready to read."
+                        : publication.FullStoryVerified ? "Full chapters verified. The ebook is not available yet."
+                        : "The full story is not available yet. Open the book status for details.",
+                    canRead ? "Read the ebook" : "View book status",
+                    canRead ? $"{detailPath}/read" : detailPath,
+                    canRead ? "Book details" : null,
+                    canRead ? detailPath : null);
+            }).ToArray();
+            return View("~/Views/Accounts/Section.cshtml", new AccountSectionPageViewModel(
+                Chrome: _chrome.BuildAuthenticatedChrome("My books", "Your private Origin library.",
+                    OriginLibraryPath, user.DisplayName, user.Email),
+                Eyebrow: "Origin library",
+                Heading: "My books",
+                Summary: "Your private Origin books. Reading links appear only when the full ebook is verified.",
+                Highlights: cards.Length == 0 ? ["No books are available in this library yet."] : [],
+                Cards: cards,
+                BackLabel: "Back to runners",
+                BackHref: "/account/roster"));
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(OriginLibraryPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Origin library could not confirm the signed-in identity.");
+            Response.StatusCode = ex.StatusCode;
+            return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
+                Chrome: _chrome.BuildPublicChrome("Library unavailable", "Your library could not be opened right now.", OriginLibraryPath),
+                Heading: "Your library is unavailable right now",
+                SupportLine: "Chummer could not confirm your account. Your books and account were not changed.",
+                Notice: null,
+                PrimaryLabel: "Try again",
+                PrimaryHref: OriginLibraryPath,
+                SecondaryLabel: "Return to account",
+                SecondaryHref: "/account"));
+        }
+    }
+
     [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}")]
     [Produces("text/html")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> OriginDossierDetailPage(
         [FromRoute] string originDossierProjectId,
         CancellationToken cancellationToken)
@@ -932,7 +997,7 @@ public sealed class AccountsController : Controller
                     SupportLine: "This account does not have a verified Origin Dossier publication for that project.",
                     Notice: "Open your library to see the dossiers that belong to this account.",
                     PrimaryLabel: "Open Origin Dossier library",
-                    PrimaryHref: "/account/roster#origin-dossier-library",
+                    PrimaryHref: OriginLibraryPath,
                     SecondaryLabel: "Return to account",
                     SecondaryHref: "/account"));
             }
@@ -946,7 +1011,7 @@ public sealed class AccountsController : Controller
                     user.Email),
                 Publication: publication,
                 AccountHref: "/account",
-                LibraryHref: "/account/roster#origin-dossier-library");
+                LibraryHref: OriginLibraryPath);
             return View("~/Views/Accounts/OriginDossier.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -962,7 +1027,7 @@ public sealed class AccountsController : Controller
                 SupportLine: "Chummer could not open this private Origin Dossier right now. The dossier and account were not changed.",
                 Notice: null,
                 PrimaryLabel: "Try account again",
-                PrimaryHref: "/account/roster#origin-dossier-library",
+                PrimaryHref: OriginLibraryPath,
                 SecondaryLabel: "Return home",
                 SecondaryHref: "/home"));
         }

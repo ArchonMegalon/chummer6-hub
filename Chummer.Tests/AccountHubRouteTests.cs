@@ -87,6 +87,40 @@ public sealed class AccountHubRouteTests
         Assert.Equal(0, remote.HeadPosts);
     }
 
+    [Fact]
+    public async Task OriginLibraryDoesNotTurnUnavailablePrimaryStorageIntoAnEmptyLibrary()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote { FailReads = true };
+        using var fixture = AccountHubRouteFixture.CreateWithUnavailableStore(remote, "publication");
+        await Assert.ThrowsAsync<HttpRequestException>(() => fixture.CreateController().OriginDossierLibraryPage(CancellationToken.None));
+        Assert.True(remote.GetRequests > 0);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
+    [Fact]
+    public async Task OriginLibraryAuthenticatesBeforeReadingPublicationStorage()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote { FailReads = true };
+        using var fixture = AccountHubRouteFixture.CreateWithUnavailableStore(remote, "publication");
+        var result = await fixture.CreateController(authenticated: false).OriginDossierLibraryPage(CancellationToken.None);
+        Assert.Equal("/login?next=%2Faccount%2Fwork%2Forigin-dossiers", Assert.IsType<RedirectResult>(result).Url);
+        Assert.Equal(0, remote.GetRequests);
+    }
+
+    [Fact]
+    public async Task OriginLibraryDoesNotReadUnrelatedSupportStorage()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var fixture = AccountHubRouteFixture.CreateWithUnavailableStore(remote, "support");
+        var controller = fixture.CreateController();
+        int readsBefore = remote.GetRequests;
+        remote.FailReads = true;
+        var view = Assert.IsType<ViewResult>(await controller.OriginDossierLibraryPage(CancellationToken.None));
+        Assert.Empty(Assert.IsType<AccountSectionPageViewModel>(view.Model).Cards);
+        Assert.Equal(readsBefore, remote.GetRequests);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("support")]
@@ -398,7 +432,8 @@ public sealed class AccountHubRouteTests
         Assert.Equal("Roster", model.Eyebrow);
         Assert.Equal("Roster", model.Heading);
         Assert.Equal("Open runners, groups, and campaigns.", model.Summary);
-        Assert.Equal(3, model.Cards.Count);
+        Assert.Equal(4, model.Cards.Count);
+        Assert.Equal("/account/work/origin-dossiers", Assert.Single(model.Cards, card => card.Title == "My books").PrimaryHref);
         Assert.StartsWith("/account/campaigns/", model.Cards[1].SecondaryHref, StringComparison.Ordinal);
     }
 

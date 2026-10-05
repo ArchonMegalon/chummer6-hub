@@ -22,6 +22,80 @@ namespace Chummer.Tests;
 public sealed class OriginDossierAccountRouteTests
 {
     [Fact]
+    public async Task OriginLibraryShowsOnlyOwnedBooksWithVerifiedReadingLinks()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("mine", fixture.SubjectId);
+        fixture.ImportGoldPublication("someone-elses-book", "subject.other-owner");
+        var view = Assert.IsType<ViewResult>(await fixture.CreateController().OriginDossierLibraryPage(CancellationToken.None));
+
+        Assert.Equal("~/Views/Accounts/Section.cshtml", view.ViewName);
+        var model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        var card = Assert.Single(model.Cards);
+        Assert.Equal("My books", model.Heading);
+        Assert.Equal("Read the ebook", card.PrimaryLabel);
+        Assert.Equal("/account/work/origin-dossiers/mine/read", card.PrimaryHref);
+        Assert.Equal("/account/work/origin-dossiers/mine", card.SecondaryHref);
+        Assert.Equal("/account/roster", model.BackHref);
+    }
+
+    [Fact]
+    public async Task OriginLibraryDoesNotOfferReadingWhenTheManuscriptIsNotVerified()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var artifacts = fixture.ImportGoldPublication("incomplete", fixture.SubjectId);
+        File.WriteAllText(artifacts.ProviderManuscriptPath, "A summary is not a full chapter.");
+
+        var view = Assert.IsType<ViewResult>(await fixture.CreateController().OriginDossierLibraryPage(CancellationToken.None));
+        var model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        var card = Assert.Single(model.Cards);
+        Assert.Equal("View book status", card.PrimaryLabel);
+        Assert.Equal("/account/work/origin-dossiers/incomplete", card.PrimaryHref);
+        Assert.Null(card.SecondaryHref);
+        Assert.Contains("not available yet", card.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OriginLibraryHasAnHonestEmptyState()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var view = Assert.IsType<ViewResult>(await fixture.CreateController().OriginDossierLibraryPage(CancellationToken.None));
+        var model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        Assert.Empty(model.Cards);
+        Assert.Equal("No books are available in this library yet.", Assert.Single(model.Highlights));
+    }
+
+    [Fact]
+    public async Task OriginLibraryRequiresSignInAndReturnsToTheLibrary()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var result = await fixture.CreateController(authenticated: false).OriginDossierLibraryPage(CancellationToken.None);
+        Assert.Equal("/login?next=%2Faccount%2Fwork%2Forigin-dossiers", Assert.IsType<RedirectResult>(result).Url);
+    }
+
+    [Fact]
+    public async Task UnavailableOriginDetailReturnsToARealOwnerLibrary()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("private", "subject.other-owner");
+        var controller = fixture.CreateController();
+        var view = Assert.IsType<ViewResult>(await controller.OriginDossierDetailPage("private", CancellationToken.None));
+        Assert.Equal(StatusCodes.Status404NotFound, controller.Response.StatusCode);
+        Assert.Equal("/account/work/origin-dossiers", Assert.IsType<AuthMessagePageViewModel>(view.Model).PrimaryHref);
+    }
+
+    [Theory]
+    [InlineData(nameof(AccountsController.OriginDossierLibraryPage))]
+    [InlineData(nameof(AccountsController.OriginDossierDetailPage))]
+    public void PrivateOriginPagesCannotBeResponseCached(string method)
+    {
+        var attribute = Assert.Single(typeof(AccountsController).GetMethod(method)!
+            .GetCustomAttributes(typeof(ResponseCacheAttribute), inherit: true).Cast<ResponseCacheAttribute>());
+        Assert.True(attribute.NoStore);
+        Assert.Equal(ResponseCacheLocation.None, attribute.Location);
+    }
+
+    [Fact]
     public async Task OriginDossierDetailPageShowsOnlyTheSignedInOwnersGoldEdition()
     {
         using var fixture = OriginDossierRouteFixture.Create();
@@ -34,6 +108,7 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal("~/Views/Accounts/OriginDossier.cshtml", view.ViewName);
         OriginDossierPublicationDetailPageViewModel model = Assert.IsType<OriginDossierPublicationDetailPageViewModel>(view.Model);
         Assert.Equal("origin-route", model.Publication.ProjectId);
+        Assert.Equal("/account/work/origin-dossiers", model.LibraryHref);
         Assert.True(model.Publication.GoldReady, string.Join(", ", model.Publication.MissingGoldRequirements));
         Assert.Equal("origin.chummer.run/Varga/Mira/Route-Runner", model.Publication.OriginEditionNamespace);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/read", model.Publication.AudiobookshelfDossierShareUrl);
