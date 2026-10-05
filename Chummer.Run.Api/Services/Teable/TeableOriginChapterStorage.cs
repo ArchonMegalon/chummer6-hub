@@ -99,7 +99,7 @@ public sealed class TeableOriginChapterStorage(TeableRevisionStore store, bool o
             if (workIds.Count is < 1 or > ReaderBatchSize)
                 throw new ArgumentException("The chapter read batch exceeds its limit.");
             foreach (string id in workIds) ValidateWorkId(id);
-            // Only the owner-filtered reader inventory uses this bounded fan-out.
+            // Only owner-bound read-only paths use this bounded fan-out.
             // No mutation heads are admitted, cached or shared by these reads.
             Task<TeableRevisionStore.Head?>[] reads = workIds.Select(ReadOneAsync).ToArray();
             try
