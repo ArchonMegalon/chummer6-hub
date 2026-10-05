@@ -15,6 +15,7 @@ public sealed class TeableOriginChapterStorage(TeableRevisionStore store, bool o
     internal const string CatalogueStream = "origin-chapter-catalogue";
     private const int MaximumCatalogueBytes = 512 * 1024;
     internal const int MaximumJobBytes = 512 * 1024;
+    internal const int ReaderBatchSize = 4;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 4 };
     private sealed record Catalogue(int Version, string[] WorkIds);
 
@@ -90,6 +91,37 @@ public sealed class TeableOriginChapterStorage(TeableRevisionStore store, bool o
             }
             _readHeads[workId] = head is null ? null : head with { Bytes = [] };
             return head?.Bytes; // Caller owns and clears these bytes after parsing.
+        }
+
+        internal byte[]?[] ReadBatchForReader(IReadOnlyList<string> workIds)
+        {
+            EnsureUsable();
+            if (workIds.Count is < 1 or > ReaderBatchSize)
+                throw new ArgumentException("The chapter read batch exceeds its limit.");
+            foreach (string id in workIds) ValidateWorkId(id);
+            // Only the owner-filtered reader inventory uses this bounded fan-out.
+            // No mutation heads are admitted, cached or shared by these reads.
+            Task<TeableRevisionStore.Head?>[] reads = workIds.Select(ReadOneAsync).ToArray();
+            try
+            {
+                var heads = Task.WhenAll(reads).GetAwaiter().GetResult();
+                if (heads.Any(head => head is not null && head.Bytes.Length > MaximumJobBytes))
+                    throw new InvalidDataException("The primary authoring record is oversized.");
+                return heads.Select(head => head?.Bytes).ToArray(); // Caller clears every returned buffer.
+            }
+            catch
+            {
+                // WhenAll joins every started read before returning, including on
+                // cancellation/failure. Clear successful peers; never return a partial library.
+                foreach (var read in reads)
+                    if (read.IsCompletedSuccessfully && read.Result is { } head)
+                        CryptographicOperations.ZeroMemory(head.Bytes);
+                _failed = true;
+                throw;
+            }
+
+            async Task<TeableRevisionStore.Head?> ReadOneAsync(string id)
+                => await store.ReadAsync(JobStream(id), _deadline.Token).ConfigureAwait(false);
         }
 
         internal void Write(string workId, byte[] bytes)
