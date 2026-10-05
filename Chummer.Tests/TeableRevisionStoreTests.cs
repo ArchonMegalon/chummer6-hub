@@ -354,6 +354,121 @@ public sealed class TeableRevisionStoreTests
         Assert.DoesNotContain("synthetic-token", error.ToString());
     }
 
+    [Theory]
+    [InlineData("schema", false)]
+    [InlineData("head", false)]
+    [InlineData("chunk", false)]
+    [InlineData("chunk-write", false)]
+    [InlineData("head-write", false)]
+    [InlineData("head", true)]
+    [InlineData("head-write", true)]
+    public async Task Stalled_response_body_obeys_request_deadline_or_caller_cancellation_without_replay(
+        string phase, bool callerCancels)
+    {
+        using var remote = new Remote();
+        byte[] payload = new byte[32 * 1024 + 7];
+        if (phase == "chunk") await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), payload);
+        using var handler = new StalledResponseHandler(remote, phase);
+        using var client = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://teable.example/"),
+            Timeout = callerCancels ? Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(250)
+        };
+        using var store = new TeableRevisionStore(client, "tbl1234567890123456", "synthetic-token");
+        using var caller = new CancellationTokenSource();
+        Guid commit = Guid.NewGuid();
+        Task operation = phase switch
+        {
+            "schema" => store.VerifySchemaAsync(caller.Token),
+            "chunk-write" or "head-write" => store.CompareExchangeAsync("accounts", null, commit, "synthetic"u8.ToArray(), caller.Token),
+            _ => store.ReadAsync("accounts", caller.Token)
+        };
+        try
+        {
+            await handler.Body.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            int admittedRequests = handler.Requests;
+            if (callerCancels) caller.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.True(handler.Body.Disposed);
+            Assert.Equal(admittedRequests, handler.Requests); // Neither a write nor a read is automatically replayed.
+            if (phase == "head-write")
+            {
+                Assert.Equal(1, remote.HeadPosts); // Timeout does not mean the write was uncommitted.
+                handler.Enabled = false;
+                var recovered = await store.ReadAsync("accounts");
+                Assert.Equal(commit, recovered!.Commit);
+                Assert.Equal("synthetic"u8.ToArray(), recovered.Bytes);
+                Assert.Equal(1, remote.HeadPosts);
+            }
+        }
+        finally
+        {
+            caller.Cancel();
+            try { await operation; } catch (OperationCanceledException) { }
+        }
+    }
+
+    private sealed class StalledResponseHandler(HttpMessageHandler inner, string phase) : DelegatingHandler(inner)
+    {
+        public StalledBody Body { get; } = new();
+        public int Requests { get; private set; }
+        public bool Enabled { get; set; } = true;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Requests++;
+            var response = await base.SendAsync(request, ct);
+            string content = request.Content is null ? "" : await request.Content.ReadAsStringAsync(ct);
+            string query = Uri.UnescapeDataString(request.RequestUri!.Query);
+            bool matches = phase switch
+            {
+                "schema" => request.RequestUri.AbsolutePath.EndsWith("/field", StringComparison.Ordinal),
+                "head" => request.Method == HttpMethod.Get && query.Contains("\"kind\"", StringComparison.Ordinal),
+                "chunk" => request.Method == HttpMethod.Get && query.Contains(":chunk:", StringComparison.Ordinal),
+                "chunk-write" => request.Method == HttpMethod.Post && content.Contains("\"kind\":\"chunk\"", StringComparison.Ordinal),
+                "head-write" => request.Method == HttpMethod.Post && content.Contains("\"kind\":\"head\"", StringComparison.Ordinal),
+                _ => throw new InvalidOperationException("Unknown synthetic phase.")
+            };
+            if (Enabled && matches)
+            {
+                Enabled = false;
+                response.Content.Dispose();
+                response.Content = new StreamContent(Body);
+            }
+            return response;
+        }
+    }
+
+    private sealed class StalledBody : Stream
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool Disposed { get; private set; }
+        private bool _prefixRead;
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            if (!_prefixRead)
+            {
+                _prefixRead = true;
+                buffer.Span[0] = (byte)'{';
+                return 1;
+            }
+            Entered.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            return 0;
+        }
+        protected override void Dispose(bool disposing) { Disposed = true; base.Dispose(disposing); }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     internal sealed class Remote : HttpMessageHandler
     {
         public Dictionary<string, JsonObject> Rows { get; } = new();
