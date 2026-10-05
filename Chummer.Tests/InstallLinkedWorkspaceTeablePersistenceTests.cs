@@ -30,6 +30,96 @@ public sealed class InstallLinkedWorkspaceTeablePersistenceTests : IDisposable
     private static InstallLinkedWorkspaceSnapshotRecord Request() => Fixtures.ToContinuationRecord(Fixtures.SampleContinuation(), includeProjection: true);
 
     [Fact]
+    public async Task Slow_roster_read_does_not_block_another_owner_or_retain_their_data()
+    {
+        using var remote = new Remote();
+        using var store = Store(remote);
+        var service = new InstallLinkedWorkspaceSnapshotService(store);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        remote.BeforeHeadReadResponse = () =>
+        {
+            entered.Set();
+            Assert.True(release.Wait(TimeSpan.FromSeconds(10)));
+        };
+        var slow = Task.Run(() => service.ListForInstallation(Installation()));
+        Task<IReadOnlyList<InstallLinkedWorkspaceSnapshotRecord>>? other = null;
+        try
+        {
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            other = Task.Run(() => service.ListForInstallation(Installation("other")));
+            Assert.Empty(await other.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.False(slow.IsCompleted);
+        }
+        finally
+        {
+            release.Set();
+            await slow;
+            if (other is not null) await other;
+        }
+        Assert.Empty(store.SnapshotsByKey);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
+    [Fact]
+    public void Roster_read_cannot_replace_an_inflight_writers_expected_primary_revision()
+    {
+        using var remote = new Remote();
+        using var store = Store(remote);
+        using var competitor = Store(remote);
+        var service = new InstallLinkedWorkspaceSnapshotService(store);
+        var other = new InstallLinkedWorkspaceSnapshotService(competitor);
+        var initial = service.UpsertForInstallation(Installation(), Request(), 0);
+        using (store.Enter("subject:subject"))
+        {
+            string key = InstallLinkedWorkspaceSnapshotStore.ComposeKey("subject:subject", initial.WorkspaceId);
+            store.SnapshotsByKey[key] = initial with { Name = "Uncommitted local edit" };
+            var winner = other.UpsertForInstallation(Installation(), Request() with { Name = "Winner" },
+                initial.RemoteRevision, initial.ServerToken);
+            Assert.Equal(winner.ServerToken, Assert.Single(service.ListForInstallation(Installation())).ServerToken);
+            Assert.Equal("Uncommitted local edit", store.SnapshotsByKey[key].Name);
+            Assert.Equal(409, Assert.Throws<InstallLinkingOperationException>(store.PersistLocked).StatusCode);
+        }
+        Assert.Equal("Winner", Assert.Single(service.ListForInstallation(Installation())).Name);
+        Assert.Equal(2, remote.HeadPosts);
+    }
+
+    [Fact]
+    public async Task Late_roster_response_cannot_regress_a_newer_observed_primary_revision()
+    {
+        using var remote = new Remote();
+        using var store = Store(remote);
+        using var competitor = Store(remote);
+        var service = new InstallLinkedWorkspaceSnapshotService(store);
+        var initial = service.UpsertForInstallation(Installation(), Request(), 0);
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        remote.BeforeHeadReadResponse = () =>
+        {
+            entered.Set();
+            Assert.True(release.Wait(TimeSpan.FromSeconds(10)));
+        };
+        var slow = Task.Run(() => Record.Exception(() => service.ListForInstallation(Installation())));
+        Task<IReadOnlyList<InstallLinkedWorkspaceSnapshotRecord>>? current = null;
+        try
+        {
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            var winner = new InstallLinkedWorkspaceSnapshotService(competitor).UpsertForInstallation(
+                Installation(), Request() with { Name = "Newer remote edit" }, initial.RemoteRevision, initial.ServerToken);
+            current = Task.Run(() => service.ListForInstallation(Installation()));
+            Assert.Equal(winner.ServerToken, Assert.Single(await current.WaitAsync(TimeSpan.FromSeconds(2))).ServerToken);
+        }
+        finally
+        {
+            release.Set();
+            await slow;
+            if (current is not null) await current;
+        }
+        Assert.Equal(503, Assert.IsType<InstallLinkingOperationException>(await slow).StatusCode);
+        Assert.Empty(store.SnapshotsByKey);
+    }
+
+    [Fact]
     public void Full_character_and_career_history_restore_on_a_fresh_store_without_local_files()
     {
         using var remote = new Remote();

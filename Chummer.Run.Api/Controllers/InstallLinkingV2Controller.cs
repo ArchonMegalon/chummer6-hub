@@ -204,6 +204,9 @@ public sealed class InstallLinkingV2Controller : ControllerBase
             InstallLinkedWorkspaceSnapshotDto[] snapshots = _workspaceSnapshots.ListForInstallation(installation!)
                 .Select(static snapshot => ToSnapshotDto(snapshot))
                 .ToArray();
+            // Primary storage can complete after the install was revoked or its
+            // owner changed. Loaded private data is not itself permission to return it.
+            if (!TryResolvePrincipal(request, out _, out _, out denied)) return denied!;
             return Ok(new InstallLinkedWorkspaceSnapshotListResponse(snapshots));
         }
         catch (InstallLinkingOperationException ex)

@@ -22,6 +22,49 @@ public sealed class AndroidLinkedV2BearerProofTests
 {
     private static readonly JsonSerializerOptions ContinuationWebJson = new(JsonSerializerDefaults.Web);
 
+    [Theory]
+    [InlineData("revoked", 401)]
+    [InlineData("owner", 401)]
+    [InlineData("outage", 503)]
+    public async Task Workspace_list_revalidates_install_authority_after_the_primary_read(string change, int status)
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["CHUMMER_INSTALL_LINKED_WORKSPACE_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var store = new InstallLinkedWorkspaceSnapshotStore(config, remote.Store());
+        var snapshots = new InstallLinkedWorkspaceSnapshotService(store);
+        var installation = fixture.Store.InstallationsById["android-v2"];
+        snapshots.UpsertForInstallation(installation,
+            InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot())
+                with { Name = "Private runner must not escape revoked access" }, 0);
+        int writes = remote.HeadPosts;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/install-linking/continuation/workspaces/list",
+            "{\"installationId\":\"android-v2\"}").CreateContext(), http =>
+        {
+            var probe = new ChapterReadinessProbe();
+            fixture.UseReadinessProbe(probe);
+            remote.BeforeHeadReadResponse = () =>
+            {
+                if (change == "outage") probe.FailOnCall = probe.Calls + 1;
+                else lock (fixture.Store.Gate)
+                {
+                    if (change == "owner") fixture.Store.InstallationsById["android-v2"] = installation with { SubjectId = "different-subject" };
+                    else fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                        with { Status = InstallationGrantStates.Revoked };
+                }
+            };
+            var controller = new InstallLinkingV2Controller(fixture.Service, snapshots, fixture.TimeProvider)
+                { ControllerContext = new() { HttpContext = http } };
+            var result = controller.ListClaimedInstallWorkspaces(new("android-v2"));
+            var denied = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(status, denied.StatusCode);
+            Assert.DoesNotContain("Private runner", JsonSerializer.Serialize(denied.Value));
+            Assert.Contains("no-store", http.Response.Headers.CacheControl.ToString());
+        });
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
     private sealed class SceneDiagnosticLogger : ILogger<AndroidLinkedOriginScenesController>
     {
         public List<IReadOnlyDictionary<string, object?>> Events { get; } = [];
