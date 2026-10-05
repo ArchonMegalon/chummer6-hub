@@ -107,6 +107,33 @@ public sealed class OriginChapterAuthoringService : IDisposable
         return Locked(root => Read(JobPath(root, Owner(subjectId), requestId), Owner(subjectId), requestId));
     }
 
+    // Account readers use an owner-bound opaque reference, never a worker ID or
+    // execution admission. Reading does not accept prose or enqueue more work.
+    internal sealed record ReaderChapter(string Reference, OriginChapterAuthoringJob Job);
+
+    internal IReadOnlyList<ReaderChapter> ListForReader(string subjectId)
+    {
+        string owner = Owner(subjectId);
+        return Locked(root =>
+        {
+            string[] references = WorkIds(root)
+                .Where(id => id.StartsWith(owner + ".", StringComparison.Ordinal))
+                .Order(StringComparer.Ordinal).Take(129).ToArray();
+            if (references.Length > 128)
+                throw new InvalidDataException("The private chapter inventory exceeds its limit.");
+            return references.Select(id => (Id: id, Stored: ReadStored(Path.Combine(root, id + ".json"), owner, null)))
+                .Where(item => item.Stored is not null)
+                .Select(item => new ReaderChapter(item.Id[65..], item.Stored!.Job)).ToArray();
+        });
+    }
+
+    internal OriginChapterAuthoringJob? GetForReader(string subjectId, string reference)
+    {
+        if (!IsDigest(reference)) return null;
+        string owner = Owner(subjectId);
+        return Locked(root => ReadStored(Path.Combine(root, owner + "." + reference + ".json"), owner, null)?.Job);
+    }
+
     public OriginChapterAuthoringJob AcceptReading(string subjectId, string requestId, string sourceDigest,
         string providerReceiptDigest, string textDigest, bool explicitlyConfirmed, Func<bool> stillAuthorized)
     {

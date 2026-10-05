@@ -941,9 +941,11 @@ public sealed class AccountsController : Controller
                     OriginLibraryPath, user.DisplayName, user.Email),
                 Eyebrow: "Origin library",
                 Heading: "My books",
-                Summary: "Your private Origin books. Reading links appear only when the full ebook is verified.",
-                Highlights: cards.Length == 0 ? ["No books are available in this library yet."] : [],
-                Cards: cards,
+                Summary: "Read your growing Life Modules chapters or open a finished Origin ebook.",
+                Highlights: cards.Length == 0 ? ["No finished ebooks are available here yet. Your growing story may already have readable chapters."] : [],
+                Cards: [new AccountHubCardViewModel("Life Modules", "Your growing stories",
+                    "Full chapters already written for your runners, including books still in progress.",
+                    "Open my chapters", OriginChapterReaderController.LibraryPath, null, null), .. cards],
                 BackLabel: "Back to runners",
                 BackHref: "/account/roster"));
         }
