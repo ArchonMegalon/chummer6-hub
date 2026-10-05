@@ -15,6 +15,27 @@ public sealed class OriginChapterAuthoringServiceTests : IDisposable
         [new("fact-one", "decision-one", "The player selected Renraku.")]), true);
     private static bool Authorized() => true;
 
+    [Fact]
+    public void Reader_inventory_filters_owner_before_loading_foreign_bytes_and_survives_restart()
+    {
+        using var service = Service();
+        var own = service.Create("subject-a", Request(), Authorized);
+        service.Create("subject-b", Request(), Authorized);
+        string foreignReference = Assert.Single(service.ListForReader("subject-b")).Reference;
+        string foreignOwner = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes("subject-b")));
+        string foreignPath = Path.Combine(_root, "origin-chapter-jobs", foreignOwner + "." + foreignReference + ".json");
+        Assert.True(File.Exists(foreignPath));
+        File.WriteAllText(foreignPath, "corrupt foreign chapter must never be loaded");
+        using var restarted = Service();
+        var entry = Assert.Single(restarted.ListForReader("subject-a"));
+        Assert.Equal(own.RequestId, entry.Job.RequestId);
+        Assert.Equal(own.SourceDigest, restarted.GetForReader("subject-a", entry.Reference)!.SourceDigest);
+        Assert.Empty(restarted.ListForReader("subject-c"));
+        Assert.Null(restarted.GetForReader("subject-c", entry.Reference));
+        Assert.Null(restarted.GetForReader("subject-a", "../private"));
+    }
+
     private static OriginChapterNarrativeContext Possibilities() => new("next-turn", new string('f', 64),
         [new("school", "Military school", OriginChapterOpportunityAvailability.Available),
             new("corporate", "A corporate education", OriginChapterOpportunityAvailability.Unavailable)]);

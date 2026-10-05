@@ -30,6 +30,28 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
     private static bool Authorized() => true;
 
     [Fact]
+    public void Account_reader_restores_complete_owned_text_without_local_files_or_acceptance_writes()
+    {
+        using var remote = new Remote();
+        using var service = Service(remote);
+        var job = service.Create("owner-a", Request(), Authorized);
+        service.Create("owner-b", Request("other-request"), Authorized);
+        var work = service.PendingForWorker(20).Single(item => item.Job.RequestId == job.RequestId);
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "execution-one");
+        const string text = "A complete synthetic chapter.\n\nThe last paragraph is retained.";
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "execution-one", text, new string('c', 64));
+        int writes = remote.HeadPosts;
+        using var restarted = Service(remote);
+        var entry = Assert.Single(restarted.ListForReader("owner-a"));
+        Assert.Equal(text, entry.Job.DraftText);
+        Assert.Equal(text, restarted.GetForReader("owner-a", entry.Reference)!.DraftText);
+        Assert.Null(restarted.GetForReader("owner-b", entry.Reference));
+        Assert.Null(restarted.Get("owner-a", job.RequestId)!.ReaderAcceptedTextDigest);
+        Assert.Equal(writes, remote.HeadPosts);
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Fact]
     public void Primary_job_result_and_reader_acceptance_restore_without_local_files()
     {
         using var remote = new Remote();

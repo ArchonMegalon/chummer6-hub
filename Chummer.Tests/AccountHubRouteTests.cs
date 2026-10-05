@@ -116,7 +116,8 @@ public sealed class AccountHubRouteTests
         int readsBefore = remote.GetRequests;
         remote.FailReads = true;
         var view = Assert.IsType<ViewResult>(await controller.OriginDossierLibraryPage(CancellationToken.None));
-        Assert.Empty(Assert.IsType<AccountSectionPageViewModel>(view.Model).Cards);
+        var card = Assert.Single(Assert.IsType<AccountSectionPageViewModel>(view.Model).Cards);
+        Assert.Equal(OriginChapterReaderController.LibraryPath, card.PrimaryHref);
         Assert.Equal(readsBefore, remote.GetRequests);
         Assert.Equal(0, remote.HeadPosts);
     }
