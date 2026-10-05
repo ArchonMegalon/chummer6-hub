@@ -19,6 +19,92 @@ namespace Chummer.Tests;
 
 public sealed class TeableRevisionStoreTests
 {
+    [Theory]
+    [InlineData("success")]
+    [InlineData("schema")]
+    [InlineData("head")]
+    [InlineData("cancel")]
+    public async Task Commit_admission_overlaps_fresh_schema_and_head_but_waits_for_both(string outcome)
+    {
+        using var remote = new Remote();
+        using var store = remote.Store();
+        var first = await store.CompareExchangeAsync("accounts", null, Guid.NewGuid(), "original"u8.ToArray());
+        int posts = remote.HeadPosts, entered = 0, active = 0;
+        var both = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var schemaRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var headRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var schemaReturned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var headReturned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task Hold(Task release, TaskCompletionSource returned, CancellationToken ct)
+        {
+            Interlocked.Increment(ref active);
+            if (Interlocked.Increment(ref entered) == 2) both.TrySetResult();
+            try { await release.WaitAsync(ct); }
+            finally { Interlocked.Decrement(ref active); returned.TrySetResult(); }
+        }
+        remote.BeforeSchemaReadResponse = ct => Hold(schemaRelease.Task, schemaReturned, ct);
+        remote.BeforeRecordReadResponse = (row, ct) => row["kind"]!.GetValue<string>() == "head"
+            ? Hold(headRelease.Task, headReturned, ct) : Task.CompletedTask;
+        if (outcome == "schema") remote.Unique = false;
+        if (outcome == "head")
+        {
+            JsonObject row = remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "head");
+            JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
+            manifest["inlineBase64"] = "Y2hhbmdl";
+            row["payload"] = manifest.ToJsonString();
+        }
+        using var caller = new CancellationTokenSource();
+        Task<TeableRevisionStore.Head> write = store.CompareExchangeAsync(
+            "accounts", first, Guid.NewGuid(), "successor"u8.ToArray(), caller.Token);
+        try
+        {
+            await both.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(posts, remote.HeadPosts);
+            Assert.False(write.IsCompleted);
+            if (outcome == "cancel")
+            {
+                caller.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
+            }
+            else
+            {
+                // A successful or failed first observation must not detach the
+                // still-running peer, or admit any POST before both are valid.
+                if (outcome == "head")
+                {
+                    headRelease.TrySetResult();
+                    await headReturned.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                else
+                {
+                    schemaRelease.TrySetResult();
+                    await schemaReturned.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                Assert.False(write.IsCompleted);
+                Assert.Equal(posts, remote.HeadPosts);
+                schemaRelease.TrySetResult();
+                headRelease.TrySetResult();
+                if (outcome == "success")
+                {
+                    var committed = await write;
+                    Assert.Equal(2, committed.Revision);
+                    Assert.Equal("successor"u8.ToArray(), committed.Bytes);
+                }
+                else await Assert.ThrowsAsync<InvalidDataException>(() => write);
+            }
+        }
+        finally
+        {
+            caller.Cancel();
+            schemaRelease.TrySetResult();
+            headRelease.TrySetResult();
+            try { await write; } catch (Exception error) when (error is InvalidDataException or OperationCanceledException) { }
+        }
+        Assert.Equal(0, active);
+        Assert.Equal(posts + (outcome == "success" ? 1 : 0), remote.HeadPosts);
+        Assert.Equal(outcome == "success" ? 4 : 2, remote.Rows.Count);
+    }
+
     [Fact]
     public async Task Teable_reads_and_writes_prefer_http2_with_tls_http1_fallback()
     {
@@ -482,6 +568,7 @@ public sealed class TeableRevisionStoreTests
         public bool CommitThenFailHard { get; set; }
         public Action? BeforeHeadPost { get; set; }
         public Action? BeforeHeadReadResponse { get; set; }
+        public Func<CancellationToken, Task>? BeforeSchemaReadResponse { get; set; }
         public Func<JsonObject, CancellationToken, Task>? BeforeChunkReadResponse { get; set; }
         public Func<JsonObject, CancellationToken, Task>? BeforeRecordReadResponse { get; set; }
         public Action<HttpRequestMessage>? ObserveRequest { get; set; }
@@ -509,11 +596,14 @@ public sealed class TeableRevisionStoreTests
                 return new(HttpStatusCode.OK) { Content = content };
             }
             if (request.RequestUri!.AbsolutePath.EndsWith("/field", StringComparison.Ordinal))
+            {
+                if (BeforeSchemaReadResponse is { } beforeSchema) await beforeSchema(ct);
                 return Response(new[] { new { name = "revision_key", type = "singleLineText", unique = Unique, notNull = true },
                     new { name = "stream", type = "singleLineText", unique = false, notNull = false },
                     new { name = "kind", type = "singleLineText", unique = false, notNull = false },
                     new { name = "revision", type = "number", unique = false, notNull = false },
                     new { name = "payload", type = "longText", unique = false, notNull = false } });
+            }
             if (request.Method == HttpMethod.Post)
             {
                 string body = await request.Content!.ReadAsStringAsync(ct);
