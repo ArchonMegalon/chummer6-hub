@@ -30,6 +30,83 @@ namespace Chummer.Tests;
 
 public sealed class AccountHubRouteTests
 {
+    [Theory]
+    [InlineData(null, "publication")]
+    [InlineData("access", "publication")]
+    [InlineData("roster", "publication")]
+    [InlineData("participation", "publication")]
+    [InlineData("access", "support")]
+    [InlineData("participation", "support")]
+    [InlineData("access", "membership")]
+    [InlineData("roster", "membership")]
+    public async Task MinimalAccountPagesDoNotReadUnrelatedPrimaryStoresDuringRequest(string? section, string store)
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var fixture = AccountHubRouteFixture.CreateWithUnavailableStore(remote, store);
+        var controller = fixture.CreateController();
+        // Some singleton stores validate on startup. This test isolates the
+        // subsequent request; it does not waive startup storage admission.
+        int readsBeforeRequest = remote.GetRequests;
+        remote.FailReads = true;
+
+        var view = Assert.IsType<ViewResult>(await controller.AccountPage(section, null, CancellationToken.None));
+
+        Assert.Equal(section is null ? "~/Views/Accounts/Hub.cshtml" : "~/Views/Accounts/Section.cshtml", view.ViewName);
+        Assert.Equal(readsBeforeRequest, remote.GetRequests);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData(null, "/account/access")]
+    [InlineData("access", "/login?next=%2Faccount%2Faccess")]
+    [InlineData("roster", "/login?next=%2Faccount%2Froster")]
+    [InlineData("participation", "/login?next=%2Faccount%2Fparticipation")]
+    public async Task MinimalAccountPagesStillRequireAuthenticationBeforeStorage(string? section, string expectedRedirect)
+    {
+        using var remote = new TeableRevisionStoreTests.Remote { FailReads = true };
+        using var fixture = AccountHubRouteFixture.CreateWithUnavailableStore(remote, "publication");
+
+        var result = await fixture.CreateController(authenticated: false).AccountPage(section, null, CancellationToken.None);
+
+        Assert.Equal(expectedRedirect, Assert.IsType<RedirectResult>(result).Url);
+        Assert.Equal(0, remote.GetRequests);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
+    [Fact]
+    public async Task DetailedAccountPageStillRequiresItsPublicationStore()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote { FailReads = true };
+        using var fixture = AccountHubRouteFixture.CreateWithUnavailableStore(remote, "publication");
+        var controller = fixture.CreateController();
+        controller.Request.QueryString = new QueryString("?edition=sr5");
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => controller.AccountPage("work", null, CancellationToken.None));
+
+        Assert.True(remote.GetRequests > 0);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("support")]
+    [InlineData("roster")]
+    public async Task AccountPagesStillRequireSupportUsedByTheirProjection(string? section)
+    {
+        // Roster still uses CampaignSpine's group support projection. Skipping
+        // unrelated controller reads must not suppress this dependency's errors.
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var fixture = AccountHubRouteFixture.CreateWithUnavailableStore(remote, "support");
+        var controller = fixture.CreateController();
+        int readsBeforeRequest = remote.GetRequests;
+        remote.FailReads = true;
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => controller.AccountPage(section, null, CancellationToken.None));
+
+        Assert.True(remote.GetRequests > readsBeforeRequest);
+        Assert.Equal(0, remote.HeadPosts);
+    }
+
     [Fact]
     public async Task PrimaryAccountBookContextRestoresQuotaAndPrivateExportAfterDiscardingTheLocalRoot()
     {
@@ -686,6 +763,30 @@ public sealed class AccountHubRouteTests
         public SupportCaseService SupportCases => _provider.GetRequiredService<SupportCaseService>();
         public CampaignSpineService CampaignSpine => _provider.GetRequiredService<CampaignSpineService>();
         public AccountService Accounts => _provider.GetRequiredService<AccountService>();
+
+        public static AccountHubRouteFixture CreateWithUnavailableStore(TeableRevisionStoreTests.Remote remote, string store)
+            => Create((services, original) =>
+            {
+                string key = store switch
+                {
+                    "publication" => "CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER",
+                    "support" => "CHUMMER_SUPPORT_STORAGE_PROVIDER",
+                    "membership" => "CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER",
+                    _ => throw new ArgumentOutOfRangeException(nameof(store))
+                };
+                var primary = new ConfigurationBuilder().AddConfiguration(original)
+                    .AddInMemoryCollection(new Dictionary<string, string?> { [key] = "teable" }).Build();
+                services.AddSingleton<IConfiguration>(primary);
+                if (store == "publication")
+                    services.AddSingleton(provider => new OriginDossierPublicationService(primary,
+                        provider.GetService<HorizonCapabilityService>(), provider.GetService<MediaArtifactHorizonsService>(),
+                        provider.GetRequiredService<ILogger<OriginDossierPublicationService>>(), new(remote.Store(), ownsStore: true)));
+                else if (store == "support")
+                    services.AddSingleton(provider => new SupportStore(primary,
+                        provider.GetRequiredService<ILogger<SupportStore>>(), remote.Store(), ownsPrimary: true));
+                else
+                    services.AddSingleton(_ => new BrilliantDirectoriesBillingStore(primary, primary: remote.Store(), ownsPrimary: true));
+            });
 
         public static AccountHubRouteFixture CreatePrimaryAccountBook(TeableRevisionStoreTests.Remote remote)
             => Create((services, original) =>
