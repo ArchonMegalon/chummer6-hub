@@ -116,6 +116,8 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
     private async Task CreateOnceAsync(string key, string stream, string kind, long revision, string payload,
         CancellationToken ct)
     {
+        using var deadline = RequestDeadline(ct);
+        ct = deadline.Token;
         using HttpRequestMessage request = Request(HttpMethod.Post, $"{TablePath}/record");
         request.Content = JsonContent.Create(new { fieldKeyType = "name", records = new[] { new { fields =
             new Dictionary<string, object> { ["revision_key"] = key, ["stream"] = stream,
@@ -221,10 +223,23 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
 
     private async Task<JsonDocument> GetAsync(string path, CancellationToken ct)
     {
+        using var deadline = RequestDeadline(ct);
+        ct = deadline.Token;
         using var request = Request(HttpMethod.Get, path);
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
         if (response.StatusCode != HttpStatusCode.OK) throw new IOException("Teable primary read failed.");
         return await ReadJsonAsync(response, ct);
+    }
+
+    private CancellationTokenSource RequestDeadline(CancellationToken ct)
+    {
+        // ResponseHeadersRead ends HttpClient's own timeout at the headers.
+        // Keep the same request budget alive through the bounded body read;
+        // partial progress must not reset it. A timed-out POST stays uncertain,
+        // never replayed or treated as an uncommitted write.
+        var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(client.Timeout);
+        return deadline;
     }
 
     private HttpRequestMessage Request(HttpMethod method, string path)
