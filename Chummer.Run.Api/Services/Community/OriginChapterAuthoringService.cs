@@ -216,7 +216,38 @@ public sealed class OriginChapterAuthoringService : IDisposable
     {
         if (limit is < 1 or > 20) throw new ArgumentException("Invalid worker page size.");
         if (bookRef is not null && !IsDigest(bookRef)) throw new ArgumentException("Invalid book reference.");
-        return Locked(root => WorkIds(root).Order(StringComparer.Ordinal)
+        // Discovery cannot authorize execution. It must not hold the mutation
+        // lock while reading every historical remote chapter: that blocks new
+        // requests/reader acceptance behind a slow queue sweep. Admission still
+        // rereads the exact current record under the lock and compare-exchanges it.
+        return ReadOnly(session =>
+        {
+            var pending = new List<OriginChapterWorkerItem>(limit);
+            foreach (string[] batch in session.WorkIds().Order(StringComparer.Ordinal)
+                .Chunk(TeableOriginChapterStorage.ReaderBatchSize))
+            {
+                byte[]?[] records = session.ReadBatchForReader(batch);
+                try
+                {
+                    for (int index = 0; index < batch.Length; index++)
+                    {
+                        if (records[index] is not { } bytes) continue;
+                        var stored = DecodeStored(bytes, batch[index] + ".json", batch[index][..64], null);
+                        if (stored.Job.State == OriginChapterAuthoringStates.ReviewRequired) continue;
+                        var work = WorkerItem(stored);
+                        if (bookRef is not null && work.BookRef != bookRef) continue;
+                        pending.Add(work);
+                        if (pending.Count == limit) return pending.ToArray();
+                    }
+                }
+                finally
+                {
+                    foreach (byte[]? bytes in records)
+                        if (bytes is not null) CryptographicOperations.ZeroMemory(bytes);
+                }
+            }
+            return pending.ToArray();
+        }, root => WorkIds(root).Order(StringComparer.Ordinal)
             .Select(workId => ReadStored(Path.Combine(root, workId + ".json"), workId[..64], null))
             // A remote catalogue reservation may outlive an interrupted initial
             // create. Missing bytes are inert, never permission to generate.
