@@ -354,13 +354,26 @@ public sealed class InstallLinkingStore : IDisposable
             ApplySnapshotLocked(snapshot);
             _committedSnapshot = snapshot;
         }
-        catch
+        catch (Exception error)
         {
             // Callers mutate the public dictionaries while holding Gate. Restore the last
             // durable view so a failed serialization/fsync/CAS cannot leave oversized or
             // partially-authorized state live in memory.
             ApplySnapshotLocked(_committedSnapshot);
             _terminalPersistenceFailure = true;
+            // Never log exception messages/objects: HTTP and crypto errors may
+            // contain credentials or protected data. Keep the durable failure
+            // latch, but retain enough safe information to diagnose it.
+            string category = error switch
+            {
+                OperationCanceledException => "timeout_or_cancel",
+                CryptographicException => "cryptographic_failure",
+                InvalidDataException or JsonException => "invalid_data",
+                IOException => "io_failure",
+                UnauthorizedAccessException => "access_denied",
+                _ => "persistence_failure"
+            };
+            _logger.LogWarning("Install-linking persistence failed ({Category}); store remains fail-closed.", category);
             throw;
         }
     }
@@ -754,9 +767,17 @@ public sealed class InstallLinkingStore : IDisposable
                 SnapshotSha256: snapshotSha256.ToArray(),
                 EnvelopeSha256: envelopeSha256.ToArray(),
                 ProtectedEnvelope: envelopeBytes.ToArray());
+            long started = System.Diagnostics.Stopwatch.GetTimestamp();
             using InstallLinkingEnvelopeCompareExchangeResult result =
                 ExecuteAuthorityOperation(token =>
                     authority.CompareExchangeAsync(request, token));
+            if (!result.Committed || result.AuthoritativeEnvelope is null)
+            {
+                _logger.LogWarning(
+                    "Install-linking authority write failed ({AuthorityCode}) after {ElapsedMilliseconds} ms; reconciliation required.",
+                    SafeAuthorityCode(result.Code),
+                    (long)System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            }
             InstallLinkingAuthoritativeEnvelope committed = result.AuthoritativeEnvelope
                 ?? throw new InvalidOperationException(
                     "Install-linking PostgreSQL compare-and-swap did not return an authoritative head.");

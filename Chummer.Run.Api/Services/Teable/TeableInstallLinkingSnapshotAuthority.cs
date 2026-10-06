@@ -57,6 +57,7 @@ internal sealed class TeableInstallLinkingSnapshotAuthority(TeableRevisionStore 
         Validate(request);
         TeableRevisionStore.Head? before = null, after = null;
         byte[]? encoded = null;
+        string phase = "read";
         try
         {
             before = await store.ReadAsync(Stream, cancellationToken);
@@ -73,6 +74,7 @@ internal sealed class TeableInstallLinkingSnapshotAuthority(TeableRevisionStore 
             BinaryPrimitives.WriteInt64LittleEndian(encoded.AsSpan(8), DateTimeOffset.UtcNow.Ticks);
             request.SnapshotSha256.CopyTo(encoded, 16);
             request.ProtectedEnvelope.CopyTo(encoded, HeaderLength);
+            phase = "commit";
             after = await store.CompareExchangeAsync(Stream, before, request.CommitId, encoded, cancellationToken);
             return new(InstallLinkingEnvelopeCommitDisposition.Applied, Decode(after), "teable_committed");
         }
@@ -84,7 +86,15 @@ internal sealed class TeableInstallLinkingSnapshotAuthority(TeableRevisionStore 
         {
             // A request might have committed. Never convert ambiguity into a safe
             // retry or fall back to an older local mirror; restart/read the authority.
-            return new(InstallLinkingEnvelopeCommitDisposition.Ambiguous, null, "teable_reconciliation_required");
+            string reason = error switch
+            {
+                TeableRequestFailureException { StatusCode: System.Net.HttpStatusCode.TooManyRequests } => "rate_limited",
+                TeableRequestFailureException => "http_failure",
+                OperationCanceledException => "timeout_or_cancel",
+                HttpRequestException => "transport_failure",
+                _ => "io_failure"
+            };
+            return new(InstallLinkingEnvelopeCommitDisposition.Ambiguous, null, $"teable_{phase}_{reason}");
         }
         finally
         {
