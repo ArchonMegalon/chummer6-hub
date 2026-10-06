@@ -18,6 +18,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
     internal const int ChunkBytes = 32 * 1024;
     private const int MaximumInlinePayloadBytes = 96 * 1024;
     private const int ChunkReadBatchSize = 4;
+    private const int ChunkWriteBatchSize = 4;
     internal const int MaximumBytes = 64 * 1024 * 1024 + 64; // Includes a bounded store-specific header.
     private const int MaximumResponseBytes = 256 * 1024;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 12 };
@@ -93,12 +94,24 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
         if (!Matches(current, expected)) throw new TeableRevisionConflictException();
 
         int count = (bytes.Length + ChunkBytes - 1) / ChunkBytes;
-        for (int index = 0; index < count; index++)
+        for (int start = 0; start < count; start += ChunkWriteBatchSize)
         {
-            var part = bytes.Slice(index * ChunkBytes, Math.Min(ChunkBytes, bytes.Length - index * ChunkBytes));
-            string key = ChunkKey(stream, commit, index);
-            string payload = Convert.ToBase64String(part.Span);
-            await CreateOnceAsync(key, stream, "chunk", revision, payload, ct);
+            ct.ThrowIfCancellationRequested();
+            // Immutable chunks have independent keys. Overlap only a bounded
+            // batch under the unchanged per-origin request pacing/deadlines.
+            // Join EVERY write, including on failure, before another batch or
+            // the authoritative head. Partial chunks never authorize a commit.
+            var pending = new Task[Math.Min(ChunkWriteBatchSize, count - start)];
+            for (int offset = 0; offset < pending.Length; offset++)
+            {
+                int index = start + offset;
+                var part = bytes.Slice(index * ChunkBytes, Math.Min(ChunkBytes, bytes.Length - index * ChunkBytes));
+                string key = ChunkKey(stream, commit, index);
+                string payload = Convert.ToBase64String(part.Span);
+                pending[offset] = CreateOnceAsync(key, stream, "chunk", revision, payload, ct);
+            }
+            await Task.WhenAll(pending);
+            ct.ThrowIfCancellationRequested();
         }
         // Small states fit in the unique head itself, eliminating a dependent
         // HTTP read on every fresh authorization check. Keep v1 chunks as well:
