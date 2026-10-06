@@ -302,6 +302,55 @@ public sealed class AndroidLinkedV2BearerProofTests
     }
 
     [Fact]
+    public async Task Signed_missing_chapter_allows_only_same_registration_and_preserves_a_racing_worker_fence()
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "en",
+            "Synthetic runner", [new("fact", "decision", "Selected a school.")]);
+        string id = OriginChapterSourceIdentity.RequestId(source);
+        var read = new AndroidLinkedOriginChapterReadRequest("android-v2", id);
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/read",
+            JsonSerializer.Serialize(read, ContinuationWebJson)).CreateContext(), http =>
+        {
+            using var chapters = PrimaryChapters(remote);
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var absent = Assert.IsType<NotFoundObjectResult>(controller.ReadChapter(read).Result);
+            var body = JsonSerializer.SerializeToElement(absent.Value, ContinuationWebJson);
+            Assert.Equal("chummer.origin.chapter-missing/v1", body.GetProperty("schema").GetString());
+            Assert.Equal(id, body.GetProperty("requestId").GetString());
+            Assert.True(body.GetProperty("canRegisterSameRequest").GetBoolean());
+            Assert.Equal(3, body.EnumerateObject().Count());
+            Assert.Equal(0, remote.HeadPosts);
+            Assert.Contains("no-store", http.Response.Headers.CacheControl.ToString());
+        });
+        // Another request can commit and dispatch after the missing read. A
+        // cold, same-ID registration must return its existing state, not write
+        // AwaitingAuthoring over the durable execution admission.
+        var request = new AndroidLinkedOriginChapterRequest("android-v2", new(id, source, true));
+        using var worker = PrimaryChapters(remote);
+        var job = worker.Create("subject-v2", request.Authoring, () => true);
+        var work = Assert.Single(worker.PendingForWorker(20));
+        Assert.True(worker.AdmitForWorker(work.WorkId, job.SourceDigest, "execution").MayStartGeneration);
+        int writes = remote.HeadPosts;
+        fixture.Reload();
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/request",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            using var chapters = PrimaryChapters(remote);
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var existing = Assert.IsType<OriginChapterAuthoringJob>(
+                Assert.IsType<OkObjectResult>(controller.RequestChapter(request).Result).Value);
+            Assert.Equal(OriginChapterAuthoringStates.ReconciliationRequired, existing.State);
+        });
+        using var cold = PrimaryChapters(remote);
+        Assert.False(cold.AdmitForWorker(work.WorkId, job.SourceDigest, "execution").MayStartGeneration);
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
+    [Fact]
     public async Task Signed_v2_primary_chapter_restores_job_prose_and_acceptance_without_replaying_work()
     {
         using Fixture fixture = new();
@@ -739,7 +788,16 @@ public sealed class AndroidLinkedV2BearerProofTests
             var controller = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
                 { ControllerContext = new() { HttpContext = http } };
             if (consent) Assert.IsType<OkObjectResult>(controller.ReadChapter(read).Result);
-            else Assert.IsType<NotFoundResult>(controller.ReadChapter(read).Result);
+            else
+            {
+                var missing = Assert.IsType<NotFoundObjectResult>(controller.ReadChapter(read).Result);
+                Assert.Equal(404, missing.StatusCode);
+                var absent = JsonSerializer.SerializeToElement(missing.Value, ContinuationWebJson);
+                Assert.Equal("chummer.origin.chapter-missing/v1", absent.GetProperty("schema").GetString());
+                Assert.Equal(requestId, absent.GetProperty("requestId").GetString());
+                // An absence response is not consent and does not create work.
+                Assert.Null(fixture.CreateChapterAuthoring().Get("subject-v2", requestId));
+            }
         });
         Assert.Null(fixture.CreateChapterAuthoring().Get("another-subject", requestId));
     }
