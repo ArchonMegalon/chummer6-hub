@@ -84,17 +84,68 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Account_library_reads_owned_chapters_in_bounded_batches_and_joins_failed_reads(bool fail)
+    [InlineData("create")]
+    [InlineData("accept")]
+    public async Task Queue_discovery_does_not_hold_the_chapter_mutation_lock(string operation)
+    {
+        using var remote = new Remote();
+        using var service = Service(remote);
+        var job = service.Create("owner", Request(), Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "execution");
+        const string prose = "A complete synthetic chapter.";
+        string receipt = new('c', 64);
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "execution", prose, receipt);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int catalogueReads = 0;
+        remote.BeforeRecordReadResponse = async (row, ct) =>
+        {
+            if (row["stream"]!.GetValue<string>() == TeableOriginChapterStorage.CatalogueStream
+                && Interlocked.Increment(ref catalogueReads) == 1)
+            {
+                entered.TrySetResult();
+                await release.Task.WaitAsync(ct);
+            }
+        };
+        var scan = Task.Run(() => service.PendingForWorker(20));
+        Task<OriginChapterAuthoringJob>? mutation = null;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            mutation = Task.Run(() => operation == "create"
+                ? service.Create("owner", Request("new-request"), Authorized)
+                : service.AcceptReading("owner", job.RequestId, job.SourceDigest, receipt, Hash(prose), true, Authorized));
+            var result = await mutation.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(scan.IsCompleted);
+            if (operation == "create") Assert.Equal("new-request", result.RequestId);
+            else Assert.Equal(Hash(prose), result.ReaderAcceptedTextDigest);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await scan;
+            if (mutation is not null) await mutation;
+        }
+        Assert.False(service.AdmitForWorker(work.WorkId, job.SourceDigest, "execution").MayStartGeneration);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Chapter_discovery_reads_bounded_batches_and_joins_failed_reads(bool fail, bool worker)
     {
         using var remote = new Remote();
         using var service = Service(remote);
         for (int index = 0; index < 9; index++)
             service.Create("owner-a", Request("owned-" + index), Authorized);
         service.Create("owner-b", Request("foreign"), Authorized);
-        string foreignStream = TeableOriginChapterStorage.JobStream(service.PendingForWorker(20)
+        var inventory = service.PendingForWorker(20);
+        string foreignStream = TeableOriginChapterStorage.JobStream(inventory
             .Single(item => item.Job.RequestId == "foreign").WorkId);
+        string bookRef = inventory.First(item => item.Job.RequestId.StartsWith("owned-", StringComparison.Ordinal)).BookRef;
         int writes = remote.HeadPosts, calls = 0, active = 0, maximum = 0;
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -104,7 +155,7 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
         {
             string stream = row["stream"]!.GetValue<string>();
             if (stream == TeableOriginChapterStorage.CatalogueStream) return;
-            Assert.NotEqual(foreignStream, stream);
+            if (!worker) Assert.NotEqual(foreignStream, stream);
             int count = Interlocked.Increment(ref active);
             int call = Interlocked.Increment(ref calls);
             int previous;
@@ -123,7 +174,9 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
             }
             finally { Interlocked.Decrement(ref active); }
         };
-        var read = Task.Run(() => service.ListForReader("owner-a"));
+        var read = Task.Run(() => worker
+            ? service.PendingForWorker(20, bookRef).Select(item => item.WorkId[65..]).ToArray()
+            : service.ListForReader("owner-a").Select(item => item.Reference).ToArray());
         try
         {
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -141,10 +194,9 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
             else
             {
                 var entries = await read;
-                Assert.Equal(9, entries.Count);
-                Assert.Equal(entries.Select(e => e.Reference).Order(StringComparer.Ordinal),
-                    entries.Select(e => e.Reference));
-                Assert.Equal(9, calls);
+                Assert.Equal(9, entries.Length);
+                Assert.Equal(entries.Order(StringComparer.Ordinal), entries);
+                Assert.Equal(worker ? 10 : 9, calls);
             }
             Assert.Equal(4, maximum);
             Assert.Equal(0, active);
