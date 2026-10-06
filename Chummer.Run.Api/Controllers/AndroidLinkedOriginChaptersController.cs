@@ -22,7 +22,16 @@ public sealed class AndroidLinkedOriginChaptersController(
     [RequestSizeLimit(4096)]
     public ActionResult<OriginChapterAuthoringJob> ReadChapter([FromBody] AndroidLinkedOriginChapterReadRequest? request)
         => WithOwner(request?.InstallationId, subject => authoring.Get(subject, request!.RequestId) is { } job
-            ? Ok(job) : NotFound());
+            ? Ok(job) : NotFound(new
+            {
+                // Only a successful primary absence has this meaning. Generic
+                // 404s, unavailable storage and revoked owners do not. Create
+                // rechecks the same identity under its mutation lock/CAS and
+                // returns any racing existing job without resetting its fence.
+                schema = "chummer.origin.chapter-missing/v1",
+                requestId = request.RequestId,
+                canRegisterSameRequest = true
+            }));
 
     [HttpPost("accept")]
     [RequestSizeLimit(4096)]
