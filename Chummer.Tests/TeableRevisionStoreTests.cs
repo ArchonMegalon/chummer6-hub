@@ -302,6 +302,7 @@ public sealed class TeableRevisionStoreTests
         using var remote = new Remote();
         byte[] bytes = Enumerable.Range(0, (chunks - 1) * 32 * 1024 + 7).Select(i => (byte)(i % 251)).ToArray();
         await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
+        UseLegacyChunkHeads(remote);
         int posts = remote.HeadPosts, reads = remote.GetRequests, calls = 0;
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -337,6 +338,7 @@ public sealed class TeableRevisionStoreTests
         using var remote = new Remote();
         byte[] bytes = new byte[(chunks - 1) * 32 * 1024 + 7];
         await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
+        UseLegacyChunkHeads(remote);
         int posts = remote.HeadPosts, reads = remote.GetRequests, active = 0;
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -397,6 +399,7 @@ public sealed class TeableRevisionStoreTests
         using var store = remote.Store();
         byte[] bytes = new byte[2 * 32 * 1024 + 7];
         await store.CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
+        UseLegacyChunkHeads(remote);
         Assert.Equal(bytes, (await store.ReadAsync("accounts"))!.Bytes); // A prior success is never a fallback.
         int posts = remote.HeadPosts, reads = remote.GetRequests;
         remote.TransformChunkBatch = rows =>
@@ -523,8 +526,74 @@ public sealed class TeableRevisionStoreTests
         Assert.Equal(1, remote.GetRequests - reads); // No fallback to a second representation after corruption.
     }
 
+    private static void UseLegacyChunkHeads(Remote remote)
+    {
+        foreach (JsonObject row in remote.Rows.Values.Where(row => row["kind"]!.GetValue<string>() == "head"))
+        {
+            JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
+            manifest.Remove("inlinePayloadBase64");
+            row["payload"] = manifest.ToJsonString();
+        }
+    }
+
+    [Theory]
+    [InlineData(66_341)] // Current protected account envelope, including its authority header.
+    [InlineData(96 * 1024)]
+    public async Task Medium_head_reads_once_and_preserves_legacy_rollback_and_fresh_revocation(int length)
+    {
+        using var remote = new Remote();
+        byte[] bytes = Enumerable.Range(0, length).Select(i => (byte)(i % 251)).ToArray();
+        using var store = remote.Store();
+        var first = await store.CompareExchangeAsync("medium", null, Guid.NewGuid(), bytes);
+        int reads = remote.GetRequests;
+        Assert.Equal(bytes, (await remote.Store().ReadAsync("medium"))!.Bytes);
+        Assert.Equal(1, remote.GetRequests - reads);
+        JsonObject row = remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "head");
+        JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
+        Assert.Equal(1, manifest["version"]!.GetValue<int>());
+        Assert.Null(manifest["inlineBase64"]); // Old readers retain their 32 KiB contract.
+        Assert.Equal(bytes, Convert.FromBase64String(manifest["inlinePayloadBase64"]!.GetValue<string>()));
+        // Emulate the old reader ignoring the new optional field, using exactly
+        // the chunks retained by this write. No replacement/rebuild is needed.
+        manifest.Remove("inlinePayloadBase64");
+        row["payload"] = manifest.ToJsonString();
+        Assert.Equal(bytes, (await remote.Store().ReadAsync("medium"))!.Bytes);
+        bytes[0] ^= 1;
+        var revoked = await store.CompareExchangeAsync("medium", first, Guid.NewGuid(), bytes);
+        reads = remote.GetRequests;
+        Assert.Equal(revoked.Bytes, (await remote.Store().ReadAsync("medium"))!.Bytes);
+        Assert.Equal(1, remote.GetRequests - reads);
+        remote.FailReads = true;
+        await Assert.ThrowsAsync<HttpRequestException>(() => store.ReadAsync("medium"));
+    }
+
+    [Theory]
+    [InlineData("base64")]
+    [InlineData("length")]
+    [InlineData("hash")]
+    [InlineData("both")]
+    [InlineData("oversized")]
+    public async Task Invalid_medium_inline_head_never_falls_back_to_valid_chunks(string fault)
+    {
+        using var remote = new Remote();
+        byte[] bytes = new byte[66_341];
+        await remote.Store().CompareExchangeAsync("medium", null, Guid.NewGuid(), bytes);
+        JsonObject row = remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "head");
+        JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
+        if (fault == "base64") manifest["inlinePayloadBase64"] = "not base64";
+        if (fault == "length") manifest["inlinePayloadBase64"] = "AA==";
+        if (fault == "hash") { bytes[0] = 1; manifest["inlinePayloadBase64"] = Convert.ToBase64String(bytes); }
+        if (fault == "both") manifest["inlineBase64"] = Convert.ToBase64String(bytes);
+        if (fault == "oversized") manifest["length"] = 96 * 1024 + 1;
+        row["payload"] = manifest.ToJsonString();
+        int reads = remote.GetRequests, posts = remote.HeadPosts;
+        await Assert.ThrowsAsync<InvalidDataException>(() => remote.Store().ReadAsync("medium"));
+        Assert.Equal(1, remote.GetRequests - reads);
+        Assert.Equal(posts, remote.HeadPosts);
+    }
+
     [Fact]
-    public async Task Large_heads_remain_chunked_and_cannot_admit_inline_payloads()
+    public async Task Large_heads_remain_chunked_and_cannot_admit_legacy_inline_payloads()
     {
         using var remote = new Remote();
         byte[] bytes = new byte[32 * 1024 + 1];
@@ -533,6 +602,24 @@ public sealed class TeableRevisionStoreTests
         JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
         Assert.Null(manifest["inlineBase64"]);
         manifest["inlineBase64"] = Convert.ToBase64String(bytes);
+        row["payload"] = manifest.ToJsonString();
+        await Assert.ThrowsAsync<InvalidDataException>(() => remote.Store().ReadAsync("large"));
+    }
+
+    [Fact]
+    public async Task Above_medium_limit_retains_chunked_format_and_rejects_extended_inline()
+    {
+        using var remote = new Remote();
+        byte[] bytes = new byte[96 * 1024 + 1];
+        await remote.Store().CompareExchangeAsync("large", null, Guid.NewGuid(), bytes);
+        JsonObject row = remote.Rows.Values.Single(row => row["kind"]!.GetValue<string>() == "head");
+        JsonObject manifest = JsonNode.Parse(row["payload"]!.GetValue<string>())!.AsObject();
+        Assert.Null(manifest["inlineBase64"]);
+        Assert.Null(manifest["inlinePayloadBase64"]);
+        int reads = remote.GetRequests;
+        Assert.Equal(bytes, (await remote.Store().ReadAsync("large"))!.Bytes);
+        Assert.Equal(2, remote.GetRequests - reads);
+        manifest["inlinePayloadBase64"] = Convert.ToBase64String(bytes);
         row["payload"] = manifest.ToJsonString();
         await Assert.ThrowsAsync<InvalidDataException>(() => remote.Store().ReadAsync("large"));
     }
@@ -583,7 +670,11 @@ public sealed class TeableRevisionStoreTests
     {
         using var remote = new Remote();
         byte[] payload = new byte[32 * 1024 + 7];
-        if (phase == "chunk") await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), payload);
+        if (phase == "chunk")
+        {
+            await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), payload);
+            UseLegacyChunkHeads(remote);
+        }
         using var handler = new StalledResponseHandler(remote, phase);
         using var client = new HttpClient(handler)
         {

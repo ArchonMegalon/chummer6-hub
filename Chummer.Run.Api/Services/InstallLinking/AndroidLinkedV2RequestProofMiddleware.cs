@@ -351,6 +351,9 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
         }
 
         long started = Stopwatch.GetTimestamp();
+        long? grantStarted = null;
+        long? replayStarted = null;
+        long? endpointStarted = null;
         string stage = "request-validation";
         try
         {
@@ -425,6 +428,7 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
             try
             {
                 stage = "grant-authority";
+                grantStarted = Stopwatch.GetTimestamp();
                 principal = installLinking.ResolveAndroidLinkedV2GrantForRequest(
                     installationId, grantId, accessToken);
             }
@@ -468,6 +472,7 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
             try
             {
                 stage = "replay-authority";
+                replayStarted = Stopwatch.GetTimestamp();
                 acceptedReplayReceipt = installLinking.TryUseAndroidLinkedV2Proof(
                     grantId,
                     packetKey,
@@ -516,6 +521,7 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                     proofPublicKey));
             RemoveCredentialHeaders(context.Request.Headers);
             stage = "endpoint";
+            endpointStarted = Stopwatch.GetTimestamp();
             await next(context);
             stage = "completed";
         }
@@ -524,12 +530,16 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
             CryptographicOperations.ZeroMemory(body);
             // Bounded operational timing only. Never include request bodies,
             // account/grant IDs, prose, credentials or exception details.
-            double elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            long finished = Stopwatch.GetTimestamp();
+            double elapsed = Stopwatch.GetElapsedTime(started, finished).TotalMilliseconds;
             if (elapsed >= 10_000 && path is "/api/v2/android/linked/origin/chapters/read"
                 or "/api/v2/android/linked/origin/chapters/request"
                 or "/api/v2/android/linked/origin/chapters/accept")
-                logger.LogWarning("Origin chapter HTTP request took {ElapsedMs:F0} ms; stage={Stage}, status={Status}, aborted={Aborted}.",
-                    elapsed, stage, context.Response.StatusCode, context.RequestAborted.IsCancellationRequested);
+                logger.LogWarning("Origin chapter HTTP request took {ElapsedMs:F0} ms; stage={Stage}, status={Status}, aborted={Aborted}; grant={GrantMs:F0}ms, replay={ReplayMs:F0}ms, endpoint={EndpointMs:F0}ms.",
+                    elapsed, stage, context.Response.StatusCode, context.RequestAborted.IsCancellationRequested,
+                    grantStarted is long grant ? Stopwatch.GetElapsedTime(grant, replayStarted ?? finished).TotalMilliseconds : 0,
+                    replayStarted is long replay ? Stopwatch.GetElapsedTime(replay, endpointStarted ?? finished).TotalMilliseconds : 0,
+                    endpointStarted is long endpoint ? Stopwatch.GetElapsedTime(endpoint, finished).TotalMilliseconds : 0);
         }
     }
 

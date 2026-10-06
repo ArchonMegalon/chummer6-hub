@@ -16,6 +16,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
 {
     private bool _ownsClient;
     internal const int ChunkBytes = 32 * 1024;
+    private const int MaximumInlinePayloadBytes = 96 * 1024;
     private const int ChunkReadBatchSize = 4;
     internal const int MaximumBytes = 64 * 1024 * 1024 + 64; // Includes a bounded store-specific header.
     private const int MaximumResponseBytes = 256 * 1024;
@@ -24,7 +25,8 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
 
     public sealed record Head(long Revision, Guid Commit, string Sha256, byte[] Bytes);
     private sealed record Manifest(int Version, string Stream, long Revision, Guid Commit,
-        string? PreviousSha256, int Length, string Sha256, int Chunks, string? InlineBase64 = null);
+        string? PreviousSha256, int Length, string Sha256, int Chunks, string? InlineBase64 = null,
+        string? InlinePayloadBase64 = null);
 
     public static TeableRevisionStore Open(Uri origin, string tableId, string token)
     {
@@ -103,9 +105,19 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
         // existing readers can ignore this optional field during rollback.
         // This is current remote data, not a cached authorization decision.
         var manifest = new Manifest(1, stream, revision, commit, expected?.Sha256, bytes.Length, hash, count,
-            bytes.Length <= ChunkBytes ? Convert.ToBase64String(bytes.Span) : null);
+            bytes.Length <= ChunkBytes ? Convert.ToBase64String(bytes.Span) : null,
+            bytes.Length is > ChunkBytes and <= MaximumInlinePayloadBytes ? Convert.ToBase64String(bytes.Span) : null);
+        // The live protected account envelope has outgrown one 32 KiB chunk.
+        // Old readers reject a larger InlineBase64, so use a new optional field
+        // that they ignore and retain every original chunk for rollback. Bound
+        // the JSON-string representation too (including escaped base64), leaving
+        // room for Teable's row metadata within the unchanged response cap.
+        string manifestJson = JsonSerializer.Serialize(manifest, Json);
+        if (manifest.InlinePayloadBase64 is not null
+            && Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(manifestJson, Json)) > MaximumResponseBytes - 16 * 1024)
+            manifestJson = JsonSerializer.Serialize(manifest with { InlinePayloadBase64 = null }, Json);
         string manifestKey = HeadKey(stream, revision);
-        await CreateOnceAsync(manifestKey, stream, "head", revision, JsonSerializer.Serialize(manifest, Json), ct);
+        await CreateOnceAsync(manifestKey, stream, "head", revision, manifestJson, ct);
         JsonElement? winner = await FindAsync(new[] { ("revision_key", manifestKey) }, latest: false, ct);
         if (winner is null) throw new IOException("Teable commit acknowledgement is unavailable; reconcile before retry.");
         Head result = await DecodeAsync(winner.Value, stream, ct);
@@ -182,6 +194,8 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
             || manifest.Revision > 1 && !Digest(manifest.PreviousSha256)
             || manifest.Chunks != (manifest.Length + ChunkBytes - 1) / ChunkBytes
             || manifest.InlineBase64 is not null && manifest.Length > ChunkBytes
+            || manifest.InlinePayloadBase64 is not null && (manifest.Length <= ChunkBytes
+                || manifest.Length > MaximumInlinePayloadBytes || manifest.InlineBase64 is not null)
             || fields.GetProperty("revision_key").GetString() != HeadKey(stream, manifest.Revision)
             || fields.GetProperty("stream").GetString() != stream || fields.GetProperty("kind").GetString() != "head"
             || fields.GetProperty("revision").GetInt64() != manifest.Revision)
@@ -190,11 +204,11 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
         byte[] bytes = new byte[manifest.Length];
         try
         {
-            if (manifest.InlineBase64 is not null)
+            if ((manifest.InlineBase64 ?? manifest.InlinePayloadBase64) is { } inline)
             {
                 // Malformed inline bytes must not fall back to a different
                 // representation. Both formats use the same exact length/hash.
-                if (!Convert.TryFromBase64String(manifest.InlineBase64, bytes, out int used)
+                if (!Convert.TryFromBase64String(inline, bytes, out int used)
                     || used != manifest.Length) throw Invalid();
             }
             else
