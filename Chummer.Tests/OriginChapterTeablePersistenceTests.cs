@@ -404,7 +404,7 @@ public sealed class OriginChapterTeablePersistenceTests : IDisposable
         var job = service.Create("owner", Request(), Authorized);
         var work = Assert.Single(service.PendingForWorker(20));
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => service.AdmitForWorker(work.WorkId, job.SourceDigest, "execution"));
+        Assert.Throws<TeableRequestFailureException>(() => service.AdmitForWorker(work.WorkId, job.SourceDigest, "execution"));
         int writes = remote.HeadPosts;
         var restored = Service(remote).AdmitForWorker(work.WorkId, job.SourceDigest, "execution");
         Assert.False(restored.MayStartGeneration);

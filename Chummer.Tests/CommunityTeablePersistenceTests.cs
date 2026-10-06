@@ -232,7 +232,7 @@ public sealed class CommunityTeablePersistenceTests : IDisposable
         using var remote = new Remote();
         using var first = Store(remote);
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => new AccountService(first).EnsureUser("principal"));
+        Assert.Throws<TeableRequestFailureException>(() => new AccountService(first).EnsureUser("principal"));
         int writes = remote.HeadPosts;
         Assert.Throws<InvalidOperationException>(() => new AccountService(first).GetBySubject("principal"));
         using var cold = Store(remote);

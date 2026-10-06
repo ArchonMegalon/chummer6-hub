@@ -31,7 +31,8 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
         if (origin is not { IsAbsoluteUri: true, Scheme: "https", AbsolutePath: "/", UserInfo: "", Query: "", Fragment: "" }
             || !ValidId(tableId, "tbl") || string.IsNullOrWhiteSpace(token) || token.Length > 4096 || token.Any(char.IsControl))
             throw Invalid();
-        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
+        var client = new HttpClient(new TeableRequestPacingHandler(
+            new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }))
             { BaseAddress = origin, Timeout = TimeSpan.FromSeconds(15) };
         return new(client, tableId, token) { _ownsClient = true };
     }
@@ -155,7 +156,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
                 return;
             }
             if (response.StatusCode is not (HttpStatusCode.BadRequest or HttpStatusCode.Conflict))
-                throw new IOException("Teable write failed; reconcile before retry.");
+                throw new TeableRequestFailureException(writing: true, response.StatusCode);
         }
         catch (HttpRequestException)
         {
@@ -254,7 +255,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
         ct = deadline.Token;
         using var request = Request(HttpMethod.Get, path);
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        if (response.StatusCode != HttpStatusCode.OK) throw new IOException("Teable primary read failed.");
+        if (response.StatusCode != HttpStatusCode.OK) throw new TeableRequestFailureException(writing: false, response.StatusCode);
         return await ReadJsonAsync(response, ct);
     }
 
@@ -322,3 +323,12 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
 }
 
 public sealed class TeableRevisionConflictException() : IOException("The remote state changed; reload before a new command.");
+
+// Retain only protocol metadata, never the response, URI, request or credentials.
+// This is diagnostic information, not proof that a failed POST did not commit.
+public sealed class TeableRequestFailureException(bool writing, HttpStatusCode statusCode)
+    : IOException("Teable primary request failed; reconcile before retry.")
+{
+    public bool Writing { get; } = writing;
+    public HttpStatusCode StatusCode { get; } = statusCode;
+}

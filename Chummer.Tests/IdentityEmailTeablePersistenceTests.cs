@@ -1,4 +1,5 @@
 using System.Net;
+using Chummer.Storage.Teable;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -98,7 +99,7 @@ public sealed class IdentityEmailTeablePersistenceTests : IDisposable
         using var provider = new Provider();
         var service = Service(remote, provider);
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => Send(service));
+        Assert.Throws<TeableRequestFailureException>(() => Send(service));
         int posts = remote.HeadPosts;
         Assert.Throws<InvalidOperationException>(() => Send(service));
         var restored = Send(Service(remote, provider, "cold"));
@@ -114,7 +115,7 @@ public sealed class IdentityEmailTeablePersistenceTests : IDisposable
         using var remote = new Remote();
         using var provider = new Provider { OnSend = () => remote.CommitThenFailHard = true };
         var service = Service(remote, provider);
-        Assert.Throws<IOException>(() => Send(service));
+        Assert.Throws<TeableRequestFailureException>(() => Send(service));
         int posts = remote.HeadPosts;
         Assert.True(Send(Service(remote, provider, "cold")).Delivered);
         Assert.Equal(1, provider.Sends);

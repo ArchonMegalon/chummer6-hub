@@ -181,7 +181,7 @@ public sealed class MembershipTeablePersistenceTests : IDisposable
         using var membership = Membership(remote);
         using var usage = Usage(remote);
         var service = Service(membership, usage);
-        Assert.Throws<IOException>(() => service.SyncMember(Request(), "synthetic-only"));
+        Assert.Throws<TeableRequestFailureException>(() => service.SyncMember(Request(), "synthetic-only"));
         Assert.Empty(membership.Members);
         Assert.True(service.GetAccount("user")!.SupporterActive);
         Assert.Equal(2, service.GetMyFirstBookQuota("user", Now).MonthlyLimit);

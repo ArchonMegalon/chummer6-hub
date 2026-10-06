@@ -94,7 +94,7 @@ public sealed class OriginDocumentTeablePersistenceTests : IDisposable
     {
         using var remote = new Remote { CommitThenFailHard = true };
         using var service = Service(remote, 1, 1);
-        Assert.Throws<IOException>(() => service.Preview("owner", "subject", "book", Request()));
+        Assert.Throws<TeableRequestFailureException>(() => service.Preview("owner", "subject", "book", Request()));
         Assert.Throws<InvalidOperationException>(() => Service(remote, 1, 1).Preview("other", "subject", "book", Request()));
         var resumed = Service(remote, 1, 1).Preview("owner", "subject", "book", Request());
         Assert.Equal("preview", resumed.State);
@@ -122,7 +122,7 @@ public sealed class OriginDocumentTeablePersistenceTests : IDisposable
         using var service = Service(remote);
         var preview = service.Preview("owner", "subject", "book", Request());
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => service.Export("owner", "subject", "book", preview.RevisionId));
+        Assert.Throws<TeableRequestFailureException>(() => service.Export("owner", "subject", "book", preview.RevisionId));
         int writes = remote.HeadPosts;
         Assert.Equal("exported", Service(remote).Export("owner", "subject", "book", preview.RevisionId).State);
         Assert.Equal(writes, remote.HeadPosts);

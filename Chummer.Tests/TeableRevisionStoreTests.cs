@@ -19,6 +19,94 @@ namespace Chummer.Tests;
 
 public sealed class TeableRevisionStoreTests
 {
+    [Fact]
+    public async Task Production_request_pacing_is_shared_across_clients_and_does_not_replay_posts()
+    {
+        var starts = new System.Collections.Concurrent.ConcurrentQueue<long>();
+        using var first = new HttpClient(new TeableRequestPacingHandler(new PacedTransport(starts)));
+        using var second = new HttpClient(new TeableRequestPacingHandler(new PacedTransport(starts)));
+        var origin = new Uri("https://" + Guid.NewGuid().ToString("N") + ".example/");
+        var requests = Enumerable.Range(0, 8).Select(async i =>
+        {
+            using var request = new HttpRequestMessage(i % 2 == 0 ? HttpMethod.Get : HttpMethod.Post, origin);
+            using var response = await (i % 2 == 0 ? first : second).SendAsync(request);
+            Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        });
+        await Task.WhenAll(requests);
+        long[] ticks = starts.ToArray();
+        Assert.Equal(8, ticks.Length); // A 429, including POST, is never replayed.
+        for (int i = 1; i < ticks.Length; i++)
+            Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(ticks[i - 1], ticks[i]) >= TimeSpan.FromMilliseconds(245));
+    }
+
+    [Fact]
+    public async Task Cancellation_while_waiting_for_a_request_slot_never_sends_it()
+    {
+        var starts = new System.Collections.Concurrent.ConcurrentQueue<long>();
+        using var client = new HttpClient(new TeableRequestPacingHandler(new PacedTransport(starts)));
+        var origin = new Uri("https://" + Guid.NewGuid().ToString("N") + ".example/");
+        using var first = await client.GetAsync(origin);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(25));
+        using var request = new HttpRequestMessage(HttpMethod.Post, origin);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.SendAsync(request, cancellation.Token));
+        Assert.Single(starts);
+    }
+
+    private sealed class PacedTransport(System.Collections.Concurrent.ConcurrentQueue<long> starts) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            starts.Enqueue(System.Diagnostics.Stopwatch.GetTimestamp());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, HttpStatusCode.TooManyRequests, "teable_read_rate_limited")]
+    [InlineData(true, HttpStatusCode.TooManyRequests, "teable_commit_rate_limited")]
+    [InlineData(false, HttpStatusCode.ServiceUnavailable, "teable_read_http_failure")]
+    [InlineData(true, HttpStatusCode.ServiceUnavailable, "teable_commit_http_failure")]
+    public async Task Account_write_diagnostics_preserve_safe_phase_without_retry_or_response_data(
+        bool writing, HttpStatusCode status, string code)
+    {
+        using var remote = new Remote();
+        using var handler = new DiagnosticFailureHandler(remote, writing, status);
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://teable.example/") };
+        using var store = new TeableRevisionStore(client, "tbl1234567890123456", "synthetic-token");
+        var authority = new TeableInstallLinkingSnapshotAuthority(store);
+        byte[] envelope = "synthetic-protected-envelope"u8.ToArray();
+        var request = new InstallLinkingEnvelopeCompareExchangeRequest(0, null, null, 1, Guid.NewGuid(), 2,
+            SHA256.HashData(envelope), SHA256.HashData(envelope), envelope);
+        using var result = await authority.CompareExchangeAsync(request);
+        Assert.False(result.Committed);
+        Assert.Null(result.AuthoritativeEnvelope);
+        Assert.Equal(code, result.Code);
+        Assert.Equal(1, handler.Failures);
+        Assert.Equal(writing ? 1 : 0, handler.Posts);
+        Assert.Empty(remote.Rows);
+        Assert.DoesNotContain("secret-provider-message", result.Code);
+        Assert.DoesNotContain("synthetic-token", result.Code);
+    }
+
+    private sealed class DiagnosticFailureHandler(HttpMessageHandler inner, bool writing, HttpStatusCode status)
+        : DelegatingHandler(inner)
+    {
+        public int Failures { get; private set; }
+        public int Posts { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            bool post = request.Method == HttpMethod.Post;
+            if (post) Posts++;
+            if (post == writing)
+            {
+                Failures++;
+                return Task.FromResult(new HttpResponseMessage(status)
+                    { Content = new StringContent("secret-provider-message synthetic-token") });
+            }
+            return base.SendAsync(request, ct);
+        }
+    }
+
     [Theory]
     [InlineData("success")]
     [InlineData("schema")]
@@ -440,7 +528,9 @@ public sealed class TeableRevisionStoreTests
     public async Task Rejected_credentials_do_not_leak_response_bodies()
     {
         using var remote = new Remote { Unauthorized = true };
-        var error = await Assert.ThrowsAsync<IOException>(() => remote.Store().ReadAsync("accounts"));
+        var error = await Assert.ThrowsAsync<TeableRequestFailureException>(() => remote.Store().ReadAsync("accounts"));
+        Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
+        Assert.False(error.Writing);
         Assert.DoesNotContain("secret-provider-message", error.ToString());
         Assert.DoesNotContain("synthetic-token", error.ToString());
     }

@@ -194,7 +194,7 @@ public sealed class OriginPublicationTeablePersistenceTests : IDisposable
         {
             var entry = Capture(writer);
             remote.CommitThenFailHard = true;
-            Assert.Throws<IOException>(() => writer.Persist([entry]));
+            Assert.Throws<TeableRequestFailureException>(() => writer.Persist([entry]));
         }
         int writes = remote.HeadPosts;
         using var cold = new TeableOriginPublicationStorage(remote.Store());

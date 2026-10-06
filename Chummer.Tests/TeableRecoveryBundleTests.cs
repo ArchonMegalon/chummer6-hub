@@ -133,7 +133,7 @@ public sealed class TeableRecoveryBundleTests : IDisposable
         Write(source, "secret", "synthetic-secret"u8.ToArray());
         remote.CommitThenFailHard = true;
         var store = new TeableRecoveryBundleStore(remote.Store());
-        await Assert.ThrowsAsync<IOException>(() => store.CaptureAsync("hub", source, ["secret"]));
+        await Assert.ThrowsAsync<TeableRequestFailureException>(() => store.CaptureAsync("hub", source, ["secret"]));
         int writes = remote.HeadPosts;
         var recovered = await new TeableRecoveryBundleStore(remote.Store()).InspectAsync("hub");
         Assert.Equal(1, recovered.Revision);

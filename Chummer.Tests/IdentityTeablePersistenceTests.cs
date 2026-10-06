@@ -95,7 +95,7 @@ public sealed class IdentityTeablePersistenceTests : IDisposable
         var first = Service(remote);
         var issued = first.IssueSession(Request());
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => first.RevokeSession(new(issued.AccessToken)));
+        Assert.Throws<TeableRequestFailureException>(() => first.RevokeSession(new(issued.AccessToken)));
         int posts = remote.HeadPosts;
         Assert.Throws<InvalidOperationException>(() => first.Introspect(new(issued.AccessToken)));
         Assert.Equal(posts, remote.HeadPosts);

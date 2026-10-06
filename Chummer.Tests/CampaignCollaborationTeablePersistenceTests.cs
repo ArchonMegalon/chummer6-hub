@@ -154,7 +154,7 @@ public sealed class CampaignCollaborationTeablePersistenceTests : IDisposable
         var invite = service.CreateInvite(gm, campaign.CampaignId, new("synthetic-invite"));
         var request = Redeem(invite, dossier);
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => service.RedeemInvite(player, invite.InviteId, request));
+        Assert.Throws<TeableRequestFailureException>(() => service.RedeemInvite(player, invite.InviteId, request));
         int writes = remote.HeadPosts;
         using var cold = Store(remote);
         var replay = Service(cold, keys).RedeemInvite(player, invite.InviteId, request);

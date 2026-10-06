@@ -128,7 +128,7 @@ public sealed class FactionTeablePersistenceTests : IDisposable
         var factions = Factions(writer);
         var charter = factions.CreateFaction(user, Charter("Synthetic Uncertain Charge"));
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => factions.ExecuteAction(user, charter.FactionId, Scout));
+        Assert.Throws<TeableRequestFailureException>(() => factions.ExecuteAction(user, charter.FactionId, Scout));
         int writes = remote.HeadPosts;
         Assert.Throws<InvalidOperationException>(() => factions.ExecuteAction(user, charter.FactionId, Scout));
 

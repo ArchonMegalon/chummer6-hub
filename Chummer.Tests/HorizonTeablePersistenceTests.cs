@@ -177,7 +177,7 @@ public sealed class HorizonTeablePersistenceTests : IDisposable
         using var remote = new Remote { CommitThenFailHard = true };
         using var receipts = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
         var original = new HorizonArtifactRequestService(new(Config())).BuildRequest(Request(), Now);
-        Assert.Throws<IOException>(() => receipts.Append(original));
+        Assert.Throws<TeableRequestFailureException>(() => receipts.Append(original));
         Assert.Equal(original.RequestId, receipts.FindByRequestId(original.RequestId)!.RequestId);
         Assert.Equal(1, remote.HeadPosts);
     }
@@ -321,7 +321,7 @@ public sealed class HorizonTeablePersistenceTests : IDisposable
     {
         using var remote = new Remote { CommitThenFailHard = true };
         using var receipts = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
-        Assert.Throws<IOException>(() => Requests(remote, receipts).BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true));
+        Assert.Throws<TeableRequestFailureException>(() => Requests(remote, receipts).BuildRequest(ChargedRequest(monthly), Now, consumeQuota: true));
         using var coldStore = new HorizonArtifactRequestReceiptStore(Config(), remote.Store());
         var cold = Requests(remote, coldStore);
         var recovered = Assert.Single(cold.ListRecentReceipts(userId: "user"));

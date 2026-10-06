@@ -1,4 +1,5 @@
 using System.Net;
+using Chummer.Storage.Teable;
 using System.Text.Json;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
@@ -142,7 +143,7 @@ public sealed class ParticipationNotificationTeableTests : IDisposable
         using var store = Store(remote);
         var user = User(store);
         remote.CommitThenFailHard = true;
-        await Assert.ThrowsAsync<IOException>(() => Notify(Service(store, delivery), user));
+        await Assert.ThrowsAsync<TeableRequestFailureException>(() => Notify(Service(store, delivery), user));
         using var cold = Store(remote);
         Assert.Equal("pending", (await Notify(Service(cold, delivery), user))!.Status);
         Assert.Equal(0, delivery.Calls);
@@ -212,7 +213,7 @@ public sealed class ParticipationNotificationTeableTests : IDisposable
         using var store = Store(remote);
         var user = User(store);
         int before = remote.HeadPosts;
-        await Assert.ThrowsAsync<IOException>(() => Notify(Service(store, delivery), user));
+        await Assert.ThrowsAsync<TeableRequestFailureException>(() => Notify(Service(store, delivery), user));
         Assert.Equal(before + 2, remote.HeadPosts);
         using var cold = Store(remote);
         Assert.Equal("sent", (await Notify(Service(cold, delivery), user))!.Status);
