@@ -297,65 +297,57 @@ public sealed class TeableRevisionStoreTests
     [Theory]
     [InlineData(3)] // The current protected account envelope requires three chunks.
     [InlineData(5)] // A larger envelope must not start an unbounded fan-out.
-    public async Task Chunk_reads_overlap_in_bounded_batches_and_preserve_exact_order_without_writes(int chunks)
+    public async Task Chunk_reads_use_bounded_remote_batches_and_preserve_exact_order_without_writes(int chunks)
     {
         using var remote = new Remote();
         byte[] bytes = Enumerable.Range(0, (chunks - 1) * 32 * 1024 + 7).Select(i => (byte)(i % 251)).ToArray();
-        int batchSize = Math.Min(4, chunks);
         await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
-        int posts = remote.HeadPosts, active = 0, maximum = 0, calls = 0;
+        int posts = remote.HeadPosts, reads = remote.GetRequests, calls = 0;
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        remote.BeforeChunkReadResponse = async (_, ct) =>
+        remote.BeforeChunkBatchReadResponse = async (rows, ct) =>
         {
-            int count = Interlocked.Increment(ref active);
-            maximum = Math.Max(maximum, count);
-            if (Interlocked.Increment(ref calls) == batchSize) entered.TrySetResult();
-            try { await release.Task.WaitAsync(ct); }
-            finally { Interlocked.Decrement(ref active); }
+            Assert.InRange(rows.Length, 1, 4);
+            calls++;
+            Array.Reverse(rows); // Provider ordering must never change reconstructed bytes.
+            entered.TrySetResult();
+            await release.Task.WaitAsync(ct);
         };
         Task<TeableRevisionStore.Head?> read = remote.Store().ReadAsync("accounts");
         try
         {
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal(batchSize, Volatile.Read(ref calls));
+            Assert.Equal(1, calls);
             Assert.False(read.IsCompleted);
         }
         finally { release.TrySetResult(); await read; }
         Assert.Equal(bytes, (await read)!.Bytes);
-        Assert.Equal(batchSize, maximum);
-        Assert.Equal(chunks, calls);
-        Assert.Equal(0, active);
+        Assert.Equal((chunks + 3) / 4, calls);
+        Assert.Equal(1 + calls, remote.GetRequests - reads); // One fresh head, then one GET per batch.
         Assert.Equal(posts, remote.HeadPosts);
     }
 
     [Theory]
     [InlineData(false, 2)]
     [InlineData(true, 2)]
-    [InlineData(false, 4)]
-    [InlineData(true, 4)]
-    public async Task Failed_or_canceled_chunk_read_joins_its_peers_before_returning(bool cancel, int chunks)
+    [InlineData(false, 5)]
+    [InlineData(true, 5)]
+    public async Task Failed_or_canceled_chunk_batch_never_starts_a_later_batch_or_write(bool cancel, int chunks)
     {
         using var remote = new Remote();
         byte[] bytes = new byte[(chunks - 1) * 32 * 1024 + 7];
         await remote.Store().CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
-        int posts = remote.HeadPosts, enteredCount = 0, active = 0;
-        var both = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int posts = remote.HeadPosts, reads = remote.GetRequests, active = 0;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        remote.BeforeChunkReadResponse = async (row, ct) =>
+        remote.BeforeChunkBatchReadResponse = async (_, ct) =>
         {
             Interlocked.Increment(ref active);
-            if (Interlocked.Increment(ref enteredCount) == chunks) both.TrySetResult();
+            entered.TrySetResult();
             try
             {
-                await both.Task.WaitAsync(ct);
-                if (!cancel && row["revision_key"]!.GetValue<string>().EndsWith(":0", StringComparison.Ordinal))
-                {
-                    failed.TrySetResult();
-                    throw new HttpRequestException("synthetic chunk outage");
-                }
                 await release.Task.WaitAsync(ct);
+                throw new HttpRequestException("synthetic chunk outage");
             }
             finally { Interlocked.Decrement(ref active); }
         };
@@ -363,7 +355,8 @@ public sealed class TeableRevisionStoreTests
         Task<TeableRevisionStore.Head?> read = remote.Store().ReadAsync("accounts", cancellation.Token);
         try
         {
-            await both.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(read.IsCompleted);
             if (cancel)
             {
                 cancellation.Cancel();
@@ -371,8 +364,6 @@ public sealed class TeableRevisionStoreTests
             }
             else
             {
-                await failed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                Assert.False(read.IsCompleted); // Peer responses still own their output slices.
                 release.TrySetResult();
                 await Assert.ThrowsAsync<HttpRequestException>(() => read);
             }
@@ -385,8 +376,52 @@ public sealed class TeableRevisionStoreTests
         }
         Assert.Equal(0, active);
         Assert.Equal(posts, remote.HeadPosts);
-        remote.BeforeChunkReadResponse = null;
+        Assert.Equal(2, remote.GetRequests - reads); // No detached peer, later batch or automatic retry.
+        remote.BeforeChunkBatchReadResponse = null;
         Assert.Equal(bytes, (await remote.Store().ReadAsync("accounts"))!.Bytes);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("duplicate")]
+    [InlineData("extra")]
+    [InlineData("key")]
+    [InlineData("stream")]
+    [InlineData("kind")]
+    [InlineData("revision")]
+    [InlineData("length")]
+    [InlineData("hash")]
+    public async Task Invalid_chunk_batch_is_rejected_without_fallback_or_replay(string fault)
+    {
+        using var remote = new Remote();
+        using var store = remote.Store();
+        byte[] bytes = new byte[2 * 32 * 1024 + 7];
+        await store.CompareExchangeAsync("accounts", null, Guid.NewGuid(), bytes);
+        Assert.Equal(bytes, (await store.ReadAsync("accounts"))!.Bytes); // A prior success is never a fallback.
+        int posts = remote.HeadPosts, reads = remote.GetRequests;
+        remote.TransformChunkBatch = rows =>
+        {
+            switch (fault)
+            {
+                case "missing": return rows[..^1];
+                case "duplicate": rows[1] = (JsonObject)rows[0].DeepClone(); break;
+                case "extra": return [.. rows, (JsonObject)rows[0].DeepClone()];
+                case "key": rows[0]["revision_key"] = "wrong-commit:0"; break;
+                case "stream": rows[0]["stream"] = "other-owner"; break;
+                case "kind": rows[0]["kind"] = "head"; break;
+                case "revision": rows[0]["revision"] = 99L; break;
+                case "length": rows[0]["payload"] = "AA=="; break;
+                case "hash":
+                    byte[] changed = Convert.FromBase64String(rows[0]["payload"]!.GetValue<string>());
+                    changed[0] ^= 1;
+                    rows[0]["payload"] = Convert.ToBase64String(changed);
+                    break;
+            }
+            return rows;
+        };
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.ReadAsync("accounts"));
+        Assert.Equal(2, remote.GetRequests - reads);
+        Assert.Equal(posts, remote.HeadPosts);
     }
 
     [Fact]
@@ -665,6 +700,8 @@ public sealed class TeableRevisionStoreTests
         public Action? BeforeHeadReadResponse { get; set; }
         public Func<CancellationToken, Task>? BeforeSchemaReadResponse { get; set; }
         public Func<JsonObject, CancellationToken, Task>? BeforeChunkReadResponse { get; set; }
+        public Func<JsonObject[], CancellationToken, Task>? BeforeChunkBatchReadResponse { get; set; }
+        public Func<JsonObject[], JsonObject[]>? TransformChunkBatch { get; set; }
         public Func<JsonObject, CancellationToken, Task>? BeforeRecordReadResponse { get; set; }
         public Action<HttpRequestMessage>? ObserveRequest { get; set; }
         public int HeadPosts { get; private set; }
@@ -724,14 +761,21 @@ public sealed class TeableRevisionStoreTests
             }
             string filterJson = Uri.UnescapeDataString(request.RequestUri.Query.Split('&')
                 .Single(pair => pair.TrimStart('?').StartsWith("filter=", StringComparison.Ordinal)).Split('=', 2)[1]);
-            var predicates = JsonNode.Parse(filterJson)!["filterSet"]!.AsArray();
+            var filter = JsonNode.Parse(filterJson)!;
+            var predicates = filter["filterSet"]!.AsArray();
+            bool any = filter["conjunction"]!.GetValue<string>() == "or";
+            int take = int.Parse(request.RequestUri.Query.Split('&')
+                .Single(pair => pair.TrimStart('?').StartsWith("take=", StringComparison.Ordinal)).Split('=', 2)[1],
+                System.Globalization.CultureInfo.InvariantCulture);
             bool headRead = predicates.Any(p => p!["fieldId"]!.GetValue<string>() == "kind");
             JsonObject[] rows;
             lock (Rows)
             {
-                rows = Rows.Values.Where(row => predicates.All(p => row[p!["fieldId"]!.GetValue<string>()]!.GetValue<string>()
-                        == p["value"]!.GetValue<string>())).OrderByDescending(row => row["revision"]!.GetValue<long>())
-                    .Take(headRead ? 1 : 2).Select(row => (JsonObject)row.DeepClone()).ToArray();
+                bool Matches(JsonObject row, JsonNode? p) => row[p!["fieldId"]!.GetValue<string>()]!.GetValue<string>()
+                    == p["value"]!.GetValue<string>();
+                rows = Rows.Values.Where(row => any ? predicates.Any(p => Matches(row, p)) : predicates.All(p => Matches(row, p)))
+                    .OrderByDescending(row => row["revision"]!.GetValue<long>())
+                    .Take(take).Select(row => (JsonObject)row.DeepClone()).ToArray();
             }
             if (rows is [var record] && BeforeRecordReadResponse is { } beforeRecord)
                 await beforeRecord(record, ct);
@@ -743,6 +787,11 @@ public sealed class TeableRevisionStoreTests
             if (!headRead && rows is [var chunk] && chunk["kind"]!.GetValue<string>() == "chunk"
                 && BeforeChunkReadResponse is { } beforeChunk)
                 await beforeChunk(chunk, ct);
+            if (any)
+            {
+                if (BeforeChunkBatchReadResponse is { } beforeBatch) await beforeBatch(rows, ct);
+                if (TransformChunkBatch is { } transform) rows = transform(rows);
+            }
             if (headRead && BeforeHeadReadResponse is { } beforeResponse)
             {
                 BeforeHeadReadResponse = null;
