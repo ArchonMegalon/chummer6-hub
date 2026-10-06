@@ -508,8 +508,10 @@ public sealed class AndroidLinkedV2BearerProofTests
     [InlineData("erase", true)]
     public async Task Account_controller_outage_after_signed_admission_preserves_the_link(string action, bool throws)
     {
-        // Exercise both the fresh-authority read and its final readiness check.
-        foreach (int failOnCall in new[] { 1, 2 })
+        // Fail both the first controller read and a later recheck after a
+        // successful read. Do not couple outage coverage to redundant probes
+        // inside one synchronous, read-only principal lookup.
+        foreach (bool previouslyRead in new[] { false, true })
         {
             using Fixture fixture = new();
             var signed = fixture.Sign(AccountRoute(action), "{\"installationId\":\"android-v2\"}");
@@ -518,8 +520,16 @@ public sealed class AndroidLinkedV2BearerProofTests
             await fixture.InvokeAsync(context, http =>
             {
                 dispatched = true;
-                fixture.UseReadinessProbe(new ChapterReadinessProbe
-                    { FailOnCall = failOnCall, ThrowOnFailure = throws });
+                var probe = new ChapterReadinessProbe { ThrowOnFailure = throws };
+                fixture.UseReadinessProbe(probe);
+                if (previouslyRead)
+                {
+                    var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+                        { ControllerContext = new() { HttpContext = http } };
+                    Assert.IsType<OkObjectResult>(controller.GetGrantStatus(new("android-v2")).Result);
+                    Assert.True(probe.Calls > 0);
+                }
+                probe.FailOnCall = probe.Calls + 1;
                 var result = DeniedAccountAction(fixture, http, action);
                 Assert.Equal(StatusCodes.Status503ServiceUnavailable, result.StatusCode);
                 string response = JsonSerializer.Serialize(result.Value);
