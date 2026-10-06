@@ -16,7 +16,7 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
 {
     private bool _ownsClient;
     internal const int ChunkBytes = 32 * 1024;
-    private const int ChunkReadConcurrency = 4;
+    private const int ChunkReadBatchSize = 4;
     internal const int MaximumBytes = 64 * 1024 * 1024 + 64; // Includes a bounded store-specific header.
     private const int MaximumResponseBytes = 256 * 1024;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 12 };
@@ -199,31 +199,36 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
             }
             else
             {
-                async Task ReadChunkAsync(int index)
+                // Fetch up to four exact immutable keys in one bounded response.
+                // The fresh head, every key/owner/revision, length and final hash
+                // remain mandatory. No cached authority or storage format change.
+                for (int start = 0; start < manifest.Chunks; start += ChunkReadBatchSize)
                 {
-                    string key = ChunkKey(stream, manifest.Commit, index);
-                    JsonElement part = await FindAsync(new[] { ("revision_key", key) }, latest: false, ct) ?? throw Invalid();
-                    JsonElement values = part.GetProperty("fields");
-                    if (values.GetProperty("stream").GetString() != stream || values.GetProperty("kind").GetString() != "chunk"
-                        || values.GetProperty("revision").GetInt64() != manifest.Revision) throw Invalid();
-                    int length = Math.Min(ChunkBytes, manifest.Length - index * ChunkBytes);
-                    if (!Convert.TryFromBase64String(values.GetProperty("payload").GetString() ?? "",
-                            bytes.AsSpan(index * ChunkBytes, length), out int used) || used != length) throw Invalid();
-                }
-                // The fresh head fixes every chunk identity and destination.
-                // A protected account envelope can span three chunks. Read a
-                // bounded batch of four so fresh authorization need not wait
-                // for a second dependent round at that size. Never cache authority or
-                // start an unbounded task per chunk. Join all even on failure
-                // before clearing their shared buffer in the outer catch.
-                for (int index = 0; index < manifest.Chunks; index += ChunkReadConcurrency)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    int count = Math.Min(ChunkReadConcurrency, manifest.Chunks - index);
-                    var reads = new Task[count];
-                    for (int offset = 0; offset < count; offset++)
-                        reads[offset] = ReadChunkAsync(index + offset);
-                    await Task.WhenAll(reads);
+                    int count = Math.Min(ChunkReadBatchSize, manifest.Chunks - start);
+                    var pending = Enumerable.Range(start, count).ToDictionary(
+                        index => ChunkKey(stream, manifest.Commit, index), index => index, StringComparer.Ordinal);
+                    string filter = JsonSerializer.Serialize(new { conjunction = "or", filterSet = pending.Keys.Select(key =>
+                        new { fieldId = "revision_key", @operator = "is", value = key }) });
+                    // One extra row detects an unexpected/duplicate result instead
+                    // of silently truncating it. Four chunks fit the existing cap.
+                    string query = $"fieldKeyType=name&take={count + 1}&filter={Uri.EscapeDataString(filter)}";
+                    using JsonDocument document = await GetAsync($"{TablePath}/record?{query}", ct);
+                    JsonElement records = document.RootElement.GetProperty("records");
+                    if (records.GetArrayLength() != count) throw Invalid();
+                    foreach (JsonElement recordPart in records.EnumerateArray())
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        JsonElement values = recordPart.GetProperty("fields");
+                        string key = values.GetProperty("revision_key").GetString() ?? throw Invalid();
+                        if (!pending.Remove(key, out int index)
+                            || values.GetProperty("stream").GetString() != stream
+                            || values.GetProperty("kind").GetString() != "chunk"
+                            || values.GetProperty("revision").GetInt64() != manifest.Revision) throw Invalid();
+                        int length = Math.Min(ChunkBytes, manifest.Length - index * ChunkBytes);
+                        if (!Convert.TryFromBase64String(values.GetProperty("payload").GetString() ?? "",
+                                bytes.AsSpan(index * ChunkBytes, length), out int used) || used != length) throw Invalid();
+                    }
+                    if (pending.Count != 0) throw Invalid();
                 }
             }
             ct.ThrowIfCancellationRequested();
