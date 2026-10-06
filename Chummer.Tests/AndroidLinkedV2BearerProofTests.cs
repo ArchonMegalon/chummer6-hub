@@ -139,6 +139,78 @@ public sealed class AndroidLinkedV2BearerProofTests
             ["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"] = "teable"
         }).Build(), new(remote.Store(), ownsStore: true));
 
+    [Theory]
+    [InlineData("request", "revoked", 401)]
+    [InlineData("read", "revoked", 401)]
+    [InlineData("decide", "revoked", 401)]
+    [InlineData("request", "outage", 503)]
+    [InlineData("read", "outage", 503)]
+    [InlineData("decide", "outage", 503)]
+    [InlineData("request", "revoked-before", 401)]
+    [InlineData("read", "revoked-before", 401)]
+    [InlineData("decide", "revoked-before", 401)]
+    [InlineData("request", "outage-before", 503)]
+    [InlineData("read", "outage-before", 503)]
+    [InlineData("decide", "outage-before", 503)]
+    public async Task Scene_entry_uses_one_fresh_probe_before_read_and_rechecks_before_any_account_or_media_access(
+        string action, string failure, int status)
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var chapters = PrimaryChapters(remote);
+        var request = PrepareSceneChapter(chapters);
+        int reads = 0, writes = remote.HeadPosts;
+        var probe = new ChapterReadinessProbe();
+        void WithdrawAuthority()
+        {
+            if (failure.StartsWith("outage", StringComparison.Ordinal)) probe.FailOnCall = probe.Calls + 1;
+            else lock (fixture.Store.Gate)
+                fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                    with { Status = InstallationGrantStates.Revoked };
+        }
+        remote.BeforeRecordReadResponse = (_, _) =>
+        {
+            reads++;
+            Assert.Equal(1, probe.Calls); // The bridge owns entry authorization, not two adjacent probes.
+            WithdrawAuthority();
+            return Task.CompletedTask;
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_ORIGIN_SCENE_MEDIA_REQUIRED"] = "true" }).Build();
+        Task<ActionResult>? pending = null;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/" + action,
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            fixture.UseReadinessProbe(probe);
+            if (failure.EndsWith("-before", StringComparison.Ordinal)) WithdrawAuthority();
+            // Null account/admission dependencies and an unconfigured socket
+            // ensure no private account read or media handoff can run on failure.
+            var controller = new AndroidLinkedOriginScenesController(fixture.Service, null!,
+                new(chapters), null!, new(config)) { ControllerContext = new() { HttpContext = http } };
+            pending = action switch
+            {
+                "request" => controller.RequestScene(request, default),
+                "read" => controller.ReadScene(new(request.InstallationId, request.ChapterRequestId, request.TextDigest), default),
+                _ => controller.DecideScene(new(request.InstallationId, request.ChapterRequestId, request.TextDigest,
+                    new string('d', 64), true, true), default)
+            };
+        });
+        Assert.NotNull(pending);
+        var result = await pending;
+        Assert.Equal(status, result is UnauthorizedResult ? 401 : Assert.IsType<ObjectResult>(result).StatusCode);
+        if (failure.EndsWith("-before", StringComparison.Ordinal))
+        {
+            Assert.Equal(0, reads);
+            Assert.Equal(1, probe.Calls);
+        }
+        else
+        {
+            Assert.True(reads > 0);
+            Assert.Equal(2, probe.Calls);
+        }
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
     private static IConfiguration SceneAdmissionConfig() => new ConfigurationBuilder().AddInMemoryCollection(
         new Dictionary<string, string?>
         {

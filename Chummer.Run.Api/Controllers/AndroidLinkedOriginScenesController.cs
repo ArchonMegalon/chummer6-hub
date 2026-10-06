@@ -19,15 +19,16 @@ public sealed class AndroidLinkedOriginScenesController(InstallLinkingService li
     public Task<ActionResult> RequestScene([FromBody] AndroidOriginSceneRequest request, CancellationToken ct)
         => WithOwner("request", request.InstallationId, async (subject, current, phase) =>
         {
-            phase("account");
-            var user = accounts.GetBySubject(subject) ?? throw new UnauthorizedAccessException();
             if (request.AutomaticInsertion && (request.SceneExcerpt != "" || request.AltText != ""))
                 throw new ArgumentException("Automatic book scenes are composed from the accepted chapter.");
             phase("compose");
             var composed = (request.AutomaticInsertion
                 ? bridge.ComposeAutomatic(subject, request.ChapterRequestId, request.TextDigest, request.ExternalProcessingConsent, current)
                 : bridge.Compose(subject, request.ChapterRequestId, request.TextDigest, request.SceneExcerpt,
-                    request.AltText, request.ExternalProcessingConsent, current)) with { UserId = user.UserId, Email = user.Email };
+                    request.AltText, request.ExternalProcessingConsent, current));
+            phase("account");
+            var user = accounts.GetBySubject(subject) ?? throw new UnauthorizedAccessException();
+            composed = composed with { UserId = user.UserId, Email = user.Email };
             phase("media-health");
             await media.EnsureDispatchAvailableAsync(ct);
             if (!current()) throw new UnauthorizedAccessException();
@@ -110,9 +111,18 @@ public sealed class AndroidLinkedOriginScenesController(InstallLinkingService li
         }
         try
         {
-            if (ObserveSubject() is not { Length: > 0 } subject) return Unauthorized();
-            if (!media.IsConfigured) return StatusCode(503, "Chapter illustrations are not enabled on this server.");
+            if (!AndroidLinkedV2RequestProof.TryGetPrincipal(HttpContext, out var principal)
+                || principal!.Installation.InstallationId != installationId
+                || principal.Installation.SubjectId is not { Length: > 0 } subject) return Unauthorized();
             bool Current() => ObserveSubject() == subject;
+            if (!media.IsConfigured)
+                return Current() ? StatusCode(503, "Chapter illustrations are not enabled on this server.") : Unauthorized();
+            // All three actions enter the bridge first. It checks current
+            // installation authority BEFORE reading a chapter and again before
+            // returning private data. Do not repeat that same remote probe here;
+            // the middleware principal supplies identity, never cached authority.
+            // Account lookup follows composition, and admission/media/disclosure
+            // keep their own fresh checks after intervening I/O.
             ActionResult result = await action(subject, Current, value => phase = value);
             phase = "final-authorization";
             return Current() ? result : Unauthorized();
