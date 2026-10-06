@@ -579,7 +579,9 @@ public sealed partial class InstallLinkingService
     private AndroidLinkedV2GrantPrincipal? ResolveAndroidLinkedV2Grant(
         string? installationId, string? grantId, string? accessToken, bool requireAvailableAuthority)
     {
-        if (!TryGetDurableStore(out InstallLinkingStore store))
+        InstallLinkingStore store;
+        try { store = _principalStoreAccessor(); }
+        catch
         {
             if (requireAvailableAuthority) throw AuthorityUnavailable();
             return null;
@@ -615,8 +617,17 @@ public sealed partial class InstallLinkingService
         lock (store.Gate)
         {
             var operation = new InstallLinkingService(this, store);
+            // Authentication is a read, not expiry maintenance. Check the full
+            // current primary authority once under the same gate used to read
+            // the grant. Expiry is enforced by TryResolveActiveGrantLocked;
+            // issuance/rotation retain their own durable maintenance. Repeating
+            // the remote probe after these local reads adds no fresh I/O boundary.
+            if (!operation.IsDurableStoreReady())
+            {
+                if (requireAvailableAuthority) throw AuthorityUnavailable();
+                return null;
+            }
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            operation.ExpireGrantsLocked(now);
             if (!operation.TryResolveActiveGrantLocked(
                     normalizedInstallationId,
                     normalizedGrantId,
@@ -628,12 +639,6 @@ public sealed partial class InstallLinkingService
             {
                 return null;
             }
-            if (!operation.IsDurableStoreReady())
-            {
-                if (requireAvailableAuthority) throw AuthorityUnavailable();
-                return null;
-            }
-
             return new AndroidLinkedV2GrantPrincipal(
                 installation!,
                 grant.GrantId,

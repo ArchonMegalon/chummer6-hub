@@ -23,6 +23,43 @@ public sealed class AndroidLinkedV2BearerProofTests
     private static readonly JsonSerializerOptions ContinuationWebJson = new(JsonSerializerDefaults.Web);
 
     [Theory]
+    [InlineData("revoked")]
+    [InlineData("expired")]
+    [InlineData("outage")]
+    [InlineData("wrong-token")]
+    public void Grant_authentication_reads_one_fresh_authority_without_expiry_maintenance(string change)
+    {
+        using Fixture fixture = new();
+        var probe = new ChapterReadinessProbe();
+        fixture.UseReadinessProbe(probe);
+        Assert.NotNull(fixture.Service.ResolveAndroidLinkedV2GrantForRequest("android-v2", Fixture.GrantId, Fixture.AccessToken));
+        Assert.Equal(1, probe.Calls);
+        string token = Fixture.AccessToken;
+        lock (fixture.Store.Gate)
+        {
+            var grant = fixture.Store.GrantsById[Fixture.GrantId];
+            if (change == "revoked") fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+            if (change == "expired") fixture.Store.GrantsById[Fixture.GrantId] = grant with { ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1) };
+        }
+        string before = JsonSerializer.Serialize(fixture.Store.GrantsById[Fixture.GrantId]);
+        if (change == "outage")
+        {
+            probe.FailOnCall = 2;
+            var error = Assert.Throws<InstallLinkingOperationException>(() =>
+                fixture.Service.ResolveAndroidLinkedV2GrantForRequest("android-v2", Fixture.GrantId, token));
+            Assert.Equal(503, error.StatusCode);
+        }
+        else
+        {
+            if (change == "wrong-token") token = "not-the-current-token";
+            Assert.Null(fixture.Service.ResolveAndroidLinkedV2GrantForRequest("android-v2", Fixture.GrantId, token));
+        }
+        Assert.Equal(2, probe.Calls); // A later request never borrows the prior authority.
+        Assert.Equal(before, JsonSerializer.Serialize(fixture.Store.GrantsById[Fixture.GrantId]));
+        Assert.Empty(fixture.Store.AndroidLinkedV2ReplayReceiptsByKey);
+    }
+
+    [Theory]
     [InlineData("revoked", 401)]
     [InlineData("owner", 401)]
     [InlineData("outage", 503)]
