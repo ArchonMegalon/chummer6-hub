@@ -151,7 +151,7 @@ public sealed class CampaignArtifactTeablePersistenceTests : IDisposable
         using var writer = Store(remote);
         var (user, workspace) = Context(writer);
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => Record(writer, user, workspace, "Uncertain recap"));
+        Assert.Throws<TeableRequestFailureException>(() => Record(writer, user, workspace, "Uncertain recap"));
         int writes = remote.HeadPosts;
         Assert.Throws<InvalidOperationException>(() => Record(writer, user, workspace, "Do not retry"));
         using var cold = Store(remote);

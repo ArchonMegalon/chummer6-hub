@@ -141,7 +141,7 @@ public sealed class CampaignSpineTeablePersistenceTests : IDisposable
         var (user, workspace) = Context(writer, remote);
         var listing = PrepareOpenRun(writer, remote, user, workspace);
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => Service(writer, remote).CloseOutOpenRun(user, listing.OpenRunId, Closeout()));
+        Assert.Throws<TeableRequestFailureException>(() => Service(writer, remote).CloseOutOpenRun(user, listing.OpenRunId, Closeout()));
         int writes = remote.HeadPosts;
         Assert.Throws<InvalidOperationException>(() => Service(writer, remote).CloseOutOpenRun(user, listing.OpenRunId, Closeout()));
         using var cold = Store(remote);

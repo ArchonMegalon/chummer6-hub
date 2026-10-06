@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -349,6 +350,8 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
             return;
         }
 
+        long started = Stopwatch.GetTimestamp();
+        string stage = "request-validation";
         try
         {
             bool refreshPath = string.Equals(
@@ -421,6 +424,7 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
             AndroidLinkedV2GrantPrincipal? principal;
             try
             {
+                stage = "grant-authority";
                 principal = installLinking.ResolveAndroidLinkedV2GrantForRequest(
                     installationId, grantId, accessToken);
             }
@@ -463,6 +467,7 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
             bool acceptedReplayReceipt;
             try
             {
+                stage = "replay-authority";
                 acceptedReplayReceipt = installLinking.TryUseAndroidLinkedV2Proof(
                     grantId,
                     packetKey,
@@ -510,11 +515,21 @@ public sealed class AndroidLinkedV2RequestProofMiddleware(
                     operationSha256 ?? string.Empty,
                     proofPublicKey));
             RemoveCredentialHeaders(context.Request.Headers);
+            stage = "endpoint";
             await next(context);
+            stage = "completed";
         }
         finally
         {
             CryptographicOperations.ZeroMemory(body);
+            // Bounded operational timing only. Never include request bodies,
+            // account/grant IDs, prose, credentials or exception details.
+            double elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            if (elapsed >= 10_000 && path is "/api/v2/android/linked/origin/chapters/read"
+                or "/api/v2/android/linked/origin/chapters/request"
+                or "/api/v2/android/linked/origin/chapters/accept")
+                logger.LogWarning("Origin chapter HTTP request took {ElapsedMs:F0} ms; stage={Stage}, status={Status}, aborted={Aborted}.",
+                    elapsed, stage, context.Response.StatusCode, context.RequestAborted.IsCancellationRequested);
         }
     }
 

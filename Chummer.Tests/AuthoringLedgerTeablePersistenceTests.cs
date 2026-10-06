@@ -118,7 +118,7 @@ public sealed class AuthoringLedgerTeablePersistenceTests : IDisposable
         using var remote = new Remote { CommitThenFailHard = true };
         using var usage = Usage(remote);
         var billing = Billing(usage);
-        Assert.Throws<IOException>(() => billing.ConsumeMyFirstBookQuota("user", Now));
+        Assert.Throws<TeableRequestFailureException>(() => billing.ConsumeMyFirstBookQuota("user", Now));
         Assert.Empty(usage.Entries);
         Assert.Equal(1, billing.GetMyFirstBookQuota("user", Now).MonthlyUsed);
         Assert.Throws<InvalidOperationException>(() => billing.ConsumeMyFirstBookQuota("user", Now));
@@ -170,7 +170,7 @@ public sealed class AuthoringLedgerTeablePersistenceTests : IDisposable
         using var usage = Usage(remote);
         using var reservations = Reservations(remote);
         var service = Service(reservations, usage);
-        Assert.Throws<IOException>(() => service.Reserve(Request(), Now));
+        Assert.Throws<TeableRequestFailureException>(() => service.Reserve(Request(), Now));
         var audit = service.Reserve(Request() with { AuditOnly = true }, Now);
         Assert.NotNull(audit.ReservationId);
         Assert.False(audit.ProviderBurnAllowed);

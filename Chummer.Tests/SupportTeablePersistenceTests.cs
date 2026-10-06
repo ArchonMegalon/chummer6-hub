@@ -128,7 +128,7 @@ public sealed class SupportTeablePersistenceTests : IDisposable
         using var remote = new Remote();
         using var writer = Store(remote);
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => Submit(writer));
+        Assert.Throws<TeableRequestFailureException>(() => Submit(writer));
         int writes = remote.HeadPosts;
         Assert.Throws<InvalidOperationException>(() => Submit(writer));
         using var cold = Store(remote);
@@ -205,7 +205,7 @@ public sealed class SupportTeablePersistenceTests : IDisposable
         using var remote = new Remote();
         using var store = Store(remote);
         remote.CommitThenFailHard = true;
-        Assert.Throws<IOException>(() => Submit(store, attachment: true));
+        Assert.Throws<TeableRequestFailureException>(() => Submit(store, attachment: true));
         int writes = remote.HeadPosts;
         using var cold = Store(remote);
         Assert.Empty(Cases(cold).ListForAutomation().Items);
