@@ -209,6 +209,86 @@ public sealed class TeableRevisionStoreTests
         Assert.True(observed >= 5); // Includes schema/head reads, chunks, head POST and commit readback.
     }
 
+    [Theory]
+    [InlineData("success")]
+    [InlineData("lost-response")]
+    [InlineData("failure")]
+    [InlineData("cancel")]
+    public async Task Chunk_writes_overlap_bounded_batches_and_join_before_head_or_failure(string outcome)
+    {
+        using var remote = new Remote();
+        using var store = remote.Store();
+        byte[] bytes = RandomNumberGenerator.GetBytes(4 * 32768 + 20);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseEarly = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseLast = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var earlyReturned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int calls = 0, active = 0, returned = 0;
+        remote.BeforeChunkWriteResponse = async (row, ct) =>
+        {
+            int call = Interlocked.Increment(ref calls);
+            if (call > 4) return;
+            Interlocked.Increment(ref active);
+            if (call == 4) entered.TrySetResult();
+            try
+            {
+                await (call == 4 ? releaseLast.Task : releaseEarly.Task).WaitAsync(ct);
+                if (call == 1 && outcome == "failure") throw new InvalidDataException("synthetic invalid acknowledgement");
+                if (call == 1 && outcome == "lost-response") throw new HttpRequestException("synthetic lost chunk acknowledgement");
+            }
+            finally
+            {
+                Interlocked.Decrement(ref active);
+                if (call < 4 && Interlocked.Increment(ref returned) == 3) earlyReturned.TrySetResult();
+            }
+        };
+        using var caller = new CancellationTokenSource();
+        Task<TeableRevisionStore.Head> write = store.CompareExchangeAsync(
+            "accounts", null, Guid.NewGuid(), bytes, caller.Token);
+        try
+        {
+            // A serial writer cannot reach this barrier. No timing-based speed assertion.
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(4, Volatile.Read(ref active));
+            Assert.Equal(4, Volatile.Read(ref calls));
+            Assert.Equal(0, remote.HeadPosts);
+            Assert.False(write.IsCompleted);
+            if (outcome == "cancel")
+            {
+                caller.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
+            }
+            else
+            {
+                releaseEarly.TrySetResult();
+                await earlyReturned.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.False(write.IsCompleted); // Even a failed peer is joined before returning.
+                Assert.Equal(4, Volatile.Read(ref calls)); // No next batch while a prior write is unresolved.
+                Assert.Equal(0, remote.HeadPosts);
+                releaseLast.TrySetResult();
+                if (outcome == "failure") await Assert.ThrowsAsync<InvalidDataException>(() => write);
+                else
+                {
+                    var head = await write;
+                    Assert.Equal(bytes, head.Bytes);
+                    Assert.Equal(bytes, (await store.ReadAsync("accounts"))!.Bytes);
+                }
+            }
+        }
+        finally
+        {
+            caller.Cancel();
+            releaseEarly.TrySetResult();
+            releaseLast.TrySetResult();
+            try { await write; } catch (Exception error) when (error is InvalidDataException or OperationCanceledException) { }
+        }
+        bool success = outcome is "success" or "lost-response";
+        Assert.Equal(0, Volatile.Read(ref active));
+        Assert.Equal(success ? 5 : 4, Volatile.Read(ref calls)); // A lost chunk response is read, never POSTed again.
+        Assert.Equal(success ? 1 : 0, remote.HeadPosts);
+        Assert.Equal(success ? 6 : 4, remote.Rows.Count); // Partial chunks never become authoritative heads.
+    }
+
     [Fact]
     public void Real_account_store_and_keyring_recover_from_remote_bytes_with_a_new_empty_local_root()
     {
@@ -791,6 +871,7 @@ public sealed class TeableRevisionStoreTests
         public Action? BeforeHeadReadResponse { get; set; }
         public Func<CancellationToken, Task>? BeforeSchemaReadResponse { get; set; }
         public Func<JsonObject, CancellationToken, Task>? BeforeChunkReadResponse { get; set; }
+        public Func<JsonObject, CancellationToken, Task>? BeforeChunkWriteResponse { get; set; }
         public Func<JsonObject[], CancellationToken, Task>? BeforeChunkBatchReadResponse { get; set; }
         public Func<JsonObject[], JsonObject[]>? TransformChunkBatch { get; set; }
         public Func<JsonObject, CancellationToken, Task>? BeforeRecordReadResponse { get; set; }
@@ -848,6 +929,8 @@ public sealed class TeableRevisionStoreTests
                         if (LoseCommitResponse) { LoseCommitResponse = false; throw new HttpRequestException("synthetic lost response"); }
                     }
                 }
+                if (fields["kind"]!.GetValue<string>() == "chunk" && BeforeChunkWriteResponse is { } beforeWrite)
+                    await beforeWrite(fields, ct);
                 return Response(new { records = Array.Empty<object>() }, HttpStatusCode.Created);
             }
             string filterJson = Uri.UnescapeDataString(request.RequestUri.Query.Split('&')
