@@ -97,8 +97,24 @@ public sealed class OriginChapterAuthoringService : IDisposable
             || predecessor.Source.RunnerName != source.RunnerName
             || predecessor.Source.ChapterId == source.ChapterId
             || predecessor.Source.AcceptedDecisionId == source.AcceptedDecisionId
-            || predecessor.Source.Facts.Any(fact => !source.Facts.Contains(fact)))
+            || predecessor.Source.Facts.Any(fact =>
+                source.Facts.Any(next => next.FactId == fact.FactId && next != fact)
+                || !IsChapterScopedBrief(fact) && !source.Facts.Contains(fact)))
             throw new InvalidOperationException("The exact reader-accepted predecessor does not match this book continuation.");
+    }
+
+    private static bool IsChapterScopedBrief(OriginChapterSourceFact fact)
+    {
+        // Existing native clients freeze a single-module refinement in Facts,
+        // under its own content-addressed player identity, NOT a Core decision.
+        // It remains bound to the old job/source/text but need not be reissued
+        // for every later chapter. Opening/background briefs and all accepted
+        // rules facts still accumulate. Inspect the retained predecessor's
+        // identity, never a replacement label supplied by the successor.
+        const string prefix = "player-chapter-brief-";
+        return fact.FactId == fact.DecisionId
+            && fact.FactId.StartsWith(prefix, StringComparison.Ordinal)
+            && IsDigest(fact.FactId[prefix.Length..]);
     }
 
     public OriginChapterAuthoringJob? Get(string subjectId, string requestId)
