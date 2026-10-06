@@ -19,6 +19,48 @@ namespace Chummer.Tests;
 
 public sealed class TeableRevisionStoreTests
 {
+    [Fact]
+    public async Task Production_request_pacing_is_shared_across_clients_and_does_not_replay_posts()
+    {
+        var starts = new System.Collections.Concurrent.ConcurrentQueue<long>();
+        using var first = new HttpClient(new TeableRequestPacingHandler(new PacedTransport(starts)));
+        using var second = new HttpClient(new TeableRequestPacingHandler(new PacedTransport(starts)));
+        var origin = new Uri("https://" + Guid.NewGuid().ToString("N") + ".example/");
+        var requests = Enumerable.Range(0, 8).Select(async i =>
+        {
+            using var request = new HttpRequestMessage(i % 2 == 0 ? HttpMethod.Get : HttpMethod.Post, origin);
+            using var response = await (i % 2 == 0 ? first : second).SendAsync(request);
+            Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        });
+        await Task.WhenAll(requests);
+        long[] ticks = starts.ToArray();
+        Assert.Equal(8, ticks.Length); // A 429, including POST, is never replayed.
+        for (int i = 1; i < ticks.Length; i++)
+            Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(ticks[i - 1], ticks[i]) >= TimeSpan.FromMilliseconds(245));
+    }
+
+    [Fact]
+    public async Task Cancellation_while_waiting_for_a_request_slot_never_sends_it()
+    {
+        var starts = new System.Collections.Concurrent.ConcurrentQueue<long>();
+        using var client = new HttpClient(new TeableRequestPacingHandler(new PacedTransport(starts)));
+        var origin = new Uri("https://" + Guid.NewGuid().ToString("N") + ".example/");
+        using var first = await client.GetAsync(origin);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(25));
+        using var request = new HttpRequestMessage(HttpMethod.Post, origin);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.SendAsync(request, cancellation.Token));
+        Assert.Single(starts);
+    }
+
+    private sealed class PacedTransport(System.Collections.Concurrent.ConcurrentQueue<long> starts) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            starts.Enqueue(System.Diagnostics.Stopwatch.GetTimestamp());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+        }
+    }
+
     [Theory]
     [InlineData(false, HttpStatusCode.TooManyRequests, "teable_read_rate_limited")]
     [InlineData(true, HttpStatusCode.TooManyRequests, "teable_commit_rate_limited")]

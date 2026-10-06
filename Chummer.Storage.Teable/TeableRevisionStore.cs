@@ -31,7 +31,8 @@ public sealed class TeableRevisionStore(HttpClient client, string tableId, strin
         if (origin is not { IsAbsoluteUri: true, Scheme: "https", AbsolutePath: "/", UserInfo: "", Query: "", Fragment: "" }
             || !ValidId(tableId, "tbl") || string.IsNullOrWhiteSpace(token) || token.Length > 4096 || token.Any(char.IsControl))
             throw Invalid();
-        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
+        var client = new HttpClient(new TeableRequestPacingHandler(
+            new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }))
             { BaseAddress = origin, Timeout = TimeSpan.FromSeconds(15) };
         return new(client, tableId, token) { _ownsClient = true };
     }
