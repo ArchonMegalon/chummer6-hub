@@ -35,6 +35,7 @@ public sealed partial class InstallLinkingService
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
     private static readonly TimeSpan RemoteProofClockSkew = TimeSpan.FromMinutes(5);
     private readonly Func<InstallLinkingStore> _storeAccessor;
+    private readonly Func<InstallLinkingStore> _principalStoreAccessor;
     private readonly bool _storeAccessorChecksReadiness;
     private InstallLinkingStore _store => _storeAccessor();
     private readonly TimeSpan _claimTicketLifetime;
@@ -51,6 +52,7 @@ public sealed partial class InstallLinkingService
     private InstallLinkingService(InstallLinkingService source, InstallLinkingStore store)
     {
         _storeAccessor = () => store;
+        _principalStoreAccessor = _storeAccessor;
         _readinessProbe = source._readinessProbe;
         _claimTicketLifetime = source._claimTicketLifetime;
         _browserCallbackLifetime = source._browserCallbackLifetime;
@@ -80,6 +82,8 @@ public sealed partial class InstallLinkingService
             readinessProbe)
     {
         _storeAccessorChecksReadiness = storeAccess.EnforcesReadiness(readinessProbe);
+        if (_storeAccessorChecksReadiness)
+            _principalStoreAccessor = storeAccess.GetForReadinessCheck;
     }
 
     private InstallLinkingService(
@@ -88,6 +92,7 @@ public sealed partial class InstallLinkingService
         IInstallLinkingStoreReadinessProbe? readinessProbe)
     {
         _storeAccessor = storeAccessor;
+        _principalStoreAccessor = storeAccessor;
         ArgumentNullException.ThrowIfNull(configuration);
         _readinessProbe = readinessProbe;
         _claimTicketLifetime = ResolveClaimTicketLifetime(configuration);
@@ -641,7 +646,9 @@ public sealed partial class InstallLinkingService
         AndroidLinkedV2GrantPrincipal principal, bool requireAvailableAuthority = false)
     {
         ArgumentNullException.ThrowIfNull(principal);
-        if (!TryGetDurableStore(out InstallLinkingStore store))
+        InstallLinkingStore store;
+        try { store = _principalStoreAccessor(); }
+        catch
         {
             if (requireAvailableAuthority) throw AuthorityUnavailable();
             return null;
@@ -650,8 +657,17 @@ public sealed partial class InstallLinkingService
         lock (store.Gate)
         {
             var operation = new InstallLinkingService(this, store);
+            // This is a read-only recheck of an already authenticated principal,
+            // not grant issuance or expiry maintenance. Validate the complete
+            // current authority under the local gate, then read current fields
+            // and expiry without I/O, mutation or releasing the gate. Every
+            // invocation (including after an await in its caller) probes anew.
+            if (!operation.IsDurableStoreReady())
+            {
+                if (requireAvailableAuthority) throw AuthorityUnavailable();
+                return null;
+            }
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            operation.ExpireGrantsLocked(now);
             if (!operation.TryResolveActiveGrantLocked(
                 principal.Installation.InstallationId,
                 principal.GrantId,
@@ -662,11 +678,6 @@ public sealed partial class InstallLinkingService
                 || !string.Equals(installation!.SubjectId, principal.Installation.SubjectId, StringComparison.Ordinal)
                 || !string.Equals(installation.UserId, principal.Installation.UserId, StringComparison.Ordinal))
             {
-                return null;
-            }
-            if (!operation.IsDurableStoreReady())
-            {
-                if (requireAvailableAuthority) throw AuthorityUnavailable();
                 return null;
             }
             return installation;

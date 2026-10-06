@@ -362,6 +362,132 @@ public sealed class TeableApiActivationTests : IDisposable
         Assert.Equal(503, pollError.StatusCode);
         Assert.Equal(3, probe.Calls);
         Assert.Equal(writes, accounts.HeadPosts);
+        var principal = SeedReadPrincipal(store);
+        writes = accounts.HeadPosts;
+        Assert.Null(service.ResolveAndroidLinkedV2Principal(principal));
+        Assert.Equal(503, Assert.Throws<InstallLinkingOperationException>(() =>
+            service.ResolveAndroidLinkedV2Principal(principal, requireAvailableAuthority: true)).StatusCode);
+        Assert.Equal(5, probe.Calls);
+        Assert.Equal(writes, accounts.HeadPosts);
+    }
+
+    private static AndroidLinkedV2GrantPrincipal SeedReadPrincipal(InstallLinkingStore store)
+    {
+        var now = DateTimeOffset.UtcNow;
+        using var rsa = RSA.Create(2048);
+        var installation = new ClaimedInstallationDto("read-install", "android-play-app", "internal", "synthetic",
+            InstallAccessClasses.AccountRequired, ClaimedInstallationStates.Active, now, now, "read-user", "read-subject",
+            Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()), "read-ticket", "android", "android", "arm64", null, "read-grant");
+        var grant = new InstallationGrantDto("read-grant", installation.InstallationId, InstallationGrantStates.Active,
+            "synthetic-read-token", now.AddHours(-1), now.AddHours(1), installation.UserId, installation.SubjectId);
+        lock (store.Gate)
+        {
+            store.InstallationsById[installation.InstallationId] = installation;
+            store.GrantsById[grant.GrantId] = grant;
+            store.GrantTransportAuthoritiesByGrantId[grant.GrantId] = new(grant.GrantId, InstallationGrantTransports.AndroidLinkedV2);
+            store.GrantsById["expired-unrelated"] = grant with
+            {
+                GrantId = "expired-unrelated", IssuedAtUtc = now.AddHours(-1), ExpiresAtUtc = now.AddMinutes(-1)
+            };
+            store.PersistLocked();
+            // Persistence normalizes expiry. Recreate the in-memory state when
+            // an active retained grant ages between writes, without a timed sleep.
+            store.GrantsById["expired-unrelated"] = store.GrantsById["expired-unrelated"]
+                with { Status = InstallationGrantStates.Active };
+        }
+        return new(installation, grant.GrantId, grant.IssuedAtUtc, grant.ExpiresAtUtc);
+    }
+
+    [Fact]
+    public void Principal_recheck_reads_fresh_primary_under_gate_once_and_never_writes_expiry_cleanup()
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "principal-read");
+        var store = services.GetRequiredService<InstallLinkingStoreActivation>().GetRequiredStore();
+        var service = services.GetRequiredService<InstallLinkingService>();
+        var principal = SeedReadPrincipal(store);
+        Assert.Equal(InstallationGrantStates.Active, store.GrantsById["expired-unrelated"].Status);
+        int reads = accounts.GetRequests, writes = accounts.HeadPosts;
+        bool observedUnderGate = false;
+        accounts.BeforeHeadReadResponse = () => observedUnderGate = Monitor.IsEntered(store.Gate);
+
+        Assert.Equal(principal.Installation, service.ResolveAndroidLinkedV2Principal(principal, requireAvailableAuthority: true));
+        Assert.True(observedUnderGate);
+        Assert.Equal(2, accounts.GetRequests - reads); // schema + exact head, not a cached authorization
+        Assert.Equal(writes, accounts.HeadPosts);
+        Assert.Equal(InstallationGrantStates.Active, store.GrantsById["expired-unrelated"].Status);
+
+        accounts.FailReads = true;
+        Assert.Null(service.ResolveAndroidLinkedV2Principal(principal));
+        Assert.Equal(503, Assert.Throws<InstallLinkingOperationException>(() =>
+            service.ResolveAndroidLinkedV2Principal(principal, requireAvailableAuthority: true)).StatusCode);
+        accounts.FailReads = false;
+        accounts.Unique = false;
+        Assert.Null(service.ResolveAndroidLinkedV2Principal(principal));
+        accounts.Unique = true;
+        Assert.NotNull(service.ResolveAndroidLinkedV2Principal(principal));
+        Assert.Equal(writes, accounts.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData("revoked")]
+    [InlineData("subject")]
+    [InlineData("user")]
+    [InlineData("transport")]
+    [InlineData("expired")]
+    public void Principal_recheck_never_reuses_earlier_authorization(string change)
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var services = Services(keys, accounts, "principal-change");
+        var store = services.GetRequiredService<InstallLinkingStoreActivation>().GetRequiredStore();
+        var principal = SeedReadPrincipal(store);
+        var service = services.GetRequiredService<InstallLinkingService>();
+        Assert.NotNull(service.ResolveAndroidLinkedV2Principal(principal));
+        int writes = accounts.HeadPosts;
+        // A change while the fresh primary read completes must be observed by
+        // the ensuing local lookup, not accepted from a pre-read snapshot.
+        accounts.BeforeHeadReadResponse = () =>
+        {
+            lock (store.Gate)
+            {
+                var grant = store.GrantsById[principal.GrantId];
+                if (change == "revoked") store.GrantsById[grant.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+                if (change == "expired") store.GrantsById[grant.GrantId] = grant with { ExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(-1) };
+                if (change == "subject") store.InstallationsById[principal.Installation.InstallationId] = principal.Installation with { SubjectId = "different" };
+                if (change == "user") store.InstallationsById[principal.Installation.InstallationId] = principal.Installation with { UserId = "different" };
+                if (change == "transport") store.GrantTransportAuthoritiesByGrantId.Remove(grant.GrantId);
+            }
+        };
+        Assert.Null(service.ResolveAndroidLinkedV2Principal(principal));
+        Assert.Equal(writes, accounts.HeadPosts);
+    }
+
+    [Fact]
+    public void Principal_recheck_rejects_a_new_remote_head_despite_a_locally_active_grant()
+    {
+        using var keys = new Remote();
+        using var accounts = new Remote();
+        using var first = Services(keys, accounts, "principal-old-head");
+        var firstStore = first.GetRequiredService<InstallLinkingStoreActivation>().GetRequiredStore();
+        var principal = SeedReadPrincipal(firstStore);
+        var service = first.GetRequiredService<InstallLinkingService>();
+        Assert.NotNull(service.ResolveAndroidLinkedV2Principal(principal));
+        using var second = Services(keys, accounts, "principal-new-head");
+        var secondStore = second.GetRequiredService<InstallLinkingStoreActivation>().GetRequiredStore();
+        lock (secondStore.Gate)
+        {
+            secondStore.GrantsById[principal.GrantId] = secondStore.GrantsById[principal.GrantId]
+                with { Status = InstallationGrantStates.Revoked };
+            secondStore.PersistLocked();
+        }
+        int writes = accounts.HeadPosts;
+        Assert.Equal(InstallationGrantStates.Active, firstStore.GrantsById[principal.GrantId].Status);
+        Assert.Null(service.ResolveAndroidLinkedV2Principal(principal));
+        Assert.Equal(503, Assert.Throws<InstallLinkingOperationException>(() =>
+            service.ResolveAndroidLinkedV2Principal(principal, requireAvailableAuthority: true)).StatusCode);
+        Assert.Equal(writes, accounts.HeadPosts);
     }
 
     private sealed class UnavailableProbe : IInstallLinkingStoreReadinessProbe

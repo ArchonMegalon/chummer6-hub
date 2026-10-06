@@ -50,6 +50,12 @@ public sealed class InstallLinkingStoreAccess
         => _fixedStore ?? _activation?.GetRequiredStore()
             ?? throw new InvalidOperationException("Install-linking durable store access is unavailable.");
 
+    // Not an authorization. The caller must hold this store's gate and perform
+    // the matching activation probe before reading any principal state.
+    internal InstallLinkingStore GetForReadinessCheck()
+        => _fixedStore ?? _activation?.GetActivatedStoreForDependencyInjection()
+            ?? throw new InvalidOperationException("Install-linking durable store access is unavailable.");
+
     // Only this exact activation's GetRequiredStore performs the supplied probe.
     // A fixed store or a separately registered admission probe is not equivalent.
     internal bool EnforcesReadiness(IInstallLinkingStoreReadinessProbe? probe)
