@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.Teable;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -16,9 +17,9 @@ public sealed class OriginChapterSceneRequestBridgeTests : IDisposable
     private OriginChapterAuthoringService Service() => new(new ConfigurationBuilder().AddInMemoryCollection(
         new Dictionary<string, string?> { ["CHUMMER_RUNTIME_STATE_ROOT"] = root }).Build());
 
-    private OriginChapterAuthoringService Prepare(bool accepted = true)
+    private OriginChapterAuthoringService Prepare(bool accepted = true, OriginChapterAuthoringService? service = null)
     {
-        var service = Service();
+        service ??= Service();
         var source = new OriginChapterSource("workspace", "chapter", new string('a', 64), "decision", "de-DE", "Synthetic",
             [new("fact", "decision", "An approved childhood scene.")]);
         var job = service.Create("owner-a", new("request", source, true), () => true);
@@ -136,9 +137,9 @@ public sealed class OriginChapterSceneRequestBridgeTests : IDisposable
     }
 
     [Theory]
+    [InlineData(1)]
     [InlineData(2)]
-    [InlineData(3)]
-    public void Automatic_continuation_keeps_authority_checks_during_predecessor_read_and_before_return(int revokeAt)
+    public void Automatic_continuation_keeps_fresh_authority_before_read_and_before_return(int revokeAt)
     {
         using var service = Prepare();
         var next = Continue(service, service.Get("owner-a", "request")!, "school", "School stage", "A school courtyard.");
@@ -146,6 +147,58 @@ public sealed class OriginChapterSceneRequestBridgeTests : IDisposable
         Assert.Throws<UnauthorizedAccessException>(() => new OriginChapterSceneRequestBridge(service)
             .ComposeAutomatic("owner-a", next.RequestId, next.ReaderAcceptedTextDigest!, true, () => ++checks < revokeAt));
         Assert.Equal(revokeAt, checks);
+    }
+
+    [Fact]
+    public void Automatic_continuation_checks_authority_once_around_the_entire_read_only_chain()
+    {
+        using var service = Prepare();
+        var opening = service.Get("owner-a", "request")!;
+        var school = Continue(service, opening, "school", "School stage", "A school courtyard.");
+        var next = Continue(service, school, "college", "College stage", "A university laboratory.");
+        int checks = 0;
+        var request = new OriginChapterSceneRequestBridge(service).ComposeAutomatic(
+            "owner-a", next.RequestId, next.ReaderAcceptedTextDigest!, true, () => { checks++; return true; });
+        Assert.Equal(2, checks); // Not one remote install probe per predecessor.
+        using var payload = JsonDocument.Parse(Assert.Single(request.GovernedRenderRequest!.Artifacts!).Payload);
+        string firstScene = new OriginChapterSceneRequestBridge(service).ResolveIdentity(
+            "owner-a", opening.RequestId, opening.ReaderAcceptedTextDigest!, () => true);
+        Assert.Equal(firstScene, payload.RootElement.GetProperty("referenceSceneId").GetString());
+        Assert.Contains(next.DraftText!, payload.RootElement.GetProperty("prompt").GetString());
+    }
+
+    [Fact]
+    public void Revocation_during_a_remote_predecessor_read_cannot_release_a_scene_packet()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var service = Prepare(service: new OriginChapterAuthoringService(
+            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_RUNTIME_STATE_ROOT"] = root,
+                ["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"] = "teable"
+            }).Build(), new TeableOriginChapterStorage(remote.Store())));
+        var opening = service.Get("owner-a", "request")!;
+        var school = Continue(service, opening, "school", "School stage", "A school courtyard.");
+        var next = Continue(service, school, "college", "College stage", "A university laboratory.");
+        string openingWorkId = Sha(JsonSerializer.Serialize("owner-a")) + "." + Sha(JsonSerializer.Serialize("request"));
+        string openingStream = TeableOriginChapterStorage.JobStream(openingWorkId);
+        int writes = remote.HeadPosts, checks = 0;
+        bool authorized = true, predecessorRead = false;
+        remote.BeforeRecordReadResponse = (row, _) =>
+        {
+            if (row["stream"]!.GetValue<string>() == openingStream)
+            {
+                predecessorRead = true;
+                authorized = false;
+            }
+            return Task.CompletedTask;
+        };
+        Assert.Throws<UnauthorizedAccessException>(() => new OriginChapterSceneRequestBridge(service)
+            .ComposeAutomatic("owner-a", next.RequestId, next.ReaderAcceptedTextDigest!, true,
+                () => { checks++; return authorized; }));
+        Assert.True(predecessorRead);
+        Assert.Equal(2, checks);
+        Assert.Equal(writes, remote.HeadPosts);
     }
 
     [Fact]

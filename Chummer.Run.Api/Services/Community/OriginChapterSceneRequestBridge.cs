@@ -88,7 +88,7 @@ public sealed class OriginChapterSceneRequestBridge(OriginChapterAuthoringServic
         string identity = Sha(string.Join('\0', owner, job.Source.WorkspaceId, job.Source.ChapterId,
             job.Source.ChapterDigest, expectedTextDigest));
         string sourceRef = "origin-dossier:scene:" + identity;
-        var first = FirstAcceptedChapter(subjectId, job, stillAuthorized);
+        var first = FirstAcceptedChapter(subjectId, job);
         string referenceSceneId = Sha(string.Join('\0', owner, first.Source.WorkspaceId, first.Source.ChapterId,
             first.Source.ChapterDigest, first.ReaderAcceptedTextDigest));
         string protagonistId = Sha(string.Join('\0', owner, job.Source.WorkspaceId, "origin-protagonist/v1"));
@@ -124,12 +124,17 @@ public sealed class OriginChapterSceneRequestBridge(OriginChapterAuthoringServic
                     RequiresApproval: true, PersistOnApproval: true, AllowPersistentPinning: false)]));
     }
 
-    private OriginChapterAuthoringJob FirstAcceptedChapter(string subject, OriginChapterAuthoringJob job, Func<bool> current)
+    private OriginChapterAuthoringJob FirstAcceptedChapter(string subject, OriginChapterAuthoringJob job)
     {
+        // This bounded traversal only reads private, digest-bound history. The
+        // caller checks fresh authority before reading and again before it can
+        // return any composed packet. No admission, disclosure or provider call
+        // occurs inside the traversal. Rechecking the remote installation for
+        // every predecessor adds latency proportional to the book's length;
+        // revocation during any of these reads must still fail the final check.
         var seen = new HashSet<string>(StringComparer.Ordinal);
         while (job.Previous is { } previous)
         {
-            if (!current()) throw new UnauthorizedAccessException();
             if (!seen.Add(job.RequestId) || seen.Count > 128) throw new InvalidOperationException("Invalid chapter continuity.");
             var prior = authoring.Get(subject, previous.RequestId) ?? throw new InvalidOperationException("Missing chapter continuity.");
             if (prior.Source.WorkspaceId != job.Source.WorkspaceId || prior.SourceDigest != previous.SourceDigest
