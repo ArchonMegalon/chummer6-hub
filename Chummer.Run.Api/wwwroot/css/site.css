@@ -11700,6 +11700,112 @@ body {
   margin-top: 10px;
 }
 
+/* A chapter is a reading surface, not a dashboard card. Keep these overrides
+   confined to the full-text reader; the chapter list and pending state retain
+   their existing layout. Measure line length in the actual prose font, not the
+   smaller shell font (which previously left only ~465px for desktop reading). */
+.route-account-work-origin-chapters:has(.origin-chapter-reader) .site-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(100%, 54rem);
+  padding-block: 0.625rem;
+}
+
+.route-account-work-origin-chapters:has(.origin-chapter-reader) .site-main {
+  width: min(calc(100% - 2rem), 54rem);
+  padding-block: 0.75rem 2rem;
+}
+
+.route-account-work-origin-chapters:has(.origin-chapter-reader) .minimal-page-hero {
+  padding: 0 0 0.75rem;
+  margin: 0 0 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft, #383a35);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.route-account-work-origin-chapters:has(.origin-chapter-reader) .minimal-page-hero > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  min-width: 0;
+}
+
+.route-account-work-origin-chapters:has(.origin-chapter-reader) .minimal-page-hero a {
+  display: flex;
+  align-items: center;
+  flex-basis: 100%;
+  min-height: 44px;
+  width: fit-content;
+  text-underline-offset: 0.2em;
+}
+
+.route-account-work-origin-chapters:has(.origin-chapter-reader) .minimal-page-hero .eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.route-account-work-origin-chapters:has(.origin-chapter-reader) .minimal-page-hero h1 {
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+}
+
+.route-account-work-origin-chapters:has(.origin-chapter-reader) .minimal-page-hero p:not(.eyebrow) {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.route-account-work-origin-chapters .origin-chapter-reader {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  padding: clamp(1rem, 3vw, 2rem);
+  border-radius: 0.75rem;
+}
+
+.route-account-work-origin-chapters .origin-chapter-reader__prose {
+  max-width: 74ch;
+  margin-inline: auto;
+  font-size: clamp(1.0625rem, 1rem + 0.25vw, 1.25rem);
+  line-height: 1.7;
+  text-align: start;
+}
+
+.route-account-work-origin-chapters .origin-chapter-reader + .minimal-section {
+  padding: 1rem 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 600px) {
+  .route-account-work-origin-chapters:has(.origin-chapter-reader) .site-main {
+    width: calc(100% - 1.5rem);
+    padding-top: 0.25rem;
+  }
+
+  .route-account-work-origin-chapters:has(.origin-chapter-reader) .minimal-page-hero {
+    margin-bottom: 0.75rem;
+  }
+
+  .route-account-work-origin-chapters .origin-chapter-reader {
+    padding: 1rem;
+    border-radius: 0.5rem;
+  }
+}
+
 @media (max-width: 720px) {
   .surface-groups .minimal-disclosure {
     width: 100%;
