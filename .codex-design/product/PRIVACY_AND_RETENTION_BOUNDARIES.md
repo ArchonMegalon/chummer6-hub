@@ -51,12 +51,14 @@ Redaction baseline:
 
 ### Android Internal technical observations
 
-Owners: `chummer-android` for the local queue and `chummer6-hub` for intake.
+Owner: `chummer-android` for the local queue and `chummer6-hub` for intake.
 User decision: 2026-10-09, automatic metadata-only diagnostics default ON in
 explicit Internal builds; saved opt-outs survive updates and restarts.
 
 This is a separate short-lived diagnostic domain, not a crash dump, durable
 support case, account record, product-usage profile or verified user count.
+
+Retention posture:
 
 * Explicit Internal build identity controls the initial default. Development and
   public builds default OFF. Do not promote an Internal binary unchanged to public.
@@ -74,6 +76,9 @@ support case, account record, product-usage profile or verified user count.
   Reports expire two days after receipt, with cleanup on startup and every
   15 minutes while running. Private dedicated storage and reader credential;
   exclude the report store from Teable, account exports, backups and case history.
+
+Redaction baseline:
+
 * Existing hosting/network request metadata is separate from these report bodies;
   do not imply that HTTPS hides the connection IP from the hosting infrastructure.
 * Only bounded category/count summaries may enter private maintainer alerts;
