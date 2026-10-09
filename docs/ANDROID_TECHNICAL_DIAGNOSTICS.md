@@ -73,6 +73,28 @@ This deliberately ephemeral store is not account recovery authority.
 
 ## Delivery boundary
 
+`scripts/android_diagnostic_alerts.py` is an optional, separate private Docker
+worker. It reads the bounded inbox once per minute with the dedicated reader;
+no account credentials or Docker socket are mounted. Its scoped Telegram bot and
+private recipient must be provisioned from the existing live EA connector binding,
+never from a test binding or a hardcoded chat fallback. It verifies the actual bot
+and private chat through Telegram before a send. It does not start EA services.
+
+Only allowlisted version/category/outcome/error counts are sent, without report
+IDs, raw observations or character/account content. Counts are reports, not users;
+slow observations are explicitly not classified as ANRs. The first poll baselines
+existing reports without notifying. New reports are batched with a 15-minute
+cooldown, at most four attempts/hour and twelve/day. Nothing is sent for quiet
+polls. This is not a guarantee that every failure produces a message.
+
+Private worker state contains only hashed deduplication IDs (two-day expiry),
+bounded attempt times and a coarse outcome. Mount `/state` mode 0700 outside
+backups and Teable; files are owner-only and bounded at 64 KiB. A send is claimed
+durably before the network request. Lost/ambiguous responses are not replayed,
+including after restart; they require manual investigation. Corrupt state fails
+closed, not as an empty outbox. Telegram may retain the category-only message;
+the two-day raw-report retention promise does not apply to those summaries.
+
 Before enabling on real phones: admit the exact Control package, connect the
 Internal-channel Android sender, verify a synthetic POST and authorized readback, reconcile
 the live privacy/Play Data Safety disclosures, and verify withdrawal/offline
