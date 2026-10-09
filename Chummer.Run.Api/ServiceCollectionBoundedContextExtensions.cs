@@ -325,6 +325,8 @@ internal static class ServiceCollectionBoundedContextExtensions
 
     public static IServiceCollection AddHubControlAndSupportContext(this IServiceCollection services)
     {
+        services.AddSingleton<AndroidDiagnosticStore>();
+        services.AddHostedService<AndroidDiagnosticRetentionWorker>();
         services.AddSingleton(provider =>
         {
             var configuration = provider.GetRequiredService<IConfiguration>();
