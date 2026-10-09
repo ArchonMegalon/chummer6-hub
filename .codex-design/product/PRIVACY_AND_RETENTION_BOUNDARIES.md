@@ -49,6 +49,44 @@ Redaction baseline:
 * no passwords, tokens, or local machine credentials in retained crash payloads
 * strip or hash install-local absolute paths when they are not required for a live investigation
 
+### Android Internal technical observations
+
+Owner: `chummer-android` for the local queue and `chummer6-hub` for intake.
+User decision: 2026-10-09, automatic metadata-only diagnostics default ON in
+explicit Internal builds; saved opt-outs survive updates and restarts.
+
+This is a separate short-lived diagnostic domain, not a crash dump, durable
+support case, account record, product-usage profile or verified user count.
+
+Retention posture:
+
+* Explicit Internal build identity controls the initial default. Development and
+  public builds default OFF. Do not promote an Internal binary unchanged to public.
+* Show the disclosure and an immediate disable/clear control. Missing state may
+  initialize the Internal default; corrupt or unavailable state fails closed.
+  Do not send historical local observations from before enablement.
+* Allow only version code, UTC observation time, fixed area/operation/outcome/error
+  categories, bounded duration and a random per-report deduplication ID. No
+  account/install/device identity, free text, runner/book content, screenshots,
+  raw exceptions, stacks, URLs, credentials or source IP enters this store.
+* Device journal: at most 128 rows / 64 KiB / two days. Delivery queue: at most
+  eight reports / 16 KiB / two days. Revocation cancels delivery and clears the
+  queue; a server-accepted report is not recalled by turning sending off.
+* Hub: at most 512 reports / 256 KiB, 64 new reports per hour, 2 KiB request cap.
+  Reports expire two days after receipt, with cleanup on startup and every
+  15 minutes while running. Private dedicated storage and reader credential;
+  exclude the report store from Teable, account exports, backups and case history.
+
+Redaction baseline:
+
+* Existing hosting/network request metadata is separate from these report bodies;
+  do not imply that HTTPS hides the connection IP from the hosting infrastructure.
+* Only bounded category/count summaries may enter private maintainer alerts;
+  no individual report IDs, exact event timestamps or user content. Ordinary
+  maintainer-log retention applies to those summaries, not unlimited raw capture.
+* Treat submissions as untrusted observations. A slow operation is not an ANR or
+  crash, and duplicate-safe report counts are not counts of affected users.
+
 ### Claim and install linkage
 
 Owner: `chummer6-hub` plus `chummer6-hub-registry`
