@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Control.Contracts.Support;
+using Chummer.Storage.Teable;
 
 namespace Chummer.Run.Api.Services.Support;
 
@@ -26,8 +27,8 @@ public sealed class AndroidDiagnosticStore : IDisposable
     public AndroidDiagnosticStore(IConfiguration configuration, TimeProvider? clock = null)
     {
         _clock = clock ?? TimeProvider.System;
-        _readerToken = configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN"] ?? string.Empty;
         Enabled = configuration["CHUMMER_ANDROID_DIAGNOSTICS_ENABLED"] == "true";
+        _readerToken = Enabled ? ReadReaderToken(configuration) : string.Empty;
         if (!Enabled) return;
         string? directory = configuration["CHUMMER_ANDROID_DIAGNOSTICS_DIRECTORY"];
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory)
@@ -48,6 +49,33 @@ public sealed class AndroidDiagnosticStore : IDisposable
     }
 
     public bool Enabled { get; }
+
+    private static string ReadReaderToken(IConfiguration configuration)
+    {
+        string? direct = configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN"];
+        string? file = configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN_FILE"];
+        if (string.IsNullOrEmpty(file)) return direct ?? string.Empty;
+        if (!string.IsNullOrEmpty(direct) || !Path.IsPathFullyQualified(file))
+            throw new InvalidOperationException("Configure exactly one scoped diagnostic reader credential source.");
+
+        // Local Docker uses a read-only secret mount, never an image/environment
+        // credential. Reject links, a writable parent and non-owner/private files.
+        LinuxSecureFile.ValidateExistingDirectory(Path.GetDirectoryName(file)!, ownerOnly: false, readOnlyFileSystem: false);
+        byte[] bytes = LinuxSecureFile.ReadOwnerOnlyRegularFile(file, maximumBytes: 258, repairOwnerMode: false);
+        try
+        {
+            int length = bytes.Length;
+            if (length > 0 && bytes[length - 1] == '\n')
+            {
+                length--;
+                if (length > 0 && bytes[length - 1] == '\r') length--;
+            }
+            if (length is < 32 or > 256 || bytes.AsSpan(0, length).ContainsAnyExceptInRange((byte)'!', (byte)'~'))
+                throw new InvalidDataException("Diagnostic reader credential is invalid.");
+            return Encoding.ASCII.GetString(bytes, 0, length);
+        }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
+    }
 
     public bool AuthorizeReader(string header)
     {

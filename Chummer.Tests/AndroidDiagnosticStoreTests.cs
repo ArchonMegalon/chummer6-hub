@@ -6,6 +6,7 @@ using Chummer.Control.Contracts.Support;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Storage.Teable;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -22,6 +23,76 @@ namespace Chummer.Tests;
 
 public sealed class AndroidDiagnosticStoreTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void PrivateMountedReaderCredentialWorksWithoutEnvironmentSecret(string ending)
+    {
+        if (!OperatingSystem.IsLinux() || !LinuxSecureFile.IsSupportedPlatform) return;
+        using var fixture = new Fixture(enabled: false);
+        string file = fixture.PrepareReaderFile(Fixture.ReaderToken + ending);
+        fixture.Configuration["CHUMMER_ANDROID_DIAGNOSTICS_ENABLED"] = "true";
+        using var store = new AndroidDiagnosticStore(fixture.Configuration, fixture.Clock);
+        Assert.True(store.AuthorizeReader("Bearer " + Fixture.ReaderToken));
+        Assert.False(store.AuthorizeReader("Bearer wrong"));
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("relative")]
+    [InlineData("ambiguous")]
+    [InlineData("oversized")]
+    [InlineData("short")]
+    [InlineData("whitespace")]
+    [InlineData("non-ascii")]
+    [InlineData("permissions")]
+    [InlineData("symlink")]
+    [InlineData("linked-parent")]
+    public void UnsafeReaderFileFailsBeforeOpeningIntake(string fault)
+    {
+        if (!OperatingSystem.IsLinux() || !LinuxSecureFile.IsSupportedPlatform) return;
+        using var fixture = new Fixture(enabled: false);
+        string file = fixture.PrepareReaderFile(fault switch
+        {
+            "oversized" => new string('x', 259),
+            "short" => "short",
+            "whitespace" => Fixture.ReaderToken + " ",
+            "non-ascii" => Fixture.ReaderToken + "ä",
+            _ => Fixture.ReaderToken
+        });
+        if (fault == "missing") File.Delete(file);
+        if (fault == "relative") fixture.Configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN_FILE"] = "reader.token";
+        if (fault == "ambiguous") fixture.Configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN"] = Fixture.ReaderToken;
+        if (fault == "permissions") File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead);
+        if (fault == "symlink")
+        {
+            File.Move(file, file + ".target");
+            File.CreateSymbolicLink(file, file + ".target");
+        }
+        if (fault == "linked-parent")
+        {
+            Directory.CreateSymbolicLink(Path.Combine(fixture.DirectoryPath, "linked"), fixture.DirectoryPath);
+            fixture.Configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN_FILE"] = Path.Combine(fixture.DirectoryPath, "linked", "reader.token");
+        }
+        fixture.Configuration["CHUMMER_ANDROID_DIAGNOSTICS_ENABLED"] = "true";
+        var error = Assert.ThrowsAny<Exception>(() => new AndroidDiagnosticStore(fixture.Configuration, fixture.Clock));
+        Assert.DoesNotContain(Fixture.ReaderToken, error.ToString());
+        Assert.False(File.Exists(Path.Combine(fixture.DirectoryPath, "writer.lock")));
+        Assert.False(File.Exists(fixture.Snapshot));
+    }
+
+    [Fact]
+    public void DisabledIntakeDoesNotReadOrRequireTheMountedCredential()
+    {
+        using var fixture = new Fixture(enabled: false);
+        fixture.Configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN_FILE"] = "/missing/private/reader.token";
+        using var store = new AndroidDiagnosticStore(fixture.Configuration, fixture.Clock);
+        Assert.False(store.Enabled);
+        Assert.False(Directory.Exists(fixture.DirectoryPath));
+    }
+
     [Fact]
     public async Task DisabledByDefaultDoesNotCreateFilesOrExposeReadback()
     {
@@ -257,6 +328,17 @@ public sealed class AndroidDiagnosticStoreTests
         {
             ControllerContext = new() { HttpContext = new DefaultHttpContext() }
         };
+        public string PrepareReaderFile(string value)
+        {
+            if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
+            Directory.CreateDirectory(DirectoryPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            string file = Path.Combine(DirectoryPath, "reader.token");
+            File.WriteAllText(file, value);
+            File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            Configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN"] = null;
+            Configuration["CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN_FILE"] = file;
+            return file;
+        }
         public AndroidDiagnosticReport Report() => new(Guid.NewGuid(), 165, Clock.Now,
             AndroidDiagnosticArea.LifeModules, AndroidDiagnosticOperation.Refresh,
             AndroidDiagnosticOutcome.Slow, 31000, AndroidDiagnosticError.None);

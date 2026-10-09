@@ -2,8 +2,14 @@
 
 This is bounded support intake, not an analytics product or crash/ANR detector.
 The Hub service owns the short-lived receiving store. Android owns collection,
-disclosure, explicit tester opt-in and its bounded offline queue. Merely deploying
+disclosure, tester control and its bounded offline queue. Merely deploying
 this server code does not enable collection on a phone or notify an operator.
+The user-approved Internal build policy defaults sending ON only when no saved
+choice exists. A saved OFF choice survives updates and restart; corrupt or
+unavailable choice storage cannot enable sending. Development/public builds
+default OFF. Internal binaries must be explicitly built for that channel, not
+promoted unchanged to public distribution. Settings explain collection and allow
+immediate disabling and queue clearing; old local observations are not replayed.
 
 ## Contract
 
@@ -21,15 +27,23 @@ presented as verified users, unique devices, causal diagnoses or release gates.
 
 ## Activation and private reading
 
-The feature is off by default. Set all of the following in private local Docker
+The **server intake** is off by default. Set all of the following in private local Docker
 configuration, never in a repository, image or distributed client:
 
 - `CHUMMER_ANDROID_DIAGNOSTICS_ENABLED=true`
 - `CHUMMER_ANDROID_DIAGNOSTICS_DIRECTORY`: absolute private writable directory,
   mode 0700 on Linux, without symlink ancestry; mount separately from account
   state and outside backup/Teable export paths.
-- `CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN`: dedicated random 32–256 character
-  printable ASCII reader credential. Do not reuse an account or Fleet credential.
+- `CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN_FILE`: absolute read-only mounted
+  file containing a dedicated random 32–256 character printable ASCII reader
+  credential (optional final LF/CRLF). Local Linux x64 verifies owner-only file
+  permissions, file type and bounded length, rejecting symlink ancestry and a
+  group/world-writable parent. Use mode 0600 owned by the container UID, outside the report
+  volume, web roots and backup/export paths. Do not reuse account/Fleet secrets.
+  `CHUMMER_ANDROID_DIAGNOSTICS_READER_TOKEN` remains a direct configuration
+  alternative for isolated tests; never configure both. Disabled intake does not
+  read or require a credential file. Credential failures must not be logged with
+  contents or authorization headers.
 
 Only one writer may use the volume. It must not be a downloads/web directory.
 Keep the production endpoint behind the existing HTTPS ingress and Hub request
@@ -60,7 +74,7 @@ This deliberately ephemeral store is not account recovery authority.
 ## Delivery boundary
 
 Before enabling on real phones: admit the exact Control package, connect the
-opt-in Android sender, verify a synthetic POST and authorized readback, reconcile
+Internal-channel Android sender, verify a synthetic POST and authorized readback, reconcile
 the live privacy/Play Data Safety disclosures, and verify withdrawal/offline
 behavior. Operator notification is a separate integration, not implied by 202.
 The reported reload-only-recovers-after-navigation defect remains a separate
