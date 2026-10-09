@@ -9,7 +9,8 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class AndroidDiagnosticsController(AndroidDiagnosticStore store) : ControllerBase
 {
     [HttpPost]
-    [RequestSizeLimit(2048)]
+    // The pre-binding Hub guardrail applies the 2 KiB (or lower configured)
+    // limit, including chunked requests. Do not override it with an MVC filter.
     public async Task<ActionResult<AndroidDiagnosticReceipt>> Submit(
         [FromBody] AndroidDiagnosticReport report, CancellationToken ct)
     {

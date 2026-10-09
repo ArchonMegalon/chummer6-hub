@@ -24,6 +24,18 @@ namespace Chummer.Tests;
 public sealed class AndroidDiagnosticStoreTests
 {
     [Theory]
+    [InlineData("/api/v1/support/android-diagnostics")]
+    [InlineData("/API/V1/SUPPORT/ANDROID-DIAGNOSTICS/")]
+    public void DiagnosticLimitIsAppliedBeforeModelBindingWithoutWideningTheConfiguredLimit(string path)
+    {
+        var request = new DefaultHttpContext().Request;
+        request.Method = "POST";
+        request.Path = path;
+        Assert.Equal(2048, HubApiGuardrailPolicy.ResolveRequestBodyLimit(request, new()));
+        Assert.Equal(512, HubApiGuardrailPolicy.ResolveRequestBodyLimit(request, new() { MaxJsonBodyBytes = 512 }));
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("\n")]
     [InlineData("\r\n")]
@@ -254,17 +266,26 @@ public sealed class AndroidDiagnosticStoreTests
         Assert.Equal(AndroidDiagnosticStore.MaximumSnapshotBytes + 1, new FileInfo(fixture.Snapshot).Length);
     }
 
-    [Fact]
-    public async Task RealHttpRouteRejectsExtraFieldsMissingFieldsAndOversizedChunkedBody()
+    [Theory]
+    [InlineData(1048576)]
+    [InlineData(512)]
+    public async Task RealHttpRouteRejectsExtraFieldsMissingFieldsAndOversizedChunkedBody(int configuredBodyLimit)
     {
         using var fixture = new Fixture();
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.UseKestrel().UseUrls("http://127.0.0.1:0");
         builder.Services.AddSingleton(fixture.Store);
-        builder.Services.AddSingleton(HubApiGuardrailOptions.FromConfiguration(builder.Configuration));
+        builder.Services.AddSingleton(new HubApiGuardrailOptions { MaxJsonBodyBytes = configuredBodyLimit });
         builder.Services.AddControllers().AddApplicationPart(typeof(AndroidDiagnosticsController).Assembly);
         await using var app = builder.Build();
+        // Mirrors the production outer exception handler: the route must retain
+        // 413 for streaming overflow instead of escaping as a retryable 500.
+        app.UseExceptionHandler(handler => handler.Run(context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            return context.Response.WriteAsync("synthetic production fallback");
+        }));
         app.UseRouting();
         app.UseMiddleware<HubApiRequestGuardrailMiddleware>();
         app.MapControllers();
@@ -287,13 +308,13 @@ public sealed class AndroidDiagnosticStoreTests
             Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
             using var request = new HttpRequestMessage(HttpMethod.Post, route)
             {
-                Content = new StringContent(json + new string(' ', 4096), Encoding.UTF8, "application/json")
+                Content = new StringContent(json + new string(' ', Math.Min(configuredBodyLimit, 2048) + 1), Encoding.UTF8, "application/json")
             };
             request.Headers.TransferEncodingChunked = true;
             using var oversized = await client.SendAsync(request);
             Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversized.StatusCode);
             using var oversizedKnownLength = await client.PostAsync(route,
-                new StringContent(json + new string(' ', 4096), Encoding.UTF8, "application/json"));
+                new StringContent(json + new string(' ', Math.Min(configuredBodyLimit, 2048) + 1), Encoding.UTF8, "application/json"));
             Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedKnownLength.StatusCode);
             Assert.Single((await fixture.Store.ReadAsync(default)).Items);
         }
