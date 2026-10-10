@@ -95,6 +95,16 @@ including after restart; they require manual investigation. Corrupt state fails
 closed, not as an empty outbox. Telegram may retain the category-only message;
 the two-day raw-report retention promise does not apply to those summaries.
 
+Deduplication history is independent of the receiver's latest snapshot: an
+inbox reset or temporarily absent report does not erase an unexpired claim.
+Existing claims retain their original receipt timestamps when IDs reappear.
+The worker retains at most 512 hashed IDs. If a new batch would exceed that
+bound, it logs `dedup_saturated_no_send`, defers the whole batch without a send
+attempt, and preserves every unexpired claim. Normal two-day expiry frees room;
+the worker never evicts claims to make space. Deferred reports may themselves
+expire or disappear from the ephemeral inbox, so this prioritizes suppression
+of repeat/uncertain sends over guaranteed notification delivery.
+
 Before enabling on real phones: admit the exact Control package, connect the
 Internal-channel Android sender, verify a synthetic POST and authorized readback, reconcile
 the live privacy/Play Data Safety disclosures, and verify withdrawal/offline

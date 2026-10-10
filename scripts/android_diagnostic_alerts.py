@@ -165,9 +165,15 @@ def cycle(path, payload, now, verify_recipient, send):
     if not fresh or (attempts and now - max(attempts) < 900) or len(attempts) >= 12 or sum(t > now - 3600 for t in attempts) >= 4:
         atomic_state(path, state)
         return 'quiet'
+    # The receiver inbox is ephemeral; its current snapshot cannot revoke a
+    # durable send claim. Defer the entire batch when retaining both histories
+    # would exceed the existing bound. Only normal expiry may free claim slots.
+    if len(state['seen']) + len(fresh) > MAX_REPORTS:
+        atomic_state(path, state)
+        return 'dedup_saturated_no_send'
     verify_recipient()  # Read-only probe; a failure cannot consume/lose reports.
-    # Keep at most the inbox's current IDs, not an ever-growing event journal.
-    state['seen'] = {key:value[0] for key,value in rows.items()}
+    # Preserve original receipt times; reappearance must not extend retention.
+    state['seen'].update({key:value[0] for key,value in fresh.items()})
     state['attempts'].append(now)
     state['lastOutcome'] = 'claimed'
     atomic_state(path, state)  # Durable before any external side effect.
