@@ -1132,6 +1132,16 @@ def test_hosted_rook_rollback_checks_require_hash_locked_system_pyyaml() -> None
         assert forbidden not in commands
 
 
+def test_diagnostic_alert_regressions_run_in_required_source_policy_step() -> None:
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(encoding="utf-8")
+    job = workflow.split("  no-siblings:\n", 1)[1].split("\n  release-fallback-macos:", 1)[0]
+    step = job.split("      - name: Verify source policy\n", 1)[1].split("      - name:", 1)[0]
+    assert "python3 -m pytest -q" in step
+    assert "            tests/test_android_diagnostic_alerts.py \\" in step
+    assert "continue-on-error:" not in job
+    assert "        if:" not in step
+
+
 def test_rook_system_python_requirement_is_closed_official_wheel_set() -> None:
     requirement = ROOT / "eng/ci-rook-system-python-requirements.txt"
     assert requirement.is_file()
