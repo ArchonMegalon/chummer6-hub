@@ -1,3 +1,5 @@
+using Chummer.Run.AI.Controllers;
+using Chummer.Run.AI.Services.Avatar;
 using Chummer.Run.AI.Services.Gateway;
 using Chummer.Run.AI.Services.Assets;
 using Chummer.Run.AI.Services.Booster;
@@ -18,7 +20,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+    options.Filters.AddService<AvatarGatewayAuthorizationFilter>());
 builder.Services.AddSingleton<IProviderRouter, ProviderRouter>();
 builder.Services.AddSingleton<IProviderAdapter>(sp =>
 {
@@ -123,6 +126,22 @@ builder.Services.AddHttpClient<BuildGhostCartesiaVoiceDeletionClient>(client =>
 });
 builder.Services.AddSingleton<ToughTongueBuildGhostCanaryHarness>();
 builder.Services.AddSingleton<IToughTongueBuildGhostAdapter, ToughTongueBuildGhostAdapter>();
+builder.Services.AddSingleton(provider => new AvatarContextStore(
+    provider.GetService<TimeProvider>() ?? TimeProvider.System));
+builder.Services.AddSingleton<AvatarGatewayCredentialPolicy>();
+builder.Services.AddSingleton<AvatarGatewayAuthorizationFilter>();
+builder.Services.AddSingleton<IAvatarGatewayService>(provider => new AvatarGatewayService(
+    provider.GetRequiredService<AvatarContextStore>(),
+    provider.GetRequiredService<IAvatarRuleAuthorityClient>(),
+    provider.GetService<TimeProvider>() ?? TimeProvider.System));
+builder.Services
+    .AddHttpClient<IAvatarRuleAuthorityClient, AvatarRuleAuthorityClient>()
+    .ConfigurePrimaryHttpMessageHandler(static () => new HttpClientHandler
+    {
+        AllowAutoRedirect = false,
+        AutomaticDecompression = System.Net.DecompressionMethods.None,
+        UseCookies = false
+    });
 builder.Services.AddHttpClient<IBuildGhostMeetingLinkBroker, ChummerMeetingLinkBrokerClient>(client =>
 {
     string configured = builder.Configuration[ChummerMeetingLinkBrokerClient.BaseUrlConfigurationKey] ?? string.Empty;
