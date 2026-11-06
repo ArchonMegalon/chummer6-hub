@@ -286,18 +286,40 @@ public sealed class HubBrowserAuthService
     {
         if (string.IsNullOrWhiteSpace(callbackUri)
             || callbackUri.Length > MaxNextPathLength
-            || HasControlOrBackslash(callbackUri)
-            || !Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed)
+            || HasControlOrBackslash(callbackUri))
+        {
+            return null;
+        }
+
+        // Android proof-poll approvals return to the hosted page; desktop proof-poll
+        // approvals return to the requesting app (custom scheme or loopback listener).
+        // Both transports carry the SAME single-state contract: no userinfo, no
+        // fragment, exactly one safe "state" query value.
+        if (!Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed)
             || !string.IsNullOrEmpty(parsed.UserInfo)
-            || !string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(parsed.Host, "chummer.run", StringComparison.OrdinalIgnoreCase)
-            || !parsed.IsDefaultPort
-            || !string.Equals(parsed.AbsolutePath, AndroidInstallLinkCallbackPath, StringComparison.Ordinal)
             || !string.IsNullOrEmpty(parsed.Fragment))
         {
             return null;
         }
 
+        if (string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(parsed.Host, "chummer.run", StringComparison.OrdinalIgnoreCase)
+            && parsed.IsDefaultPort
+            && string.Equals(parsed.AbsolutePath, AndroidInstallLinkCallbackPath, StringComparison.Ordinal))
+        {
+            return NormalizeProofPollPageCallback(parsed);
+        }
+
+        if (IsDesktopProofPollCallback(parsed))
+        {
+            return parsed.ToString();
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeProofPollPageCallback(Uri parsed)
+    {
         IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
             QueryHelpers.ParseQuery(parsed.Query);
         if (query.Count != 1
@@ -312,6 +334,33 @@ public sealed class HubBrowserAuthService
             $"https://chummer.run{AndroidInstallLinkCallbackPath}",
             "state",
             state[0]!);
+    }
+
+    private static bool IsDesktopProofPollCallback(Uri parsed)
+    {
+        // chummer://install-link — the desktop custom-scheme callback registered by
+        // the installed app.
+        if (string.Equals(parsed.Scheme, "chummer", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(parsed.Host, "install-link", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrEmpty(parsed.AbsolutePath.TrimEnd('/')))
+        {
+            return true;
+        }
+
+        // http(s)://127.0.0.1[:port]/install-link/callback — the app-local loopback
+        // listener callback. Loopback hosts only; the listener picks its own port.
+        if ((string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            && IsLoopbackHost(parsed.Host)
+            && string.Equals(
+                parsed.AbsolutePath.TrimEnd('/'),
+                AppLocalInstallLinkCallbackPath.TrimEnd('/'),
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     public static string? SanitizeInstallLinkPublicKey(string? publicKey)

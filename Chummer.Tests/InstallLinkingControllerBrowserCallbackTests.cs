@@ -111,7 +111,375 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         ActionResult<ExchangeInstallBrowserCallbackResponseDto> replay =
             fixture.Controller.PollBrowserCallback(poll);
-        ObjectResult conflict = Assert.IsType<ObjectResult>(replay.Result);
+        OkObjectResult replayOk = Assert.IsType<OkObjectResult>(replay.Result);
+        ExchangeInstallBrowserCallbackResponseDto replayExchange =
+            Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(replayOk.Value);
+        Assert.Equal(InstallationGrantStates.Active, replayExchange.Grant.Status);
+        Assert.Equal(exchanged.Grant.GrantId, replayExchange.Grant.GrantId);
+        Assert.True(replayExchange.AlreadyClaimed);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Desktop_proof_poll_links_the_exact_approved_install_without_exposing_callback_code()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+        using RSA rsa = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+        const string callbackUri = "chummer://install-link";
+
+        IActionResult approval = await fixture.Controller.BrowserInstallLink(
+            installationId: "desktop-proof-install",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: callbackUri,
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: "proof_poll",
+            publicKey: publicKey);
+
+        ContentResult page = Assert.IsType<ContentResult>(approval);
+        Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        Assert.Contains("Account linked", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Return to Chummer", page.Content, StringComparison.Ordinal);
+        Assert.Contains(callbackUri.Replace("&", "&amp;", StringComparison.Ordinal), page.Content, StringComparison.Ordinal);
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        Assert.Equal(publicKey, callback.PublicKey);
+        Assert.Equal("avalonia-win-x64-installer", callback.ArtifactId);
+        Assert.Equal(
+            InstallLinkingService.LegacyProofPollTransport,
+            fixture.Store.BrowserCallbackTransportIntentsByCallbackId[callback.CallbackId].Transport);
+        Assert.DoesNotContain(callback.CallbackCode, page.Content, StringComparison.Ordinal);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Desktop_client_url_journey_login_approval_poll_grant_end_to_end()
+    {
+        using RSA rsa = RSA.Create(2048);
+        string spkiBase64 = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+
+        // Step 0: build the exact client URL (DesktopInstallLinkingRuntime contract).
+        string clientPath = HubBrowserAuthService.BuildInstallLinkingNextPath(
+            "cross-repo-desktop",
+            "avalonia",
+            "6.0.1-preview",
+            "preview",
+            "windows",
+            "x64",
+            "chummer://install-link",
+            "proof_poll",
+            spkiBase64);
+        Assert.Equal(
+            "/account/access/install-link",
+            new Uri("https://chummer.run" + clientPath).AbsolutePath);
+
+        // Step 1: unauthenticated GET -> login redirect carrying the next path.
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+
+        IActionResult redirectResult = await fixture.Controller.BrowserInstallLink(
+            installationId: "cross-repo-desktop",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: "chummer://install-link",
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: "proof_poll",
+            publicKey: spkiBase64);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(redirectResult);
+        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
+
+        // Step 2: login return sanitization preserves the proof-poll parameters exactly.
+        string nextPath = Uri.UnescapeDataString(redirect.Url!["/login?next=".Length..]);
+        string sanitized = HubBrowserAuthService.SanitizeNextPath(nextPath, "/safe");
+        IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
+            Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri("https://chummer.run" + sanitized).Query);
+        Assert.Equal("proof_poll", Assert.Single(query["installLinkTransport"]));
+        Assert.Equal(spkiBase64, Assert.Single(query["publicKey"]));
+        Assert.Equal("cross-repo-desktop", Assert.Single(query["installationId"]));
+        Assert.Equal("chummer://install-link/", Assert.Single(query["installLinkCallbackUri"]));
+
+        // Step 3: authenticated approval with the same parameters -> 200 approval page.
+        // The browser session changes at login, so the authenticated call runs against
+        // a fresh fixture (the identity handler is constructed per-fixture).
+        using Fixture authedFixture = new(authenticated: true);
+        authedFixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        authedFixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        authedFixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+        IActionResult approval = await authedFixture.Controller.BrowserInstallLink(
+            installationId: "cross-repo-desktop",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: "chummer://install-link",
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: "proof_poll",
+            publicKey: spkiBase64);
+
+        ContentResult page = Assert.IsType<ContentResult>(approval);
+        Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        Assert.Contains("Account linked", page.Content!, StringComparison.Ordinal);
+        InstallBrowserCallbackDto callback = Assert.Single(authedFixture.Store.BrowserCallbacksById.Values);
+        Assert.Equal("cross-repo-desktop", callback.InstallationId);
+        Assert.Equal(spkiBase64, callback.PublicKey);
+
+        // Step 4: the desktop app polls with a signed proof -> active grant.
+        long issuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        const string nonce = "0123456789abcdef0123456789abcdef0123456789abcdef";
+        byte[] proof = Encoding.UTF8.GetBytes(string.Join(
+            '\n',
+            "chummer.install-link.remote-callback.v1",
+            "cross-repo-desktop",
+            "avalonia",
+            "6.0.1-preview",
+            "preview",
+            "windows",
+            "x64",
+            issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            nonce));
+        string signature;
+        try
+        {
+            signature = Convert.ToBase64String(rsa.SignData(
+                proof,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(proof);
+        }
+
+        AndroidInstallLinkProofPollRequest poll = new(
+            "cross-repo-desktop",
+            "avalonia",
+            "6.0.1-preview",
+            "preview",
+            "windows",
+            "x64",
+            spkiBase64,
+            issuedAt,
+            nonce,
+            signature,
+            "Desktop proof-poll journey");
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> pollResult =
+            authedFixture.Controller.PollBrowserCallback(poll);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(pollResult.Result);
+        ExchangeInstallBrowserCallbackResponseDto exchanged =
+            Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(ok.Value);
+        Assert.Equal(InstallationGrantStates.Active, exchanged.Grant.Status);
+        Assert.Equal("cross-repo-desktop", exchanged.Grant.InstallationId);
+
+        // Step 5: replay -> AlreadyClaimed recovery (identical retry).
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> replay =
+            authedFixture.Controller.PollBrowserCallback(poll);
+        OkObjectResult replayOk = Assert.IsType<OkObjectResult>(replay.Result);
+        ExchangeInstallBrowserCallbackResponseDto replayExchange =
+            Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(replayOk.Value);
+        Assert.Equal(exchanged.Grant.GrantId, replayExchange.Grant.GrantId);
+        Assert.True(replayExchange.AlreadyClaimed);
+        AssertSensitiveResponseHeaders(authedFixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Desktop_proof_poll_retry_after_lost_response_recovers_original_grant()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+        using RSA rsa = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+        const string callbackUri = "chummer://install-link";
+
+        await fixture.Controller.BrowserInstallLink(
+            installationId: "desktop-recovery-install",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: callbackUri,
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: "proof_poll",
+            publicKey: publicKey);
+
+        long issuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        const string nonce = "0123456789abcdef0123456789abcdef0123456789abcdef";
+        byte[] proof = Encoding.UTF8.GetBytes(string.Join(
+            '\n',
+            "chummer.install-link.remote-callback.v1",
+            "desktop-recovery-install",
+            "avalonia",
+            "6.0.1-preview",
+            "preview",
+            "windows",
+            "x64",
+            issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            nonce));
+        string signature;
+        try
+        {
+            signature = Convert.ToBase64String(rsa.SignData(
+                proof,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(proof);
+        }
+
+        AndroidInstallLinkProofPollRequest poll = new(
+            "desktop-recovery-install",
+            "avalonia",
+            "6.0.1-preview",
+            "preview",
+            "windows",
+            "x64",
+            publicKey,
+            issuedAt,
+            nonce,
+            signature,
+            "Desktop recovery journey");
+
+        // First poll succeeds (its response is "lost" on the way back).
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> first =
+            fixture.Controller.PollBrowserCallback(poll);
+        OkObjectResult firstOk = Assert.IsType<OkObjectResult>(first.Result);
+        ExchangeInstallBrowserCallbackResponseDto firstExchange =
+            Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(firstOk.Value);
+        Assert.Equal(InstallationGrantStates.Active, firstExchange.Grant.Status);
+        string firstGrantId = firstExchange.Grant.GrantId;
+
+        // Retry with the IDENTICAL proof reaches the recovery path and returns
+        // the original grant instead of failing with "already completed".
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> retry =
+            fixture.Controller.PollBrowserCallback(poll);
+        OkObjectResult retryOk = Assert.IsType<OkObjectResult>(retry.Result);
+        ExchangeInstallBrowserCallbackResponseDto retryExchange =
+            Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(retryOk.Value);
+        Assert.Equal(InstallationGrantStates.Active, retryExchange.Grant.Status);
+        Assert.Equal(firstGrantId, retryExchange.Grant.GrantId);
+        Assert.True(retryExchange.AlreadyClaimed);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Desktop_proof_poll_retry_with_different_nonce_is_isolated_after_redemption()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+        using RSA rsa = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+        const string callbackUri = "chummer://install-link";
+
+        await fixture.Controller.BrowserInstallLink(
+            installationId: "desktop-isolation-install",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: callbackUri,
+            cancellationToken: CancellationToken.None,
+            installLinkTransport: "proof_poll",
+            publicKey: publicKey);
+
+        static string SignProof(RSA key, long issuedAt, string nonce)
+        {
+            byte[] proof = System.Text.Encoding.UTF8.GetBytes(string.Join(
+                '\n',
+                "chummer.install-link.remote-callback.v1",
+                "desktop-isolation-install",
+                "avalonia",
+                "6.0.1-preview",
+                "preview",
+                "windows",
+                "x64",
+                issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                nonce));
+            try
+            {
+                return Convert.ToBase64String(key.SignData(
+                    proof,
+                    HashAlgorithmName.SHA256,
+                    RSASignaturePadding.Pkcs1));
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(proof);
+            }
+        }
+
+        long issuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        const string originalNonce = "0123456789abcdef0123456789abcdef0123456789abcdef";
+        const string attackerNonce = "fedcba9876543210fedcba9876543210fedcba9876543210";
+        string originalSignature = SignProof(rsa, issuedAt, originalNonce);
+        string attackerSignature = SignProof(rsa, issuedAt, attackerNonce);
+
+        AndroidInstallLinkProofPollRequest originalPoll = new(
+            "desktop-isolation-install",
+            "avalonia",
+            "6.0.1-preview",
+            "preview",
+            "windows",
+            "x64",
+            publicKey,
+            issuedAt,
+            originalNonce,
+            originalSignature,
+            "Desktop isolation original");
+        AndroidInstallLinkProofPollRequest attackerPoll = originalPoll with
+        {
+            Nonce = attackerNonce,
+            Signature = attackerSignature,
+            HostLabel = "Desktop isolation attacker"
+        };
+
+        // Original poll redeems the callback.
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> first =
+            fixture.Controller.PollBrowserCallback(originalPoll);
+        OkObjectResult firstOk = Assert.IsType<OkObjectResult>(first.Result);
+        ExchangeInstallBrowserCallbackResponseDto firstExchange =
+            Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(firstOk.Value);
+        string firstGrantId = firstExchange.Grant.GrantId;
+
+        // A DIFFERENT attempt (fresh nonce) after redemption must NOT recover the
+        // grant: attempt isolation keeps terminal callbacks terminal.
+        ActionResult<ExchangeInstallBrowserCallbackResponseDto> attacker =
+            fixture.Controller.PollBrowserCallback(attackerPoll);
+        ObjectResult conflict = Assert.IsType<ObjectResult>(attacker.Result);
         Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
         AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
     }
@@ -958,6 +1326,9 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         public void Dispose()
         {
+            // Release the writer lease before deleting the store directory; the
+            // store holds an exclusive lock for its lifetime on Windows.
+            Store.Dispose();
             if (Directory.Exists(_root))
             {
                 Directory.Delete(_root, recursive: true);

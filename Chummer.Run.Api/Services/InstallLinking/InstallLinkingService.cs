@@ -1431,10 +1431,11 @@ public sealed partial class InstallLinkingService
                 {
                     throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was revoked.");
                 }
-                if (string.Equals(callback.Status, InstallBrowserCallbackStates.Redeemed, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was already completed; start a fresh link.");
-                }
+                // Lost-response recovery: a client retrying after a network loss
+                // re-sends the identical proof. Let it reach ExchangeBrowserCallback,
+                // which validates the proof and returns the original grant via the
+                // redemption receipt (AlreadyClaimed) instead of failing the retry
+                // with "already completed".
                 bool callbackMatches = FixedTimeEquals(callback.PublicKey ?? string.Empty, canonicalPublicKey)
                     && string.Equals(callback.HeadId, headId, StringComparison.Ordinal)
                     && string.Equals(callback.Version, applicationVersion, StringComparison.Ordinal)
@@ -1490,7 +1491,19 @@ public sealed partial class InstallLinkingService
                     exchangeRequest,
                     InstallationGrantTransports.LegacyV1,
                     CreateExchangeRequestSha256(exchangeRequest),
-                    InstallBrowserCallbackTransports.LegacyProofPoll);
+                    InstallBrowserCallbackTransports.LegacyProofPoll,
+                    operationId: CreateLegacyProofOperationId(nonce),
+                    operationSha256: CreateLegacyProofOperationSha256(
+                        installationId,
+                        headId,
+                        applicationVersion,
+                        channelId,
+                        platform,
+                        arch,
+                        canonicalPublicKey,
+                        request.IssuedAtUnixSeconds,
+                        nonce,
+                        signature));
                 return new PollInstallBrowserCallbackResult(
                     new AndroidInstallLinkProofPollStatus(
                         exchange.Callback.Status,
@@ -2342,6 +2355,55 @@ public sealed partial class InstallLinkingService
             request.PublicKey,
             request.HostLabel);
     }
+
+    private static string CreateLegacyProofOperationId(string nonce)
+    {
+        // Store-persisted operation identities are validated by
+        // AndroidLinkedV2RequestProof.IsValidOperationId (32 base64url
+        // characters). Derive a stable per-attempt id from the proof nonce:
+        // an identical retry yields the identical id, any other attempt
+        // (fresh nonce) yields a different id.
+        byte[] digest = System.Security.Cryptography.SHA256.HashData(
+            Encoding.UTF8.GetBytes(nonce));
+        try
+        {
+            // OperationIdBytes is 24 -> exactly 32 base64url characters.
+            ReadOnlySpan<byte> nonceBytes = digest.AsSpan(0, 24);
+            return Convert.ToBase64String(nonceBytes)
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(digest);
+        }
+    }
+
+    private static string CreateLegacyProofOperationSha256(
+        string installationId,
+        string headId,
+        string applicationVersion,
+        string channelId,
+        string platform,
+        string arch,
+        string canonicalPublicKey,
+        long issuedAtUnixSeconds,
+        string nonce,
+        string signature)
+        => Sha256Parts(
+            "chummer.install-link.remote-callback-operation.v1",
+            InstallBrowserCallbackTransports.LegacyProofPoll,
+            installationId,
+            headId,
+            applicationVersion,
+            channelId,
+            platform,
+            arch,
+            canonicalPublicKey,
+            issuedAtUnixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            nonce,
+            signature);
 
     private static string CreateV2BootstrapRequestSha256(
         AndroidInstallLinkProofPollV2Request request,
