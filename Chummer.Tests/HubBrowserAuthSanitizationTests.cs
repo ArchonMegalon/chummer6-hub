@@ -129,6 +129,30 @@ public sealed class HubBrowserAuthSanitizationTests
     }
 
     [Fact]
+    public void Desktop_proof_poll_transport_survives_login_return_sanitization_exactly()
+    {
+        using RSA key = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo());
+        string nextPath = HubBrowserAuthService.BuildInstallLinkingNextPath(
+            "desktop-preview11",
+            "avalonia",
+            "6.0.1-preview",
+            "preview",
+            "windows",
+            "x64",
+            "chummer://install-link?state=desktop-state",
+            "proof_poll",
+            publicKey);
+
+        string sanitized = HubBrowserAuthService.SanitizeNextPath(nextPath, "/safe");
+        IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
+            QueryHelpers.ParseQuery(new Uri($"https://chummer.run{sanitized}").Query);
+
+        Assert.Equal("proof_poll", Assert.Single(query["installLinkTransport"]));
+        Assert.Equal(publicKey, Assert.Single(query["publicKey"]));
+    }
+
+    [Fact]
     public void Decode_depth_limit_fails_closed_even_when_final_decode_becomes_network_path()
     {
         string nested = "/evil.example";

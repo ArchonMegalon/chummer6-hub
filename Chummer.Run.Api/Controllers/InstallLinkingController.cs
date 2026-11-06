@@ -241,12 +241,13 @@ public sealed class InstallLinkingController : ControllerBase
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link callback uri is invalid.");
         }
-        if (proofPoll
-            && (normalizedPublicKey is null
-                || !string.Equals(headId, "android", StringComparison.Ordinal)
-                || !string.Equals(platform, "android", StringComparison.Ordinal)))
+        if (proofPoll && normalizedPublicKey is null)
         {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Android proof-poll install identity is invalid.");
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "remote proof public key is required.");
+        }
+        if (proofPoll && !IsProofPollIdentityAllowed(headId, platform))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "proof-poll install identity is invalid.");
         }
 
         try
@@ -254,9 +255,7 @@ public sealed class InstallLinkingController : ControllerBase
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             PublicReleaseManifestDto manifest = _releases.LoadManifest();
-            PublicReleaseArtifactDto? artifact = proofPoll
-                ? null
-                : ResolveBrowserCallbackArtifact(manifest, headId, platform, arch);
+            PublicReleaseArtifactDto? artifact = ResolveBrowserCallbackArtifact(manifest, headId, platform, arch);
             if (!proofPoll && artifact is null)
             {
                 return BuildBrowserInstallLinkStatusPage(
@@ -281,7 +280,7 @@ public sealed class InstallLinkingController : ControllerBase
             IssueInstallBrowserCallbackResponseDto issued = _installLinking.IssueBrowserCallback(
                 new IssueInstallBrowserCallbackRequestDto(
                     InstallationId: installationId ?? string.Empty,
-                    ArtifactId: proofPoll ? "android-play-app" : artifact!.Id,
+                    ArtifactId: artifact?.Id ?? "android-play-app",
                     ApplicationVersion: applicationVersion ?? manifest.Version,
                     ChannelId: releaseChannel ?? manifest.Channel,
                     HeadId: headId ?? artifact?.Head ?? "desktop",
@@ -290,7 +289,8 @@ public sealed class InstallLinkingController : ControllerBase
                     CallbackUri: normalizedCallbackUri,
                     PublicKey: normalizedPublicKey,
                     HostLabel: null,
-                    InstallAccessClass: proofPoll ? InstallAccessClasses.AccountRequired : artifact!.InstallAccessClass),
+                    InstallAccessClass: artifact?.InstallAccessClass
+                        ?? InstallAccessClasses.AccountRequired),
                 user.UserId,
                 subject.SubjectId,
                 proofPoll
@@ -418,6 +418,26 @@ public sealed class InstallLinkingController : ControllerBase
         headers["Pragma"] = "no-cache";
         headers["Expires"] = "0";
         headers["Referrer-Policy"] = "no-referrer";
+    }
+
+    private static bool IsProofPollIdentityAllowed(string? headId, string? platform)
+    {
+        // Android (legacy + v2) keeps its exact identity contract.
+        if (string.Equals(headId, "android", StringComparison.Ordinal)
+            && string.Equals(platform, "android", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // Desktop heads approve through proof-poll when the installed app holds the
+        // signing key; the poll request must present the SAME head/platform pair,
+        // enforced again by InstallLinkingService.PollBrowserCallback exact matching.
+        string normalizedHead = (headId ?? string.Empty).Trim().ToLowerInvariant();
+        string normalizedPlatform = (platform ?? string.Empty).Trim().ToLowerInvariant();
+        return normalizedHead.Length > 0
+            && normalizedHead != "android"
+            && normalizedPlatform.Length > 0
+            && normalizedPlatform != "android";
     }
 
     private static bool MatchesDesktopLaunchIdentity(ClaimedInstallationDto installation, AccountDesktopLaunchTicketClaims claims)
