@@ -1484,6 +1484,23 @@ public sealed partial class InstallLinkingService
 
                 InstallBrowserCallbackDto? operationCallback =
                     FindBrowserCallbackForProofOperationLocked(installationId, operationId);
+                if (request.OperationId is not null && operationCallback is null)
+                {
+                    // Authenticated operation-bound poll whose approval has not been
+                    // recorded yet. Another operation's terminal history (possibly an
+                    // older application version or target) says nothing about this
+                    // attempt, so this operation must keep waiting for its own
+                    // approval instead of being terminated by that history. Strict
+                    // transport/target validation still applies once an approval is
+                    // actually associated with this operation.
+                    return new PollInstallBrowserCallbackResult(
+                        new AndroidInstallLinkProofPollStatus(
+                            InstallBrowserCallbackStates.Pending,
+                            Completed: false,
+                            Terminal: false,
+                            ExpiresAtUtc: now.Add(_browserCallbackLifetime)),
+                        Exchange: null);
+                }
                 InstallBrowserCallbackDto? callback = operationCallback ?? _store.BrowserCallbacksById.Values
                     .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(static item => item.CreatedAtUtc)
