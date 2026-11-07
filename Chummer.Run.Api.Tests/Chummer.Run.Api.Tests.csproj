@@ -47,6 +47,8 @@
     <Compile Include="ReleaseBuildProvenanceValidatorTests.cs" />
     <Compile Include="..\Chummer.Tests\AndroidDiagnosticStoreTests.cs" Link="AndroidDiagnosticStoreTests.cs" />
     <Compile Include="..\Chummer.Tests\HubApiGuardrailPolicyTests.cs" Link="HubApiGuardrailPolicyTests.cs" />
+    <Compile Include="..\Chummer.Tests\HubBrowserAuthSanitizationTests.cs" Link="HubBrowserAuthSanitizationTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingControllerBrowserCallbackTests.cs" Link="InstallLinkingControllerBrowserCallbackTests.cs" />
     <Compile Include="..\Chummer.Tests\HubApiRequestGuardrailMiddlewareTests.cs" Link="HubApiRequestGuardrailMiddlewareTests.cs" />
     <Compile Include="..\Chummer.Tests\AccountErasureServiceTests.cs" Link="AccountErasureServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\AccountHubRouteTests.cs" Link="AccountHubRouteTests.cs" />

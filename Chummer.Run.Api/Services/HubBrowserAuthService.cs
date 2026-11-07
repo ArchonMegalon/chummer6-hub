@@ -293,8 +293,8 @@ public sealed class HubBrowserAuthService
 
         // Android proof-poll approvals return to the hosted page; desktop proof-poll
         // approvals return to the requesting app (custom scheme or loopback listener).
-        // Both transports carry the SAME single-state contract: no userinfo, no
-        // fragment, exactly one safe "state" query value.
+        // Neither accepts userinfo or fragments. The hosted Android callback requires
+        // state; current desktop clients also send callbacks without state.
         if (!Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed)
             || !string.IsNullOrEmpty(parsed.UserInfo)
             || !string.IsNullOrEmpty(parsed.Fragment))
@@ -312,7 +312,23 @@ public sealed class HubBrowserAuthService
 
         if (IsDesktopProofPollCallback(parsed))
         {
-            return parsed.ToString();
+            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
+                QueryHelpers.ParseQuery(parsed.Query);
+            var preserved = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (string key in CallbackStateKeys)
+            {
+                if (!query.TryGetValue(key, out Microsoft.Extensions.Primitives.StringValues values))
+                {
+                    continue;
+                }
+                if (values.Count != 1 || !IsSafeCallbackStateValue(values[0]))
+                {
+                    return null;
+                }
+                preserved[key] = values[0];
+            }
+
+            return QueryHelpers.AddQueryString(parsed.GetLeftPart(UriPartial.Path), preserved);
         }
 
         return null;
