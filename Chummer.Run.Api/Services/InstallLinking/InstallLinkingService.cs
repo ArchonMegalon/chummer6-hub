@@ -34,6 +34,13 @@ public sealed partial class InstallLinkingService
     private static readonly TimeSpan DefaultBrowserCallbackLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
     private static readonly TimeSpan RemoteProofClockSkew = TimeSpan.FromMinutes(5);
+
+    // Margin separating "created before this attempt started" from a callback
+    // belonging to the attempt itself; absorbs client/server clock skew safely:
+    // Margin separating "created before this attempt started" from a callback
+    // belonging to the attempt itself; absorbs client/server clock skew safely:
+    // a fresh attempt's callback is created within seconds of the dispatch.
+    private const long AttemptHistorySkewSeconds = 120;
     private readonly Func<InstallLinkingStore> _storeAccessor;
     private readonly Func<InstallLinkingStore> _principalStoreAccessor;
     private readonly bool _storeAccessorChecksReadiness;
@@ -1405,6 +1412,28 @@ public sealed partial class InstallLinkingService
                     .OrderByDescending(static item => item.CreatedAtUtc)
                     .FirstOrDefault();
                 if (callback is null)
+                {
+                    return new PollInstallBrowserCallbackResult(
+                        new AndroidInstallLinkProofPollStatus(
+                            InstallBrowserCallbackStates.Pending,
+                            Completed: false,
+                            Terminal: false,
+                            ExpiresAtUtc: now.Add(_browserCallbackLifetime)),
+                        Exchange: null);
+                }
+
+                // A fresh approval attempt must not be stopped by terminal history
+                // from an older attempt: an expired or revoked callback created well
+                // before this attempt started is history, so the poll stays pending
+                // until the new browser approval is recorded. Terminal callbacks from
+                // the current attempt remain terminal.
+                bool callbackIsTerminalHistory =
+                    request.AttemptStartedAtUnixSeconds > 0
+                    && (string.Equals(callback.Status, InstallBrowserCallbackStates.Expired, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(callback.Status, InstallBrowserCallbackStates.Revoked, StringComparison.OrdinalIgnoreCase))
+                    && callback.CreatedAtUtc.ToUnixTimeSeconds()
+                        < request.AttemptStartedAtUnixSeconds - AttemptHistorySkewSeconds;
+                if (callbackIsTerminalHistory)
                 {
                     return new PollInstallBrowserCallbackResult(
                         new AndroidInstallLinkProofPollStatus(
@@ -2918,7 +2947,8 @@ public sealed record AndroidInstallLinkProofPollRequest(
     long IssuedAtUnixSeconds,
     string Nonce,
     string Signature,
-    string? HostLabel = null);
+    string? HostLabel = null,
+    long AttemptStartedAtUnixSeconds = 0);
 
 public sealed record AndroidInstallLinkProofPollV2Request(
     string InstallationId,
