@@ -35,12 +35,7 @@ public sealed partial class InstallLinkingService
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
     private static readonly TimeSpan RemoteProofClockSkew = TimeSpan.FromMinutes(5);
 
-    // Margin separating "created before this attempt started" from a callback
-    // belonging to the attempt itself; absorbs client/server clock skew safely:
-    // Margin separating "created before this attempt started" from a callback
-    // belonging to the attempt itself; absorbs client/server clock skew safely:
-    // a fresh attempt's callback is created within seconds of the dispatch.
-    private const long AttemptHistorySkewSeconds = 120;
+    private const string LegacyProofCallbackIdPrefix = "ibc_proof_";
     private readonly Func<InstallLinkingStore> _storeAccessor;
     private readonly Func<InstallLinkingStore> _principalStoreAccessor;
     private readonly bool _storeAccessorChecksReadiness;
@@ -1113,7 +1108,8 @@ public sealed partial class InstallLinkingService
         IssueInstallBrowserCallbackRequestDto request,
         string? userId,
         string? subjectId,
-        string? callbackTransport = null)
+        string? callbackTransport = null,
+        string? proofOperationId = null)
     {
         EnsureDurableStoreReady();
         InstallLinkingStore store = _store;
@@ -1121,7 +1117,7 @@ public sealed partial class InstallLinkingService
         {
             var operation = new InstallLinkingService(this, store);
             IssueInstallBrowserCallbackResponseDto result = operation.IssueBrowserCallbackCore(
-                request, userId, subjectId, callbackTransport);
+                request, userId, subjectId, callbackTransport, proofOperationId);
             operation.EnsureDurableStoreReady();
             return result;
         }
@@ -1131,7 +1127,8 @@ public sealed partial class InstallLinkingService
         IssueInstallBrowserCallbackRequestDto request,
         string? userId,
         string? subjectId,
-        string? callbackTransport)
+        string? callbackTransport,
+        string? proofOperationId)
     {
         EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
@@ -1146,6 +1143,12 @@ public sealed partial class InstallLinkingService
         string normalizedCallbackTransport = ResolveBrowserCallbackTransport(
             callbackTransport,
             normalizedPublicKey);
+        if (proofOperationId is not null
+            && (!string.Equals(normalizedCallbackTransport, LegacyProofPollTransport, StringComparison.Ordinal)
+                || !AndroidLinkedV2RequestProof.IsValidOperationId(proofOperationId)))
+        {
+            throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof operation id is invalid.");
+        }
         string? normalizedUserId = NormalizeOptional(userId);
         string? normalizedSubjectId = NormalizeOptional(subjectId);
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -1158,14 +1161,41 @@ public sealed partial class InstallLinkingService
             _store.InstallationsById.TryGetValue(normalizedInstallationId, out ClaimedInstallationDto? existingInstallation);
             EnsureInstallationIdentityAvailable(existingInstallation, normalizedUserId, normalizedSubjectId);
 
-            InstallBrowserCallbackDto? callback = FindReusableBrowserCallbackLocked(
+            InstallBrowserCallbackDto? callback = proofOperationId is null
+                ? FindReusableBrowserCallbackLocked(
                     normalizedInstallationId,
                     normalizedUserId,
                     normalizedSubjectId,
                     normalizedCallbackUri,
                     normalizedCallbackTransport,
                     request,
-                    now);
+                    now)
+                : FindBrowserCallbackForProofOperationLocked(normalizedInstallationId, proofOperationId);
+            if (proofOperationId is not null && callback is not null)
+            {
+                // An operation identifies one approval for its entire lifetime, including
+                // terminal history. Reopening the browser must never create a replacement.
+                if (!IdentityValueMatches(callback.UserId, normalizedUserId)
+                    || !IdentityValueMatches(callback.SubjectId, normalizedSubjectId)
+                    || !BrowserCallbackHasTransportLocked(callback, normalizedCallbackTransport)
+                    || !BrowserCallbackApprovalMatches(callback, request))
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof operation does not match its original approval.");
+                }
+                if (callback.ExpiresAtUtc <= now
+                    || string.Equals(callback.Status, InstallBrowserCallbackStates.Expired, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status410Gone, "browser callback expired before it could be completed.");
+                }
+                if (string.Equals(callback.Status, InstallBrowserCallbackStates.Revoked, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was revoked.");
+                }
+                if (!string.Equals(callback.CallbackUri, normalizedCallbackUri, StringComparison.Ordinal))
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof operation does not match its original callback uri.");
+                }
+            }
             if (callback is null)
             {
                 EnforcePendingCallbackLimitLocked(normalizedUserId, normalizedSubjectId, now);
@@ -1176,6 +1206,13 @@ public sealed partial class InstallLinkingService
                     CallbackUri = normalizedCallbackUri,
                     PublicKey = normalizedPublicKey
                 }, normalizedUserId, normalizedSubjectId, now);
+                if (proofOperationId is not null)
+                {
+                    callback = callback with
+                    {
+                        CallbackId = CreateLegacyProofCallbackId(normalizedInstallationId, proofOperationId)
+                    };
+                }
                 _store.BrowserCallbackTransportIntentsByCallbackId[callback.CallbackId] =
                     new InstallBrowserCallbackTransportIntent(
                         callback.CallbackId,
@@ -1371,6 +1408,14 @@ public sealed partial class InstallLinkingService
             throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof nonce is invalid.");
         }
 
+        string operationId = CreateLegacyProofOperationId(nonce);
+        if (request.OperationId is not null
+            && (!AndroidLinkedV2RequestProof.IsValidOperationId(request.OperationId)
+                || !FixedTimeEquals(request.OperationId, operationId)))
+        {
+            throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof operation id does not match its signed nonce.");
+        }
+
         byte[] publicKeyBytes = DecodeBase64(publicKey, "public key");
         byte[] signatureBytes = DecodeBase64(signature, "signature");
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -1402,38 +1447,48 @@ public sealed partial class InstallLinkingService
             }
 
             string canonicalPublicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+            // Authenticate the signed nonce before selecting history or returning pending.
+            byte[] proof = Encoding.UTF8.GetBytes(string.Join(
+                '\n',
+                "chummer.install-link.remote-callback.v1",
+                installationId,
+                headId,
+                applicationVersion,
+                channelId,
+                platform,
+                arch,
+                request.IssuedAtUnixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                nonce));
+            bool signatureValid;
+            try
+            {
+                signatureValid = rsa.VerifyData(
+                    proof,
+                    signatureBytes,
+                    HashAlgorithmName.SHA256,
+                    RSASignaturePadding.Pkcs1);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(proof);
+            }
+            if (!signatureValid)
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof signature is invalid.");
+            }
+
             lock (_store.Gate)
             {
                 ExpireBrowserCallbacksLocked(now);
                 ExpireGrantsLocked(now);
 
-                InstallBrowserCallbackDto? callback = _store.BrowserCallbacksById.Values
+                InstallBrowserCallbackDto? operationCallback =
+                    FindBrowserCallbackForProofOperationLocked(installationId, operationId);
+                InstallBrowserCallbackDto? callback = operationCallback ?? _store.BrowserCallbacksById.Values
                     .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(static item => item.CreatedAtUtc)
                     .FirstOrDefault();
                 if (callback is null)
-                {
-                    return new PollInstallBrowserCallbackResult(
-                        new AndroidInstallLinkProofPollStatus(
-                            InstallBrowserCallbackStates.Pending,
-                            Completed: false,
-                            Terminal: false,
-                            ExpiresAtUtc: now.Add(_browserCallbackLifetime)),
-                        Exchange: null);
-                }
-
-                // A fresh approval attempt must not be stopped by terminal history
-                // from an older attempt: an expired or revoked callback created well
-                // before this attempt started is history, so the poll stays pending
-                // until the new browser approval is recorded. Terminal callbacks from
-                // the current attempt remain terminal.
-                bool callbackIsTerminalHistory =
-                    request.AttemptStartedAtUnixSeconds > 0
-                    && (string.Equals(callback.Status, InstallBrowserCallbackStates.Expired, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(callback.Status, InstallBrowserCallbackStates.Revoked, StringComparison.OrdinalIgnoreCase))
-                    && callback.CreatedAtUtc.ToUnixTimeSeconds()
-                        < request.AttemptStartedAtUnixSeconds - AttemptHistorySkewSeconds;
-                if (callbackIsTerminalHistory)
                 {
                     return new PollInstallBrowserCallbackResult(
                         new AndroidInstallLinkProofPollStatus(
@@ -1453,15 +1508,6 @@ public sealed partial class InstallLinkingService
                         "remote proof transport does not match the approved install link.");
                 }
 
-                if (callback.ExpiresAtUtc <= now
-                    || string.Equals(callback.Status, InstallBrowserCallbackStates.Expired, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InstallLinkingOperationException(StatusCodes.Status410Gone, "browser callback expired before it could be completed.");
-                }
-                if (string.Equals(callback.Status, InstallBrowserCallbackStates.Revoked, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was revoked.");
-                }
                 // Lost-response recovery: a client retrying after a network loss
                 // re-sends the identical proof. Let it reach ExchangeBrowserCallback,
                 // which validates the proof and returns the original grant via the
@@ -1478,33 +1524,32 @@ public sealed partial class InstallLinkingService
                     throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof does not match the approved install link.");
                 }
 
-                byte[] proof = Encoding.UTF8.GetBytes(string.Join(
-                    '\n',
-                    "chummer.install-link.remote-callback.v1",
-                    installationId,
-                    headId,
-                    applicationVersion,
-                    channelId,
-                    platform,
-                    arch,
-                    request.IssuedAtUnixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    nonce));
-                bool signatureValid;
-                try
+                if (operationCallback is null && request.OperationId is not null)
                 {
-                    signatureValid = rsa.VerifyData(
-                        proof,
-                        signatureBytes,
-                        HashAlgorithmName.SHA256,
-                        RSASignaturePadding.Pkcs1);
+                    // The browser has not approved this authenticated operation yet.
+                    // Another operation's terminal state says nothing about this attempt.
+                    return new PollInstallBrowserCallbackResult(
+                        new AndroidInstallLinkProofPollStatus(
+                            InstallBrowserCallbackStates.Pending,
+                            Completed: false,
+                            Terminal: false,
+                            ExpiresAtUtc: now.Add(_browserCallbackLifetime)),
+                        Exchange: null);
                 }
-                finally
+                if (operationCallback is null
+                    && callback.CallbackId.StartsWith(LegacyProofCallbackIdPrefix, StringComparison.Ordinal))
                 {
-                    CryptographicOperations.ZeroMemory(proof);
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof does not match the approved operation.");
                 }
-                if (!signatureValid)
+
+                if (callback.ExpiresAtUtc <= now
+                    || string.Equals(callback.Status, InstallBrowserCallbackStates.Expired, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof signature is invalid.");
+                    throw new InstallLinkingOperationException(StatusCodes.Status410Gone, "browser callback expired before it could be completed.");
+                }
+                if (string.Equals(callback.Status, InstallBrowserCallbackStates.Revoked, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was revoked.");
                 }
 
                 ExchangeInstallBrowserCallbackRequestDto exchangeRequest =
@@ -1523,7 +1568,7 @@ public sealed partial class InstallLinkingService
                     InstallationGrantTransports.LegacyV1,
                     CreateExchangeRequestSha256(exchangeRequest),
                     InstallBrowserCallbackTransports.LegacyProofPoll,
-                    operationId: CreateLegacyProofOperationId(nonce),
+                    operationId: operationId,
                     operationSha256: CreateLegacyProofOperationSha256(
                         installationId,
                         headId,
@@ -1973,24 +2018,27 @@ public sealed partial class InstallLinkingService
         DateTimeOffset now)
         => _store.BrowserCallbacksById.Values
             .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
+            .Where(item => !item.CallbackId.StartsWith(LegacyProofCallbackIdPrefix, StringComparison.Ordinal))
             .Where(item => string.Equals(item.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase))
             .Where(item => item.ExpiresAtUtc > now)
             .Where(item => MatchesIdentity(item.UserId, item.SubjectId, userId, subjectId))
             .Where(item => string.Equals(item.CallbackUri, callbackUri, StringComparison.Ordinal))
             .Where(item => BrowserCallbackHasTransportLocked(item, callbackTransport))
-            // A repeated approval may reuse only the exact approved target and key.
-            // A proof-poll signature still has no browser-attempt identifier.
-            .Where(item => string.Equals(item.ArtifactId, NormalizeOptional(request.ArtifactId), StringComparison.Ordinal)
-                && string.Equals(item.PublicKey, NormalizeOptional(request.PublicKey), StringComparison.Ordinal)
-                && string.Equals(item.HeadId, NormalizeOptional(request.HeadId), StringComparison.Ordinal)
-                && string.Equals(item.Version, NormalizeOptional(request.ApplicationVersion) ?? "unknown", StringComparison.Ordinal)
-                && string.Equals(item.Channel, NormalizeOptional(request.ChannelId) ?? "preview", StringComparison.Ordinal)
-                && string.Equals(item.Platform, NormalizeOptional(request.Platform), StringComparison.Ordinal)
-                && string.Equals(item.Arch, NormalizeOptional(request.Arch), StringComparison.Ordinal)
-                && string.Equals(item.HostLabel, NormalizeOptional(request.HostLabel), StringComparison.Ordinal)
-                && string.Equals(item.InstallAccessClass, NormalizeAccessClass(request.InstallAccessClass), StringComparison.Ordinal))
+            .Where(item => BrowserCallbackApprovalMatches(item, request))
             .OrderByDescending(static item => item.CreatedAtUtc)
             .FirstOrDefault();
+
+    private static bool BrowserCallbackApprovalMatches(
+        InstallBrowserCallbackDto item, IssueInstallBrowserCallbackRequestDto request)
+        => string.Equals(item.ArtifactId, NormalizeOptional(request.ArtifactId), StringComparison.Ordinal)
+            && string.Equals(item.PublicKey, NormalizeOptional(request.PublicKey), StringComparison.Ordinal)
+            && string.Equals(item.HeadId, NormalizeOptional(request.HeadId), StringComparison.Ordinal)
+            && string.Equals(item.Version, NormalizeOptional(request.ApplicationVersion) ?? "unknown", StringComparison.Ordinal)
+            && string.Equals(item.Channel, NormalizeOptional(request.ChannelId) ?? "preview", StringComparison.Ordinal)
+            && string.Equals(item.Platform, NormalizeOptional(request.Platform), StringComparison.Ordinal)
+            && string.Equals(item.Arch, NormalizeOptional(request.Arch), StringComparison.Ordinal)
+            && string.Equals(item.HostLabel, NormalizeOptional(request.HostLabel), StringComparison.Ordinal)
+            && string.Equals(item.InstallAccessClass, NormalizeAccessClass(request.InstallAccessClass), StringComparison.Ordinal);
 
     private InstallClaimTicketDto? FindTicketByClaimCodeLocked(string normalizedClaimCode)
         => _store.ClaimTicketsById.Values
@@ -2421,6 +2469,30 @@ public sealed partial class InstallLinkingService
         {
             System.Security.Cryptography.CryptographicOperations.ZeroMemory(digest);
         }
+    }
+
+    private static string CreateLegacyProofCallbackId(string installationId, string operationId)
+        => LegacyProofCallbackIdPrefix + Sha256Parts(
+            "chummer.install-link.remote-callback-attempt.v1",
+            installationId.ToUpperInvariant(),
+            operationId);
+
+    private InstallBrowserCallbackDto? FindBrowserCallbackForProofOperationLocked(
+        string installationId, string operationId)
+    {
+        // Receipts also recover operations accepted before browser binding was added.
+        // They take precedence over newer approvals for this installation.
+        InstallBrowserCallbackDto? accepted = _store.BrowserCallbacksById.Values
+            .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
+            .Where(item => _store.BrowserCallbackRedemptionReceiptsByCallbackId.TryGetValue(item.CallbackId, out var receipt)
+                && string.Equals(receipt.OperationId, operationId, StringComparison.Ordinal))
+            .OrderBy(static item => item.CreatedAtUtc)
+            .FirstOrDefault();
+        if (accepted is not null)
+        {
+            return accepted;
+        }
+        return _store.BrowserCallbacksById.GetValueOrDefault(CreateLegacyProofCallbackId(installationId, operationId));
     }
 
     private static string CreateLegacyProofOperationSha256(
@@ -2948,7 +3020,8 @@ public sealed record AndroidInstallLinkProofPollRequest(
     string Nonce,
     string Signature,
     string? HostLabel = null,
-    long AttemptStartedAtUnixSeconds = 0);
+    long AttemptStartedAtUnixSeconds = 0,
+    string? OperationId = null);
 
 public sealed record AndroidInstallLinkProofPollV2Request(
     string InstallationId,

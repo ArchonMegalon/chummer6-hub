@@ -221,11 +221,20 @@ public sealed class InstallLinkingController : ControllerBase
         [FromQuery] string? installLinkCallbackUri,
         CancellationToken cancellationToken,
         [FromQuery] string? installLinkTransport = null,
-        [FromQuery] string? publicKey = null)
+        [FromQuery] string? publicKey = null,
+        [FromQuery] string? installLinkOperationId = null)
     {
         ApplySensitiveResponseHeaders();
         bool proofPoll = installLinkTransport is not null
             && InstallBrowserCallbackTransports.IsProofPoll(installLinkTransport);
+        if ((Request.Query.TryGetValue("installLinkOperationId", out var operationValues)
+                && (operationValues.Count != 1 || installLinkOperationId is null))
+            || (installLinkOperationId is not null
+                && (!string.Equals(installLinkTransport, InstallLinkingService.LegacyProofPollTransport, StringComparison.Ordinal)
+                    || !AndroidLinkedV2RequestProof.IsValidOperationId(installLinkOperationId))))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link operation id is invalid.");
+        }
         if (!proofPoll && !string.IsNullOrWhiteSpace(installLinkTransport))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link transport is invalid.");
@@ -306,7 +315,8 @@ public sealed class InstallLinkingController : ControllerBase
                 subject.SubjectId,
                 proofPoll
                     ? installLinkTransport
-                    : InstallBrowserCallbackTransports.GrantCallback);
+                    : InstallBrowserCallbackTransports.GrantCallback,
+                proofOperationId: installLinkOperationId);
 
             if (proofPoll)
             {
@@ -373,7 +383,8 @@ public sealed class InstallLinkingController : ControllerBase
                 arch,
                 normalizedCallbackUri,
                 proofPoll ? installLinkTransport : null,
-                normalizedPublicKey);
+                normalizedPublicKey,
+                installLinkOperationId);
             return Redirect($"/login?next={Uri.EscapeDataString(returnPath)}");
         }
         catch (HubRequestAuthException ex)

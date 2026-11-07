@@ -152,6 +152,52 @@ public sealed class HubBrowserAuthSanitizationTests
         Assert.Equal(publicKey, Assert.Single(query["publicKey"]));
     }
 
+    [Fact]
+    public void Bound_proof_operation_and_callback_state_survive_login_return_sanitization()
+    {
+        using RSA key = RSA.Create(2048);
+        const string operation = "0123456789abcdef0123456789abcdef";
+        string nextPath = HubBrowserAuthService.BuildInstallLinkingNextPath(
+            "bound-install", "avalonia", "6.0.1-preview", "preview", "windows", "x64",
+            "chummer://install-link?state=bound-state", "proof_poll",
+            Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()), operation);
+        string sanitized = HubBrowserAuthService.SanitizeNextPath(nextPath, "/safe");
+        var query = QueryHelpers.ParseQuery(new Uri($"https://chummer.run{sanitized}").Query);
+        Assert.Equal(operation, Assert.Single(query["installLinkOperationId"]));
+        Assert.Equal(new Uri("chummer://install-link?state=bound-state").AbsoluteUri, Assert.Single(query["installLinkCallbackUri"]));
+        Assert.Equal(sanitized, HubBrowserAuthService.SanitizeNextPath(sanitized, "/safe"));
+    }
+
+    [Theory]
+    [InlineData("installLinkOperationId=")]
+    [InlineData("installLinkOperationId=short")]
+    [InlineData("installLinkOperationId=0123456789abcdef0123456789abcdef&installLinkOperationId=0123456789abcdef0123456789abcdef")]
+    public void Invalid_or_duplicate_operation_cannot_silently_downgrade_to_legacy(string query)
+    {
+        using RSA key = RSA.Create(2048);
+        string nextPath = HubBrowserAuthService.BuildInstallLinkingNextPath(
+            "bound-install", "avalonia", "6.0.1-preview", "preview", "windows", "x64",
+            "chummer://install-link", "proof_poll", Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()));
+        Assert.Equal("/safe", HubBrowserAuthService.SanitizeNextPath(nextPath + "&" + query, "/safe"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("proof_poll_v2")]
+    public void Bound_operation_cannot_change_transport(string? transport)
+    {
+        using RSA key = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo());
+        Assert.Throws<ArgumentException>(() => HubBrowserAuthService.BuildInstallLinkingNextPath(
+            "bound-install", "avalonia", "6.0.1-preview", "preview", "windows", "x64",
+            "chummer://install-link", transport, publicKey, "0123456789abcdef0123456789abcdef"));
+        string nextPath = HubBrowserAuthService.BuildInstallLinkingNextPath(
+            "bound-install", "avalonia", "6.0.1-preview", "preview", "windows", "x64",
+            "chummer://install-link", transport, publicKey);
+        Assert.Equal("/safe", HubBrowserAuthService.SanitizeNextPath(
+            nextPath + "&installLinkOperationId=0123456789abcdef0123456789abcdef", "/safe"));
+    }
+
     [Theory]
     [InlineData("chummer://install-link")]
     [InlineData("http://127.0.0.1:47761/install-link/callback")]

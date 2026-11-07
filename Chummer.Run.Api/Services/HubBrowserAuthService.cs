@@ -202,6 +202,14 @@ public sealed class HubBrowserAuthService
             QueryHelpers.ParseQuery(queryIndex < 0 ? string.Empty : candidate[queryIndex..]);
         string? callbackUri = SingleQueryValue(query, "installLinkCallbackUri");
         string? transport = SingleQueryValue(query, "installLinkTransport");
+        string? operationId = SingleQueryValue(query, "installLinkOperationId");
+        if (query.ContainsKey("installLinkOperationId")
+            && (!string.Equals(transport, InstallBrowserCallbackTransports.LegacyProofPoll, StringComparison.Ordinal)
+                || operationId is null
+                || !AndroidLinkedV2RequestProof.IsValidOperationId(operationId)))
+        {
+            return safeFallback;
+        }
         bool proofPoll = transport is not null
             && InstallBrowserCallbackTransports.IsProofPoll(transport);
         if (!proofPoll && !string.IsNullOrWhiteSpace(transport))
@@ -233,7 +241,8 @@ public sealed class HubBrowserAuthService
             SingleQueryValue(query, "arch"),
             sanitizedCallback,
             proofPoll ? transport : null,
-            publicKey);
+            publicKey,
+            operationId);
     }
 
     public static string BuildInstallLinkingNextPath(
@@ -245,8 +254,15 @@ public sealed class HubBrowserAuthService
         string? arch,
         string installLinkCallbackUri,
         string? installLinkTransport = null,
-        string? publicKey = null)
+        string? publicKey = null,
+        string? installLinkOperationId = null)
     {
+        if (installLinkOperationId is not null
+            && (!string.Equals(installLinkTransport, InstallBrowserCallbackTransports.LegacyProofPoll, StringComparison.Ordinal)
+                || !AndroidLinkedV2RequestProof.IsValidOperationId(installLinkOperationId)))
+        {
+            throw new ArgumentException("Install-link operation id is invalid.", nameof(installLinkOperationId));
+        }
         bool proofPoll = installLinkTransport is not null
             && InstallBrowserCallbackTransports.IsProofPoll(installLinkTransport);
         if (!proofPoll && !string.IsNullOrWhiteSpace(installLinkTransport))
@@ -274,7 +290,8 @@ public sealed class HubBrowserAuthService
             ["arch"] = SanitizeInstallLinkValue(arch),
             ["installLinkCallbackUri"] = callback,
             ["installLinkTransport"] = proofPoll ? installLinkTransport : null,
-            ["publicKey"] = canonicalPublicKey
+            ["publicKey"] = canonicalPublicKey,
+            ["installLinkOperationId"] = installLinkOperationId
         };
         return QueryHelpers.AddQueryString(
             InstallLinkPath,
