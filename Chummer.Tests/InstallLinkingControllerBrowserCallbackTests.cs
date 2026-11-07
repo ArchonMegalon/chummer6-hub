@@ -304,6 +304,79 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
     }
 
     [Fact]
+    public async Task Desktop_proof_poll_for_new_operation_stays_pending_despite_older_version_history()
+    {
+        // R69 audit regression: a terminal callback recorded for application version A
+        // must not terminate a fresh, authenticated operation from version B on the
+        // same installation. The operation-bound poll has to keep waiting for its own
+        // approval instead of being rejected through the historical-target fallback.
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        const string installationId = "desktop-version-history-install";
+
+        // Version A: issue and complete an approval so terminal history exists.
+        AndroidInstallLinkProofPollRequest versionA = CreateSignedPoll(key, installationId, bound: true, nonce: "0123456789abcdef0123456789abcdef0123456789abcdef");
+        await ApproveAttempt(fixture, versionA);
+        InstallBrowserCallbackDto historyCallback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        // The browser completes version A: the poll itself exchanges the callback and
+        // records terminal history for this installation.
+        ExchangeInstallBrowserCallbackResponseDto historyExchange =
+            AssertExchange(fixture.Controller.PollBrowserCallback(versionA));
+        Assert.False(historyExchange.AlreadyClaimed);
+
+        // Version B: a fresh, authenticated operation signs its own proof with a NEW
+        // application version. Its approval has not been recorded yet when the first
+        // poll arrives.
+        const string versionBNonce = "fedcba9876543210fedcba9876543210fedcba9876543210";
+        long versionBIssuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        byte[] versionBProof = Encoding.UTF8.GetBytes(string.Join(
+            '\n',
+            "chummer.install-link.remote-callback.v1",
+            installationId,
+            "avalonia",
+            "6.0.2-preview",
+            "preview",
+            "windows",
+            "x64",
+            versionBIssuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            versionBNonce));
+        AndroidInstallLinkProofPollRequest versionB;
+        try
+        {
+            versionB = new AndroidInstallLinkProofPollRequest(
+                installationId, "avalonia", "6.0.2-preview", "preview", "windows", "x64",
+                versionA.PublicKey,
+                versionBIssuedAt,
+                versionBNonce,
+                Convert.ToBase64String(key.SignData(versionBProof, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)),
+                "Desktop version-B attempt",
+                OperationId: ProofOperationId(versionBNonce));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(versionBProof);
+        }
+
+        // The new operation must stay pending (202) rather than being terminated by
+        // version A's terminal history (409).
+        AssertPending(fixture.Controller.PollBrowserCallback(versionB));
+
+        // The browser then approves version B's attempt; the poll consumes it and
+        // links against the exact new approval.
+        await ApproveAttempt(fixture, versionB);
+        InstallBrowserCallbackDto versionBCallback = Assert.Single(fixture.Store.BrowserCallbacksById.Values,
+            item => !string.Equals(item.CallbackId, historyCallback.CallbackId, StringComparison.Ordinal));
+        Assert.NotNull(versionBCallback);
+
+        ExchangeInstallBrowserCallbackResponseDto exchanged =
+            AssertExchange(fixture.Controller.PollBrowserCallback(versionB));
+        Assert.Equal(InstallationGrantStates.Active, exchanged.Grant.Status);
+        Assert.False(exchanged.AlreadyClaimed);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
     public async Task Desktop_proof_poll_retry_after_lost_response_recovers_original_grant()
     {
         using Fixture fixture = new(authenticated: true);
@@ -1471,8 +1544,19 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             fresh = fresh with { Nonce = first.Nonce, OperationId = first.OperationId };
         }
         int grantCount = fixture.Store.GrantsById.Count;
-        AssertPollProblem(fixture.Controller.PollBrowserCallback(fresh with { AttemptStartedAtUnixSeconds = long.MaxValue }),
-            attack == "operation" ? StatusCodes.Status400BadRequest : StatusCodes.Status409Conflict);
+        if (attack is "key" or "transport")
+        {
+            // R69: a fresh, authenticated operation is not terminated by another
+            // operation's history. The signature is valid (authentication happened
+            // above); a historical callback with a different key or transport
+            // describes a different operation and must not answer this poll.
+            AssertPending(fixture.Controller.PollBrowserCallback(fresh with { AttemptStartedAtUnixSeconds = long.MaxValue }));
+        }
+        else
+        {
+            AssertPollProblem(fixture.Controller.PollBrowserCallback(fresh with { AttemptStartedAtUnixSeconds = long.MaxValue }),
+                attack == "operation" ? StatusCodes.Status400BadRequest : StatusCodes.Status409Conflict);
+        }
         Assert.Equal(grantCount, fixture.Store.GrantsById.Count);
     }
 
