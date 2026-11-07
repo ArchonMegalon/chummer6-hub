@@ -1338,174 +1338,391 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal("no-referrer", headers["Referrer-Policy"].ToString());
     }
 
-    [Fact]
-    public async Task Fresh_attempt_poll_before_new_approval_stays_pending_against_old_revoked_callback_history()
+    [Theory]
+    [InlineData("revoked")]
+    [InlineData("expired")]
+    [InlineData("redeemed")]
+    [InlineData("redeemed-expired")]
+    public async Task Bound_attempt_immediate_retry_uses_distinct_nonce_without_aging_history(string history)
     {
         using Fixture fixture = new(authenticated: true);
-        fixture.Controller.ControllerContext = new ControllerContext
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest first = CreateSignedPoll(key, "attempt-immediate", bound: true);
+        AssertPending(fixture.Controller.PollBrowserCallback(first));
+        await ApproveAttempt(fixture, first);
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        ExchangeInstallBrowserCallbackResponseDto? accepted = null;
+        if (history != "expired")
         {
-            HttpContext = new DefaultHttpContext()
-        };
-        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
-        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
-        using RSA rsa = RSA.Create(2048);
-        string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
-
-        // Attempt 1: approve, redeem, revoke the grant -> terminal (revoked)
-        // callback history for this installation.
-        await fixture.Controller.BrowserInstallLink(
-            installationId: "desktop-attempt-boundary-install",
-            headId: "avalonia",
-            applicationVersion: "6.0.1-preview",
-            releaseChannel: "preview",
-            platform: "windows",
-            arch: "x64",
-            installLinkCallbackUri: "chummer://install-link",
-            cancellationToken: CancellationToken.None,
-            installLinkTransport: "proof_poll",
-            publicKey: publicKey);
-
-        InstallBrowserCallbackDto firstCallback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
-        AndroidInstallLinkProofPollRequest firstPoll = CreateSignedPoll(
-            rsa, publicKey, "desktop-attempt-boundary-install", attemptStartedAt: 0);
-        ExchangeInstallBrowserCallbackResponseDto firstExchange =
-            AssertExchange(fixture.Controller.PollBrowserCallback(firstPoll));
-        Assert.False(firstExchange.AlreadyClaimed);
-        _ = fixture.InstallLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(
-            InstallationId: "desktop-attempt-boundary-install",
-            AccessToken: firstExchange.Grant.AccessToken));
-
-        // Age the revoked callback so it is genuinely OLD history, like the
-        // real race (callback from a previous session, created long ago).
-        lock (fixture.Store.Gate)
+            accepted = AssertExchange(fixture.Controller.PollBrowserCallback(first));
+        }
+        if (history == "revoked")
         {
-            fixture.Store.BrowserCallbacksById[firstCallback.CallbackId] =
-                fixture.Store.BrowserCallbacksById[firstCallback.CallbackId] with
-                {
-                    CreatedAtUtc = DateTimeOffset.UtcNow.AddHours(-2)
-                };
-            fixture.Store.PersistLocked();
+            fixture.InstallLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(
+                first.InstallationId, accepted!.Grant.AccessToken));
+        }
+        if (history is "expired" or "redeemed-expired")
+        {
+            ExpireAttempt(fixture, callback.CallbackId);
+        }
+        fixture.ReloadInstallLinking();
+        Assert.Equal(callback.CreatedAtUtc, fixture.Store.BrowserCallbacksById[callback.CallbackId].CreatedAtUtc);
+        if (history == "redeemed-expired")
+        {
+            Assert.Equal(InstallBrowserCallbackStates.Redeemed, fixture.Store.BrowserCallbacksById[callback.CallbackId].Status);
         }
 
-        // Attempt 2 starts (desktop stamps its dispatch time) BEFORE the new
-        // browser approval is recorded. The stale revoked callback must be
-        // treated as history: the poll stays pending, NOT a terminal 409.
-        long attemptStarted = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        AndroidInstallLinkProofPollRequest secondPoll = CreateSignedPoll(
-            rsa, publicKey, "desktop-attempt-boundary-install", attemptStartedAt: attemptStarted);
-        ActionResult<ExchangeInstallBrowserCallbackResponseDto> pending =
-            fixture.Controller.PollBrowserCallback(secondPoll);
-        AcceptedResult pendingAccepted = Assert.IsType<AcceptedResult>(pending.Result);
-        AndroidInstallLinkProofPollStatus pendingStatus =
-            Assert.IsType<AndroidInstallLinkProofPollStatus>(pendingAccepted.Value);
-        Assert.Equal(InstallBrowserCallbackStates.Pending, pendingStatus.State);
-        Assert.False(pendingStatus.Completed);
-        Assert.False(pendingStatus.Terminal);
+        AndroidInstallLinkProofPollRequest second = CreateSignedPoll(key, first.InstallationId, bound: true);
+        Assert.NotEqual(first.Nonce, second.Nonce);
+        Assert.NotEqual(first.OperationId, second.OperationId);
+        AssertPending(fixture.Controller.PollBrowserCallback(second));
+        if (history == "redeemed")
+        {
+            Assert.Equal(accepted!.Grant, AssertExchange(fixture.Controller.PollBrowserCallback(first)).Grant);
+        }
+        else
+        {
+            int expected = history == "revoked" ? StatusCodes.Status409Conflict : StatusCodes.Status410Gone;
+            AssertPollProblem(fixture.Controller.PollBrowserCallback(first with { AttemptStartedAtUnixSeconds = long.MaxValue }), expected);
+            ObjectResult repeatedApproval = Assert.IsType<ObjectResult>(await ApproveAttempt(fixture, first, expectSuccess: false));
+            Assert.Equal(expected, repeatedApproval.StatusCode);
+        }
 
-        // Once the NEW approval is recorded, the same poll completes normally.
-        await fixture.Controller.BrowserInstallLink(
-            installationId: "desktop-attempt-boundary-install",
-            headId: "avalonia",
-            applicationVersion: "6.0.1-preview",
-            releaseChannel: "preview",
-            platform: "windows",
-            arch: "x64",
-            installLinkCallbackUri: "chummer://install-link",
-            cancellationToken: CancellationToken.None,
-            installLinkTransport: "proof_poll",
-            publicKey: publicKey);
-        InstallBrowserCallbackDto secondCallback =
-            Assert.Single(fixture.Store.BrowserCallbacksById.Values
-                .Where(item => string.Equals(item.Status, InstallBrowserCallbackStates.Pending, StringComparison.Ordinal)));
-        Assert.Equal("desktop-attempt-boundary-install", secondCallback.InstallationId);
-        ExchangeInstallBrowserCallbackResponseDto secondExchange =
-            AssertExchange(fixture.Controller.PollBrowserCallback(secondPoll));
-        Assert.False(secondExchange.AlreadyClaimed);
-        Assert.Equal(InstallationGrantStates.Active, secondExchange.Grant.Status);
+        await ApproveAttempt(fixture, second);
+        fixture.ReloadInstallLinking();
+        ExchangeInstallBrowserCallbackResponseDto linked = AssertExchange(fixture.Controller.PollBrowserCallback(second));
+        Assert.False(linked.AlreadyClaimed);
+        Assert.NotEqual(callback.CallbackId, linked.Callback.CallbackId);
+        Assert.NotEqual(accepted?.Grant.GrantId, linked.Grant.GrantId);
+        Assert.Equal(2, fixture.Store.BrowserCallbacksById.Count);
+        Assert.Equal(second.OperationId, fixture.Store.BrowserCallbackRedemptionReceiptsByCallbackId[linked.Callback.CallbackId].OperationId);
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(first),
+            history is "expired" or "redeemed-expired" ? StatusCodes.Status410Gone : StatusCodes.Status409Conflict);
+        Assert.Equal(linked.Grant.GrantId, fixture.Store.InstallationsById[first.InstallationId].GrantId);
         AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
     }
 
-    [Fact]
-    public async Task Legacy_poll_without_attempt_stamp_keeps_old_revoked_callback_terminal()
+    [Theory]
+    [InlineData(false, 0L)]
+    [InlineData(false, long.MaxValue)]
+    [InlineData(false, long.MinValue)]
+    [InlineData(true, 0L)]
+    [InlineData(true, long.MaxValue)]
+    [InlineData(true, long.MinValue)]
+    public async Task Advisory_attempt_timestamp_cannot_hide_current_revocation(bool bound, long advisory)
     {
         using Fixture fixture = new(authenticated: true);
-        fixture.Controller.ControllerContext = new ControllerContext
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest poll = CreateSignedPoll(key, "attempt-advisory", bound);
+        await ApproveAttempt(fixture, poll);
+        ExchangeInstallBrowserCallbackResponseDto accepted = AssertExchange(fixture.Controller.PollBrowserCallback(poll));
+        fixture.InstallLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(poll.InstallationId, accepted.Grant.AccessToken));
+        fixture.ReloadInstallLinking();
+
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(poll with { AttemptStartedAtUnixSeconds = advisory }),
+            StatusCodes.Status409Conflict);
+        // Omitting the new field cannot turn the same signed operation into a new attempt.
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(poll with { OperationId = null, AttemptStartedAtUnixSeconds = advisory }),
+            StatusCodes.Status409Conflict);
+        Assert.Single(fixture.Store.GrantsById);
+        Assert.Equal(InstallationGrantStates.Revoked, fixture.Store.GrantsById[accepted.Grant.GrantId].Status);
+    }
+
+    [Theory]
+    [InlineData("key")]
+    [InlineData("signature")]
+    [InlineData("transport")]
+    [InlineData("operation")]
+    [InlineData("nonce")]
+    public async Task Fresh_bound_poll_authenticates_before_returning_pending(string attack)
+    {
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        using RSA otherKey = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest first = CreateSignedPoll(key, "attempt-auth", bound: attack != "transport");
+        if (attack == "transport")
         {
-            HttpContext = new DefaultHttpContext()
-        };
-        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
-        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
-        using RSA rsa = RSA.Create(2048);
-        string publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+            // Use the real service boundary to record a different transport.
+            fixture.InstallLinking.IssueBrowserCallback(
+                CreateProofApproval(key) with { InstallationId = first.InstallationId },
+                "user.transport", "subject.install.browser", InstallLinkingService.AndroidLinkedV2ProofPollTransport);
+        }
+        else
+        {
+            await ApproveAttempt(fixture, first);
+            ExchangeInstallBrowserCallbackResponseDto accepted = AssertExchange(fixture.Controller.PollBrowserCallback(first));
+            fixture.InstallLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(first.InstallationId, accepted.Grant.AccessToken));
+        }
+        AndroidInstallLinkProofPollRequest fresh = CreateSignedPoll(
+            attack == "key" ? otherKey : key, first.InstallationId, bound: true);
+        if (attack == "signature")
+        {
+            fresh = fresh with { Signature = CreateSignedPoll(otherKey, first.InstallationId, bound: true).Signature };
+        }
+        if (attack == "operation")
+        {
+            fresh = fresh with { OperationId = first.OperationId };
+        }
+        if (attack == "nonce")
+        {
+            fresh = fresh with { Nonce = first.Nonce, OperationId = first.OperationId };
+        }
+        int grantCount = fixture.Store.GrantsById.Count;
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(fresh with { AttemptStartedAtUnixSeconds = long.MaxValue }),
+            attack == "operation" ? StatusCodes.Status400BadRequest : StatusCodes.Status409Conflict);
+        Assert.Equal(grantCount, fixture.Store.GrantsById.Count);
+    }
 
-        await fixture.Controller.BrowserInstallLink(
-            installationId: "desktop-attempt-legacy-install",
-            headId: "avalonia",
-            applicationVersion: "6.0.1-preview",
-            releaseChannel: "preview",
-            platform: "windows",
-            arch: "x64",
-            installLinkCallbackUri: "chummer://install-link",
-            cancellationToken: CancellationToken.None,
-            installLinkTransport: "proof_poll",
-            publicKey: publicKey);
+    [Fact]
+    public void Bound_poll_with_no_history_still_requires_valid_signature()
+    {
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        using RSA otherKey = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest poll = CreateSignedPoll(key, "attempt-no-history", bound: true);
+        poll = poll with { Signature = CreateSignedPoll(otherKey, poll.InstallationId, bound: true).Signature };
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(poll), StatusCodes.Status409Conflict);
+        Assert.Empty(fixture.Store.GrantsById);
+    }
 
-        AndroidInstallLinkProofPollRequest firstPoll = CreateSignedPoll(
-            rsa, publicKey, "desktop-attempt-legacy-install", attemptStartedAt: 0);
-        ExchangeInstallBrowserCallbackResponseDto firstExchange =
-            AssertExchange(fixture.Controller.PollBrowserCallback(firstPoll));
-        Assert.False(firstExchange.AlreadyClaimed);
-        _ = fixture.InstallLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(
-            InstallationId: "desktop-attempt-legacy-install",
-            AccessToken: firstExchange.Grant.AccessToken));
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Uncertain_original_completion_reconciles_its_receipt_across_new_approval_and_reload(bool originalBound)
+    {
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest first = CreateSignedPoll(key, "attempt-uncertain", originalBound);
+        await ApproveAttempt(fixture, first);
+        ExchangeInstallBrowserCallbackResponseDto original = AssertExchange(fixture.Controller.PollBrowserCallback(first));
+        AndroidInstallLinkProofPollRequest second = CreateSignedPoll(key, first.InstallationId, bound: true);
+        Assert.NotEqual(first.Nonce, second.Nonce);
+        Assert.NotEqual(ProofOperationId(first.Nonce), second.OperationId);
+        await ApproveAttempt(fixture, second);
+        fixture.ReloadInstallLinking();
 
-        // Age the revoked callback the same way for the legacy-path check.
+        ExchangeInstallBrowserCallbackResponseDto recovered = AssertExchange(fixture.Controller.PollBrowserCallback(first));
+        Assert.True(recovered.AlreadyClaimed);
+        Assert.Equal(original.Callback.CallbackId, recovered.Callback.CallbackId);
+        Assert.Equal(original.Grant, recovered.Grant);
+        Assert.Single(fixture.Store.GrantsById);
+        // Retention clears a redeemed callback URI. Reopening cannot substitute a
+        // new URI or approval; recovery is the authenticated poll above.
+        ObjectResult reopen = Assert.IsType<ObjectResult>(await ApproveAttempt(
+            fixture, first with { OperationId = ProofOperationId(first.Nonce) }, expectSuccess: false));
+        Assert.Equal(StatusCodes.Status409Conflict, reopen.StatusCode);
+        Assert.Equal(2, fixture.Store.BrowserCallbacksById.Count);
+        // A valid re-sign with a changed timestamp is not the immutable accepted operation.
+        AndroidInstallLinkProofPollRequest rewritten = CreateSignedPoll(
+            key, first.InstallationId, originalBound, first.Nonce, first.IssuedAtUnixSeconds + 1);
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(rewritten), StatusCodes.Status409Conflict);
+
+        ExchangeInstallBrowserCallbackResponseDto replacement = AssertExchange(fixture.Controller.PollBrowserCallback(second));
+        Assert.NotEqual(original.Grant.GrantId, replacement.Grant.GrantId);
+        fixture.ReloadInstallLinking();
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(first), StatusCodes.Status409Conflict);
+        Assert.Equal(replacement.Grant.GrantId, fixture.Store.InstallationsById[first.InstallationId].GrantId);
+        Assert.Equal(2, fixture.Store.GrantsById.Count);
+    }
+
+    [Fact]
+    public async Task Bound_approval_is_idempotent_and_rejects_changes_to_account_target_key_or_callback()
+    {
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        using RSA otherKey = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest poll = CreateSignedPoll(key, "attempt-binding", bound: true);
+        await ApproveAttempt(fixture, poll);
+        await ApproveAttempt(fixture, poll);
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        IssueInstallBrowserCallbackRequestDto request = CreateProofApproval(key) with { InstallationId = poll.InstallationId };
+        foreach (var changed in new[]
+        {
+            request with { PublicKey = Convert.ToBase64String(otherKey.ExportSubjectPublicKeyInfo()) },
+            request with { Arch = "arm64" },
+            request with { CallbackUri = "chummer://install-link?state=other" }
+        })
+        {
+            Assert.Equal(StatusCodes.Status409Conflict, Assert.Throws<InstallLinkingOperationException>(() =>
+                fixture.InstallLinking.IssueBrowserCallback(changed, callback.UserId, callback.SubjectId,
+                    InstallLinkingService.LegacyProofPollTransport, poll.OperationId)).StatusCode);
+        }
+        foreach (var identity in new[] { ("other-user", callback.SubjectId), (callback.UserId, "other-subject") })
+        {
+            Assert.Equal(StatusCodes.Status409Conflict, Assert.Throws<InstallLinkingOperationException>(() =>
+                fixture.InstallLinking.IssueBrowserCallback(request, identity.Item1, identity.Item2,
+                    InstallLinkingService.LegacyProofPollTransport, poll.OperationId)).StatusCode);
+        }
+        Assert.Single(fixture.Store.BrowserCallbacksById);
+        Assert.Empty(fixture.Store.GrantsById);
+    }
+
+    [Fact]
+    public async Task Omitted_operation_cannot_consume_another_bound_approval()
+    {
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest bound = CreateSignedPoll(key, "attempt-omitted", bound: true);
+        await ApproveAttempt(fixture, bound);
+        AndroidInstallLinkProofPollRequest other = CreateSignedPoll(key, bound.InstallationId, bound: false);
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(other), StatusCodes.Status409Conflict);
+        Assert.Empty(fixture.Store.GrantsById);
+        AssertExchange(fixture.Controller.PollBrowserCallback(bound));
+    }
+
+    [Fact]
+    public async Task Definitive_pending_allows_fresh_proof_with_stable_attempt_nonce_but_receipt_stays_immutable()
+    {
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest pending = CreateSignedPoll(key, "attempt-refresh", bound: true);
+        AssertPending(fixture.Controller.PollBrowserCallback(pending));
+        AndroidInstallLinkProofPollRequest refreshed = CreateSignedPoll(
+            key, pending.InstallationId, bound: true, pending.Nonce, pending.IssuedAtUnixSeconds + 1);
+        Assert.Equal(pending.Nonce, refreshed.Nonce);
+        Assert.Equal(pending.OperationId, refreshed.OperationId);
+        Assert.NotEqual(pending.Signature, refreshed.Signature);
+        AssertPending(fixture.Controller.PollBrowserCallback(refreshed));
+        await ApproveAttempt(fixture, pending);
+        ExchangeInstallBrowserCallbackResponseDto accepted = AssertExchange(fixture.Controller.PollBrowserCallback(refreshed));
+        fixture.ReloadInstallLinking();
+        Assert.Equal(accepted.Grant, AssertExchange(fixture.Controller.PollBrowserCallback(refreshed)).Grant);
+        AssertPollProblem(fixture.Controller.PollBrowserCallback(pending), StatusCodes.Status409Conflict);
+        Assert.Single(fixture.Store.GrantsById);
+    }
+
+    [Theory]
+    [InlineData("", "proof_poll")]
+    [InlineData("short", "proof_poll")]
+    [InlineData("0123456789abcdef0123456789abcdef", "proof_poll_v2")]
+    [InlineData("0123456789abcdef0123456789abcdef", null)]
+    public async Task Browser_approval_rejects_invalid_operation_binding(string operationId, string? transport)
+    {
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        ObjectResult result = Assert.IsType<ObjectResult>(await fixture.Controller.BrowserInstallLink(
+            "attempt-invalid", "avalonia", "6.0.1-preview", "preview", "windows", "x64",
+            "chummer://install-link", CancellationToken.None, transport,
+            Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()), operationId));
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Empty(fixture.Store.BrowserCallbacksById);
+    }
+
+    [Fact]
+    public async Task Browser_approval_rejects_empty_or_duplicate_query_before_issuing_legacy_approval()
+    {
+        using Fixture fixture = new(authenticated: true);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest poll = CreateSignedPoll(key, "attempt-query", bound: true);
+        foreach (string query in new[]
+        {
+            "?installLinkOperationId=",
+            $"?installLinkOperationId={poll.OperationId}&installLinkOperationId={poll.OperationId}"
+        })
+        {
+            fixture.Controller.Request.QueryString = new QueryString(query);
+            ObjectResult result = Assert.IsType<ObjectResult>(await ApproveAttempt(
+                fixture, poll with { OperationId = null }, expectSuccess: false));
+            Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        }
+        Assert.Empty(fixture.Store.BrowserCallbacksById);
+    }
+
+    [Fact]
+    public async Task Bound_browser_login_return_preserves_operation_and_state()
+    {
+        using Fixture fixture = new(authenticated: false);
+        ConfigureAttemptController(fixture);
+        using RSA key = RSA.Create(2048);
+        AndroidInstallLinkProofPollRequest poll = CreateSignedPoll(key, "attempt-login", bound: true);
+        RedirectResult redirect = Assert.IsType<RedirectResult>(
+            await ApproveAttempt(fixture, poll, expectSuccess: false, callbackUri: "chummer://install-link?state=attempt-state"));
+        var login = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri("https://chummer.run" + redirect.Url).Query);
+        string next = HubBrowserAuthService.SanitizeNextPath(Assert.Single(login["next"]), "/safe");
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri("https://chummer.run" + next).Query);
+        Assert.Equal(poll.OperationId, Assert.Single(query["installLinkOperationId"]));
+        Assert.Equal(new Uri("chummer://install-link?state=attempt-state").AbsoluteUri, Assert.Single(query["installLinkCallbackUri"]));
+        Assert.Empty(fixture.Store.BrowserCallbacksById);
+    }
+
+    private static void ConfigureAttemptController(Fixture fixture)
+    {
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        fixture.Controller.Request.Path = "/account/access/install-link";
+        fixture.Controller.Request.Headers.Authorization = "Bearer desktop-access-token";
+    }
+
+    private static async Task<IActionResult> ApproveAttempt(
+        Fixture fixture, AndroidInstallLinkProofPollRequest poll, bool expectSuccess = true,
+        string callbackUri = "chummer://install-link")
+    {
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            poll.InstallationId, poll.HeadId, poll.ApplicationVersion, poll.ChannelId, poll.Platform, poll.Arch,
+            callbackUri, CancellationToken.None, InstallLinkingService.LegacyProofPollTransport, poll.PublicKey, poll.OperationId);
+        if (expectSuccess)
+        {
+            Assert.Equal(StatusCodes.Status200OK, Assert.IsType<ContentResult>(result).StatusCode);
+        }
+        return result;
+    }
+
+    private static void ExpireAttempt(Fixture fixture, string callbackId)
+    {
         lock (fixture.Store.Gate)
         {
-            string firstCallbackId = Assert.Single(fixture.Store.BrowserCallbacksById.Values).CallbackId;
-            fixture.Store.BrowserCallbacksById[firstCallbackId] =
-                fixture.Store.BrowserCallbacksById[firstCallbackId] with
-                {
-                    CreatedAtUtc = DateTimeOffset.UtcNow.AddHours(-2)
-                };
+            InstallBrowserCallbackDto callback = fixture.Store.BrowserCallbacksById[callbackId];
+            // Exercise expiry itself; never age CreatedAt to manufacture attempt separation.
+            fixture.Store.BrowserCallbacksById[callbackId] = callback with { ExpiresAtUtc = callback.CreatedAtUtc };
             fixture.Store.PersistLocked();
         }
-
-        // A legacy poll (no attempt stamp, e.g. Android review flow) must keep
-        // seeing the terminal history: 409, not a pending 202.
-        AndroidInstallLinkProofPollRequest legacyPoll = CreateSignedPoll(
-            rsa, publicKey, "desktop-attempt-legacy-install", attemptStartedAt: 0);
-        ObjectResult legacyConflict = Assert.IsType<ObjectResult>(
-            fixture.Controller.PollBrowserCallback(legacyPoll).Result);
-        Assert.Equal(StatusCodes.Status409Conflict, legacyConflict.StatusCode);
-        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
     }
+
+    private static void AssertPending(ActionResult<ExchangeInstallBrowserCallbackResponseDto> result)
+    {
+        AcceptedResult accepted = Assert.IsType<AcceptedResult>(result.Result);
+        AndroidInstallLinkProofPollStatus status = Assert.IsType<AndroidInstallLinkProofPollStatus>(accepted.Value);
+        Assert.Equal(InstallBrowserCallbackStates.Pending, status.State);
+        Assert.False(status.Terminal);
+        Assert.False(status.Completed);
+    }
+
+    private static void AssertPollProblem(ActionResult<ExchangeInstallBrowserCallbackResponseDto> result, int expected)
+        => Assert.Equal(expected, Assert.IsType<ObjectResult>(result.Result).StatusCode);
 
     private static ExchangeInstallBrowserCallbackResponseDto AssertExchange(
         ActionResult<ExchangeInstallBrowserCallbackResponseDto> result)
-    {
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
-        return Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(ok.Value);
-    }
+        => Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(Assert.IsType<OkObjectResult>(result.Result).Value);
+
+    private static string ProofOperationId(string nonce)
+        => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(nonce)).AsSpan(0, 24))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private static AndroidInstallLinkProofPollRequest CreateSignedPoll(
-        RSA key, string publicKey, string installationId, long attemptStartedAt)
+        RSA key, string installationId, bool bound, string? nonce = null, long? issuedAtUnixSeconds = null)
     {
-        long issuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long issuedAt = issuedAtUnixSeconds ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        nonce ??= Guid.NewGuid().ToString("N");
         byte[] proof = Encoding.UTF8.GetBytes(string.Join('\n',
             "chummer.install-link.remote-callback.v1", installationId, "avalonia",
             "6.0.1-preview", "preview", "windows", "x64",
-            issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "0123456789abcdef0123456789abcdef0123456789abcdef"));
+            issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture), nonce));
         try
         {
             return new AndroidInstallLinkProofPollRequest(
                 installationId, "avalonia", "6.0.1-preview", "preview", "windows", "x64",
-                publicKey, issuedAt,
-                "0123456789abcdef0123456789abcdef0123456789abcdef",
+                Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()), issuedAt, nonce,
                 Convert.ToBase64String(key.SignData(proof, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)),
-                "Attempt boundary test",
-                attemptStartedAt);
+                OperationId: bound ? ProofOperationId(nonce) : null);
         }
         finally
         {
