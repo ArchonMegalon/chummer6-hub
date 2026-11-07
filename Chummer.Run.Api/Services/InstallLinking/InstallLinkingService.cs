@@ -1157,6 +1157,7 @@ public sealed partial class InstallLinkingService
                     normalizedSubjectId,
                     normalizedCallbackUri,
                     normalizedCallbackTransport,
+                    request,
                     now);
             if (callback is null)
             {
@@ -1291,6 +1292,7 @@ public sealed partial class InstallLinkingService
                     || !BrowserCallbackRetryOperationMatches(
                         redemptionReceipt,
                         requestSha256,
+                        callbackTransport,
                         operationId,
                         operationSha256))
                 {
@@ -1938,14 +1940,26 @@ public sealed partial class InstallLinkingService
         string? subjectId,
         string callbackUri,
         string callbackTransport,
+        IssueInstallBrowserCallbackRequestDto request,
         DateTimeOffset now)
         => _store.BrowserCallbacksById.Values
             .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
             .Where(item => string.Equals(item.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase))
             .Where(item => item.ExpiresAtUtc > now)
             .Where(item => MatchesIdentity(item.UserId, item.SubjectId, userId, subjectId))
-            .Where(item => string.Equals(item.CallbackUri, callbackUri, StringComparison.OrdinalIgnoreCase))
+            .Where(item => string.Equals(item.CallbackUri, callbackUri, StringComparison.Ordinal))
             .Where(item => BrowserCallbackHasTransportLocked(item, callbackTransport))
+            // A repeated approval may reuse only the exact approved target and key.
+            // A proof-poll signature still has no browser-attempt identifier.
+            .Where(item => string.Equals(item.ArtifactId, NormalizeOptional(request.ArtifactId), StringComparison.Ordinal)
+                && string.Equals(item.PublicKey, NormalizeOptional(request.PublicKey), StringComparison.Ordinal)
+                && string.Equals(item.HeadId, NormalizeOptional(request.HeadId), StringComparison.Ordinal)
+                && string.Equals(item.Version, NormalizeOptional(request.ApplicationVersion) ?? "unknown", StringComparison.Ordinal)
+                && string.Equals(item.Channel, NormalizeOptional(request.ChannelId) ?? "preview", StringComparison.Ordinal)
+                && string.Equals(item.Platform, NormalizeOptional(request.Platform), StringComparison.Ordinal)
+                && string.Equals(item.Arch, NormalizeOptional(request.Arch), StringComparison.Ordinal)
+                && string.Equals(item.HostLabel, NormalizeOptional(request.HostLabel), StringComparison.Ordinal)
+                && string.Equals(item.InstallAccessClass, NormalizeAccessClass(request.InstallAccessClass), StringComparison.Ordinal))
             .OrderByDescending(static item => item.CreatedAtUtc)
             .FirstOrDefault();
 
@@ -2451,6 +2465,7 @@ public sealed partial class InstallLinkingService
     private static bool BrowserCallbackRetryOperationMatches(
         InstallBrowserCallbackRedemptionReceipt receipt,
         string requestSha256,
+        string callbackTransport,
         string? operationId,
         string? operationSha256)
     {
@@ -2466,7 +2481,10 @@ public sealed partial class InstallLinkingService
                 && FixedTimeEquals(storedOperationSha256, operationSha256);
         }
 
-        return FixedTimeEquals(receipt.RequestSha256, requestSha256);
+        // Pre-upgrade proof-poll digests contain no nonce, timestamp or signature.
+        // They cannot establish that this is the original proof being retried.
+        return !string.Equals(callbackTransport, InstallBrowserCallbackTransports.LegacyProofPoll, StringComparison.Ordinal)
+            && FixedTimeEquals(receipt.RequestSha256, requestSha256);
     }
 
     internal static string SecretSha256(string value)

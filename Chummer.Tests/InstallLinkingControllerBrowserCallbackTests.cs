@@ -377,6 +377,8 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal(InstallationGrantStates.Active, firstExchange.Grant.Status);
         string firstGrantId = firstExchange.Grant.GrantId;
 
+        fixture.ReloadInstallLinking();
+
         // Retry with the IDENTICAL proof reaches the recovery path and returns
         // the original grant instead of failing with "already completed".
         ActionResult<ExchangeInstallBrowserCallbackResponseDto> retry =
@@ -386,6 +388,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(retryOk.Value);
         Assert.Equal(InstallationGrantStates.Active, retryExchange.Grant.Status);
         Assert.Equal(firstGrantId, retryExchange.Grant.GrantId);
+        Assert.Equal(firstExchange.Grant.AccessToken, retryExchange.Grant.AccessToken);
         Assert.True(retryExchange.AlreadyClaimed);
         AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
     }
@@ -482,6 +485,221 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         ObjectResult conflict = Assert.IsType<ObjectResult>(attacker.Result);
         Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
         AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Proof_poll_persisted_pre_upgrade_receipt_cannot_recover_with_identical_or_fresh_proof(bool preTransportAuthority)
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        using RSA key = RSA.Create(2048);
+        IssueInstallBrowserCallbackRequestDto approval = CreateProofApproval(key);
+        InstallBrowserCallbackDto callback = fixture.InstallLinking.IssueBrowserCallback(
+            approval, fixture.User.UserId, fixture.SubjectId, InstallLinkingService.LegacyProofPollTransport).Callback;
+        AndroidInstallLinkProofPollRequest original = SignProofPoll(key, approval);
+        ExchangeInstallBrowserCallbackResponseDto first = Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(
+            fixture.InstallLinking.PollBrowserCallback(original).Exchange);
+
+        // Persist the pre-upgrade shape, including the older pre-transport-authority form.
+        // Loading it must remain supported, but its exchange digest cannot identify a proof retry.
+        lock (fixture.Store.Gate)
+        {
+            InstallBrowserCallbackRedemptionReceipt receipt = fixture.Store.BrowserCallbackRedemptionReceiptsByCallbackId[callback.CallbackId];
+            fixture.Store.BrowserCallbackRedemptionReceiptsByCallbackId[callback.CallbackId] = receipt with
+            {
+                OperationId = null,
+                OperationSha256 = null,
+                CallbackTransport = preTransportAuthority ? null : receipt.CallbackTransport
+            };
+            if (preTransportAuthority)
+            {
+                fixture.Store.BrowserCallbackTransportIntentsByCallbackId.Remove(callback.CallbackId);
+            }
+            fixture.Store.PersistLocked();
+        }
+        fixture.ReloadInstallLinking();
+        InstallBrowserCallbackRedemptionReceipt loaded = Assert.Single(fixture.Store.BrowserCallbackRedemptionReceiptsByCallbackId.Values);
+        Assert.Null(loaded.OperationId);
+        Assert.Null(loaded.OperationSha256);
+        Assert.Equal(first.Grant.GrantId, loaded.GrantId);
+
+        AndroidInstallLinkProofPollRequest fresh = SignProofPoll(key, approval, "fedcba9876543210fedcba9876543210");
+        foreach (AndroidInstallLinkProofPollRequest poll in new[] { original, fresh })
+        {
+            ObjectResult rejected = Assert.IsType<ObjectResult>(fixture.Controller.PollBrowserCallback(poll).Result);
+            Assert.Equal(StatusCodes.Status409Conflict, rejected.StatusCode);
+        }
+        Assert.Equal(first.Grant, Assert.Single(fixture.Store.GrantsById.Values));
+        Assert.Equal(InstallBrowserCallbackStates.Redeemed, Assert.Single(fixture.Store.BrowserCallbacksById.Values).Status);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Theory]
+    [InlineData("unknown-head", "windows", "x64", StatusCodes.Status404NotFound)]
+    [InlineData("avalonia", "unknown-platform", "x64", StatusCodes.Status404NotFound)]
+    [InlineData("avalonia", "windows", "arm64", StatusCodes.Status404NotFound)]
+    [InlineData("avalonia", "windows", "unknown-arch", StatusCodes.Status404NotFound)]
+    [InlineData("android", "windows", "x64", StatusCodes.Status404NotFound)]
+    [InlineData("avalonia", "android", "arm64", StatusCodes.Status404NotFound)]
+    [InlineData("Android", "android", "arm64", StatusCodes.Status404NotFound)]
+    [InlineData("android", "Android", "arm64", StatusCodes.Status404NotFound)]
+    [InlineData(null, "windows", "x64", StatusCodes.Status400BadRequest)]
+    [InlineData("avalonia", null, "x64", StatusCodes.Status400BadRequest)]
+    [InlineData("avalonia", "windows", null, StatusCodes.Status400BadRequest)]
+    [InlineData("avalonia", "windows", " ", StatusCodes.Status400BadRequest)]
+    public async Task Desktop_proof_poll_requires_complete_catalog_target(
+        string? headId, string? platform, string? arch, int expectedStatus)
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        fixture.Controller.Request.Headers.Authorization = "Bearer desktop-access-token";
+        using RSA key = RSA.Create(2048);
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            "desktop-invalid-target", headId, "6.0.1-preview", "preview", platform, arch,
+            "chummer://install-link", CancellationToken.None, "proof_poll",
+            Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()));
+
+        if (expectedStatus == StatusCodes.Status400BadRequest)
+        {
+            Assert.Equal(expectedStatus, Assert.IsType<ObjectResult>(result).StatusCode);
+        }
+        else
+        {
+            ContentResult page = Assert.IsType<ContentResult>(result);
+            Assert.Equal(expectedStatus, page.StatusCode);
+            Assert.Contains("This install needs a current desktop package", page.Content, StringComparison.Ordinal);
+        }
+        Assert.Empty(fixture.Store.BrowserCallbacksById);
+        Assert.Empty(fixture.Store.InstallationsById);
+        Assert.Empty(fixture.Store.GrantsById);
+    }
+
+    [Theory]
+    [InlineData("avalonia", "linux", "avalonia-linux-x64-installer")]
+    [InlineData("blazor-desktop", "windows", "blazor-desktop-win-x64-installer")]
+    public async Task Desktop_proof_poll_uses_existing_catalog_platform_matching(string headId, string platform, string artifactId)
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        fixture.Controller.Request.Headers.Authorization = "Bearer desktop-access-token";
+        using RSA key = RSA.Create(2048);
+        IssueInstallBrowserCallbackRequestDto request = CreateProofApproval(key) with { HeadId = headId, Platform = platform };
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            request.InstallationId, request.HeadId, request.ApplicationVersion, request.ChannelId, request.Platform, request.Arch,
+            request.CallbackUri, CancellationToken.None, "proof_poll", request.PublicKey);
+
+        Assert.Equal(StatusCodes.Status200OK, Assert.IsType<ContentResult>(result).StatusCode);
+        Assert.Equal(artifactId, Assert.Single(fixture.Store.BrowserCallbacksById.Values).ArtifactId);
+        OkObjectResult exchange = Assert.IsType<OkObjectResult>(fixture.Controller.PollBrowserCallback(SignProofPoll(key, request)).Result);
+        Assert.Equal(artifactId, Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(exchange.Value).Installation.ArtifactId);
+    }
+
+    [Theory]
+    [InlineData("chummer://install-link")]
+    [InlineData("http://127.0.0.1:47761/install-link/callback")]
+    public async Task Desktop_proof_poll_browser_approval_rejects_duplicate_state_and_strips_credentials(string callbackBase)
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        fixture.Controller.Request.Headers.Authorization = "Bearer desktop-access-token";
+        using RSA key = RSA.Create(2048);
+        string publicKey = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo());
+        string callbackUri = callbackBase + "?state=safe&nonce=safe-nonce&accessToken=prior-access&callbackCode=foreign-code";
+        IActionResult rejected = await fixture.Controller.BrowserInstallLink(
+            "desktop-query-install", "avalonia", "6.0.1-preview", "preview", "windows", "x64",
+            callbackUri + "&state=duplicate", CancellationToken.None, "proof_poll", publicKey);
+        Assert.Equal(StatusCodes.Status400BadRequest, Assert.IsType<ObjectResult>(rejected).StatusCode);
+        Assert.Empty(fixture.Store.BrowserCallbacksById);
+
+        IActionResult approved = await fixture.Controller.BrowserInstallLink(
+            "desktop-query-install", "avalonia", "6.0.1-preview", "preview", "windows", "x64",
+            callbackUri, CancellationToken.None, "proof_poll", publicKey);
+        ContentResult page = Assert.IsType<ContentResult>(approved);
+        Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(callback.CallbackUri!).Query);
+        Assert.Equal(2, query.Count);
+        Assert.Equal("safe", Assert.Single(query["state"]));
+        Assert.Equal("safe-nonce", Assert.Single(query["nonce"]));
+        Assert.DoesNotContain("prior-access", callback.CallbackUri, StringComparison.Ordinal);
+        Assert.DoesNotContain("foreign-code", callback.CallbackUri, StringComparison.Ordinal);
+        Assert.DoesNotContain("prior-access", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("foreign-code", page.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain(callback.CallbackCode, page.Content, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("key")]
+    [InlineData("head")]
+    [InlineData("version")]
+    [InlineData("channel")]
+    [InlineData("platform")]
+    [InlineData("arch")]
+    [InlineData("artifact")]
+    [InlineData("host")]
+    [InlineData("access")]
+    [InlineData("state")]
+    public void Pending_proof_poll_approval_reuses_only_exact_identity(string changedField)
+    {
+        using Fixture fixture = new(authenticated: true);
+        using RSA key = RSA.Create(2048);
+        using RSA otherKey = RSA.Create(2048);
+        IssueInstallBrowserCallbackRequestDto request = CreateProofApproval(key) with { CallbackUri = "chummer://install-link?state=case-sensitive" };
+        InstallBrowserCallbackDto first = fixture.InstallLinking.IssueBrowserCallback(
+            request, fixture.User.UserId, fixture.SubjectId, InstallLinkingService.LegacyProofPollTransport).Callback;
+        InstallBrowserCallbackDto repeated = fixture.InstallLinking.IssueBrowserCallback(
+            request, fixture.User.UserId, fixture.SubjectId, InstallLinkingService.LegacyProofPollTransport).Callback;
+        Assert.Equal(first.CallbackId, repeated.CallbackId);
+
+        IssueInstallBrowserCallbackRequestDto changed = changedField switch
+        {
+            "key" => request with { PublicKey = Convert.ToBase64String(otherKey.ExportSubjectPublicKeyInfo()) },
+            "head" => request with { HeadId = "blazor-desktop" },
+            "version" => request with { ApplicationVersion = "6.0.2-preview" },
+            "channel" => request with { ChannelId = "stable" },
+            "platform" => request with { Platform = "linux" },
+            "arch" => request with { Arch = "arm64" },
+            "artifact" => request with { ArtifactId = "replacement-installer" },
+            "host" => request with { HostLabel = "other-host" },
+            "access" => request with { InstallAccessClass = InstallAccessClasses.AccountRecommended },
+            "state" => request with { CallbackUri = "chummer://install-link?state=CASE-SENSITIVE" },
+            _ => throw new ArgumentOutOfRangeException(nameof(changedField))
+        };
+        InstallBrowserCallbackDto next = fixture.InstallLinking.IssueBrowserCallback(
+            changed, fixture.User.UserId, fixture.SubjectId, InstallLinkingService.LegacyProofPollTransport).Callback;
+        Assert.NotEqual(first.CallbackId, next.CallbackId);
+        Assert.Equal(changed.PublicKey, next.PublicKey);
+        Assert.Equal(changed.ApplicationVersion, next.Version);
+        Assert.Equal(changed.ArtifactId, next.ArtifactId);
+        Assert.Equal(changed.CallbackUri, next.CallbackUri);
+        Assert.Equal(2, fixture.Store.BrowserCallbacksById.Count);
+        Assert.Empty(fixture.Store.GrantsById);
+    }
+
+    [Fact]
+    public void New_browser_approval_cannot_move_a_linked_install_to_another_account()
+    {
+        using Fixture fixture = new(authenticated: true);
+        using RSA key = RSA.Create(2048);
+        IssueInstallBrowserCallbackRequestDto request = CreateProofApproval(key);
+        fixture.InstallLinking.IssueBrowserCallback(
+            request, fixture.User.UserId, fixture.SubjectId, InstallLinkingService.LegacyProofPollTransport);
+        AndroidInstallLinkProofPollRequest proof = SignProofPoll(key, request);
+        ExchangeInstallBrowserCallbackResponseDto original = Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(
+            fixture.InstallLinking.PollBrowserCallback(proof).Exchange);
+
+        InstallLinkingOperationException conflict = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.InstallLinking.IssueBrowserCallback(request, "other-user", "other-subject", InstallLinkingService.LegacyProofPollTransport));
+        Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
+        ExchangeInstallBrowserCallbackResponseDto retry = Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(
+            fixture.InstallLinking.PollBrowserCallback(proof).Exchange);
+        Assert.True(retry.AlreadyClaimed);
+        Assert.Equal(original.Grant, retry.Grant);
+        Assert.Equal(fixture.User.UserId, retry.Installation.UserId);
+        Assert.Equal(fixture.SubjectId, retry.Installation.SubjectId);
+        Assert.Single(fixture.Store.BrowserCallbacksById);
     }
 
     [Fact]
@@ -1120,9 +1338,46 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal("no-referrer", headers["Referrer-Policy"].ToString());
     }
 
+    private static IssueInstallBrowserCallbackRequestDto CreateProofApproval(RSA key)
+        => new(
+            InstallationId: "desktop-proof-repair-install",
+            ArtifactId: "avalonia-win-x64-installer",
+            ApplicationVersion: "6.0.1-preview",
+            ChannelId: "preview",
+            HeadId: "avalonia",
+            Platform: "windows",
+            Arch: "x64",
+            CallbackUri: "chummer://install-link",
+            PublicKey: Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()),
+            HostLabel: null,
+            InstallAccessClass: InstallAccessClasses.AccountRequired);
+
+    private static AndroidInstallLinkProofPollRequest SignProofPoll(
+        RSA key, IssueInstallBrowserCallbackRequestDto approval, string nonce = "0123456789abcdef0123456789abcdef")
+    {
+        long issuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        byte[] proof = Encoding.UTF8.GetBytes(string.Join('\n',
+            "chummer.install-link.remote-callback.v1", approval.InstallationId, approval.HeadId,
+            approval.ApplicationVersion, approval.ChannelId, approval.Platform, approval.Arch,
+            issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture), nonce));
+        try
+        {
+            return new AndroidInstallLinkProofPollRequest(
+                approval.InstallationId, approval.HeadId!, approval.ApplicationVersion!, approval.ChannelId!,
+                approval.Platform!, approval.Arch!, approval.PublicKey!, issuedAt, nonce,
+                Convert.ToBase64String(key.SignData(proof, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)), approval.HostLabel);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(proof);
+        }
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
+        private readonly IConfiguration _configuration;
+        private readonly IDataProtectionProvider _dataProtection;
 
         public Fixture(bool authenticated)
         {
@@ -1201,6 +1456,8 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(communityStore);
             IDataProtectionProvider dataProtection = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
+            _configuration = configuration;
+            _dataProtection = dataProtection;
             InstallLinkingStore installLinkingStore = new(
                 configuration,
                 dataProtection,
@@ -1235,15 +1492,29 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         public AccountService Accounts { get; }
 
-        public InstallLinkingStore Store { get; }
+        public InstallLinkingStore Store { get; private set; }
 
-        public InstallLinkingService InstallLinking { get; }
+        public InstallLinkingService InstallLinking { get; private set; }
 
         public PublicReleaseManifestService Releases { get; }
 
         public AccountDesktopLaunchTicketService DesktopLaunchTickets { get; }
 
-        public InstallLinkingController Controller { get; }
+        public InstallLinkingController Controller { get; private set; }
+
+        public void ReloadInstallLinking()
+        {
+            ControllerContext context = Controller.ControllerContext;
+            Store.Dispose();
+            Store = new InstallLinkingStore(_configuration, _dataProtection, NullLogger<InstallLinkingStore>.Instance);
+            InstallLinking = new InstallLinkingService(Store, _configuration);
+            Controller = new InstallLinkingController(
+                Identity, Accounts, InstallLinking, DesktopLaunchTickets, Releases,
+                supportCases: null!, supportPresentation: new SupportCasePresentationService(), _configuration)
+            {
+                ControllerContext = context
+            };
+        }
 
         public Chummer.Run.Contracts.Community.HubUserDto User { get; private set; } = null!;
 
