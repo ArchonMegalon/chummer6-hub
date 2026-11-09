@@ -94,7 +94,7 @@ PRIVACY_LAUNCH_GATE_CONTRACT = (
     / "PRIVACY_LAUNCH_GATE.json"
 )
 PRIVACY_LAUNCH_GATE_CONTRACT_NAME = "chummer.privacy_launch_gate"
-PRIVACY_LAUNCH_GATE_CONTRACT_VERSION = 1
+PRIVACY_LAUNCH_GATE_CONTRACT_VERSION = 2
 PROOF_REVIEW_ROLLOUT_STATE = "public_release_review_required"
 BOUNDED_PREVIEW_READY_PROFILE = "v4_unsigned_windows_preview_ready"
 BOUNDED_PREVIEW_READINESS_CONTRACT = (
@@ -1954,6 +1954,11 @@ def apply_current_release_supportability_floor(
             f"{readiness_blocker}."
         ),
     )
+    if projected.get("publicationProfile") == "windows_unsigned_preview_v1":
+        disclosure = str(projected.get("message") or "").strip()
+        for field in ("rolloutReason", "supportabilitySummary", "knownIssueSummary", "fixAvailabilitySummary"):
+            if disclosure and disclosure not in str(projected.get(field) or ""):
+                projected[field] = disclosure + " " + str(projected.get(field) or "")
     return projected
 
 
@@ -2261,11 +2266,52 @@ def _copy_without_symlinks(source: Path, destination: Path) -> None:
         shutil.copy2(source, destination)
 
 
+def _validate_windows_preview_candidate_files(source_root: Path) -> None:
+    manifests = [read_json_object(source_root / name, name) if (source_root / name).is_file() else None
+                 for name in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST)]
+    profile = "windows_unsigned_preview_v1"
+    for row in manifests:
+        if row is not None and (row.get("publicationProfile", "") not in ("", profile)
+                                or ("publicationScope" in row and not row.get("publicationProfile"))):
+            raise ReleaseShelfError("Unknown or unnamed publication profile")
+    if not any(row is not None and row.get("publicationProfile") == profile for row in manifests):
+        return
+    if source_root.is_symlink():
+        raise ReleaseShelfError("Windows preview source root must not be a symlink")
+    if not all(isinstance(row, dict) for row in manifests):
+        raise ReleaseShelfError("Windows preview requires both manifest projections")
+    canonical, compatibility = manifests
+    for key in ("publicationProfile", "publicationScope", "platformScope", "message", "releaseProof"):
+        if canonical.get(key) != compatibility.get(key):
+            raise ReleaseShelfError(f"Windows preview manifests disagree on {key}")
+    for row in manifests:
+        if (row.get("channel") != "preview" or row.get("status") != "published"
+                or row.get("supportabilityState") != "review_required"
+                or row.get("rolloutState") != "public_release_review_required"
+                or row.get("platformScope") != "windows_only"
+                or not str(row.get("message") or "").startswith("Unsigned Windows-only preview.")
+                or any(key in row for key in ("projectionProfile", "releaseProfile", "projectionStage",
+                                              "codeDeployCurrentShelfAuthority", "channelPromotionAuthority"))):
+            raise ReleaseShelfError("Windows preview must preserve its scoped review-required posture")
+    allowed = {
+        CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST,
+        "files/chummer-avalonia-win-x64-installer.exe",
+        "files/chummer-avalonia-win-x64-payload.zip",
+        "files/chummer-avalonia-win-x64-payload.zip.json",
+        "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+    }
+    for path in source_root.rglob("*"):
+        relative = path.relative_to(source_root).as_posix()
+        if path.is_symlink() or (not path.is_dir() and relative not in allowed):
+            raise ReleaseShelfError(f"Windows preview contains an unselected public file: {relative}")
+
+
 def copy_candidate(source_root: Path, generation_root: Path) -> None:
     if not source_root.is_dir():
         raise ReleaseShelfError(f"candidate root is missing: {source_root}")
     if generation_root.exists():
         raise ReleaseShelfError(f"generation destination already exists: {generation_root}")
+    _validate_windows_preview_candidate_files(source_root)
     generation_root.mkdir(parents=True)
     for name in sorted(COPYABLE_FILES):
         source = source_root / name

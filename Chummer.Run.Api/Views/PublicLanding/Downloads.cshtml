@@ -167,6 +167,10 @@
 }
 else
 {
+    @if (Model.Manifest.Message?.StartsWith("Unsigned Windows-only preview.", StringComparison.Ordinal) == true)
+    {
+        <p class="muted-copy" data-publication-profile="windows_unsigned_preview_v1">@Model.Manifest.Message</p>
+    }
     <section class="downloads-choice-list minimal-lane-grid" aria-label="Downloads">
         <article class="downloads-choice-card" id="stable">
             <div>

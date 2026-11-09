@@ -44,6 +44,9 @@ array_count() {
 }
 
 VERIFY_ARGS=()
+if [[ -n "${CHUMMER_PUBLIC_PUBLICATION_PROFILE:-}" ]]; then
+  VERIFY_ARGS+=(--publication-profile "$CHUMMER_PUBLIC_PUBLICATION_PROFILE")
+fi
 if [[ "${CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE:-1}" != "0" ]]; then
   VERIFY_ARGS+=(--require-complete-desktop-coverage)
 fi
