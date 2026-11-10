@@ -76,6 +76,7 @@
     <Compile Include="..\Chummer.Tests\IdentityLinkServiceTests.cs" Link="IdentityLinkServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\IdentitySubjectErasureTests.cs" Link="IdentitySubjectErasureTests.cs" />
     <Compile Include="..\Chummer.Tests\IdentityTeablePersistenceTests.cs" Link="IdentityTeablePersistenceTests.cs" />
+    <Compile Include="..\Chummer.Tests\IdentityEmailEntryTests.cs" Link="IdentityEmailEntryTests.cs" />
     <Compile Include="..\Chummer.Tests\InstallLinkedWorkspaceTeablePersistenceTests.cs" Link="InstallLinkedWorkspaceTeablePersistenceTests.cs" />
     <Compile Include="..\Chummer.Tests\InstallLinkingPostgresCoordinatorStoreTests.cs" Link="InstallLinkingPostgresCoordinatorStoreTests.cs" />
     <Compile Include="..\Chummer.Tests\InstallLinkingStoreActivationTests.cs" Link="InstallLinkingStoreActivationTests.cs" />
@@ -104,6 +105,7 @@
     <Compile Include="..\Chummer.Tests\TeableImportantWorkServiceTests.cs" Link="TeableImportantWorkServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\TeableRecoveryBundleTests.cs" Link="TeableRecoveryBundleTests.cs" />
     <Compile Include="..\Chummer.Tests\TeableRevisionStoreTests.cs" Link="TeableRevisionStoreTests.cs" />
+    <Compile Include="..\Chummer.Tests\TeableRevisionStoreTests.Remote.cs" Link="TeableRevisionStoreTests.Remote.cs" />
     <Compile Include="..\Chummer.Tests\TeableUserProjectionServiceTests.cs" Link="TeableUserProjectionServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\UserExperienceServiceTests.cs" Link="UserExperienceServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\HubSessionAccountAdmissionServiceTests.cs" Link="HubSessionAccountAdmissionServiceTests.cs" />
