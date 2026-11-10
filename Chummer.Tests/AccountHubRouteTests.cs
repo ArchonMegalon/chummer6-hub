@@ -31,6 +31,31 @@ namespace Chummer.Tests;
 public sealed class AccountHubRouteTests
 {
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Profile_display_name_changes_require_the_authenticated_account(bool authenticated)
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        const string subjectId = "subject.account-hub-route";
+        var original = fixture.Accounts.EnsureUser(subjectId, "Original Name", "account.runner@example.invalid");
+        var result = await fixture.CreateController(authenticated).UpsertProfile(
+            new UpsertHubUserProfileRequest(null, DisplayName: "Authorized Name"), CancellationToken.None);
+
+        if (authenticated)
+        {
+            var updated = Assert.IsType<HubUserDto>(Assert.IsType<OkObjectResult>(result.Result).Value);
+            Assert.Equal(original.UserId, updated.UserId);
+            Assert.Equal(subjectId, updated.SubjectId);
+            Assert.Equal("Authorized Name", updated.DisplayName);
+        }
+        else
+        {
+            Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+        }
+        Assert.Equal(authenticated ? "Authorized Name" : "Original Name", fixture.Accounts.GetBySubject(subjectId)!.DisplayName);
+    }
+
+    [Theory]
     [InlineData(null, "publication")]
     [InlineData("access", "publication")]
     [InlineData("roster", "publication")]

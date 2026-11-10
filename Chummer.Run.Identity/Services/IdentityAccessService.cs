@@ -221,7 +221,8 @@ public sealed class IdentityAccessService : IIdentityAccessService
             }
 
             _recentEmailStartAttempts.Add(new EmailStartAttemptState(email, now));
-            EnsureSubjectLocked(subjectId, displayName, email, new[] { "player" }, now);
+            // Unverified input belongs only to the ticket. Create a new subject
+            // after verification without mutating an existing subject at start.
             var ticketId = $"eml_{Guid.NewGuid():N}";
             var ticket = new EmailTicketState
             {
@@ -278,7 +279,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
                 SubjectId: ticket.SubjectId,
                 DisplayName: ticket.DisplayName,
                 Email: ticket.Email,
-                RequestedRoles: new[] { "player" }));
+                RequestedRoles: new[] { "player" }), preserveExistingSubject: true);
             // IssueSessionLocked committed ticket consumption and session issue
             // together. A second commit could fail after the first was durable.
             return session;
@@ -438,7 +439,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
         }
     }
 
-    private IdentitySessionIssueResponse IssueSessionLocked(IdentitySessionIssueRequest request)
+    private IdentitySessionIssueResponse IssueSessionLocked(IdentitySessionIssueRequest request, bool preserveExistingSubject = false)
     {
         var now = DateTimeOffset.UtcNow;
         var requestedRoles = request.RequestedRoles ?? Array.Empty<string>();
@@ -447,12 +448,16 @@ public sealed class IdentityAccessService : IIdentityAccessService
             : TimeSpan.FromHours(8);
 
         var subjectId = NormalizeRequired(request.SubjectId);
-        var subject = EnsureSubjectLocked(
-            subjectId,
-            NormalizeOptional(request.DisplayName) ?? subjectId,
-            NormalizeOptional(request.Email),
-            requestedRoles,
-            now);
+        // Email possession authorizes a session, not edits to an existing profile.
+        // Explicit privileged session issuance retains its existing update path.
+        var subject = preserveExistingSubject && _subjects.TryGetValue(subjectId, out var existing)
+            ? existing
+            : EnsureSubjectLocked(
+                subjectId,
+                NormalizeOptional(request.DisplayName) ?? subjectId,
+                NormalizeOptional(request.Email),
+                requestedRoles,
+                now);
 
         var accessToken = BuildToken(subject.SubjectId, "access");
         var refreshToken = BuildToken(subject.SubjectId, "refresh");
@@ -748,9 +753,13 @@ public sealed class IdentityAccessService : IIdentityAccessService
                 throw new InvalidDataException("Invalid identity primary session.");
         var tickets = new HashSet<string>(StringComparer.Ordinal);
         foreach (var ticket in snapshot.EmailTickets)
-            if (ticket is null || !subjects.Contains(ticket.SubjectId) || !CanonicalHash(ticket.TicketHash)
+            if (ticket is null || string.IsNullOrWhiteSpace(ticket.SubjectId) || !CanonicalHash(ticket.TicketHash)
                 || ticket.TicketId is not null || !tickets.Add(ticket.TicketHash!)
                 || string.IsNullOrWhiteSpace(ticket.Email) || string.IsNullOrWhiteSpace(ticket.DisplayName)
+                // New accounts remain pending until verified. Orphan tickets
+                // must still bind to the exact subject derived from their email.
+                || (!subjects.Contains(ticket.SubjectId)
+                    && !string.Equals(ticket.SubjectId, IdentitySubjectDerivation.FromEmail(ticket.Email), StringComparison.Ordinal))
                 || ticket.ExpiresAtUtc <= ticket.CreatedAtUtc)
                 throw new InvalidDataException("Invalid identity primary ticket.");
         if (snapshot.RecentEmailStartAttempts?.Any(attempt => attempt is null || string.IsNullOrWhiteSpace(attempt.Email)) == true)

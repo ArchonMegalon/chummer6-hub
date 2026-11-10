@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Chummer.Run.Contracts.Identity;
 using Chummer.Run.Identity.Services;
 using Chummer.Storage.Teable;
@@ -111,14 +112,80 @@ public sealed class IdentityTeablePersistenceTests : IDisposable
         var entry = Service(remote, mail: mail).StartEmailEntry(new("email@example.invalid", "Synthetic"));
         Assert.Equal(1, mail.Deliveries);
         Assert.False(string.IsNullOrEmpty(entry.TicketId));
+        Assert.Null(Service(remote, "pending-host").GetSubject(entry.SubjectId));
         int posts = remote.HeadPosts;
         var issue = Service(remote, "new-host", mail).CompleteEmailEntry(new(entry.TicketId));
         Assert.Equal(posts + 1, remote.HeadPosts);
+        Assert.Equal(entry.SubjectId, issue.SubjectId);
+        Assert.Equal(entry.Email, issue.Email);
+        Assert.Equal("Synthetic", Service(remote).GetSubject(issue.SubjectId)!.DisplayName);
         Assert.Throws<KeyNotFoundException>(() => Service(remote).CompleteEmailEntry(new(entry.TicketId)));
         Assert.True(Service(remote).Introspect(new(issue.AccessToken)).Active);
         Assert.Equal(1, mail.Deliveries);
         Service(remote, "another-host", mail).StartEmailEntry(new("email@example.invalid", "Synthetic"));
         Assert.Equal(1, mail.Deliveries); // Recipient cooldown also survived loss of the first host.
+    }
+
+    [Fact]
+    public void Email_start_and_completion_preserve_existing_primary_subject_across_hosts()
+    {
+        using var remote = new Remote();
+        var mail = new Mail();
+        var first = Service(remote, mail: mail);
+        const string email = "existing@example.invalid";
+        string subjectId = IdentitySubjectDerivation.FromEmail(email);
+        first.IssueSession(new(subjectId, "Original Name", email, ["gm"]));
+        string original = JsonSerializer.Serialize(first.GetSubject(subjectId));
+
+        var entry = first.StartEmailEntry(new(email, "Unverified Name"));
+        var restored = Service(remote, "other-host", mail);
+        Assert.Equal(original, JsonSerializer.Serialize(restored.GetSubject(subjectId)));
+        restored.StartEmailEntry(new(email, "Repeated Unverified Name"));
+        Assert.Equal(1, mail.Deliveries);
+        Assert.Equal(original, JsonSerializer.Serialize(Service(remote).GetSubject(subjectId)));
+
+        var session = Service(remote).CompleteEmailEntry(new(entry.TicketId));
+        Assert.Equal("Original Name", session.DisplayName);
+        Assert.Equal(new[] { "gm" }, session.Roles);
+        Assert.Equal(original, JsonSerializer.Serialize(Service(remote).GetSubject(subjectId)));
+        Assert.True(Service(remote).Introspect(new(session.AccessToken)).Active);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Lost_completion_response_does_not_replay_or_change_existing_profile(bool existing)
+    {
+        using var remote = new Remote();
+        var first = Service(remote);
+        const string email = "lost-response@example.invalid";
+        string subjectId = IdentitySubjectDerivation.FromEmail(email);
+        if (existing) first.IssueSession(new(subjectId, "Original Name", email));
+        var entry = first.StartEmailEntry(new(email, "Proposed Name"));
+        remote.CommitThenFailHard = true;
+
+        Assert.Throws<TeableRequestFailureException>(() => first.CompleteEmailEntry(new(entry.TicketId)));
+        int posts = remote.HeadPosts;
+        Assert.False(first.IsStorageReady());
+        Assert.Throws<InvalidOperationException>(() => first.CompleteEmailEntry(new(entry.TicketId)));
+        var cold = Service(remote, "recovery");
+        Assert.Equal(existing ? "Original Name" : "Proposed Name", cold.GetSubject(subjectId)!.DisplayName);
+        Assert.Throws<KeyNotFoundException>(() => cold.CompleteEmailEntry(new(entry.TicketId)));
+        Assert.Equal(posts, remote.HeadPosts);
+    }
+
+    [Fact]
+    public async Task Pending_new_subject_ticket_must_bind_to_its_email_in_primary_snapshot()
+    {
+        using var remote = new Remote();
+        Service(remote).StartEmailEntry(new("pending@example.invalid", "Pending Runner"));
+        var store = remote.Store();
+        var head = (await store.ReadAsync("identity"))!;
+        var snapshot = JsonNode.Parse(head.Bytes)!;
+        snapshot["emailTickets"]![0]!["subjectId"] = IdentitySubjectDerivation.FromEmail("unrelated@example.invalid");
+        await store.CompareExchangeAsync("identity", head, Guid.NewGuid(), Encoding.UTF8.GetBytes(snapshot.ToJsonString()));
+
+        Assert.Throws<InvalidDataException>(() => Service(remote, "cold-host"));
     }
 
     [Fact]

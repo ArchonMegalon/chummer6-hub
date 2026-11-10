@@ -64,6 +64,11 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(RunIdentityTestsOnly)' == 'true'">
+    <Compile Include="IdentityEmailEntryTests.cs" />
+    <Compile Include="IdentityEmailDeliveryServiceTests.cs" />
+    <Compile Include="IdentityTeablePersistenceTests.cs" />
+    <Compile Include="IdentityEmailTeablePersistenceTests.cs" />
+    <Compile Include="TeableRevisionStoreTests.Remote.cs" />
     <Compile Include="IdentitySubjectErasureTests.cs" />
     <Compile Include="IdentityAdminRouteAuthorizationTests.cs" />
     <Compile Include="IdentityEmailWebhookAuthorizationTests.cs" />
@@ -107,6 +112,7 @@
     <Compile Include="OriginDossierFirstPartyDocumentServiceTests.cs" />
     <Compile Include="DataProtectionKeyProtectionConfiguratorTests.cs" />
     <Compile Include="TeableRevisionStoreTests.cs" />
+    <Compile Include="TeableRevisionStoreTests.Remote.cs" />
     <Compile Include="TeableRecoveryBundleTests.cs" />
     <Compile Include="TeableApiActivationTests.cs" />
     <Compile Include="InstallLinkingPostgresCoordinatorStoreTests.cs" />
