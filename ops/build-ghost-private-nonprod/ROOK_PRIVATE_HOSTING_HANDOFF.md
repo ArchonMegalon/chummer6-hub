@@ -5,6 +5,13 @@ through Hub PR #237. It
 does not record a deployment, provider readback, public route, or live-support
 capability.
 
+The separately ported Avatar Gateway foundation has independent implementation,
+test, deployment, provider, and live-authority axes. Its current fail-closed
+posture and blockers are recorded in
+[`ROOK_AVATAR_GATEWAY_STATUS.md`](ROOK_AVATAR_GATEWAY_STATUS.md). In particular,
+candidate source and focused tests do not make that gateway deployable,
+provider-enabled, or live-authoritative.
+
 ## Source boundary
 
 The private lane keeps two different access paths separate:

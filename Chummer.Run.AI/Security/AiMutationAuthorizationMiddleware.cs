@@ -9,6 +9,8 @@ public sealed class AiMutationAuthorizationMiddleware
 {
     public const string BuildGhostPrivateToolPath = "/api/v1/ai/build-ghost/tool";
     public const string BuildGhostPrivateProviderToolPath = "/api/v2/ai/build-ghost/tool";
+    public const string AvatarProviderPathPrefix = "/api/internal/avatar/provider";
+    public const string AvatarContextAdministrationPathPrefix = "/api/internal/avatar/contexts";
     public const string PrimaryTokenConfigurationKey = "CHUMMER_AI_INTERNAL_API_TOKEN";
     public const string FallbackTokenConfigurationKey = "FLEET_INTERNAL_API_TOKEN";
     internal static readonly object AuthorizationMarker = new();
@@ -22,7 +24,7 @@ public sealed class AiMutationAuthorizationMiddleware
 
     public async Task InvokeAsync(HttpContext context, IConfiguration configuration)
     {
-        if (IsPrivateToolRequest(context.Request))
+        if (IsPrivateToolRequest(context.Request) || IsAvatarGatewayRequest(context.Request))
         {
             context.Response.Headers.CacheControl = "no-store";
         }
@@ -76,6 +78,10 @@ public sealed class AiMutationAuthorizationMiddleware
         {
             return true;
         }
+        if (IsAvatarGatewayRequest(request))
+        {
+            return true;
+        }
 
         if (!HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method))
         {
@@ -91,6 +97,15 @@ public sealed class AiMutationAuthorizationMiddleware
         => HttpMethods.IsPost(request.Method)
             && (string.Equals(request.Path.Value, BuildGhostPrivateToolPath, StringComparison.Ordinal)
                 || string.Equals(request.Path.Value, BuildGhostPrivateProviderToolPath, StringComparison.Ordinal));
+
+    private static bool IsAvatarGatewayRequest(HttpRequest request)
+        => (HttpMethods.IsPost(request.Method) || HttpMethods.IsDelete(request.Method))
+            && (request.Path.StartsWithSegments(
+                    AvatarProviderPathPrefix,
+                    StringComparison.OrdinalIgnoreCase)
+                || request.Path.StartsWithSegments(
+                    AvatarContextAdministrationPathPrefix,
+                    StringComparison.OrdinalIgnoreCase));
 
     private static string NormalizePath(string? path)
     {
