@@ -365,6 +365,51 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
     )
 
 
+@pytest.mark.parametrize("generation_id", ["preview-123", "g.2026_11-A"])
+def test_scoped_denial_builder_is_literal_and_does_not_change_default_profile(
+    generation_id: str,
+) -> None:
+    original_hosts = transaction.MANAGED_HOSTS
+    original_paths = transaction.FAIL_CLOSED_PATHS_RE2
+    patterns = transaction.scoped_download_denial_paths(generation_id)
+    assert len(patterns) == 2
+    for pattern in patterns:
+        transaction.validate_re2_pattern(pattern)
+    for path in [
+        "/downloads/files", "/downloads/files/unknown.exe",
+        "/downloads/files/%2e%2e%2fprivate", "/DOWNLOADS/FILES/unknown",
+        "/downloads/files/%252fprivate", "/downloads/files%252fprivate",
+        "/downloads/files/line\nbreak", "/downloads/files/\x00",
+        "/downloads/files\\private",
+        f"/downloads/g/{generation_id}",
+        f"/downloads/g/{generation_id}/files/unknown.exe",
+        f"/downloads/g/{generation_id}/release-evidence/CURRENT.json",
+        f"/downloads/g/{generation_id}%252fprivate",
+        f"/downloads/g/{generation_id}/../another-generation/files/private",
+    ]:
+        assert any(re.fullmatch(pattern, path) for pattern in patterns), path
+    for path in [
+        "/downloads", "/downloads/build-chummer6-linux.sh",
+        "/downloads/files-other/file", "/downloads/files.json",
+        f"/downloads/g/{generation_id}-other/files/private",
+        f"/downloads/g/{generation_id}x/files/private",
+        "/downloads/g/some-other-generation/files/private",
+        "/account/profile", "/api/ready", "/ws",
+    ]:
+        assert not any(re.fullmatch(pattern, path) for pattern in patterns), path
+    if "." in generation_id:
+        assert re.fullmatch(patterns[1],
+            f"/downloads/g/{generation_id.replace('.', 'X')}/private") is None
+    assert transaction.MANAGED_HOSTS == original_hosts
+    assert transaction.FAIL_CLOSED_PATHS_RE2 == original_paths
+
+
+@pytest.mark.parametrize("generation_id", ["", ".", "..", "a..b", "a/b", "a%2fb", "a\\b", "a|b", "a\n", "a" * 129, None])
+def test_scoped_denial_builder_rejects_unbounded_generation(generation_id: str) -> None:
+    with pytest.raises(transaction.ValidationError):
+        transaction.scoped_download_denial_paths(generation_id)
+
+
 @pytest.mark.parametrize(
     ("hostname", "path", "expected_service"),
     [

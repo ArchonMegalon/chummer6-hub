@@ -54,6 +54,8 @@ public sealed class PublicReleaseTruthProjectionTests
         Assert.True(projection.AuthorityBound);
         Assert.True(projection.AvailabilityClaimsAllowed);
         Assert.True(projection.StableClaimsAllowed);
+        Assert.False(projection.ReviewBannerRequired);
+        Assert.False(projection.ReviewRequiredPublicByteHandoffsAllowed);
 
         using JsonDocument serialized = JsonDocument.Parse(JsonSerializer.Serialize(projection));
         foreach (string requiredField in new[]

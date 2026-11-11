@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
@@ -8,6 +9,29 @@ namespace Chummer.Tests;
 
 public sealed class PublicLandingReleaseTruthPresentationGateTests
 {
+    [Fact]
+    public void SharedReviewBannerDistinguishesScopedByteHandoffWithoutWideningReleaseClaims()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot(
+            "Chummer.Run.Api", "Views", "Shared", "_ReleaseTruthProjection.cshtml"));
+        // This is a source gate; compiled Razor/HTTP rendering is a separate check.
+        Match branches = Regex.Match(view,
+            @"@if \(Model\.ReviewRequiredPublicByteHandoffsAllowed\)\s*\{\s*<span>(?<allowed>[^<]+)</span>\s*\}\s*else\s*\{\s*<span>(?<withheld>[^<]+)</span>\s*\}");
+        Assert.True(branches.Success, "Byte handoff copy must be gated by immutable scoped authority.");
+        string allowed = branches.Groups["allowed"].Value;
+        string withheld = branches.Groups["withheld"].Value;
+        Assert.Contains("listed preview downloads are authorized for this release scope", allowed, StringComparison.Ordinal);
+        Assert.Contains("does not establish signing, compatibility, wider availability, stable-release readiness, or complete manual Windows/SR6 qualification", allowed, StringComparison.Ordinal);
+        Assert.DoesNotContain("handoffs and availability or stable-release claims are withheld", allowed, StringComparison.Ordinal);
+        Assert.Contains("installer handoffs and availability or stable-release claims are withheld", withheld, StringComparison.Ordinal);
+        Assert.DoesNotContain("downloads are authorized", withheld, StringComparison.Ordinal);
+        Assert.Contains("@Model.ReleaseDecisionStatus", allowed, StringComparison.Ordinal);
+        Assert.Contains("@Model.ReleaseDecisionStatus", withheld, StringComparison.Ordinal);
+        Assert.Matches(@"@if \(Model\.ReviewBannerRequired\)\s*\{\s*<section[^>]+data-release-truth-banner", view);
+        Assert.Contains("JsonSerializer.Serialize(Model", view, StringComparison.Ordinal);
+        Assert.Equal(1, Regex.Matches(view, "<section").Count);
+    }
+
     [Theory]
     [InlineData("stale", "preview_supported", "promoted_preview")]
     [InlineData("missing", "preview_supported", "promoted_preview")]
