@@ -140,6 +140,121 @@ public sealed class PublicReleaseTruthProjectionTests
         Assert.True(projection.ReviewBannerRequired);
     }
 
+    [Fact]
+    public void UnknownCompatibilityIsPreservedOnlyForExactV2WindowsReviewBytes()
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildUnknownReviewArtifact());
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(
+            manifest, "review_required", publicByteHandoff: true);
+
+        PublicReleaseTruthProjectionDto projection = ProjectAuthority(manifest, authority);
+
+        Assert.Equal("unknown", Assert.Single(manifest.Downloads).CompatibilityState);
+        using JsonDocument snapshot = JsonDocument.Parse(authority.SnapshotBytes);
+        Assert.Equal("unknown", snapshot.RootElement.GetProperty("artifacts")[0]
+            .GetProperty("compatibilityState").GetString());
+        Assert.Equal("review_required", projection.ReleaseDecisionStatus);
+        Assert.True(projection.AuthorityBound);
+        Assert.True(projection.ReviewRequiredPublicByteHandoffsAllowed);
+        Assert.False(projection.AvailabilityClaimsAllowed);
+        Assert.False(projection.StableClaimsAllowed);
+        Assert.True(projection.ReviewBannerRequired);
+    }
+
+    [Theory]
+    [InlineData("review_required", false)]
+    [InlineData("preview_ready", false)]
+    [InlineData("stable_ready", false)]
+    [InlineData("preview_ready", true)]
+    public void UnknownCompatibilityCannotEnterOrdinaryOrReadyAuthority(
+        string status, bool handoff)
+    {
+        PublicReleaseManifestDto manifest = status == "stable_ready"
+            ? BuildManifest(BuildUnknownReviewArtifact())
+            : BuildReviewManifest(BuildUnknownReviewArtifact());
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(
+            manifest, status, publicByteHandoff: handoff);
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, authority));
+    }
+
+    [Theory]
+    [InlineData("incompatible")]
+    [InlineData("missing")]
+    [InlineData("")]
+    public void ReviewHandoffNeverAcceptsIncompatibleOrMissingCompatibility(string compatibility)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(
+            BuildUnknownReviewArtifact() with { CompatibilityState = compatibility });
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(
+            manifest, "review_required", publicByteHandoff: true);
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, authority));
+    }
+
+    [Theory]
+    [InlineData("unknown", "compatible")]
+    [InlineData("compatible", "unknown")]
+    [InlineData("incompatible", "unknown")]
+    [InlineData("", "unknown")]
+    [InlineData(null, "unknown")]
+    public void ReviewHandoffCannotChangeCompatibilityBetweenSnapshotAndHub(
+        string? hubCompatibility, string snapshotCompatibility)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(
+            BuildUnknownReviewArtifact() with { CompatibilityState = hubCompatibility! });
+        AuthorityEnvelope authority = MutateSnapshot(
+            BuildAuthorityEnvelope(manifest, "review_required", publicByteHandoff: true),
+            snapshot => snapshot["artifacts"]!.AsArray()[0]!.AsObject()[
+                "compatibilityState"] = snapshotCompatibility);
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, authority));
+    }
+
+    [Theory]
+    [InlineData("id", "other-installer")]
+    [InlineData("head", "blazor-desktop")]
+    [InlineData("platform", "linux")]
+    [InlineData("rid", "win-arm64")]
+    [InlineData("arch", "arm64")]
+    [InlineData("access", "account_required")]
+    public void UnknownReviewHandoffRejectsOtherTuplesEvenWhenBindingsAgree(
+        string field, string value)
+    {
+        PublicReleaseArtifactDto artifact = BuildUnknownReviewArtifact() with
+        {
+            Id = field == "id" ? value : "avalonia-win-x64-installer",
+            Head = field == "head" ? value : "avalonia",
+            Platform = field == "platform" ? value : "windows",
+            PlatformId = field == "platform" ? value : "windows",
+            Rid = field == "rid" ? value : "win-x64",
+            Arch = field == "arch" ? value : "x64",
+            InstallAccessClass = field == "access" ? value : "open_public"
+        };
+        PublicReleaseManifestDto manifest = BuildReviewManifest(artifact);
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(
+            manifest, "review_required", publicByteHandoff: true);
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, authority));
+    }
+
+    [Fact]
+    public void UnknownReviewHandoffRejectsMultipleArtifacts()
+    {
+        PublicReleaseManifestDto single = BuildReviewManifest(BuildUnknownReviewArtifact());
+        AuthorityEnvelope singleAuthority = BuildAuthorityEnvelope(
+            single, "review_required", publicByteHandoff: true);
+        JsonObject singleDecision = JsonNode.Parse(
+            Encoding.UTF8.GetString(singleAuthority.DecisionBytes.Span))!.AsObject();
+        PublicReleaseManifestDto multiple = BuildReviewManifest(
+            BuildUnknownReviewArtifact(),
+            BuildArtifact("linux", "linux", "avalonia", 'f', "open_public"));
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(multiple, "review_required");
+        JsonObject decision = JsonNode.Parse(
+            Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
+        decision["contractName"] = "chummer.preview-release-decision/v2";
+        decision["artifactHandoff"] = singleDecision["artifactHandoff"]!.DeepClone();
+        AuthorityEnvelope rebound = RebindDecision(
+            authority, Encoding.UTF8.GetBytes(decision.ToJsonString()));
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(multiple, rebound));
+    }
+
     [Theory]
     [InlineData("account_recommended")]
     [InlineData("account_required")]
@@ -262,19 +377,22 @@ public sealed class PublicReleaseTruthProjectionTests
         string field,
         string value)
     {
-        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
-        AuthorityEnvelope authority = BuildAuthorityEnvelope(
-            manifest,
-            "review_required",
-            publicByteHandoff: true);
-        JsonObject decision = JsonNode.Parse(
-            Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
-        decision["artifactHandoff"]!.AsObject()[field] = value;
-        AuthorityEnvelope rebound = RebindDecision(
-            authority,
-            Encoding.UTF8.GetBytes(decision.ToJsonString()));
+        foreach (string compatibility in new[] { "compatible", "unknown" })
+        {
+            PublicReleaseManifestDto manifest = BuildReviewManifest(BuildUnknownReviewArtifact() with { CompatibilityState = compatibility });
+            AuthorityEnvelope authority = BuildAuthorityEnvelope(
+                manifest,
+                "review_required",
+                publicByteHandoff: true);
+            JsonObject decision = JsonNode.Parse(
+                Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
+            decision["artifactHandoff"]!.AsObject()[field] = value;
+            AuthorityEnvelope rebound = RebindDecision(
+                authority,
+                Encoding.UTF8.GetBytes(decision.ToJsonString()));
 
-        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, rebound));
+            Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, rebound));
+        }
     }
 
     [Theory]
@@ -1182,7 +1300,7 @@ public sealed class PublicReleaseTruthProjectionTests
                 downloadUrl = artifact.Url,
                 sha256 = artifact.Sha256.Trim().ToLowerInvariant(),
                 sizeBytes = artifact.SizeBytes,
-                compatibilityState = "compatible",
+                compatibilityState = (artifact.CompatibilityState ?? string.Empty).Trim().ToLowerInvariant(),
                 promotionState = "promoted",
                 publicationScope = "signed-in-and-public",
                 revokeState = "not_revoked",
@@ -1592,6 +1710,12 @@ public sealed class PublicReleaseTruthProjectionTests
             Status = "published",
             RolloutState = "public_release_review_required",
             SupportabilityState = "review_required"
+        };
+
+    private static PublicReleaseArtifactDto BuildUnknownReviewArtifact()
+        => BuildArtifact("avalonia-win-x64-installer", "windows", "avalonia", 'd', "open_public") with
+        {
+            CompatibilityState = "unknown"
         };
 
     private static PublicReleaseArtifactDto BuildPublicArtifact()
