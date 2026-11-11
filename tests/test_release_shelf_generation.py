@@ -1373,8 +1373,26 @@ def write_candidate(root: Path, version: str = "release-1", artifact: bytes = b"
     return root
 
 
+def _bootstrap_trailer(sidecar: dict[str, object]) -> bytes:
+    # Literal contract from finalize-windows-bootstrap-installer.py, independent
+    # of the shelf helper's validator. The ZIP is embedded by NSIS, not appended.
+    return b"\nCHUMMER6_BOOTSTRAP_METADATA\n" + (
+        f"payloadFileName={sidecar['fileName']}\n"
+        f"payloadDownloadUrl={sidecar['downloadUrl']}\n"
+        f"payloadSha256={sidecar['sha256']}\n"
+        f"payloadSizeBytes={sidecar['sizeBytes']}\n"
+        f"payloadAcquisitionMode={sidecar['payloadAcquisitionMode']}\n"
+    ).encode("utf-8")
+
+
+@pytest.mark.parametrize(
+    ("acquisition_mode", "finalized"),
+    [("download", False), (None, False), ("download", True), ("embedded", True)],
+)
 def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_without_source_mutation(
     tmp_path: Path,
+    acquisition_mode: str | None,
+    finalized: bool,
 ) -> None:
     candidate = tmp_path / "candidate"
     files = candidate / "files"
@@ -1397,12 +1415,14 @@ def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_witho
         "sizeBytes": payload.stat().st_size,
         "installerFileName": installer_name,
         "releaseVersion": "run-read-only-five-file",
-        "payloadAcquisitionMode": "download",
+        "payloadAcquisitionMode": acquisition_mode,
     }
     metadata.write_text(
         json.dumps(source_sidecar, indent=2) + "\n",
         encoding="utf-8",
     )
+    if finalized:
+        installer.write_bytes(installer.read_bytes() + _bootstrap_trailer(source_sidecar))
 
     artifact = {
         "artifactId": "avalonia-win-x64-installer",
@@ -1418,6 +1438,8 @@ def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_witho
         "payloadMetadataFileName": metadata_name,
         "payloadMetadataUrl": f"/downloads/files/{metadata_name}",
     }
+    if finalized:
+        artifact.update(installerMode="bootstrap", payloadAcquisitionMode=acquisition_mode)
     canonical = {
         "version": "run-read-only-five-file",
         "releaseVersion": "run-read-only-five-file",
@@ -1509,12 +1531,17 @@ def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_witho
     )
     expected_sidecar = {
         **source_sidecar,
-        "downloadUrl": expected_payload_url,
+        "payloadAcquisitionMode": acquisition_mode or "download",
+        "downloadUrl": (
+            source_sidecar["downloadUrl"] if acquisition_mode == "embedded" else expected_payload_url
+        ),
     }
     assert generation_sidecar.read_bytes() == (
         json.dumps(expected_sidecar, indent=2, ensure_ascii=False) + "\n"
     ).encode("utf-8")
-    assert MODULE.sha256_file(generation_sidecar) != MODULE.sha256_file(metadata)
+    assert (MODULE.sha256_file(generation_sidecar) == MODULE.sha256_file(metadata)) == (
+        acquisition_mode == "embedded"
+    )
 
     projected_canonical = json.loads(
         (generation / MODULE.CANONICAL_MANIFEST).read_text(encoding="utf-8")
@@ -1583,6 +1610,152 @@ def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_witho
     assert receipt["compatibilityMirrorSha256"] == MODULE.sha256_file(
         candidate / MODULE.COMPATIBILITY_MANIFEST
     )
+    MODULE.verify_generation(generation, pointer)
+    generation_sidecar.chmod(0o600)
+    generation_sidecar.write_bytes(generation_sidecar.read_bytes() + b" ")
+    generation_sidecar.chmod(MODULE.SEALED_FILE_MODE)
+    with pytest.raises(MODULE.ReleaseShelfError, match="inventory"):
+        MODULE.verify_generation(generation, pointer)
+
+
+def _write_embedded_bootstrap_candidate(root: Path) -> Path:
+    candidate = write_candidate(root)
+    files = candidate / "files"
+    installer = files / "chummer-test-installer.exe"
+    payload = files / "test-payload.zip"
+    payload.write_bytes(b"fixture ZIP identity")
+    sidecar = {
+        "contractName": MODULE.PAYLOAD_SIDECAR_CONTRACT,
+        "fileName": payload.name,
+        "downloadUrl": f"https://chummer.run/downloads/files/{payload.name}",
+        "sha256": MODULE.sha256_file(payload),
+        "sizeBytes": payload.stat().st_size,
+        "installerFileName": installer.name,
+        "releaseVersion": "release-1",
+        "payloadAcquisitionMode": "embedded",
+    }
+    installer.write_bytes(b"fixture NSIS bytes" + _bootstrap_trailer(sidecar))
+    (files / f"{payload.name}.json").write_text(json.dumps(sidecar), encoding="utf-8")
+    for name, collection in (
+        (MODULE.CANONICAL_MANIFEST, "artifacts"),
+        (MODULE.COMPATIBILITY_MANIFEST, "downloads"),
+    ):
+        manifest_path = candidate / name
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest[collection][0].update(
+            sha256=MODULE.sha256_file(installer), sizeBytes=installer.stat().st_size,
+            installerMode="bootstrap", payloadAcquisitionMode="embedded",
+            installAccessClass="open_public", payloadFileName=payload.name,
+            payloadDownloadUrl=f"/downloads/files/{payload.name}",
+            payloadSha256=sidecar["sha256"], payloadSizeBytes=sidecar["sizeBytes"],
+        )
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return candidate
+
+
+@pytest.mark.parametrize("mutation", [
+    "sidecar-mode", "compatibility-mode", "canonical-mode", "relabel-as-download",
+    "binary-mode", "binary-digest", "binary-size", "missing-trailer", "duplicate-trailer",
+    "trailing-bytes", "sidecar-digest", "sidecar-size", "sidecar-float-size",
+    "sidecar-private-field", "sidecar-duplicate-field", "sidecar-oversize",
+    "sidecar-relative-url", "sidecar-foreign-url",
+    "sidecar-query", "sidecar-encoded-path", "sidecar-generation-url",
+    "sidecar-installer-name", "sidecar-version", "payload-traversal",
+    "corrupt-installer", "corrupt-payload", "canonical-payload-identity",
+])
+def test_generation_rejects_embedded_bootstrap_identity_or_metadata_rewrite(
+    tmp_path: Path, mutation: str,
+) -> None:
+    candidate = _write_embedded_bootstrap_candidate(tmp_path / "candidate")
+    files = candidate / "files"
+    installer = files / "chummer-test-installer.exe"
+    sidecar_path = files / "test-payload.zip.json"
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    canonical = json.loads((candidate / MODULE.CANONICAL_MANIFEST).read_text(encoding="utf-8"))
+    compatibility = json.loads((candidate / MODULE.COMPATIBILITY_MANIFEST).read_text(encoding="utf-8"))
+    canonical_row, compatibility_row = canonical["artifacts"][0], compatibility["downloads"][0]
+    if mutation in ("sidecar-mode", "relabel-as-download"):
+        sidecar["payloadAcquisitionMode"] = "download"
+    if mutation in ("compatibility-mode", "relabel-as-download"):
+        compatibility_row["payloadAcquisitionMode"] = "download"
+    if mutation in ("canonical-mode", "relabel-as-download"):
+        canonical_row["payloadAcquisitionMode"] = "download"
+    if mutation.startswith("binary-"):
+        trailer_sidecar = dict(sidecar)
+        field, value = {
+            "binary-mode": ("payloadAcquisitionMode", "download"),
+            "binary-digest": ("sha256", "a" * 64),
+            "binary-size": ("sizeBytes", sidecar["sizeBytes"] + 1),
+        }[mutation]
+        trailer_sidecar[field] = value
+        installer.write_bytes(b"fixture NSIS bytes" + _bootstrap_trailer(trailer_sidecar))
+    if mutation == "missing-trailer":
+        installer.write_bytes(b"fixture NSIS bytes")
+    if mutation == "duplicate-trailer":
+        installer.write_bytes(installer.read_bytes() + _bootstrap_trailer(sidecar))
+    if mutation == "trailing-bytes":
+        installer.write_bytes(installer.read_bytes() + b"unexpected suffix")
+    # Bind the edited binary, so trailer tests cannot pass via an unrelated SHA failure.
+    if mutation.startswith("binary-") or mutation in ("missing-trailer", "duplicate-trailer", "trailing-bytes"):
+        for row in (canonical_row, compatibility_row):
+            row.update(sha256=MODULE.sha256_file(installer), sizeBytes=installer.stat().st_size)
+    sidecar_changes = {
+        "sidecar-digest": ("sha256", "a" * 64),
+        "sidecar-size": ("sizeBytes", sidecar["sizeBytes"] + 1),
+        "sidecar-float-size": ("sizeBytes", float(sidecar["sizeBytes"])),
+        "sidecar-private-field": ("privateEvidence", "must not be projected"),
+        "sidecar-relative-url": ("downloadUrl", "/downloads/files/test-payload.zip"),
+        "sidecar-foreign-url": ("downloadUrl", "https://example.invalid/downloads/files/test-payload.zip"),
+        "sidecar-query": ("downloadUrl", sidecar["downloadUrl"] + "?token=fixture"),
+        "sidecar-encoded-path": ("downloadUrl", "https://chummer.run/downloads/files/%74est-payload.zip"),
+        "sidecar-generation-url": ("downloadUrl", "https://chummer.run/downloads/g/other/files/test-payload.zip"),
+        "sidecar-installer-name": ("installerFileName", "different.exe"),
+        "sidecar-version": ("releaseVersion", "different-version"),
+    }
+    if mutation in sidecar_changes:
+        field, value = sidecar_changes[mutation]
+        sidecar[field] = value
+    if mutation == "payload-traversal":
+        for row in (canonical_row, compatibility_row):
+            row["payloadFileName"] = "../test-payload.zip"
+        sidecar["fileName"] = "../test-payload.zip"
+    if mutation == "corrupt-installer":
+        installer.write_bytes(b"X" + installer.read_bytes()[1:])
+    if mutation == "corrupt-payload":
+        (files / "test-payload.zip").write_bytes(b"corrupt ZIP identity!")
+    if mutation == "canonical-payload-identity":
+        canonical_row["payloadSha256"] = "b" * 64
+    sidecar_path.write_text(json.dumps(sidecar), encoding="utf-8")
+    if mutation == "sidecar-duplicate-field":
+        sidecar_path.write_text(
+            '{"releaseVersion":"must not be projected",' + json.dumps(sidecar)[1:],
+            encoding="utf-8",
+        )
+    if mutation == "sidecar-oversize":
+        sidecar_path.write_text(json.dumps(sidecar) + " " * (64 * 1024), encoding="utf-8")
+    for name, manifest in (
+        (MODULE.CANONICAL_MANIFEST, canonical), (MODULE.COMPATIBILITY_MANIFEST, compatibility),
+    ):
+        (candidate / name).write_text(json.dumps(manifest), encoding="utf-8")
+    source_snapshot = {path: path.read_bytes() for path in candidate.rglob("*") if path.is_file()}
+    output = tmp_path / "prepared"
+    expected_error = "sidecar"
+    if mutation.startswith("binary-") or mutation in (
+        "missing-trailer", "duplicate-trailer", "trailing-bytes", "relabel-as-download",
+    ):
+        expected_error = "trailer"
+    elif mutation == "canonical-mode":
+        expected_error = "mode disagrees"
+    elif mutation == "canonical-payload-identity":
+        expected_error = "identity disagrees"
+    elif mutation == "payload-traversal":
+        expected_error = "unsafe payloadFileName"
+    elif mutation in ("corrupt-installer", "corrupt-payload"):
+        expected_error = "SHA-256 mismatch|size mismatch"
+    with pytest.raises(MODULE.ReleaseShelfError, match=expected_error):
+        MODULE.prepare_layout(candidate, output, generation_id="generation-rejected")
+    assert not (output / MODULE.CURRENT_POINTER).exists()
+    assert all(path.read_bytes() == contents for path, contents in source_snapshot.items())
 
 
 def test_generation_rewrite_keeps_account_required_sidecar_bytes_unchanged(

@@ -41,6 +41,7 @@ SERVER_WRITER_POLICY_MODE = "server-journal-v1"
 SIDECAR_WRITER_POLICY_MODE = "sidecar-readonly-v1"
 CANONICAL_PUBLIC_ORIGIN = "https://chummer.run"
 PAYLOAD_SIDECAR_CONTRACT = "chummer6-ui.windows_bootstrap_payload"
+BOOTSTRAP_METADATA_MARKER = b"\nCHUMMER6_BOOTSTRAP_METADATA\n"
 CANONICAL_MANIFEST = "RELEASE_CHANNEL.generated.json"
 COMPATIBILITY_MANIFEST = "releases.json"
 PUBLICATION_SCOPE = "PUBLICATION_SCOPE.generated.json"
@@ -742,10 +743,46 @@ def _incoming_payload_sidecar_url_matches(
     )
 
 
+def _validate_bootstrap_payload_trailer(
+    installer_path: Path, sidecar: dict[str, Any], acquisition_mode: str,
+) -> None:
+    # The approved NSIS finalizer appends this literal identity, not the ZIP.
+    # Stream the installer: embedded payloads need not fit in the launcher cap.
+    expected_trailer = BOOTSTRAP_METADATA_MARKER + (
+        f"payloadFileName={sidecar['fileName']}\n"
+        f"payloadDownloadUrl={sidecar['downloadUrl']}\n"
+        f"payloadSha256={sidecar['sha256']}\n"
+        f"payloadSizeBytes={sidecar['sizeBytes']}\n"
+        f"payloadAcquisitionMode={acquisition_mode}\n"
+    ).encode("utf-8")
+    marker_count = 0
+    overlap = tail = b""
+    try:
+        with installer_path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                window = overlap + chunk
+                marker_count += window.count(BOOTSTRAP_METADATA_MARKER)
+                if marker_count > 1:
+                    break
+                overlap = window[-(len(BOOTSTRAP_METADATA_MARKER) - 1):]
+                tail = (tail + chunk)[-len(expected_trailer):]
+    except OSError as exc:
+        raise ReleaseShelfError(f"bootstrap installer is unreadable: {installer_path.name}") from exc
+    # Older download bootstraps predate the finalizer's literal trailer.
+    if marker_count == 0 and acquisition_mode == "download":
+        return
+    if marker_count != 1 or tail != expected_trailer:
+        raise ReleaseShelfError(
+            f"bootstrap installer trailer does not match payload sidecar: {installer_path.name}"
+        )
+
+
 def rewrite_payload_sidecars_for_generation(
     generation_root: Path,
     compatibility_source: dict[str, Any],
     artifact_routes: dict[str, dict[str, str | None]],
+    *,
+    canonical_source: dict[str, Any] | None = None,
 ) -> None:
     release_version = str(compatibility_source.get("version") or "").strip()
     if not release_version:
@@ -830,6 +867,9 @@ def rewrite_payload_sidecars_for_generation(
             )
 
         incoming_mode = incoming.get("payloadAcquisitionMode")
+        manifest_mode = row.get("payloadAcquisitionMode")
+        incoming_mode = "download" if incoming_mode is None else incoming_mode
+        manifest_mode = "download" if manifest_mode is None else manifest_mode
         incoming_manifest_url = str(
             row.get("payloadDownloadUrl") or ""
         ).strip()
@@ -847,10 +887,8 @@ def rewrite_payload_sidecars_for_generation(
             != payload_sha256
             or isinstance(incoming.get("sizeBytes"), bool)
             or incoming.get("sizeBytes") != raw_payload_size
-            or (
-                incoming_mode is not None
-                and incoming_mode != "download"
-            )
+            or incoming_mode not in ("download", "embedded")
+            or manifest_mode != incoming_mode
             or not _incoming_payload_sidecar_url_matches(
                 incoming_url,
                 incoming_manifest_url,
@@ -860,6 +898,62 @@ def rewrite_payload_sidecars_for_generation(
             raise ReleaseShelfError(
                 f"payload sidecar identity does not match manifests for {artifact_id}"
             )
+
+        if canonical_source is not None:
+            canonical_rows = [
+                item for item in (canonical_source.get("artifacts") or [])
+                if isinstance(item, dict)
+                and (item.get("artifactId") or item.get("id")) == artifact_id
+            ]
+            if len(canonical_rows) != 1 or canonical_rows[0].get(
+                "payloadAcquisitionMode"
+            ) not in ((None, "download") if incoming_mode == "download" else ("embedded",)):
+                raise ReleaseShelfError(f"payload acquisition mode disagrees between manifests for {artifact_id}")
+            if incoming_mode == "embedded" and any(
+                canonical_rows[0].get(field) != row.get(field)
+                for field in (
+                    "installerMode", "fileName", "sha256", "sizeBytes",
+                    "payloadFileName", "payloadSha256", "payloadSizeBytes",
+                )
+            ):
+                raise ReleaseShelfError(f"embedded payload identity disagrees between manifests for {artifact_id}")
+
+        if incoming_mode == "embedded":
+            # This URL is compiled into the unchanged EXE. It identifies the
+            # embedded bytes; only manifest delivery routes become generation URLs.
+            expected_sidecar = {
+                "contractName": PAYLOAD_SIDECAR_CONTRACT,
+                "fileName": payload_file_name,
+                "downloadUrl": CANONICAL_PUBLIC_ORIGIN + f"/downloads/files/{quote(payload_file_name, safe='+')}",
+                "sha256": payload_sha256,
+                "sizeBytes": raw_payload_size,
+                "installerFileName": installer_file_name,
+                "releaseVersion": release_version,
+                "payloadAcquisitionMode": "embedded",
+            }
+            # Unlike the download projection, retained JSON must not hide extra
+            # values in duplicate properties discarded by the JSON decoder.
+            property_pairs = json.loads(
+                sidecar_path.read_text(encoding="utf-8-sig"), object_pairs_hook=list,
+            )
+            if (
+                incoming != expected_sidecar
+                or len(property_pairs) != len(incoming)
+                or type(incoming.get("sizeBytes")) is not int
+                or raw_payload_size <= 0
+                or row.get("installerMode") != "bootstrap"
+                or not SHA256_PATTERN.fullmatch(str(row.get("sha256") or ""))
+                or type(row.get("sizeBytes")) is not int
+                or row["sizeBytes"] <= 0
+            ):
+                raise ReleaseShelfError(f"embedded payload sidecar identity is noncanonical for {artifact_id}")
+
+        _validate_bootstrap_payload_trailer(
+            generation_root / "files" / installer_file_name, incoming, incoming_mode,
+        )
+        if incoming_mode == "embedded":
+            # Preserve the complete public sidecar, including serialization.
+            continue
 
         normalized = {
             "contractName": PAYLOAD_SIDECAR_CONTRACT,
@@ -2590,6 +2684,9 @@ def materialize_generation(
         generation_root / COMPATIBILITY_MANIFEST,
         COMPATIBILITY_MANIFEST,
     )
+    canonical_source = read_json_object(
+        generation_root / CANONICAL_MANIFEST, CANONICAL_MANIFEST,
+    )
     artifact_routes = _artifact_routes(compatibility_source, generation_id)
     canonical = normalize_manifest(
         generation_root / CANONICAL_MANIFEST,
@@ -2607,6 +2704,7 @@ def materialize_generation(
         generation_root,
         compatibility_source,
         artifact_routes,
+        canonical_source=canonical_source,
     )
     canonical_identity = _manifest_identity(canonical, CANONICAL_MANIFEST)
     compatibility_identity = _manifest_identity(
