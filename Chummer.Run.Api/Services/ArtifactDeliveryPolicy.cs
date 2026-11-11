@@ -843,7 +843,14 @@ internal static class PayloadSidecarContractValidator
                     || !string.Equals(
                         acquisitionMode.GetString(),
                         "download",
-                        StringComparison.Ordinal)))
+                        StringComparison.Ordinal)
+                    // Embedded metadata needs the sealed-generation URL contract;
+                    // mutable ingest still normalizes sidecars for downloading.
+                    && (allowMutableIncomingUrl
+                        || !string.Equals(
+                            acquisitionMode.GetString(),
+                            "embedded",
+                            StringComparison.Ordinal))))
             {
                 return Fail("payload sidecar identity does not match its manifests", out failure);
             }
@@ -859,7 +866,10 @@ internal static class PayloadSidecarContractValidator
                     expectedPayloadName,
                     allowMutableIncomingUrl,
                     installAccessClass,
-                    artifactId))
+                    artifactId,
+                    hasPayloadAcquisitionMode
+                        ? root.GetProperty("payloadAcquisitionMode").GetString()
+                        : null))
             {
                 return Fail("payload sidecar URL does not match its governed payload route", out failure);
             }
@@ -878,7 +888,8 @@ internal static class PayloadSidecarContractValidator
         string payloadFileName,
         bool allowMutableIncomingUrl,
         string? installAccessClass,
-        string? artifactId)
+        string? artifactId,
+        string? payloadAcquisitionMode)
     {
         if (allowMutableIncomingUrl)
         {
@@ -904,7 +915,12 @@ internal static class PayloadSidecarContractValidator
                 installAccessClass,
                 InstallAccessClasses.OpenPublic,
                 StringComparison.Ordinal)
-            && IsImmutableSemanticPayloadRoute(rawManifestUrl, artifactId)
+            && (IsImmutableSemanticPayloadRoute(rawManifestUrl, artifactId)
+                // The sealed open-public manifest can bind the selected payload
+                // by exact filename while original embedded metadata stays intact.
+                || string.Equals(payloadAcquisitionMode, "embedded", StringComparison.Ordinal)
+                && IsPortableRouteSegment(artifactId ?? string.Empty)
+                && IsImmutableFilePayloadRoute(rawManifestUrl, payloadFileName))
             && string.Equals(actual, stableUrl, StringComparison.Ordinal))
         {
             return true;
@@ -986,6 +1002,18 @@ internal static class PayloadSidecarContractValidator
                && parts[4] == "install"
                && string.Equals(parts[5], expectedArtifactId, StringComparison.Ordinal)
                && parts[6] == "payload";
+    }
+
+    private static bool IsImmutableFilePayloadRoute(string value, string payloadFileName)
+    {
+        string[] parts = value.Split('/');
+        return parts.Length == 6
+               && parts[0].Length == 0
+               && parts[1] == "downloads"
+               && parts[2] == "g"
+               && IsPortableRouteSegment(parts[3])
+               && parts[4] == "files"
+               && string.Equals(parts[5], payloadFileName, StringComparison.Ordinal);
     }
 
     private static bool IsImmutablePayloadRoute(string value, string payloadFileName)
