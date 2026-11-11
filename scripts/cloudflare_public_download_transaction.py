@@ -338,6 +338,24 @@ def validate_generation_id(value: Any) -> str:
     return value
 
 
+def scoped_download_denial_paths(generation_id: str) -> tuple[str, str]:
+    """Deny only stable files and one generation after literal allow rules.
+
+    cloudflared matches the decoded URL path. Also reject encoded separators
+    left by nested escaping and backslashes rather than forwarding them to an
+    origin with different path normalization. Generation tokens remain exact
+    and case-sensitive; only the fixed route names accept case variants.
+    """
+    generation_id = validate_generation_id(generation_id)
+    downloads = r"/[dD][oO][wW][nN][lL][oO][aA][dD][sS]"
+    boundary = r"((/|\\|%(25)*(2[fF]|5[cC]))[\s\S]*)?$"
+    return (
+        "^" + downloads + r"/[fF][iI][lL][eE][sS]" + boundary,
+        "^" + downloads + r"/[gG]/" + generation_id.replace(".", r"\.")
+        + boundary,
+    )
+
+
 def validate_sha256(value: Any, label: str) -> str:
     if not isinstance(value, str) or SHA256.fullmatch(value) is None:
         raise ValidationError(f"{label} must be a lowercase SHA-256")

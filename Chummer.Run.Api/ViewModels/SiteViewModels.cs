@@ -972,7 +972,46 @@ public sealed record DownloadsPageViewModel(
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
     PublicAccessPostureViewModel? AccessPosture = null,
-    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null)
+{
+    public string? ReviewRequiredPublicByteHandoffHref(ReleaseOptionViewModel option)
+    {
+        var projection = ReleaseTruthProjection;
+        var artifact = option.Artifact;
+        var generationId = Manifest.GenerationId;
+        var fileName = artifact.FileName;
+        if (projection?.ReviewRequiredPublicByteHandoffsAllowed != true
+            || option.RequiresAccount
+            || !option.GuestDownloadAllowed
+            || !string.Equals(option.InstallAccessClass, "open_public", StringComparison.Ordinal)
+            || !string.Equals(artifact.InstallAccessClass, "open_public", StringComparison.Ordinal)
+            || !Manifest.Downloads.Contains(artifact)
+            || !string.Equals(Manifest.Version, projection.ReleaseVersion, StringComparison.Ordinal)
+            || !string.Equals(Manifest.Channel, projection.Channel, StringComparison.Ordinal)
+            || string.IsNullOrEmpty(generationId)
+            || !System.Text.RegularExpressions.Regex.IsMatch(
+                generationId, @"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\z")
+            || generationId.Contains("..", StringComparison.Ordinal)
+            || string.IsNullOrEmpty(fileName)
+            || fileName is "." or ".."
+            || fileName.IndexOfAny(['/', '\\', '%', '?', '#']) >= 0
+            || fileName.Any(static character =>
+                char.IsWhiteSpace(character) || char.IsControl(character) || char.IsSurrogate(character)))
+        {
+            return null;
+        }
+
+        var href = $"/downloads/g/{Uri.EscapeDataString(generationId)}/files/{Uri.EscapeDataString(fileName)}";
+        var handoff = projection.ArtifactHandoff!;
+        return string.Equals(artifact.Id, handoff.ArtifactId, StringComparison.Ordinal)
+               && string.Equals(artifact.Sha256, handoff.Sha256, StringComparison.Ordinal)
+               && artifact.SizeBytes == handoff.SizeBytes
+               && string.Equals(artifact.Url, href, StringComparison.Ordinal)
+               && string.Equals(handoff.DownloadUrl, href, StringComparison.Ordinal)
+            ? href
+            : null;
+    }
+}
 
 public sealed record ReleaseUploadPageViewModel(
     SiteChromeViewModel Chrome,

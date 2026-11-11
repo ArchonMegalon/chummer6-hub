@@ -188,13 +188,14 @@ else
             }
             else
             {
+                var previewHref = Model.ReviewRequiredPublicByteHandoffHref(stable);
                 <a class="button-like button-like--primary"
-                   href="@stable.DispatchHref"
+                   href="@(previewHref ?? stable.DispatchHref)"
                    data-download-action="download-artifact"
                    data-download-artifact="@stable.Artifact.Id"
                    data-download-platform="@PlatformId(stable)"
-                   data-download-raw-url="@stable.DirectFileHref"
-                   data-download-install-route="/downloads/install/@Uri.EscapeDataString(stable.Artifact.Id)"
+                   data-download-raw-url="@(previewHref ?? stable.DirectFileHref)"
+                   data-download-install-route="@(previewHref ?? $"/downloads/install/{Uri.EscapeDataString(stable.Artifact.Id)}")"
                    data-download-link-mode="raw-url"
                    data-release-lane="stable"
                    data-platform="@PlatformId(stable)"
@@ -220,13 +221,14 @@ else
             }
             else
             {
+                var previewHref = Model.ReviewRequiredPublicByteHandoffHref(nightly);
                 <a class="button-like button-like--secondary"
-                   href="@nightly.DispatchHref"
+                   href="@(previewHref ?? nightly.DispatchHref)"
                    data-download-action="download-artifact"
                    data-download-artifact="@nightly.Artifact.Id"
                    data-download-platform="@PlatformId(nightly)"
-                   data-download-raw-url="@nightly.DirectFileHref"
-                   data-download-install-route="/downloads/install/@Uri.EscapeDataString(nightly.Artifact.Id)"
+                   data-download-raw-url="@(previewHref ?? nightly.DirectFileHref)"
+                   data-download-install-route="@(previewHref ?? $"/downloads/install/{Uri.EscapeDataString(nightly.Artifact.Id)}")"
                    data-download-link-mode="raw-url"
                    data-release-lane="nightly"
                    data-platform="@PlatformId(nightly)"
@@ -262,6 +264,7 @@ else
 
                 @foreach (var option in otherPlatformOptions)
                 {
+                    var previewHref = Model.ReviewRequiredPublicByteHandoffHref(option);
                     <article class="downloads-choice-card">
                         <div>
                             <span>@option.PlatformLabel</span>
@@ -270,12 +273,12 @@ else
                             <p class="muted-copy downloads-version">@VersionText(option, Model.Manifest, isStableRelease)</p>
                         </div>
                         <a class="button-like button-like--ghost"
-                           href="@option.DispatchHref"
+                           href="@(previewHref ?? option.DispatchHref)"
                            data-download-action="download-artifact"
                            data-download-artifact="@option.Artifact.Id"
                            data-download-platform="@PlatformId(option)"
-                           data-download-raw-url="@option.DirectFileHref"
-                           data-download-install-route="/downloads/install/@Uri.EscapeDataString(option.Artifact.Id)"
+                           data-download-raw-url="@(previewHref ?? option.DirectFileHref)"
+                           data-download-install-route="@(previewHref ?? $"/downloads/install/{Uri.EscapeDataString(option.Artifact.Id)}")"
                            data-download-link-mode="raw-url"
                            data-release-lane="other"
                            data-platform="@PlatformId(option)"

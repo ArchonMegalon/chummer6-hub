@@ -180,7 +180,8 @@ public sealed class PublicReleaseManifestService
                             FilterManifestPayload(
                                 DecodeUtf8Manifest(
                                     generationCanonicalBytes!,
-                                    ReleaseShelfGenerationStore.CanonicalManifestFileName)),
+                                    ReleaseShelfGenerationStore.CanonicalManifestFileName),
+                                preserveSealedReviewKnownIssue: true),
                             "registry"),
                         snapshot),
                     snapshot,
@@ -1064,24 +1065,34 @@ public sealed class PublicReleaseManifestService
         ReleaseShelfSnapshot snapshot,
         PublicReleaseManifestDto manifest)
         => !snapshot.IsLegacy
-           && string.Equals(
-               NormalizeStateToken(manifest.Status),
+           && CanPreserveReviewKnownIssue(
+               manifest.Status, manifest.Channel, manifest.RolloutState,
+               manifest.SupportabilityState, manifest.KnownIssueSummary);
+
+    private static bool CanPreserveReviewKnownIssue(
+        string? status,
+        string? channel,
+        string? rolloutState,
+        string? supportabilityState,
+        string? knownIssueSummary)
+        => string.Equals(
+               NormalizeStateToken(status),
                "published",
                StringComparison.Ordinal)
            && string.Equals(
-               NormalizeStateToken(manifest.Channel),
+               NormalizeStateToken(channel),
                "preview",
                StringComparison.Ordinal)
            && string.Equals(
-               NormalizeStateToken(manifest.RolloutState),
+               NormalizeStateToken(rolloutState),
                "public_release_review_required",
                StringComparison.Ordinal)
            && string.Equals(
-               NormalizeStateToken(manifest.SupportabilityState),
+               NormalizeStateToken(supportabilityState),
                "review_required",
                StringComparison.Ordinal)
-           && !string.IsNullOrWhiteSpace(manifest.KnownIssueSummary)
-           && !NarrativeMakesOptimisticSupportClaim(manifest.KnownIssueSummary);
+           && !string.IsNullOrWhiteSpace(knownIssueSummary)
+           && !NarrativeMakesOptimisticSupportClaim(knownIssueSummary);
 
     private PublicReleaseManifestDto ApplyLocalReleaseProofFallback(
         PublicReleaseManifestDto manifest,
@@ -1583,7 +1594,7 @@ public sealed class PublicReleaseManifestService
         };
     }
 
-    private string FilterManifestPayload(string json)
+    private string FilterManifestPayload(string json, bool preserveSealedReviewKnownIssue = false)
     {
         DateTimeOffset evaluationInstant = _timeProvider.GetUtcNow();
         HashSet<string> disabledArtifactIds = ResolveDisabledArtifactIds();
@@ -1612,7 +1623,8 @@ public sealed class PublicReleaseManifestService
             rewroteManifest |= ApplyProofFreshnessSupportabilityFloor(
                 manifest,
                 evaluationInstant,
-                _privacyLaunchGate);
+                _privacyLaunchGate,
+                preserveSealedReviewKnownIssue);
             return rewroteManifest
                 ? manifest.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : json;
@@ -1641,16 +1653,25 @@ public sealed class PublicReleaseManifestService
         ApplyProofFreshnessSupportabilityFloor(
             manifest,
             evaluationInstant,
-            _privacyLaunchGate);
+            _privacyLaunchGate,
+            preserveSealedReviewKnownIssue);
         return manifest.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web));
     }
 
     private static bool ApplyProofFreshnessSupportabilityFloor(
         JsonObject manifest,
         DateTimeOffset evaluationInstant,
-        PrivacyLaunchGateSnapshot privacyLaunchGate)
+        PrivacyLaunchGateSnapshot privacyLaunchGate,
+        bool preserveSealedReviewKnownIssue = false)
     {
         JsonObject original = manifest.DeepClone().AsObject();
+        bool preserveKnownIssue = preserveSealedReviewKnownIssue
+            && CanPreserveReviewKnownIssue(
+                GetJsonString(manifest["status"]),
+                GetJsonString(manifest["channelId"]) ?? GetJsonString(manifest["channel"]),
+                GetJsonString(manifest["rolloutState"]),
+                GetJsonString(manifest["supportabilityState"]),
+                GetJsonString(manifest["knownIssueSummary"]));
         JsonObject publicTrustMetrics = manifest["publicTrustMetrics"] as JsonObject ?? [];
         JsonObject proofFreshness = publicTrustMetrics["proofFreshness"] as JsonObject ?? [];
         DateTimeOffset? publishedAt = TryGetJsonDateTimeOffset(manifest["publishedAt"]);
@@ -1711,10 +1732,16 @@ public sealed class PublicReleaseManifestService
             GetJsonString(manifest["supportabilitySummary"]),
             reviewSupportabilitySummary,
             strongerRolloutState);
-        manifest["knownIssueSummary"] = PreserveOrReplaceNarrative(
-            GetJsonString(manifest["knownIssueSummary"]),
-            reviewKnownIssueSummary,
-            strongerRolloutState);
+        // The immutable review preview's summary is sealed Registry authority.
+        // Keep it exact; the current freshness/privacy warning is still projected
+        // in rolloutReason, supportabilitySummary and the public trust metrics.
+        if (!preserveKnownIssue)
+        {
+            manifest["knownIssueSummary"] = PreserveOrReplaceNarrative(
+                GetJsonString(manifest["knownIssueSummary"]),
+                reviewKnownIssueSummary,
+                strongerRolloutState);
+        }
         manifest["fixAvailabilitySummary"] = PreserveOrReplaceNarrative(
             GetJsonString(manifest["fixAvailabilitySummary"]),
             reviewFixAvailabilitySummary,
