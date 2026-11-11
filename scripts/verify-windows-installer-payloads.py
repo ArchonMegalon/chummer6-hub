@@ -25,6 +25,7 @@ WINDOWS_EXE_MAGIC = b"MZ"
 WINDOWS_PE_MAGIC = b"PE\0\0"
 ZIP_LOCAL_FILE_MAGIC = b"PK\x03\x04"
 MAX_BOOTSTRAP_INSTALLER_BYTES = 15 * 1024 * 1024
+BOOTSTRAP_METADATA_MARKER = b"\nCHUMMER6_BOOTSTRAP_METADATA\n"
 
 DEFAULT_LAUNCH_EXECUTABLES = {
     "avalonia": "Chummer.Avalonia.exe",
@@ -44,6 +45,7 @@ class ManifestRow:
     payload_sha256: str
     payload_size_bytes: int | None
     installer_mode: str
+    payload_acquisition_mode: str
     authoritative_identity: str
     release_proof_base_urls: tuple[str, ...]
     manifest_errors: tuple[str, ...]
@@ -665,6 +667,7 @@ def read_manifest_rows(manifest_paths: list[Path]) -> ManifestReadResult:
                     payload_sha256=str(item.get("payloadSha256") or "").strip().lower(),
                     payload_size_bytes=try_int(item.get("payloadSizeBytes")),
                     installer_mode=str(item.get("installerMode") or "").strip().lower(),
+                    payload_acquisition_mode=str(item.get("payloadAcquisitionMode") or "").strip().lower(),
                     authoritative_identity=manifest_row_authoritative_identity(
                         item,
                         artifact_id=artifact_id,
@@ -899,6 +902,8 @@ def validate_manifest_payload_metadata(candidate: PayloadCandidate, manifest_row
     if manifest_row.installer_mode == "bootstrap" and candidate.mode != "bootstrap":
         failures.append("manifest says installerMode=bootstrap but the payload was not a sidecar payload")
     if manifest_row.installer_mode == "bootstrap":
+        if manifest_row.payload_acquisition_mode not in {"", "download", "embedded"}:
+            failures.append("manifest bootstrap payloadAcquisitionMode must be download or embedded")
         authority = manifest_url_authority(manifest_row)
         failures.extend(authority.failures)
         if not manifest_row.payload_file_name:
@@ -959,12 +964,28 @@ def validate_manifest_installer_metadata(installer_path: Path, manifest_row: Man
     return failures
 
 
-def validate_bootstrap_installer_size(installer_path: Path, manifest_row: ManifestRow | None) -> list[str]:
+def validate_bootstrap_installer_size(
+    installer_path: Path,
+    manifest_row: ManifestRow | None,
+    *,
+    validated_embedded_payload_size: int | None = None,
+) -> list[str]:
     if manifest_row is None or manifest_row.installer_mode != "bootstrap":
         return []
 
     observed_size = installer_path.stat().st_size
     failures: list[str] = []
+    if validated_embedded_payload_size is not None:
+        # NSIS embeds and compresses the ZIP alongside the bootstrap runtime.
+        # Allow the verified payload bytes plus the existing launcher allowance;
+        # compression means there is no installer-versus-ZIP lower size bound.
+        maximum_size = validated_embedded_payload_size + MAX_BOOTSTRAP_INSTALLER_BYTES
+        if observed_size > maximum_size:
+            failures.append(
+                f"embedded bootstrap installer is {observed_size} bytes; must be <= "
+                f"verified payload size + bootstrap launcher allowance ({maximum_size} bytes)"
+            )
+        return failures
     if observed_size > MAX_BOOTSTRAP_INSTALLER_BYTES:
         failures.append(
             f"manifest installerMode=bootstrap but installer is {observed_size} bytes; "
@@ -1074,6 +1095,26 @@ def validate_bootstrap_installer_metadata(
         "payloadSha256": payload_sha256,
         "payloadSizeBytes": str(payload_size_bytes),
     }
+    if manifest_row is not None and manifest_row.payload_acquisition_mode == "embedded":
+        # The native builder's finalizer emits this literal trailer after NSIS
+        # compression. Require its full identity, not an isolated mode label.
+        required_values = {
+            "payloadFileName": manifest_row.payload_file_name,
+            **required_values,
+            "payloadAcquisitionMode": "embedded",
+        }
+        expected_trailer = BOOTSTRAP_METADATA_MARKER + "".join(
+            f"{label}={value}\n" for label, value in required_values.items()
+        ).encode("utf-8")
+        if (
+            installer_bytes.count(BOOTSTRAP_METADATA_MARKER) != 1
+            or installer_bytes.count(expected_trailer) != 1
+        ):
+            failures.append("embedded bootstrap installer must contain exactly one validated metadata trailer")
+    elif manifest_row is not None and (
+        scan_embedded_bootstrap_metadata(installer_bytes, "payloadAcquisitionMode").occurrence_count
+    ):
+        required_values["payloadAcquisitionMode"] = manifest_row.payload_acquisition_mode or "download"
     for label, value in required_values.items():
         scan = scan_embedded_bootstrap_metadata(installer_bytes, label)
         if scan.occurrence_count == 0:
@@ -1153,6 +1194,11 @@ def validate_bootstrap_sidecar_metadata(
         )
 
     if manifest_row is not None:
+        acquisition_mode = str(payload.get("payloadAcquisitionMode") or "").strip().lower()
+        if acquisition_mode not in {"", "download", "embedded"}:
+            failures.append("bootstrap payload sidecar payloadAcquisitionMode must be download or embedded")
+        if (acquisition_mode or "download") != (manifest_row.payload_acquisition_mode or "download"):
+            failures.append("bootstrap payload sidecar payloadAcquisitionMode does not match manifest")
         if manifest_row.payload_file_name and manifest_row.payload_file_name != str(payload.get("fileName") or "").strip():
             failures.append("bootstrap payload sidecar metadata fileName does not match manifest payloadFileName")
         if (
@@ -1287,12 +1333,21 @@ def verify_installer(
         )
         return [f"{installer_path.name}: {failure}" for failure in failures]
 
+    embedded_bootstrap = (
+        manifest_row is not None
+        and manifest_row.installer_mode == "bootstrap"
+        and manifest_row.payload_acquisition_mode == "embedded"
+    )
     failures.extend(validate_manifest_installer_metadata(installer_path, manifest_row))
     failures.extend(validate_manifest_payload_metadata(candidate, manifest_row))
-    failures.extend(validate_bootstrap_installer_size(installer_path, manifest_row))
     failures.extend(validate_bootstrap_sidecar_metadata(installer_path, candidate, manifest_row))
-    if require_embedded_bootstrap_metadata:
+    if require_embedded_bootstrap_metadata or embedded_bootstrap:
         failures.extend(validate_bootstrap_installer_metadata(installer_path, candidate, manifest_row))
+    failures.extend(validate_bootstrap_installer_size(
+        installer_path,
+        manifest_row,
+        validated_embedded_payload_size=len(candidate.data) if embedded_bootstrap and not failures else None,
+    ))
     failures.extend(
         validate_zip_payload(
             installer_path.name,
