@@ -14,6 +14,7 @@ import contextlib
 import copy
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -26,6 +27,16 @@ from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO, Iterator
 from urllib.parse import quote, unquote, urlsplit
 from urllib.request import Request, urlopen
+
+
+# Load beside this file so CLI and path-based controller imports use the same contract.
+_PREVIEW_AUTHORITY_SPEC = importlib.util.spec_from_file_location(
+    "_release_shelf_preview_authority", Path(__file__).with_name("preview_authority_contract.py"),
+)
+if _PREVIEW_AUTHORITY_SPEC is None or _PREVIEW_AUTHORITY_SPEC.loader is None:
+    raise RuntimeError("Windows preview authority contract is unavailable")
+preview_authority = importlib.util.module_from_spec(_PREVIEW_AUTHORITY_SPEC)
+_PREVIEW_AUTHORITY_SPEC.loader.exec_module(preview_authority)
 
 
 POINTER_SCHEMA = "chummer.release-shelf.current/v1"
@@ -746,6 +757,57 @@ def _incoming_payload_sidecar_url_matches(
 def _validate_bootstrap_payload_trailer(
     installer_path: Path, sidecar: dict[str, Any], acquisition_mode: str,
 ) -> None:
+    # The single-file Windows installer ends with its exact ZIP bytes,
+    # an unsigned little-endian UInt64 ZIP length, and CHUMMER6PAYLOAD1.
+    # This format embeds no download URL. Keep the sidecar/manifest identity
+    # checks in the caller and verify the embedded bytes before accepting it.
+    if acquisition_mode == "embedded":
+        marker = b"CHUMMER6PAYLOAD1"
+        footer_size = 8 + len(marker)
+        try:
+            with installer_path.open("rb") as stream:
+                stream.seek(0, os.SEEK_END)
+                installer_size = stream.tell()
+                if installer_size >= footer_size:
+                    stream.seek(-footer_size, os.SEEK_END)
+                    footer = stream.read(footer_size)
+                    if footer[8:] == marker:
+                        payload_size = int.from_bytes(footer[:8], "little")
+                        payload_start = installer_size - footer_size - payload_size
+                        expected_size = sidecar.get("sizeBytes")
+                        expected_digest = sidecar.get("sha256")
+                        if (
+                            type(expected_size) is not int
+                            or payload_size != expected_size
+                            or payload_size <= 0
+                            or payload_start <= 0
+                            or not isinstance(expected_digest, str)
+                            or not SHA256_PATTERN.fullmatch(expected_digest)
+                        ):
+                            raise ReleaseShelfError(
+                                "single-file embedded payload length or identity is invalid"
+                            )
+                        stream.seek(payload_start)
+                        digest = hashlib.sha256()
+                        remaining = payload_size
+                        while remaining:
+                            chunk = stream.read(min(1024 * 1024, remaining))
+                            if not chunk:
+                                raise ReleaseShelfError(
+                                    "single-file embedded payload is truncated"
+                                )
+                            digest.update(chunk)
+                            remaining -= len(chunk)
+                        if digest.hexdigest() != expected_digest:
+                            raise ReleaseShelfError(
+                                "single-file embedded payload digest differs from sidecar"
+                            )
+                        return
+        except OSError as exc:
+            raise ReleaseShelfError(
+                f"bootstrap installer is unreadable: {installer_path.name}"
+            ) from exc
+
     # The approved NSIS finalizer appends this literal identity, not the ZIP.
     # Stream the installer: embedded payloads need not fit in the launcher cap.
     expected_trailer = BOOTSTRAP_METADATA_MARKER + (
@@ -2050,7 +2112,11 @@ def apply_current_release_supportability_floor(
     )
     if projected.get("publicationProfile") == "windows_unsigned_preview_v1":
         disclosure = str(projected.get("message") or "").strip()
-        for field in ("rolloutReason", "supportabilitySummary", "knownIssueSummary", "fixAvailabilitySummary"):
+        # knownIssueSummary is sealed in the Registry authority snapshot. Hub's
+        # proof/privacy floor replaces it with review_known_issue_summary, so
+        # adding disclosure here would contradict that final projection. Keep
+        # the unsigned disclosure in message and the presentation-only summaries.
+        for field in ("rolloutReason", "supportabilitySummary", "fixAvailabilitySummary"):
             if disclosure and disclosure not in str(projected.get(field) or ""):
                 projected[field] = disclosure + " " + str(projected.get(field) or "")
     return projected
@@ -2360,7 +2426,57 @@ def _copy_without_symlinks(source: Path, destination: Path) -> None:
         shutil.copy2(source, destination)
 
 
-def _validate_windows_preview_candidate_files(source_root: Path) -> None:
+def _validate_windows_preview_authority(source_root: Path) -> None:
+    """Validate the existing optional envelope; a partial envelope fails closed.
+
+    This checks public contract consistency, not the controller's private
+    approval, native execution, or the preimage of a release-scope commitment.
+    """
+    paths = preview_authority.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS
+    try:
+        canonical_raw = (source_root / CANONICAL_MANIFEST).read_bytes()
+        canonical = preview_authority._strict_json_object_bytes(
+            canonical_raw, label=CANONICAL_MANIFEST,
+        )
+        preview_authority._strict_json_object_bytes(
+            (source_root / COMPATIBILITY_MANIFEST).read_bytes(), label=COMPATIBILITY_MANIFEST,
+        )
+        artifacts = canonical.get('artifacts')
+        if not isinstance(artifacts, list) or len(artifacts) != 1 or not isinstance(artifacts[0], dict):
+            raise ReleaseShelfError('Windows preview requires one selected canonical artifact')
+        smoke = source_root / preview_authority.SCOPE_BOUND_STARTUP_SMOKE_PATH
+        if smoke.stat().st_size > 4 * 1024 * 1024:
+            raise ReleaseShelfError('Windows preview startup receipt exceeds contract limit')
+        preview_authority._validate_scope_bound_startup_smoke(
+            smoke.read_bytes(), artifact=artifacts[0],
+            release_version=canonical.get('releaseVersion') or canonical.get('version'),
+        )
+        if not any((source_root / name).exists() for name in paths):
+            return
+        evidence = {}
+        for name in paths:
+            path = source_root / name
+            limit = 64 * 1024 if name.endswith('/CURRENT.json') else 4 * 1024 * 1024
+            if not path.is_file() or path.is_symlink() or path.stat().st_size > limit:
+                raise ReleaseShelfError(f"Windows preview authority file missing or invalid: {name}")
+            evidence[name] = path.read_bytes()
+        decision = preview_authority._strict_json_object_bytes(
+            evidence['release-evidence/RELEASE_DECISION.json'], label='preview decision',
+        )
+        scope_digest = decision.get('releaseScopeDecisionSha256')
+        if not isinstance(scope_digest, str) or not SHA256_PATTERN.fullmatch(scope_digest):
+            raise ReleaseShelfError('Windows preview release-scope commitment must be a SHA-256')
+        generation_id = validate_generation_id(str(canonical.get('generationId') or ''))
+        preview_authority._validate_scope_bound_review_authority(
+            canonical_raw=canonical_raw, canonical=canonical, evidence_bytes=evidence,
+            generation_id=generation_id, release_scope_decision_sha256=scope_digest,
+            candidate_version=str(canonical.get('releaseVersion') or canonical.get('version') or ''),
+        )
+    except (OSError, preview_authority.CutoverError) as exc:
+        raise ReleaseShelfError(f"Windows preview authority validation failed: {exc}") from exc
+
+
+def _validate_windows_preview_candidate_files(source_root: Path, *, prepared: bool = False) -> None:
     manifests = [read_json_object(source_root / name, name) if (source_root / name).is_file() else None
                  for name in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST)]
     profile = "windows_unsigned_preview_v1"
@@ -2394,10 +2510,22 @@ def _validate_windows_preview_candidate_files(source_root: Path) -> None:
         "files/chummer-avalonia-win-x64-payload.zip.json",
         "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
     }
+    required = set(allowed)
+    # Only this fixed envelope can be admitted, after its existing contract and
+    # digest chain validate below. There is no directory-wide exception.
+    allowed.update(preview_authority.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS)
+    if prepared:
+        allowed.add(ACTIVATION_CANDIDATE)
     for path in source_root.rglob("*"):
         relative = path.relative_to(source_root).as_posix()
-        if path.is_symlink() or (not path.is_dir() and relative not in allowed):
+        if (path.is_symlink()
+            or (path.is_dir() and relative not in {"files", "startup-smoke", "release-evidence"})
+            or (not path.is_dir() and (not path.is_file() or relative not in allowed))):
             raise ReleaseShelfError(f"Windows preview contains an unselected public file: {relative}")
+    for name in sorted(required):
+        if not (source_root / name).is_file():
+            raise ReleaseShelfError(f"Windows preview selected file is missing: {name}")
+    _validate_windows_preview_authority(source_root)
 
 
 def copy_candidate(source_root: Path, generation_root: Path) -> None:
@@ -2720,6 +2848,7 @@ def materialize_generation(
         )
     validate_manifest_artifacts(canonical, compatibility, generation_root)
     validate_files_are_manifest_bound(canonical, compatibility, generation_root)
+    _validate_windows_preview_candidate_files(generation_root, prepared=True)
     inventory = build_inventory(generation_root)
     if not inventory:
         raise ReleaseShelfError("activation candidate inventory must not be empty")
@@ -2853,6 +2982,7 @@ def verify_generation(
         raise ReleaseShelfError("pointer inventoryDigest does not match generation bytes")
     if candidate.get("inventoryDigest") != f"sha256:{actual_inventory_digest}":
         raise ReleaseShelfError("activation candidate inventoryDigest does not match generation bytes")
+    _validate_windows_preview_candidate_files(generation_root, prepared=True)
 
 
 def validate_pointer_payload(pointer: dict[str, Any]) -> dict[str, Any]:

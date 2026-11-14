@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import stat
+import struct
 import subprocess
 import threading
 import time
@@ -916,7 +917,7 @@ def test_project_manifest_pair_materializes_exact_runtime_privacy_floor(
         receipt["privacyLaunchGateContractName"]
         == expected_privacy["contractName"]
     )
-    assert receipt["privacyLaunchGateContractVersion"] == 1
+    assert receipt["privacyLaunchGateContractVersion"] == 2
     assert receipt["privacyLaunchGateContractSha256"] == MODULE.sha256_file(
         MODULE.PRIVACY_LAUNCH_GATE_CONTRACT
     )
@@ -3540,3 +3541,341 @@ def test_layout_v1_reader_exposes_no_verify_then_reopen_path_api() -> None:
             offenders.append(source_path.relative_to(ROOT).as_posix())
 
     assert offenders == []
+
+
+# Portable preview-contract fixtures. All receipts and authority statuses below
+# are TEST_ONLY synthetic protocol data, never native or publication evidence.
+_PREVIEW_AUTHORITY = MODULE.preview_authority
+_PREVIEW_INSTALLER = "chummer-avalonia-win-x64-installer.exe"
+_PREVIEW_PAYLOAD = "chummer-avalonia-win-x64-payload.zip"
+_PREVIEW_GENERATION_ID = "synthetic-test-only-not-publication"
+_PREVIEW_VERSION = "synthetic-test-only"
+_PREVIEW_STAMP = "2026-11-14T09:00:00Z"
+_PREVIEW_FOOTER_MARKER = b"CHUMMER6PAYLOAD1"
+
+
+@pytest.mark.parametrize("declared_size", [0, 10, 11, 2**64 - 1])
+def test_windows_unsigned_preview_footer_bounds_independent_of_sidecar(
+    tmp_path: Path, declared_size: int,
+) -> None:
+    # The sidecar agrees with the footer, so only the independent byte bounds
+    # can reject an empty payload or one consuming/overrunning the entire stub.
+    installer = tmp_path / "fixture.exe"
+    installer.write_bytes(b"MZ12345678" + declared_size.to_bytes(8, "little") + _PREVIEW_FOOTER_MARKER)
+    sidecar = _preview_sidecar(b"fixture")
+    sidecar["sizeBytes"] = declared_size
+    with pytest.raises(MODULE.ReleaseShelfError, match="length or identity is invalid"):
+        MODULE._validate_bootstrap_payload_trailer(installer, sidecar, "embedded")
+
+
+@pytest.mark.parametrize("privacy_blocked", [False, True])
+def test_windows_unsigned_preview_known_issue_matches_independent_expected_sentence(
+    tmp_path: Path, privacy_blocked: bool,
+) -> None:
+    candidate = _write_unsigned_preview_candidate(tmp_path / "candidate")
+    privacy = (
+        json.loads(MODULE.PRIVACY_LAUNCH_GATE_CONTRACT.read_text(encoding="utf-8"))
+        if privacy_blocked else _clear_privacy_contract()
+    )
+    expected = (
+        "Known issue: stale or incomplete proof receipts and Hosted Build privacy, "
+        "retention, recovery, and erasure review still block launch-readiness claims."
+        if privacy_blocked else
+        "Known issue: stale or incomplete proof receipts still block launch-readiness claims."
+    )
+    for name in (MODULE.CANONICAL_MANIFEST, MODULE.COMPATIBILITY_MANIFEST):
+        manifest = json.loads((candidate / name).read_text(encoding="utf-8"))
+        projected = MODULE.apply_current_release_supportability_floor(
+            manifest, privacy, evaluated_at=_PREVIEW_STAMP,
+        )
+        assert projected["knownIssueSummary"] == expected
+        disclosure = projected["message"].strip()
+        assert "Unsigned Windows-only preview" in disclosure
+        for field in ("rolloutReason", "supportabilitySummary", "fixAvailabilitySummary"):
+            assert disclosure in projected[field]
+
+
+def _preview_digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def _preview_write_json(path, obj):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    MODULE.write_json(path, obj)
+
+
+def _preview_sidecar(data, version=_PREVIEW_VERSION):
+    return dict(contractName=MODULE.PAYLOAD_SIDECAR_CONTRACT, fileName=_PREVIEW_PAYLOAD,
+                downloadUrl=f'https://chummer.run/downloads/files/{_PREVIEW_PAYLOAD}',
+                sha256=_preview_digest(data), sizeBytes=len(data), payloadAcquisitionMode='embedded',
+                installerFileName=_PREVIEW_INSTALLER, releaseVersion=version)
+
+
+
+@pytest.mark.parametrize('mutation', ['hash','length','zero','oversized','truncated-footer','truncated-body','tampered','boolean-length','missing-stub'])
+def test_windows_unsigned_preview_embedded_invalid_bytes_fail(tmp_path, mutation):
+    data = b'PK\x03\x04synthetic-payload-only'
+    metadata = _preview_sidecar(data)
+    exe = b'MZsynthetic-stub' + data + struct.pack('<Q', len(data)) + _PREVIEW_FOOTER_MARKER
+    if mutation == 'hash': metadata['sha256'] = '0' * 64
+    if mutation == 'length': metadata['sizeBytes'] += 1
+    if mutation == 'zero': exe = exe[:-(8+len(_PREVIEW_FOOTER_MARKER))] + struct.pack('<Q',0) + _PREVIEW_FOOTER_MARKER
+    if mutation == 'oversized': exe = exe[:-(8+len(_PREVIEW_FOOTER_MARKER))] + struct.pack('<Q',2**64-1) + _PREVIEW_FOOTER_MARKER
+    if mutation == 'truncated-footer': exe = exe[:-1]
+    if mutation == 'truncated-body': exe = exe[:20] + exe[25:]
+    if mutation == 'tampered': exe = exe.replace(b'synthetic-payload', b'Synthetic-payload')
+    if mutation == 'boolean-length': metadata['sizeBytes'] = True
+    if mutation == 'missing-stub': exe = exe[len(b'MZsynthetic-stub'):]
+    p = tmp_path / 'fixture.exe'; p.write_bytes(exe)
+    with pytest.raises(MODULE.ReleaseShelfError): MODULE._validate_bootstrap_payload_trailer(p, metadata, 'embedded')
+
+
+def _write_unsigned_preview_candidate(root):
+    data=b'PK\x03\x04SYNTHETIC TEST PAYLOAD, NEVER PUBLISH'
+    exe=b'MZ TEST ONLY'+data+struct.pack('<Q',len(data))+_PREVIEW_FOOTER_MARKER
+    (root/'files').mkdir(parents=True)
+    (root/'files'/_PREVIEW_INSTALLER).write_bytes(exe); (root/'files'/_PREVIEW_PAYLOAD).write_bytes(data)
+    _preview_write_json(root/'files'/f'{_PREVIEW_PAYLOAD}.json',_preview_sidecar(data))
+    artifact=dict(artifactId='avalonia-win-x64-installer', id='avalonia-win-x64-installer',
+        head='avalonia', platform='windows',rid='win-x64',arch='x64',kind='installer',
+        fileName=_PREVIEW_INSTALLER,downloadUrl=f'/downloads/files/{_PREVIEW_INSTALLER}',sha256=_preview_digest(exe),sizeBytes=len(exe),
+        compatibilityState='compatible',installAccessClass='open_public',installerMode='bootstrap',
+        payloadAcquisitionMode='embedded',payloadFileName=_PREVIEW_PAYLOAD,payloadDownloadUrl=f'/downloads/files/{_PREVIEW_PAYLOAD}',
+        payloadSha256=_preview_digest(data),payloadSizeBytes=len(data))
+    common=dict(version=_PREVIEW_VERSION,releaseVersion=_PREVIEW_VERSION,channel='preview',channelId='preview',status='published',
+        publishedAt=_PREVIEW_STAMP,generatedAt=_PREVIEW_STAMP,publicationProfile='windows_unsigned_preview_v1',
+        platformScope='windows_only',publicationScope={'signingStatus':'unsigned','sr6Qualification':'incomplete'},
+        supportabilityState='review_required',rolloutState='public_release_review_required',
+        message='Unsigned Windows-only preview. TEST_ONLY: SYNTHETIC FIXTURE; qualification incomplete; strict H1/H2 unrun.',
+        knownIssueSummary='TEST_ONLY: SYNTHETIC FIXTURE. Native Windows not executed.',
+        releaseProof={'status':'review_required','journeysPassed':[], 'proofRoutes':['/downloads']})
+    _preview_write_json(root/MODULE.CANONICAL_MANIFEST, dict(common,artifacts=[artifact]))
+    compat=copy.deepcopy(artifact); compat['url']=compat.pop('downloadUrl')
+    _preview_write_json(root/MODULE.COMPATIBILITY_MANIFEST,dict(common,downloads=[compat]))
+    # Reuse the real projector before binding authority to exact manifest bytes.
+    MODULE.project_manifest_pair(root/MODULE.CANONICAL_MANIFEST,root/MODULE.COMPATIBILITY_MANIFEST,_PREVIEW_GENERATION_ID,evaluated_at=_PREVIEW_STAMP)
+    canonical=json.loads((root/MODULE.CANONICAL_MANIFEST).read_text()); artifact=canonical['artifacts'][0]
+    receipt=dict(status='pass',headId='avalonia',version=_PREVIEW_VERSION,releaseVersion=_PREVIEW_VERSION,channelId='preview',
+        platform='windows',arch='x64',rid='win-x64',artifactDigest='sha256:'+artifact['sha256'],
+        artifactSha256=artifact['sha256'],artifactId=artifact['artifactId'],artifactFileName=_PREVIEW_INSTALLER,
+        fileName=_PREVIEW_INSTALLER,artifactRelativePath='files/'+_PREVIEW_INSTALLER,bootstrapPayloadSha256=artifact['payloadSha256'],
+        bootstrapPayloadSizeBytes=artifact['payloadSizeBytes'],bootstrapPayloadFileName=_PREVIEW_PAYLOAD,
+        testOnly='TEST_ONLY: SYNTHETIC FIXTURE. NOT NATIVE EVIDENCE OR PUBLICATION AUTHORITY.')
+    _preview_write_json(root/_PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH,receipt)
+    _write_test_preview_envelope(root,canonical)
+    return root
+
+
+def _write_test_preview_envelope(root,c):
+    a=c['artifacts'][0]; manifest_digest=MODULE.sha256_file(root/MODULE.CANONICAL_MANIFEST)
+    scope=_preview_digest(b'SYNTHETIC TEST SCOPE - NO AUTHORITY')
+    handoff=dict(contractName='chummer.public-preview-byte-handoff/v1',status='approved_public_preview_bytes',
+        sourcePublicationState='preview',releaseScopeDecisionSha256=scope,releaseVersion=_PREVIEW_VERSION,channel='preview',
+        artifactId=a['artifactId'],head='avalonia',platform='windows',rid='win-x64',arch='x64',sha256=a['sha256'],
+        sizeBytes=a['sizeBytes'],artifactAccessClass='open_public',signingRequirement='preview_unsigned_allowed',
+        downloadUrl=a['downloadUrl'],publicInstallRoute='/downloads/install/'+a['artifactId'])
+    decision=dict(contractName='chummer.preview-release-decision/v2',generatedAt=_PREVIEW_STAMP,status='review_required',
+        releaseDecisionStatus='review_required',verdict='PREVIEW_RELEASE_REVIEW_REQUIRED',releaseVersion=_PREVIEW_VERSION,
+        releaseScopeDecisionSha256=scope,channel='preview',platforms=['windows'],primaryHeadByPlatform={'windows':'avalonia'},
+        fallbackHeadsByPlatform={'windows':[]},artifactAccessClass='open_public',supportOwner='synthetic-test-only',
+        nextActions=['TEST_ONLY: SYNTHETIC FIXTURE. Never publish.'],registryCommit='1'*40,manifestSha256=manifest_digest,
+        authoritySnapshotSha256='',candidateDecisionStatus='',candidateDecisionSha256='',manifestGeneratedAt=_PREVIEW_STAMP,
+        scorecardSha256='',convergenceSha256='',blockingFindings=[dict(id='preview_1',severity='release_truth',summary='TEST_ONLY: synthetic finding; never publish.')],
+        artifactHandoff=handoff)
+    ep=root/'release-evidence'; _preview_write_json(ep/'RELEASE_DECISION.json',decision)
+    sa={k:a[k] for k in ['artifactId','head','platform','rid','arch','kind','downloadUrl','sha256','sizeBytes','compatibilityState','installAccessClass']}
+    sa.update(promotionState='promoted',publicationScope='signed-in-and-public',revokeState='not_revoked',publicInstallRoute='/downloads/install/'+a['artifactId'])
+    snapshot=dict(authorityContract='chummer.release-authority-snapshot/v2',releaseVersion=_PREVIEW_VERSION,channel='preview',
+        status='published',rolloutState='public_release_review_required',supportabilityState='review_required',availablePlatforms=['windows'],
+        primaryHeadByPlatform={'windows':'avalonia'},artifactCount=1,downloadAccessPosture='open_public',knownIssueSummary=c['knownIssueSummary'],
+        manifestSha256=manifest_digest,registryRepository='ArchonMegalon/chummer6-hub-registry',registryCommit='1'*40,
+        releaseDecisionStatus='review_required',releaseDecisionSha256=MODULE.sha256_file(ep/'RELEASE_DECISION.json'),
+        supportOwner=decision['supportOwner'],nextActions=decision['nextActions'],artifacts=[sa],manifestPath='RELEASE_CHANNEL.json',
+        releaseDecisionPath='RELEASE_DECISION.json')
+    _preview_write_json(ep/'SNAPSHOT.json',snapshot)
+    _preview_write_json(ep/'CURRENT.json',dict(releaseVersion=_PREVIEW_VERSION,status='review_required',
+        snapshotSha256=MODULE.sha256_file(ep/'SNAPSHOT.json'),decisionSha256=MODULE.sha256_file(ep/'RELEASE_DECISION.json')))
+
+
+def _prepare_unsigned_preview(candidate,tmp):
+    p=MODULE.prepare_layout(candidate,tmp/'prepared',generation_id=_PREVIEW_GENERATION_ID,activated_at=_PREVIEW_STAMP,activation_receipt_id='synthetic-test-only')
+    generation=tmp/'prepared/generations'/_PREVIEW_GENERATION_ID
+    MODULE.verify_generation(generation,p)
+    return generation,p
+
+
+def test_windows_unsigned_preview_mandatory_bound_metadata_prepares_and_verifies(tmp_path):
+    candidate=_write_unsigned_preview_candidate(tmp_path/'candidate')
+    generation,pointer=_prepare_unsigned_preview(candidate,tmp_path)
+    inventory=json.loads((generation/MODULE.ACTIVATION_CANDIDATE).read_text())['inventory']
+    assert set(_PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS).issubset({x['path'] for x in inventory})
+    assert json.loads((generation/MODULE.CANONICAL_MANIFEST).read_text())['publicationProfile']=='windows_unsigned_preview_v1'
+
+
+def _replace_preview_findings(candidate, findings):
+    # Rebind TEST_ONLY hashes so rejection tests the decision contract, not a
+    # stale outer checksum. These receipts never establish native acceptance.
+    evidence = candidate / 'release-evidence'
+    decision_path = evidence / 'RELEASE_DECISION.json'
+    decision = json.loads(decision_path.read_text())
+    decision['blockingFindings'] = findings
+    _preview_write_json(decision_path, decision)
+    snapshot_path = evidence / 'SNAPSHOT.json'
+    snapshot = json.loads(snapshot_path.read_text())
+    snapshot['releaseDecisionSha256'] = MODULE.sha256_file(decision_path)
+    _preview_write_json(snapshot_path, snapshot)
+    pointer_path = evidence / 'CURRENT.json'
+    pointer = json.loads(pointer_path.read_text())
+    pointer['decisionSha256'] = MODULE.sha256_file(decision_path)
+    pointer['snapshotSha256'] = MODULE.sha256_file(snapshot_path)
+    _preview_write_json(pointer_path, pointer)
+
+
+@pytest.fixture(scope='module')
+def preview_cutover_controller():
+    import sys
+    spec = importlib.util.spec_from_file_location(
+        'preview_finding_cutover_test', ROOT / 'scripts/deploy_public_download_only_cutover.py')
+    assert spec is not None and spec.loader is not None
+    controller = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = controller
+    spec.loader.exec_module(controller)
+    return controller
+
+
+def _validate_preview_at_cutover(candidate, controller):
+    raw = (candidate / MODULE.CANONICAL_MANIFEST).read_bytes()
+    return controller._validate_scope_bound_review_authority(
+        canonical_raw=raw, canonical=json.loads(raw),
+        evidence_bytes={name: (candidate / name).read_bytes()
+                        for name in controller.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS},
+        generation_id=_PREVIEW_GENERATION_ID,
+        release_scope_decision_sha256=_preview_digest(b'SYNTHETIC TEST SCOPE - NO AUTHORITY'),
+        candidate_version=_PREVIEW_VERSION,
+    )
+
+
+@pytest.mark.parametrize('mutation', [
+    'old-arbitrary-id', 'wrong-order', 'duplicate-id', 'wrong-severity',
+    'empty-summary', 'padded-summary', 'long-summary', 'long-utf16-summary',
+    'too-many-findings',
+])
+def test_windows_unsigned_preview_rejects_http_incompatible_findings(tmp_path, mutation, preview_cutover_controller):
+    candidate = _write_unsigned_preview_candidate(tmp_path / 'candidate')
+    findings = [dict(id='preview_1', severity='release_truth', summary='TEST_ONLY')]
+    if mutation == 'old-arbitrary-id': findings[0]['id'] = 'synthetic'
+    if mutation == 'wrong-order': findings[0]['id'] = 'preview_2'
+    if mutation == 'duplicate-id': findings.append(dict(findings[0]))
+    if mutation == 'wrong-severity': findings[0]['severity'] = 'warning'
+    if mutation == 'empty-summary': findings[0]['summary'] = ''
+    if mutation == 'padded-summary': findings[0]['summary'] = ' TEST_ONLY '
+    if mutation == 'long-summary': findings[0]['summary'] = 'x' * 513
+    if mutation == 'long-utf16-summary': findings[0]['summary'] = '\U0001f600' * 257
+    if mutation == 'too-many-findings':
+        findings = [dict(id=f'preview_{index}', severity='release_truth', summary='TEST_ONLY')
+                    for index in range(1, 258)]
+    _replace_preview_findings(candidate, findings)
+    with pytest.raises(preview_cutover_controller.CutoverError):
+        _validate_preview_at_cutover(candidate, preview_cutover_controller)
+    with pytest.raises(MODULE.ReleaseShelfError):
+        _prepare_unsigned_preview(candidate, tmp_path)
+
+
+@pytest.mark.parametrize('boundary', ['512-utf16-units', '256-findings'])
+def test_windows_unsigned_preview_accepts_http_finding_boundaries(tmp_path, boundary, preview_cutover_controller):
+    candidate = _write_unsigned_preview_candidate(tmp_path / 'candidate')
+    findings = ([dict(id='preview_1', severity='release_truth', summary='\U0001f600' * 256)]
+                if boundary == '512-utf16-units' else
+                [dict(id=f'preview_{index}', severity='release_truth', summary='TEST_ONLY')
+                 for index in range(1, 257)])
+    _replace_preview_findings(candidate, findings)
+    _validate_preview_at_cutover(candidate, preview_cutover_controller)
+    _prepare_unsigned_preview(candidate, tmp_path)
+
+
+
+@pytest.mark.parametrize('mutation',['extra-file','extra-evidence','extra-directory','missing-proof','corrupt-proof','missing-smoke','wrong-smoke',
+    'path-escape','symlink-file','symlink-directory','duplicate-json','manifest-drift','unknown-field','boolean-count','broader-posture'])
+def test_windows_unsigned_preview_preparation_rejects_invalid_selected_tree(tmp_path,mutation):
+    c=_write_unsigned_preview_candidate(tmp_path/'candidate'); ep=c/'release-evidence'
+    if mutation=='extra-file': (c/'files/private.txt').write_text('private')
+    if mutation=='extra-evidence': (ep/'private.json').write_text('{}')
+    if mutation=='extra-directory': (ep/'unselected').mkdir()
+    if mutation=='missing-proof': (ep/'SNAPSHOT.json').unlink()
+    if mutation=='corrupt-proof': (ep/'RELEASE_DECISION.json').write_bytes(b'{}')
+    if mutation=='missing-smoke': (c/_PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH).unlink()
+    if mutation=='wrong-smoke': (c/_PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH).write_bytes(b'{}')
+    if mutation=='symlink-file':
+        (ep/'SNAPSHOT.json').rename(tmp_path/'outside'); (ep/'SNAPSHOT.json').symlink_to(tmp_path/'outside')
+    if mutation=='symlink-directory':
+        ep.rename(tmp_path/'outside'); ep.symlink_to(tmp_path/'outside',target_is_directory=True)
+    if mutation=='duplicate-json':
+        p=ep/'CURRENT.json';p.write_text(p.read_text().replace('{','{"status":"review_required",',1))
+    if mutation=='manifest-drift':
+        p=c/MODULE.CANONICAL_MANIFEST;d=json.loads(p.read_text());d['knownIssueSummary']+=' drift';_preview_write_json(p,d)
+    if mutation in ('path-escape','unknown-field','boolean-count','broader-posture'):
+        p=ep/'SNAPSHOT.json';d=json.loads(p.read_text())
+        if mutation=='path-escape': d['releaseDecisionPath']='../../outside.json'
+        if mutation=='unknown-field': d['privateMetadata']='never admit'
+        if mutation=='boolean-count': d['artifactCount']=True
+        if mutation=='broader-posture': d['supportabilityState']='gold_supported'
+        _preview_write_json(p,d)
+        pointer=json.loads((ep/'CURRENT.json').read_text());pointer['snapshotSha256']=MODULE.sha256_file(p);_preview_write_json(ep/'CURRENT.json',pointer)
+    with pytest.raises(MODULE.ReleaseShelfError): _prepare_unsigned_preview(c,tmp_path)
+
+
+
+@pytest.mark.parametrize('missing',list(_PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS))
+def test_windows_unsigned_preview_each_authority_sibling_required_once_selected(tmp_path,missing):
+    c=_write_unsigned_preview_candidate(tmp_path/'candidate'); (c/missing).unlink()
+    with pytest.raises(MODULE.ReleaseShelfError): _prepare_unsigned_preview(c,tmp_path)
+
+
+def test_windows_unsigned_preview_verify_rejects_corrupted_proof(tmp_path):
+    c=_write_unsigned_preview_candidate(tmp_path/'candidate'); generation,pointer=_prepare_unsigned_preview(c,tmp_path)
+    proof=generation/'release-evidence/SNAPSHOT.json';proof.chmod(0o644);proof.write_bytes(b'{}')
+    with pytest.raises(MODULE.ReleaseShelfError): MODULE.verify_generation(generation,pointer,require_sealed_modes=False)
+
+
+def test_windows_unsigned_preview_no_envelope_is_separate_runtime_supported_route(tmp_path):
+    c=_write_unsigned_preview_candidate(tmp_path/'candidate')
+    for p in _PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS: (c/p).unlink()
+    # A newly selected six-file contract, not deletion of a required old proof.
+    (c/'release-evidence').rmdir()
+    _prepare_unsigned_preview(c,tmp_path)
+
+
+def test_windows_unsigned_preview_no_envelope_still_requires_candidate_bound_smoke(tmp_path):
+    c=_write_unsigned_preview_candidate(tmp_path/'candidate')
+    for p in _PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS: (c/p).unlink()
+    smoke=c/_PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH
+    receipt=json.loads(smoke.read_text());receipt['artifactSha256']='0'*64;_preview_write_json(smoke,receipt)
+    with pytest.raises(MODULE.ReleaseShelfError,match='startup-smoke receipt contradicts'):
+        _prepare_unsigned_preview(c,tmp_path)
+
+
+
+@pytest.mark.parametrize('mutation',['proof-digest','unselected-file','unselected-generated-metadata','path-escape'])
+def test_windows_unsigned_preview_verify_rechecks_contract_even_if_outer_inventory_rebound(tmp_path,mutation):
+    c=_write_unsigned_preview_candidate(tmp_path/'candidate');g,pointer=_prepare_unsigned_preview(c,tmp_path)
+    for p in [g,*g.rglob('*')]:p.chmod(0o755 if p.is_dir() else 0o644)
+    if mutation=='unselected-file':(g/'release-evidence/private.json').write_bytes(b'{}')
+    elif mutation=='unselected-generated-metadata':(g/MODULE.PUBLICATION_SCOPE).write_bytes(b'{}')
+    else:
+        p=g/'release-evidence/SNAPSHOT.json';d=json.loads(p.read_text())
+        if mutation=='proof-digest':d['knownIssueSummary']='tampered'
+        else:d['releaseDecisionPath']='../../escape.json'
+        _preview_write_json(p,d)
+        if mutation=='path-escape':
+            p=g/'release-evidence/CURRENT.json';d=json.loads(p.read_text());d['snapshotSha256']=MODULE.sha256_file(g/'release-evidence/SNAPSHOT.json');_preview_write_json(p,d)
+    activation=json.loads((g/MODULE.ACTIVATION_CANDIDATE).read_text())
+    activation['inventory']=MODULE.build_inventory(g)
+    activation['inventoryDigest']='sha256:'+MODULE.inventory_digest(activation['inventory'])
+    pointer['inventoryDigest']=activation['inventoryDigest'];_preview_write_json(g/MODULE.ACTIVATION_CANDIDATE,activation)
+    with pytest.raises(MODULE.ReleaseShelfError):MODULE.verify_generation(g,pointer,require_sealed_modes=False)
+
+
+def test_windows_unsigned_preview_footer_magic_in_payload_is_not_a_second_footer(tmp_path):
+    data=b'PK\x03\x04'+_PREVIEW_FOOTER_MARKER+b'synthetic fixture'
+    p=tmp_path/'fixture.exe';p.write_bytes(b'MZ stub'+data+struct.pack('<Q',len(data))+_PREVIEW_FOOTER_MARKER)
+    MODULE._validate_bootstrap_payload_trailer(p,_preview_sidecar(data),'embedded')

@@ -6746,15 +6746,17 @@ def _validate_scope_bound_review_authority(
         or not decision["generatedAt"]
         or not isinstance(blocking, list)
         or not blocking
+        or len(blocking) > 256
         or any(
             not isinstance(item, dict)
             or set(item) != {"id", "severity", "summary"}
             or item.get("severity") != "release_truth"
-            or not isinstance(item.get("id"), str)
-            or not item["id"]
+            or item.get("id") != f"preview_{index}"
             or not isinstance(item.get("summary"), str)
             or not item["summary"]
-            for item in blocking
+            or item["summary"] != item["summary"].strip()
+            or len(item["summary"].encode("utf-16-le", errors="surrogatepass")) > 1024
+            for index, item in enumerate(blocking, start=1)
         )
         or not isinstance(handoff, dict)
         or set(handoff) != REVIEW_AUTHORITY_HANDOFF_FIELDS
