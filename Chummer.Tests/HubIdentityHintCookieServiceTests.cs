@@ -164,10 +164,194 @@ public sealed class HubIdentityHintCookieServiceTests
 
 public sealed class HubBrowserAuthServiceTests
 {
-    [Fact]
-    public async Task IssueSessionAsyncRetriesTransientIdentityFailure()
+    [Theory]
+    [InlineData(HttpStatusCode.RequestTimeout)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.NotImplemented)]
+    [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    [InlineData((HttpStatusCode)599)]
+    public async Task IssueSessionAsyncDoesNotRetryTransientIdentityFailure(HttpStatusCode statusCode)
     {
         int sessionRequests = 0;
+        using var handler = new StubHttpMessageHandler((request, _) =>
+        {
+            AssertSessionRequest(request);
+            Interlocked.Increment(ref sessionRequests);
+            return Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent("identity unavailable", Encoding.UTF8, "text/plain")
+            });
+        });
+        using var client = new HttpClient(handler);
+        HubBrowserAuthService browserAuth = CreateBrowserAuth(client);
+
+        HubBrowserAuthRequestFailedException failure = await Assert.ThrowsAsync<HubBrowserAuthRequestFailedException>(
+            () => IssueSessionAsync(browserAuth));
+
+        Assert.Equal("issue-session", failure.Operation);
+        Assert.Equal((int)statusCode, failure.StatusCode);
+        Assert.Equal("identity unavailable", failure.Detail);
+        Assert.Equal(1, sessionRequests);
+    }
+
+    [Fact]
+    public async Task IssueSessionAsyncDoesNotReplayCommittedSessionWhenResponseIsLost()
+    {
+        int sessionRequests = 0;
+        List<IdentitySessionIssueResponse> committedSessions = [];
+        HttpRequestException lostResponse = new("Identity committed the session but the response was lost.");
+        using var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            AssertSessionRequest(request);
+            int attempt = Interlocked.Increment(ref sessionRequests);
+            string body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            IdentitySessionIssueRequest issue = Assert.IsType<IdentitySessionIssueRequest>(
+                JsonSerializer.Deserialize<IdentitySessionIssueRequest>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            // Model a producer commit before the transport loses the first response.
+            committedSessions.Add(CreateSession(issue.SubjectId, $"session-{attempt}"));
+            if (attempt == 1)
+            {
+                throw lostResponse;
+            }
+
+            return JsonResponse(HttpStatusCode.Created, committedSessions[^1]);
+        });
+        using var client = new HttpClient(handler);
+        HubBrowserAuthService browserAuth = CreateBrowserAuth(client);
+
+        HubBrowserAuthUnavailableException failure = await Assert.ThrowsAsync<HubBrowserAuthUnavailableException>(
+            () => IssueSessionAsync(browserAuth));
+
+        Assert.Same(lostResponse, failure.InnerException);
+        Assert.Equal(1, sessionRequests);
+        IdentitySessionIssueResponse committed = Assert.Single(committedSessions);
+        Assert.Equal("session-1", committed.SessionId);
+        Assert.Equal("subject.single", committed.SubjectId);
+    }
+
+    [Fact]
+    public async Task IssueSessionAsyncDoesNotRetryNonCallerTimeout()
+    {
+        int sessionRequests = 0;
+        using var callerCancellation = new CancellationTokenSource();
+        using var handler = new StubHttpMessageHandler((request, _) =>
+        {
+            AssertSessionRequest(request);
+            Interlocked.Increment(ref sessionRequests);
+            throw new TaskCanceledException("Identity response timed out.", new TimeoutException());
+        });
+        using var client = new HttpClient(handler);
+        HubBrowserAuthService browserAuth = CreateBrowserAuth(client);
+
+        HubBrowserAuthUnavailableException failure = await Assert.ThrowsAsync<HubBrowserAuthUnavailableException>(
+            () => IssueSessionAsync(browserAuth, callerCancellation.Token));
+
+        Assert.IsType<TaskCanceledException>(failure.InnerException);
+        Assert.False(callerCancellation.IsCancellationRequested);
+        Assert.Equal(1, sessionRequests);
+    }
+
+    [Fact]
+    public async Task IssueSessionAsyncPropagatesCallerCancellationWithoutRetry()
+    {
+        int sessionRequests = 0;
+        using var callerCancellation = new CancellationTokenSource();
+        using var handler = new StubHttpMessageHandler((request, cancellationToken) =>
+        {
+            AssertSessionRequest(request);
+            Interlocked.Increment(ref sessionRequests);
+            callerCancellation.Cancel();
+            return Task.FromCanceled<HttpResponseMessage>(cancellationToken);
+        });
+        using var client = new HttpClient(handler);
+        HubBrowserAuthService browserAuth = CreateBrowserAuth(client);
+
+        OperationCanceledException failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => IssueSessionAsync(browserAuth, callerCancellation.Token));
+
+        Assert.Equal(callerCancellation.Token, failure.CancellationToken);
+        Assert.True(callerCancellation.IsCancellationRequested);
+        Assert.Equal(1, sessionRequests);
+    }
+
+    [Fact]
+    public async Task IssueSessionAsyncReturnsSuccessfulSessionWithoutChangingRequest()
+    {
+        int sessionRequests = 0;
+        IdentitySessionIssueResponse expected = CreateSession();
+        using var handler = new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            AssertSessionRequest(request);
+            Interlocked.Increment(ref sessionRequests);
+            string body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            IdentitySessionIssueRequest issue = Assert.IsType<IdentitySessionIssueRequest>(
+                JsonSerializer.Deserialize<IdentitySessionIssueRequest>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            Assert.Equal(expected.SubjectId, issue.SubjectId);
+            Assert.Equal(expected.DisplayName, issue.DisplayName);
+            Assert.Equal(expected.Email, issue.Email);
+            Assert.Equal(new[] { "player" }, issue.RequestedRoles);
+            Assert.Null(issue.RequestedTtl);
+            return JsonResponse(HttpStatusCode.Created, expected);
+        });
+        using var client = new HttpClient(handler);
+        HubBrowserAuthService browserAuth = CreateBrowserAuth(client);
+
+        IdentitySessionIssueResponse session = await IssueSessionAsync(browserAuth);
+
+        Assert.Equal(expected.SessionId, session.SessionId);
+        Assert.Equal(expected.SubjectId, session.SubjectId);
+        Assert.Equal(expected.DisplayName, session.DisplayName);
+        Assert.Equal(expected.Email, session.Email);
+        Assert.Equal(expected.Roles, session.Roles);
+        Assert.Equal(expected.AccessToken, session.AccessToken);
+        Assert.Equal(expected.RefreshToken, session.RefreshToken);
+        Assert.Equal(expected.IssuedAtUtc, session.IssuedAtUtc);
+        Assert.Equal(expected.ExpiresAtUtc, session.ExpiresAtUtc);
+        Assert.Equal(1, sessionRequests);
+    }
+
+    [Theory]
+    [InlineData("status")]
+    [InlineData("transport")]
+    [InlineData("timeout")]
+    public async Task StartEmailEntryAsyncRetainsExistingTransientRetries(string failureKind)
+    {
+        int emailRequests = 0;
+        EmailAuthStartResponse expected = new(
+            "ticket-1", "subject.email", "runner@example.com", "Runner Prime", "/home",
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(10), "preview", "test");
+        using var handler = new StubHttpMessageHandler((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("http://identity.test/api/v1/identity/email/start", request.RequestUri?.AbsoluteUri);
+            if (Interlocked.Increment(ref emailRequests) == 1)
+            {
+                return failureKind switch
+                {
+                    "status" => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)),
+                    "transport" => throw new HttpRequestException("Identity transport failed."),
+                    "timeout" => throw new TaskCanceledException("Identity response timed out.", new TimeoutException()),
+                    _ => throw new InvalidOperationException("Unexpected failure kind.")
+                };
+            }
+
+            return Task.FromResult(JsonResponse(HttpStatusCode.OK, expected));
+        });
+        using var client = new HttpClient(handler);
+        HubBrowserAuthService browserAuth = CreateBrowserAuth(client);
+
+        EmailAuthStartResponse result = await browserAuth.StartEmailEntryAsync(
+            expected.Email, expected.DisplayName, expected.NextPath, CancellationToken.None);
+
+        Assert.Equal(expected, result);
+        Assert.Equal(2, emailRequests);
+    }
+
+    private static HubBrowserAuthService CreateBrowserAuth(HttpClient client)
+    {
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -175,56 +359,27 @@ public sealed class HubBrowserAuthServiceTests
                 ["IDENTITY_ADMIN_KEY"] = "admin-key"
             })
             .Build();
+        return new HubBrowserAuthService(client, configuration, NullLogger<HubBrowserAuthService>.Instance);
+    }
 
-        var handler = new RetryStubHttpMessageHandler(async request =>
-        {
-            if (!string.Equals(request.RequestUri?.AbsoluteUri, "http://identity.test/api/v1/identity/sessions", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException($"Unexpected request URI in HubBrowserAuthService test: {request.RequestUri}");
-            }
+    private static Task<IdentitySessionIssueResponse> IssueSessionAsync(
+        HubBrowserAuthService browserAuth,
+        CancellationToken cancellationToken = default)
+        => browserAuth.IssueSessionAsync("subject.single", "Runner Prime", "runner@example.com", ["player"], cancellationToken);
 
-            Assert.Equal("admin-key", request.Headers.GetValues("X-Identity-Admin-Key").Single());
-            int attempt = Interlocked.Increment(ref sessionRequests);
-            if (attempt == 1)
-            {
-                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
-                {
-                    Content = new StringContent("identity warming up", Encoding.UTF8, "text/plain")
-                };
-            }
+    private static void AssertSessionRequest(HttpRequestMessage request)
+    {
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("http://identity.test/api/v1/identity/sessions", request.RequestUri?.AbsoluteUri);
+        Assert.Equal("admin-key", request.Headers.GetValues("X-Identity-Admin-Key").Single());
+    }
 
-            string body = await request.Content!.ReadAsStringAsync();
-            Assert.Contains("subject.retry", body, StringComparison.Ordinal);
-
-            return JsonResponse(HttpStatusCode.Created, new
-            {
-                sessionId = "session-1",
-                subjectId = "subject.retry",
-                displayName = "Runner Prime",
-                email = "runner@example.com",
-                roles = new[] { "player" },
-                accessToken = "issued-access-token",
-                refreshToken = "issued-refresh-token",
-                issuedAtUtc = DateTimeOffset.UtcNow,
-                expiresAtUtc = DateTimeOffset.UtcNow.AddHours(4)
-            });
-        });
-
-        HubBrowserAuthService browserAuth = new(
-            new HttpClient(handler),
-            configuration,
-            NullLogger<HubBrowserAuthService>.Instance);
-
-        IdentitySessionIssueResponse session = await browserAuth.IssueSessionAsync(
-            "subject.retry",
-            "Runner Prime",
-            "runner@example.com",
-            ["player"],
-            CancellationToken.None);
-
-        Assert.Equal("issued-access-token", session.AccessToken);
-        Assert.Equal("subject.retry", session.SubjectId);
-        Assert.Equal(2, sessionRequests);
+    private static IdentitySessionIssueResponse CreateSession(string subjectId = "subject.single", string sessionId = "session-1")
+    {
+        DateTimeOffset issuedAt = new(2026, 11, 14, 12, 0, 0, TimeSpan.Zero);
+        return new IdentitySessionIssueResponse(
+            sessionId, subjectId, "Runner Prime", "runner@example.com", ["player"],
+            "issued-access-token", "issued-refresh-token", issuedAt, issuedAt.AddHours(4));
     }
 
     private static HttpResponseMessage JsonResponse(HttpStatusCode statusCode, object payload)
@@ -235,11 +390,11 @@ public sealed class HubBrowserAuthServiceTests
         };
     }
 
-    private sealed class RetryStubHttpMessageHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> responder)
+    private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responder)
         : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => responder(request);
+            => responder(request, cancellationToken);
     }
 }
 

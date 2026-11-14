@@ -126,7 +126,9 @@ public sealed class HubBrowserAuthService
             },
             operation: "issue-session",
             publicMessage: "Sign-in could not be completed right now. Try again later.",
-            cancellationToken);
+            cancellationToken,
+            // Identity creates a new session per POST, even if an earlier response was lost.
+            maxAttempts: 1);
     }
 
     public async Task RevokeCookieSessionAsync(HttpRequest request, CancellationToken cancellationToken)
@@ -649,9 +651,10 @@ public sealed class HubBrowserAuthService
         Func<Task<HttpResponseMessage>> sendAsync,
         string operation,
         string publicMessage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int maxAttempts = TransientRetryAttempts)
     {
-        using var response = await SendAsync(sendAsync, operation, publicMessage, cancellationToken);
+        using var response = await SendAsync(sendAsync, operation, publicMessage, cancellationToken, maxAttempts);
         try
         {
             var payload = await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
@@ -684,7 +687,8 @@ public sealed class HubBrowserAuthService
         Func<Task<HttpResponseMessage>> sendAsync,
         string operation,
         string publicMessage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int maxAttempts = TransientRetryAttempts)
     {
         for (int attempt = 1; ; attempt++)
         {
@@ -697,7 +701,7 @@ public sealed class HubBrowserAuthService
                 }
 
                 var detail = await SafeReadBodyAsync(response, cancellationToken);
-                if (attempt < TransientRetryAttempts && IsTransientStatusCode(response.StatusCode))
+                if (attempt < maxAttempts && IsTransientStatusCode(response.StatusCode))
                 {
                     _logger.LogWarning(
                         "Identity browser auth operation {Operation} returned transient status {StatusCode} on attempt {Attempt}. Retrying. Detail: {Detail}",
@@ -722,12 +726,12 @@ public sealed class HubBrowserAuthService
                     (int)response.StatusCode,
                     detail);
             }
-            catch (HttpRequestException ex) when (attempt < TransientRetryAttempts)
+            catch (HttpRequestException ex) when (attempt < maxAttempts)
             {
                 _logger.LogWarning(ex, "Identity browser auth operation {Operation} failed on attempt {Attempt}. Retrying.", operation, attempt);
                 await DelayBeforeRetryAsync(attempt, cancellationToken);
             }
-            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested && attempt < TransientRetryAttempts)
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested && attempt < maxAttempts)
             {
                 _logger.LogWarning(ex, "Identity browser auth operation {Operation} timed out on attempt {Attempt}. Retrying.", operation, attempt);
                 await DelayBeforeRetryAsync(attempt, cancellationToken);
