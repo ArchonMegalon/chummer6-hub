@@ -283,6 +283,7 @@ def _release_proof_for_windows_installer(
             "install_claim_restore_continue",
             "build_explain_publish",
             "campaign_session_recover_recap",
+            "recover_from_sync_conflict",
             "report_cluster_release_notify",
             "organize_community_and_close_loop",
         ],
@@ -2175,6 +2176,9 @@ def test_http_publisher_requires_manifest_bound_embedded_bootstrap_metadata() ->
 
 
 def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_path: Path) -> None:
+    from test_public_downloads_bundle import write_startup_smoke_fixture
+    from test_windows_installer_visual_proof_gate import _write_visual_audit
+
     bundle_dir = tmp_path / "bundle"
     files_dir = bundle_dir / "files"
     files_dir.mkdir(parents=True)
@@ -2182,7 +2186,7 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
     payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
     payload_bytes = _write_bootstrap_payload(payload_path)
     payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
-    payload_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    payload_url = f"https://chummer.run/downloads/files/{payload_path.name}"
     installer_bytes = _windows_installer_stub_with_payload_metadata(
         payload_download_url=payload_url,
         payload_sha256=payload_sha256,
@@ -2201,15 +2205,76 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
         installer_name=installer_path.name,
         installer_sha256=hashlib.sha256(installer_bytes).hexdigest(),
         installer_size_bytes=len(installer_bytes),
+        installer_download_url=f"https://chummer.run/downloads/files/{installer_path.name}",
         payload_name=payload_path.name,
         payload_download_url=payload_url,
         payload_sha256=payload_sha256,
         payload_size_bytes=len(payload_bytes),
         release_proof=_release_proof_for_windows_installer(
-            base_url="https://example.invalid"
+            base_url="https://chummer.run"
         ),
     )
-    _write_startup_smoke_receipt(bundle_dir / "startup-smoke", installer_path)
+    # The ordinary publication profile requires both current desktop platforms.
+    linux_path = files_dir / "chummer-avalonia-linux-x64-installer.deb"
+    linux_path.write_bytes(b"synthetic-debian-package-for-bootstrap-publication-test")
+    linux_row = {
+        "artifactId": "avalonia-linux-x64-installer",
+        "head": "avalonia",
+        "platform": "linux",
+        "arch": "x64",
+        "rid": "linux-x64",
+        "kind": "installer",
+        "fileName": linux_path.name,
+        "url": f"https://chummer.run/downloads/files/{linux_path.name}",
+        "sha256": hashlib.sha256(linux_path.read_bytes()).hexdigest(),
+        "sizeBytes": linux_path.stat().st_size,
+    }
+    manifest_path = bundle_dir / "releases.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["downloads"].append(linux_row)
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    localization_path = bundle_dir / "UI_LOCALIZATION_RELEASE_GATE.generated.json"
+    localization_path.write_text(
+        json.dumps(manifest["releaseProof"]["uiLocalizationReleaseGate"], indent=2) + "\n",
+        encoding="utf-8",
+    )
+    readiness_path = bundle_dir / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+    readiness_path.write_text(
+        json.dumps({
+            "contract_name": "chummer.flagship_product_readiness_gate.v1",
+            "generated_at_utc": manifest["releaseProof"]["generatedAt"],
+            "status": "pass",
+            "coverage_gap_keys": [],
+            "launch_critical_nested_blockers": [],
+            "reason": "Synthetic bootstrap publication fixture; not native readiness proof.",
+        }, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    for artifact_path, artifact_row in (
+        (linux_path, linux_row),
+        (installer_path, {**manifest["downloads"][0], "head": "avalonia", "platform": "windows", "rid": "win-x64", "arch": "x64"}),
+    ):
+        write_startup_smoke_fixture(
+            bundle_dir / "startup-smoke", artifact_path, artifact_row, manifest["releaseProof"]["generatedAt"]
+        )
+        receipt_path = bundle_dir / "startup-smoke" / f"startup-smoke-avalonia-{artifact_row['rid']}.receipt.json"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["releaseVersion"] = manifest["version"]
+        receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+    # Synthetic fixture evidence exercises the gate; it is not native Windows proof.
+    audit_path = tmp_path / "visual-audit" / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"
+    audit = _write_visual_audit(audit_path, installer_path=installer_path)
+    startup_receipt = audit["startupReceipt"]
+    assert isinstance(startup_receipt, dict)
+    startup_receipt["path"] = str(
+        bundle_dir / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json"
+    )
+    audit_path.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+
+    source_manifest_bytes = (bundle_dir / "releases.json").read_bytes()
+    source_receipt_path = Path(startup_receipt["path"])
+    source_receipt_bytes = source_receipt_path.read_bytes()
 
     deploy_dir = tmp_path / "deploy"
     result = subprocess.run(
@@ -2217,9 +2282,14 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
         cwd=REPO_ROOT,
         env={
             **os.environ,
-            "CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS": "windows",
+            "CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS": "linux,windows",
+            "CHUMMER_PUBLIC_PUBLICATION_PROFILE": "",
+            "CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH": str(localization_path),
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH": str(readiness_path),
             "CHUMMER_PUBLIC_EDGE_DOWNLOADS_MIRROR_AUTO": "false",
-            "CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER": "true",
+            "CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER": "false",
+            "CHUMMER_WINDOWS_INSTALLER_VISUAL_PROOF_PATH": str(tmp_path / "missing-legacy-proof.json"),
+            "CHUMMER_WINDOWS_VISUAL_AUDIT_PUBLISHED_PATH": str(audit_path),
             "PORTAL_MANIFEST_PATH": str(deploy_dir / "releases.json"),
             "PORTAL_DOWNLOADS_DIR": str(deploy_dir),
         },
@@ -2229,6 +2299,7 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "windows_installer_visual_proof_gate:ok checked=1 legacy=0 visual_audit=1" in result.stdout
     assert (deploy_dir / "files" / installer_path.name).is_file()
     assert (deploy_dir / "files" / payload_path.name).is_file()
     deployed_sidecar = deploy_dir / "files" / f"{payload_path.name}.json"
@@ -2236,6 +2307,24 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
     sidecar = json.loads(deployed_sidecar.read_text(encoding="utf-8"))
     assert sidecar["fileName"] == payload_path.name
     assert sidecar["installerFileName"] == installer_path.name
+    assert (deploy_dir / "files" / installer_path.name).read_bytes() == installer_bytes
+    assert (deploy_dir / "files" / payload_path.name).read_bytes() == payload_bytes
+    assert (bundle_dir / "releases.json").read_bytes() == source_manifest_bytes
+    assert source_receipt_path.read_bytes() == source_receipt_bytes
+    for manifest_name, rows_key in (
+        ("RELEASE_CHANNEL.generated.json", "artifacts"),
+        ("releases.json", "downloads"),
+    ):
+        rows = json.loads((deploy_dir / manifest_name).read_text(encoding="utf-8"))[rows_key]
+        assert sorted(row["fileName"] for row in rows) == sorted([linux_path.name, installer_path.name])
+        installer_row = next(row for row in rows if row["fileName"] == installer_path.name)
+        assert installer_row["sha256"] == hashlib.sha256(installer_bytes).hexdigest()
+        assert installer_row["sizeBytes"] == len(installer_bytes)
+        assert installer_row["installerMode"] == "bootstrap"
+        assert installer_row["payloadFileName"] == payload_path.name
+        assert installer_row["payloadDownloadUrl"] == payload_url
+        assert installer_row["payloadSha256"] == payload_sha256
+        assert installer_row["payloadSizeBytes"] == len(payload_bytes)
 
 
 def test_windows_installer_verifier_rejects_non_windows_executable(tmp_path: Path) -> None:

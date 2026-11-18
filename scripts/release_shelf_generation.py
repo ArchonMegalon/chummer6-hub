@@ -2447,11 +2447,14 @@ def _validate_windows_preview_authority(source_root: Path) -> None:
         smoke = source_root / preview_authority.SCOPE_BOUND_STARTUP_SMOKE_PATH
         if smoke.stat().st_size > 4 * 1024 * 1024:
             raise ReleaseShelfError('Windows preview startup receipt exceeds contract limit')
+        has_authority_envelope = any((source_root / name).exists() for name in paths)
         preview_authority._validate_scope_bound_startup_smoke(
             smoke.read_bytes(), artifact=artifacts[0],
             release_version=canonical.get('releaseVersion') or canonical.get('version'),
+            publication_profile=canonical.get('publicationProfile'),
+            has_authority_envelope=has_authority_envelope,
         )
-        if not any((source_root / name).exists() for name in paths):
+        if not has_authority_envelope:
             return
         evidence = {}
         for name in paths:
@@ -2503,14 +2506,38 @@ def _validate_windows_preview_candidate_files(source_root: Path, *, prepared: bo
                 or any(key in row for key in ("projectionProfile", "releaseProfile", "projectionStage",
                                               "codeDeployCurrentShelfAuthority", "channelPromotionAuthority"))):
             raise ReleaseShelfError("Windows preview must preserve its scoped review-required posture")
+    selected = []
+    for manifest, key in ((canonical, "artifacts"), (compatibility, "downloads")):
+        rows = manifest.get(key)
+        if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
+            raise ReleaseShelfError("Windows preview requires one selected artifact in each manifest")
+        selected.append(rows[0])
+    packaging = [
+        {key: row[key] for key in preview_authority.STARTUP_PACKAGING_AUTHORITY_FIELDS if key in row}
+        for row in selected
+    ]
+    if not preview_authority._json_semantically_equal(packaging[0], packaging[1]):
+        raise ReleaseShelfError("Windows preview manifests disagree on packaging authority")
+    startup_only = preview_authority._is_startup_only_windows_preview(
+        selected[0], profile,
+        any((source_root / name).exists() for name in preview_authority.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS),
+    )
     allowed = {
         CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST,
         "files/chummer-avalonia-win-x64-installer.exe",
-        "files/chummer-avalonia-win-x64-payload.zip",
-        "files/chummer-avalonia-win-x64-payload.zip.json",
         "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
     }
     required = set(allowed)
+    payload_files = {
+        "files/chummer-avalonia-win-x64-payload.zip",
+        "files/chummer-avalonia-win-x64-payload.zip.json",
+    }
+    allowed.update(payload_files)
+    # Only a validated startup-only receipt without packaging claims can select
+    # the installer alone. A selected authority envelope is validated separately;
+    # bootstrap inputs still require both payload files.
+    if not startup_only:
+        required.update(payload_files)
     # Only this fixed envelope can be admitted, after its existing contract and
     # digest chain validate below. There is no directory-wide exception.
     allowed.update(preview_authority.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS)
@@ -2526,6 +2553,10 @@ def _validate_windows_preview_candidate_files(source_root: Path, *, prepared: bo
         if not (source_root / name).is_file():
             raise ReleaseShelfError(f"Windows preview selected file is missing: {name}")
     _validate_windows_preview_authority(source_root)
+    if startup_only:
+        # Apply the unchanged binding guard at intake and verification, including
+        # after an outer inventory is rebound. Unreferenced ZIPs remain private.
+        validate_files_are_manifest_bound(canonical, compatibility, source_root)
 
 
 def copy_candidate(source_root: Path, generation_root: Path) -> None:

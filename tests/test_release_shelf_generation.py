@@ -3554,6 +3554,366 @@ _PREVIEW_STAMP = "2026-11-14T09:00:00Z"
 _PREVIEW_FOOTER_MARKER = b"CHUMMER6PAYLOAD1"
 
 
+@pytest.fixture
+def startup_only_public_receipt():
+    # Public projection reviewed in review8673. Replaying this contract fixture
+    # does not execute Windows or establish new native/publication evidence.
+    return {
+        "status": "pass", "headId": "avalonia",
+        "version": "1.0.0-preview.20261118.b95573f9",
+        "releaseVersion": "1.0.0-preview.20261118.b95573f9",
+        "channelId": "preview", "platform": "windows", "arch": "x64", "rid": "win-x64",
+        "readyCheckpoint": "pre_ui_event_loop", "hostClass": "local-win-x64",
+        "artifactDigest": "sha256:497a7b170ec8d89eb58f90e6156ca08337090a188f320a83545cb21560ec9444",
+        "operatingSystem": "Microsoft Windows 10.0.26200",
+        "recordedAtUtc": "2026-11-18T16:09:22.3299307+00:00",
+        "executionEnvironment": "native_windows", "verificationScope": "native_windows_startup",
+        "nativeHostEvidence": {
+            "contractName": "chummer6-ui.native_windows_host_evidence", "status": "verified",
+            "isNativeWindows": True, "hostPlatform": "windows",
+            "hostKernel": "MINGW64_NT-10.0-26200", "runner": "native-msys-direct",
+            "evidenceSource": "host_kernel_and_native_direct_selection",
+        },
+        "artifactSha256": "497a7b170ec8d89eb58f90e6156ca08337090a188f320a83545cb21560ec9444",
+        "artifactId": "avalonia-win-x64-installer",
+        "artifactFileName": _PREVIEW_INSTALLER, "fileName": _PREVIEW_INSTALLER,
+        "artifactRelativePath": "files/" + _PREVIEW_INSTALLER,
+    }
+
+
+def _validate_startup_only_fixture(receipt, **overrides):
+    arguments = dict(
+        artifact={"artifactId": "avalonia-win-x64-installer", "fileName": _PREVIEW_INSTALLER,
+                  "sha256": "497a7b170ec8d89eb58f90e6156ca08337090a188f320a83545cb21560ec9444"},
+        release_version="1.0.0-preview.20261118.b95573f9",
+        publication_profile="windows_unsigned_preview_v1", has_authority_envelope=False,
+    )
+    arguments.update(overrides)
+    return _PREVIEW_AUTHORITY._validate_scope_bound_startup_smoke(
+        json.dumps(receipt).encode(), **arguments,
+    )
+
+
+def test_windows_unsigned_preview_accepts_review8673_startup_only_projection(startup_only_public_receipt):
+    result = _validate_startup_only_fixture(startup_only_public_receipt)
+    assert result == {
+        "path": _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH,
+        "sha256": _preview_digest(json.dumps(startup_only_public_receipt).encode()),
+        "sizeBytes": len(json.dumps(startup_only_public_receipt).encode()), "status": "pass",
+    }
+
+
+def test_windows_unsigned_preview_startup_only_requires_every_projected_field(startup_only_public_receipt):
+    for field in startup_only_public_receipt:
+        incomplete = copy.deepcopy(startup_only_public_receipt)
+        incomplete.pop(field)
+        with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+            _validate_startup_only_fixture(incomplete)
+    for field in startup_only_public_receipt["nativeHostEvidence"]:
+        incomplete = copy.deepcopy(startup_only_public_receipt)
+        incomplete["nativeHostEvidence"].pop(field)
+        with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+            _validate_startup_only_fixture(incomplete)
+
+
+def test_windows_unsigned_preview_startup_only_rejects_complete_bootstrap_overlay(startup_only_public_receipt):
+    startup_only_public_receipt.update(
+        artifactInstallMode="nsis_bootstrap_installer", bootstrapPayloadAcquisitionMode="embedded",
+        bootstrapPayloadFileName=_PREVIEW_PAYLOAD, bootstrapPayloadSha256="8" * 64,
+        bootstrapPayloadSizeBytes=58094656,
+    )
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+        _validate_startup_only_fixture(startup_only_public_receipt)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("status", "skipped"), ("headId", "blazor"), ("version", "other"),
+    ("releaseVersion", "other"), ("channelId", "stable"), ("platform", "linux"),
+    ("arch", "arm64"), ("rid", "linux-x64"), ("artifactDigest", "sha256:" + "0" * 64),
+    ("artifactSha256", "0" * 64), ("artifactId", "other"), ("artifactFileName", "other.exe"),
+    ("fileName", "other.exe"), ("artifactRelativePath", "files/../private.exe"),
+    ("executionEnvironment", "wine"), ("verificationScope", "windows_wine_compatibility"),
+    ("readyCheckpoint", "process_started"), ("hostClass", "local-linux-x64"),
+    ("operatingSystem", "Linux"), ("recordedAtUtc", "2026-11-18T16:09:22"),
+    ("recordedAtUtc", None), ("installLinkingInstallationId", "private"),
+    ("processPath", "C:\\private\\app.exe"), ("producer", "invented"),
+])
+def test_windows_unsigned_preview_startup_only_rejects_changed_public_fields(startup_only_public_receipt, field, value):
+    startup_only_public_receipt[field] = value
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+        _validate_startup_only_fixture(startup_only_public_receipt)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("contractName", "other"), ("status", "unverified"), ("isNativeWindows", False),
+    ("isNativeWindows", 1), ("hostPlatform", "linux"), ("hostKernel", "Linux"),
+    ("runner", "wine"), ("evidenceSource", ""), ("privatePath", "C:\\private"),
+])
+def test_windows_unsigned_preview_startup_only_rejects_changed_native_evidence(startup_only_public_receipt, field, value):
+    startup_only_public_receipt["nativeHostEvidence"][field] = value
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+        _validate_startup_only_fixture(startup_only_public_receipt)
+
+
+@pytest.mark.parametrize("field", sorted(_PREVIEW_AUTHORITY.STARTUP_PACKAGING_AUTHORITY_FIELDS))
+@pytest.mark.parametrize("value", [None, "", False, "unverified"])
+def test_windows_unsigned_preview_startup_only_rejects_any_packaging_field(startup_only_public_receipt, field, value):
+    # Presence, including null/false/empty aliases, cannot opt into this branch.
+    artifact = {"artifactId": "avalonia-win-x64-installer", "fileName": _PREVIEW_INSTALLER,
+                "sha256": startup_only_public_receipt["artifactSha256"], field: value}
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+        _validate_startup_only_fixture(startup_only_public_receipt, artifact=artifact)
+    startup_only_public_receipt[field] = value
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+        _validate_startup_only_fixture(startup_only_public_receipt)
+
+
+@pytest.mark.parametrize("overrides", [
+    {"publication_profile": None}, {"publication_profile": "full_release"},
+    {"publication_profile": "windows_unsigned_preview_v1 "},
+    {"has_authority_envelope": None}, {"has_authority_envelope": 0},
+])
+def test_windows_unsigned_preview_startup_only_requires_exact_scope(startup_only_public_receipt, overrides):
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+        _validate_startup_only_fixture(startup_only_public_receipt, **overrides)
+
+
+def _write_startup_only_preview_candidate(root, receipt):
+    candidate = _write_unsigned_preview_candidate(root)
+    for relative in _PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS:
+        (candidate / relative).unlink()
+    (candidate / "release-evidence").rmdir()
+    for name, key in ((MODULE.CANONICAL_MANIFEST, "artifacts"), (MODULE.COMPATIBILITY_MANIFEST, "downloads")):
+        path = candidate / name
+        manifest = json.loads(path.read_text())
+        artifact = manifest[key][0]
+        for field in _PREVIEW_AUTHORITY.STARTUP_PACKAGING_AUTHORITY_FIELDS:
+            artifact.pop(field, None)
+        _preview_write_json(path, manifest)
+    receipt = copy.deepcopy(receipt)
+    receipt.update(version=_PREVIEW_VERSION, releaseVersion=_PREVIEW_VERSION,
+                   artifactSha256=artifact["sha256"], artifactDigest="sha256:" + artifact["sha256"])
+    _preview_write_json(candidate / _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH, receipt)
+    return candidate
+
+
+def test_windows_unsigned_preview_startup_only_intake_preserves_generation_file_binding(tmp_path, startup_only_public_receipt):
+    candidate = _write_startup_only_preview_candidate(tmp_path / "candidate", startup_only_public_receipt)
+    manifest = json.loads((candidate / MODULE.CANONICAL_MANIFEST).read_text())
+    assert manifest["supportabilityState"] == "review_required"
+    assert manifest["rolloutState"] == "public_release_review_required"
+    assert not _PREVIEW_AUTHORITY.STARTUP_PACKAGING_AUTHORITY_FIELDS.intersection(manifest["artifacts"][0])
+    # Removing unsupported packaging claims leaves the separately selected ZIP
+    # and sidecar unreferenced. Both intake and preparation retain byte binding.
+    with pytest.raises(MODULE.ReleaseShelfError, match="unreferenced bytes"):
+        MODULE._validate_windows_preview_candidate_files(candidate)
+    with pytest.raises(MODULE.ReleaseShelfError, match="unreferenced bytes"):
+        MODULE.prepare_layout(candidate, tmp_path / "prepared", generation_id=_PREVIEW_GENERATION_ID)
+
+
+def _select_startup_only_installer(candidate):
+    for name in (_PREVIEW_PAYLOAD, _PREVIEW_PAYLOAD + ".json"):
+        (candidate / "files" / name).unlink()
+    return candidate
+
+
+def test_windows_unsigned_preview_startup_only_installer_prepares_and_verifies(tmp_path, startup_only_public_receipt):
+    candidate = _select_startup_only_installer(
+        _write_startup_only_preview_candidate(tmp_path / "candidate", startup_only_public_receipt)
+    )
+    receipt_bytes = (candidate / _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH).read_bytes()
+    generation, pointer = _prepare_unsigned_preview(candidate, tmp_path)
+    assert (generation / _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH).read_bytes() == receipt_bytes
+    inventory = json.loads((generation / MODULE.ACTIVATION_CANDIDATE).read_text())["inventory"]
+    assert {row["path"] for row in inventory} == {
+        "files/" + _PREVIEW_INSTALLER, _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH,
+    }
+    # The pointer binds manifests separately from the selected-file inventory.
+    assert set(pointer["manifests"]) == {"canonical", "compatibility"}
+    for name, key in ((MODULE.CANONICAL_MANIFEST, "artifacts"), (MODULE.COMPATIBILITY_MANIFEST, "downloads")):
+        manifest = json.loads((generation / name).read_text())
+        assert manifest["supportabilityState"] == "review_required"
+        assert manifest["rolloutState"] == "public_release_review_required"
+        assert manifest["releaseProof"]["status"] == "review_required"
+        assert manifest["releaseProof"]["journeysPassed"] == []
+        assert not _PREVIEW_AUTHORITY.STARTUP_PACKAGING_AUTHORITY_FIELDS.intersection(manifest[key][0])
+
+
+def _write_scope_bound_startup_only_candidate(root, receipt, compatibility="unknown"):
+    candidate = _select_startup_only_installer(_write_startup_only_preview_candidate(root, receipt))
+    for name, key in ((MODULE.CANONICAL_MANIFEST, "artifacts"), (MODULE.COMPATIBILITY_MANIFEST, "downloads")):
+        manifest = json.loads((candidate / name).read_text())
+        manifest[key][0]["compatibilityState"] = compatibility
+        _preview_write_json(candidate / name, manifest)
+    # TEST_ONLY authority binds the final projected manifest, never real approval.
+    MODULE.project_manifest_pair(candidate / MODULE.CANONICAL_MANIFEST, candidate / MODULE.COMPATIBILITY_MANIFEST,
+                                 _PREVIEW_GENERATION_ID, evaluated_at=_PREVIEW_STAMP)
+    _write_test_preview_envelope(candidate, json.loads((candidate / MODULE.CANONICAL_MANIFEST).read_text()))
+    return candidate
+
+
+@pytest.mark.parametrize("compatibility", ["unknown", "compatible"])
+def test_windows_unsigned_preview_scope_bound_startup_only_prepares_and_verifies(
+    tmp_path, startup_only_public_receipt, compatibility,
+):
+    candidate = _write_scope_bound_startup_only_candidate(tmp_path / "candidate", startup_only_public_receipt, compatibility)
+    receipt = (candidate / _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH).read_bytes()
+    generation, pointer = _prepare_unsigned_preview(candidate, tmp_path)
+    assert (generation / _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH).read_bytes() == receipt
+    assert {row["path"] for row in MODULE.build_inventory(generation)} == {
+        "files/" + _PREVIEW_INSTALLER, _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH,
+        *_PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS,
+    }
+    canonical = json.loads((generation / MODULE.CANONICAL_MANIFEST).read_text())
+    assert canonical["artifacts"][0]["compatibilityState"] == compatibility
+    assert canonical["releaseProof"]["journeysPassed"] == []
+    assert canonical["supportabilityState"] == "review_required"
+    assert set(pointer["manifests"]) == {"canonical", "compatibility"}
+
+
+@pytest.mark.parametrize("mutation", [
+    "missing-current", "missing-snapshot", "missing-decision", "empty-envelope", "duplicate-current",
+    "digest-drift", "scope-drift", "handoff-drift", "source-drift", "other-profile", "other-scope",
+    "compatibility-drift", "receipt-drift", "extra-file",
+])
+def test_windows_unsigned_preview_scope_bound_startup_only_rejects_drift(tmp_path, startup_only_public_receipt, mutation):
+    candidate = _write_scope_bound_startup_only_candidate(tmp_path / "candidate", startup_only_public_receipt)
+    evidence = candidate / "release-evidence"
+    if mutation.startswith("missing-"):
+        (evidence / {"missing-current": "CURRENT.json", "missing-snapshot": "SNAPSHOT.json",
+                     "missing-decision": "RELEASE_DECISION.json"}[mutation]).unlink()
+    elif mutation == "empty-envelope":
+        for name in _PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS:
+            _preview_write_json(candidate / name, {})
+    elif mutation == "duplicate-current":
+        path = evidence / "CURRENT.json"
+        path.write_text(path.read_text().replace("{", '{"status":"review_required",', 1))
+    elif mutation in ("digest-drift", "scope-drift", "handoff-drift", "source-drift"):
+        path = evidence / "RELEASE_DECISION.json"
+        decision = json.loads(path.read_text())
+        if mutation == "scope-drift": decision["artifactHandoff"]["releaseScopeDecisionSha256"] = "0" * 64
+        if mutation == "handoff-drift": decision["artifactHandoff"]["sha256"] = "0" * 64
+        if mutation == "source-drift": decision["registryCommit"] = "0" * 40
+        _preview_write_json(path, decision)
+        if mutation == "digest-drift":
+            path.write_bytes(path.read_bytes() + b" ")
+        else:
+            _replace_preview_findings(candidate, decision["blockingFindings"])
+    elif mutation in ("other-profile", "other-scope", "compatibility-drift"):
+        path = candidate / MODULE.CANONICAL_MANIFEST
+        manifest = json.loads(path.read_text())
+        if mutation == "other-profile": manifest["publicationProfile"] = "full_release"
+        if mutation == "other-scope": manifest["platformScope"] = "all_platforms"
+        if mutation == "compatibility-drift": manifest["artifacts"][0]["compatibilityState"] = "unsupported"
+        _preview_write_json(path, manifest)
+        _write_test_preview_envelope(candidate, manifest)
+    elif mutation == "receipt-drift":
+        path = candidate / _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH
+        receipt = json.loads(path.read_text()); receipt["artifactSha256"] = "0" * 64
+        _preview_write_json(path, receipt)
+    else:
+        (candidate / "files/private.txt").write_text("TEST ONLY unselected bytes")
+    with pytest.raises(MODULE.ReleaseShelfError):
+        _prepare_unsigned_preview(candidate, tmp_path)
+
+
+@pytest.mark.parametrize("field", sorted(_PREVIEW_AUTHORITY.STARTUP_PACKAGING_AUTHORITY_FIELDS))
+@pytest.mark.parametrize("value", [None, "", False, "altered"])
+def test_windows_unsigned_preview_scope_bound_startup_only_rejects_packaging_fields(
+    startup_only_public_receipt, field, value,
+):
+    artifact = {"artifactId": "avalonia-win-x64-installer", "fileName": _PREVIEW_INSTALLER,
+                "sha256": startup_only_public_receipt["artifactSha256"], field: value}
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+        _validate_startup_only_fixture(startup_only_public_receipt, artifact=artifact, has_authority_envelope=True)
+    startup_only_public_receipt[field] = value
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError):
+        _validate_startup_only_fixture(startup_only_public_receipt, has_authority_envelope=True)
+
+
+@pytest.mark.parametrize("projection", ["canonical", "compatibility", "both"])
+@pytest.mark.parametrize("field", ["installerMode", "payloadFileName", "payloadMetadataFileName", "payload_size_bytes"])
+@pytest.mark.parametrize("value", [None, "", False])
+def test_windows_unsigned_preview_installer_only_rejects_partial_packaging_authority(
+    tmp_path, startup_only_public_receipt, projection, field, value,
+):
+    candidate = _select_startup_only_installer(
+        _write_startup_only_preview_candidate(tmp_path / "candidate", startup_only_public_receipt)
+    )
+    for role, name, key in (("canonical", MODULE.CANONICAL_MANIFEST, "artifacts"),
+                            ("compatibility", MODULE.COMPATIBILITY_MANIFEST, "downloads")):
+        if projection in (role, "both"):
+            manifest = json.loads((candidate / name).read_text())
+            manifest[key][0][field] = value
+            _preview_write_json(candidate / name, manifest)
+    with pytest.raises(MODULE.ReleaseShelfError, match="packaging authority|selected file is missing"):
+        MODULE.prepare_layout(candidate, tmp_path / "prepared", generation_id=_PREVIEW_GENERATION_ID)
+
+
+@pytest.mark.parametrize("extra", [_PREVIEW_PAYLOAD, _PREVIEW_PAYLOAD + ".json", "private.txt"])
+def test_windows_unsigned_preview_startup_only_verify_rejects_rebound_extra_file(tmp_path, startup_only_public_receipt, extra):
+    candidate = _select_startup_only_installer(
+        _write_startup_only_preview_candidate(tmp_path / "candidate", startup_only_public_receipt)
+    )
+    generation, pointer = _prepare_unsigned_preview(candidate, tmp_path)
+    for path in [generation, *generation.rglob("*")]:
+        path.chmod(0o755 if path.is_dir() else 0o644)
+    (generation / "files" / extra).write_bytes(b"TEST ONLY: unselected bytes")
+    activation = json.loads((generation / MODULE.ACTIVATION_CANDIDATE).read_text())
+    activation["inventory"] = MODULE.build_inventory(generation)
+    activation["inventoryDigest"] = "sha256:" + MODULE.inventory_digest(activation["inventory"])
+    pointer["inventoryDigest"] = activation["inventoryDigest"]
+    _preview_write_json(generation / MODULE.ACTIVATION_CANDIDATE, activation)
+    with pytest.raises(MODULE.ReleaseShelfError, match="unreferenced bytes|unselected public file"):
+        MODULE.verify_generation(generation, pointer, require_sealed_modes=False)
+
+
+@pytest.mark.parametrize("envelope", [True, False])
+@pytest.mark.parametrize("name", [_PREVIEW_PAYLOAD, _PREVIEW_PAYLOAD + ".json"])
+@pytest.mark.parametrize("mutation", ["missing", "corrupt"])
+def test_windows_unsigned_preview_bootstrap_still_requires_actual_payload_and_sidecar(tmp_path, envelope, name, mutation):
+    candidate = _write_unsigned_preview_candidate(tmp_path / "candidate")
+    if not envelope:
+        for relative in _PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS:
+            (candidate / relative).unlink()
+        (candidate / "release-evidence").rmdir()
+    path = candidate / "files" / name
+    if mutation == "missing":
+        path.unlink()
+    else:
+        path.write_bytes(b"{}")
+    with pytest.raises(MODULE.ReleaseShelfError):
+        MODULE.prepare_layout(candidate, tmp_path / "prepared", generation_id=_PREVIEW_GENERATION_ID)
+
+
+@pytest.mark.parametrize("relative", _PREVIEW_AUTHORITY.SCOPE_BOUND_REVIEW_EVIDENCE_PATHS)
+def test_windows_unsigned_preview_startup_only_cannot_bypass_optional_envelope(tmp_path, startup_only_public_receipt, relative):
+    candidate = _write_startup_only_preview_candidate(tmp_path / "candidate", startup_only_public_receipt)
+    _preview_write_json(candidate / relative, {})
+    with pytest.raises(MODULE.ReleaseShelfError, match="authority file missing or invalid|release-scope commitment"):
+        MODULE.copy_candidate(candidate, tmp_path / "generation")
+
+
+@pytest.mark.parametrize("field,value", [
+    ("payloadFileName", None), ("payloadFileName", ""), ("payloadSha256", None),
+    ("payloadFileName", " "), ("payloadSha256", int("1" * 64)),
+    ("payloadSha256", ""), ("payloadSizeBytes", None), ("payloadSizeBytes", 0),
+    ("payloadSizeBytes", True),
+])
+def test_windows_unsigned_preview_bootstrap_authority_must_remain_complete(tmp_path, field, value):
+    candidate = _write_unsigned_preview_candidate(tmp_path / "candidate")
+    manifest = json.loads((candidate / MODULE.CANONICAL_MANIFEST).read_text())
+    artifact = manifest["artifacts"][0]
+    artifact[field] = value
+    receipt = json.loads((candidate / _PREVIEW_AUTHORITY.SCOPE_BOUND_STARTUP_SMOKE_PATH).read_text())
+    receipt[{"payloadFileName": "bootstrapPayloadFileName", "payloadSha256": "bootstrapPayloadSha256",
+             "payloadSizeBytes": "bootstrapPayloadSizeBytes"}[field]] = value
+    with pytest.raises(_PREVIEW_AUTHORITY.CutoverError, match="complete bootstrap payload authority"):
+        _PREVIEW_AUTHORITY._validate_scope_bound_startup_smoke(
+            json.dumps(receipt).encode(), artifact=artifact, release_version=_PREVIEW_VERSION,
+        )
+
+
 @pytest.mark.parametrize("declared_size", [0, 10, 11, 2**64 - 1])
 def test_windows_unsigned_preview_footer_bounds_independent_of_sidecar(
     tmp_path: Path, declared_size: int,

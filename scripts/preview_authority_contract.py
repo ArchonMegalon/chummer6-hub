@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import re
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Mapping
@@ -205,11 +206,92 @@ def _json_semantically_equal(actual: Any, expected: Any) -> bool:
         )
     return type(actual) is type(expected) and actual == expected
 
+STARTUP_PACKAGING_AUTHORITY_FIELDS = frozenset({
+    "installerMode", "installer_mode", "artifactInstallMode", "artifact_install_mode",
+    "bootstrapInstallerMode", "bootstrap_installer_mode",
+    "payloadAcquisitionMode", "payload_acquisition_mode",
+    "payloadFileName", "payload_file_name", "payloadSha256", "payload_sha256",
+    "payloadMetadataFileName", "payload_metadata_file_name",
+    "payloadSizeBytes", "payload_size_bytes", "payloadDownloadUrl", "payload_download_url",
+    "bootstrapPayloadAcquisitionMode", "bootstrap_payload_acquisition_mode",
+    "bootstrapPayloadFileName", "bootstrap_payload_file_name",
+    "bootstrapPayloadSha256", "bootstrap_payload_sha256",
+    "bootstrapPayloadSizeBytes", "bootstrap_payload_size_bytes",
+    "bootstrapPayloadDownloadUrl", "bootstrap_payload_download_url",
+})
+
+
+def _is_startup_only_windows_preview(
+    artifact: Mapping[str, Any], publication_profile: str | None, has_authority_envelope: bool,
+) -> bool:
+    return (
+        publication_profile == "windows_unsigned_preview_v1"
+        # Packaging evidence is independent of the release-authority envelope.
+        # The caller must still validate every selected authority sibling.
+        and type(has_authority_envelope) is bool
+        and not STARTUP_PACKAGING_AUTHORITY_FIELDS.intersection(artifact)
+    )
+
+
+def _validate_startup_only_windows_preview(receipt: dict[str, Any], common: dict[str, Any]) -> None:
+    """Admit only the public native startup projection, without packaging authority."""
+    expected = {
+        **common,
+        "readyCheckpoint": "pre_ui_event_loop",
+        "executionEnvironment": "native_windows",
+        "verificationScope": "native_windows_startup",
+    }
+    public_fields = set(expected) | {
+        "hostClass", "operatingSystem", "recordedAtUtc", "nativeHostEvidence",
+    }
+    native = receipt.get("nativeHostEvidence")
+    native_expected = {
+        "contractName": "chummer6-ui.native_windows_host_evidence",
+        "status": "verified",
+        "isNativeWindows": True,
+        "hostPlatform": "windows",
+    }
+    if (
+        set(receipt) != public_fields
+        or not _json_semantically_equal({key: receipt.get(key) for key in expected}, expected)
+        or not isinstance(native, dict)
+        or set(native) != set(native_expected) | {"hostKernel", "runner", "evidenceSource"}
+        or not _json_semantically_equal({key: native.get(key) for key in native_expected}, native_expected)
+    ):
+        raise CutoverError("startup-only Windows preview requires exact public native startup fields")
+    # These are public labels, never paths, private installation state, or raw logs.
+    labels = {key: receipt[key] for key in ("hostClass", "operatingSystem")}
+    labels.update({key: native[key] for key in ("hostKernel", "runner", "evidenceSource")})
+    if any(
+        not isinstance(value, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._ -]{0,127}", value) is None
+        or "wine" in value.lower()
+        for value in labels.values()
+    ) or (
+        "win" not in receipt["hostClass"].lower()
+        or "windows" not in receipt["operatingSystem"].lower()
+        or re.fullmatch(r"Windows_NT|(?:MINGW32|MINGW64|MSYS)_NT-[0-9.-]+", native["hostKernel"]) is None
+        or (native["runner"], native["evidenceSource"]) not in {
+            ("native-msys-direct", "host_kernel_and_native_direct_selection"),
+            ("pwsh", "host_kernel_and_runner_selection"),
+        }
+    ):
+        raise CutoverError("startup-only Windows preview requires native Windows host evidence")
+    try:
+        stamp = datetime.fromisoformat(receipt["recordedAtUtc"].replace("Z", "+00:00"))
+        if stamp.utcoffset() is None:
+            raise ValueError("timezone required")
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise CutoverError("startup-only Windows preview requires a public recordedAtUtc timestamp") from exc
+
+
 def _validate_scope_bound_startup_smoke(
     raw: bytes,
     *,
     artifact: Mapping[str, Any],
     release_version: str,
+    publication_profile: str | None = None,
+    has_authority_envelope: bool = True,
 ) -> dict[str, Any]:
     receipt = _strict_json_object_bytes(
         raw,
@@ -235,10 +317,28 @@ def _validate_scope_bound_startup_smoke(
         "artifactFileName": file_name,
         "fileName": file_name,
         "artifactRelativePath": f"files/{file_name}",
-        "bootstrapPayloadSha256": payload_sha256,
-        "bootstrapPayloadSizeBytes": payload_size,
-        "bootstrapPayloadFileName": payload_name,
     }
+    startup_only = _is_startup_only_windows_preview(
+        artifact, publication_profile, has_authority_envelope,
+    )
+    if startup_only:
+        _validate_startup_only_windows_preview(receipt, expected)
+    else:
+        if (
+            not isinstance(artifact.get("payloadFileName"), str)
+            or not payload_name
+            or payload_name != payload_name.strip()
+            or not isinstance(artifact.get("payloadSha256"), str)
+            or not SHA256.fullmatch(payload_sha256)
+            or type(payload_size) is not int
+            or payload_size <= 0
+        ):
+            raise CutoverError("scope-bound Windows startup-smoke receipt requires complete bootstrap payload authority")
+        expected.update({
+            "bootstrapPayloadSha256": payload_sha256,
+            "bootstrapPayloadSizeBytes": payload_size,
+            "bootstrapPayloadFileName": payload_name,
+        })
     if not _json_semantically_equal(
         {key: receipt.get(key) for key in expected},
         expected,
@@ -309,6 +409,12 @@ def _validate_scope_bound_review_authority(
             "scope-bound canonical manifest must contain one artifact"
         )
     artifact = artifacts[0]
+    startup_only = (
+        canonical.get("platformScope") == "windows_only"
+        and _is_startup_only_windows_preview(
+            artifact, canonical.get("publicationProfile"), True,
+        )
+    )
     artifact_id = str(artifact.get("artifactId") or "")
     file_name = str(artifact.get("fileName") or "")
     expected_download_url = (
@@ -345,7 +451,9 @@ def _validate_scope_bound_review_authority(
         or artifact.get("rid") != "win-x64"
         or artifact.get("arch") != "x64"
         or artifact.get("kind") != "installer"
-        or artifact.get("compatibilityState") != "compatible"
+        or artifact.get("compatibilityState") not in (
+            ("compatible", "unknown") if startup_only else ("compatible",)
+        )
         or artifact.get("installAccessClass") != "open_public"
         or artifact.get("downloadUrl") != expected_download_url
         or not file_name
@@ -353,8 +461,10 @@ def _validate_scope_bound_review_authority(
         or SHA256.fullmatch(str(artifact.get("sha256") or "")) is None
         or type(artifact.get("sizeBytes")) is not int
         or artifact["sizeBytes"] <= 0
-        or type(artifact.get("payloadSizeBytes")) is not int
-        or artifact["payloadSizeBytes"] <= 0
+        or (not startup_only and (
+            type(artifact.get("payloadSizeBytes")) is not int
+            or artifact["payloadSizeBytes"] <= 0
+        ))
     ):
         raise CutoverError(
             "scope-bound manifest is not the exact review-required "

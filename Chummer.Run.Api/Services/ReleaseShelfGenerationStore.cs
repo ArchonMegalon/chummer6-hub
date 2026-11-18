@@ -2415,7 +2415,22 @@ public sealed record ReleaseShelfSnapshot
         }
 
         byte[] bytes = new byte[checked((int)verified.SizeBytes)];
-        verified.Stream.ReadExactly(bytes);
+        try
+        {
+            verified.Stream.ReadExactly(bytes);
+            // Authenticate the actual returned buffer: concurrent writes can
+            // change a file after OpenVerifiedFile's initial hash pass.
+            if (!IsLegacy && (verified.Stream.Length != verified.SizeBytes
+                || !FixedTimeDigestEquals(verified.ExpectedSha256!,
+                    Convert.ToHexStringLower(SHA256.HashData(bytes)))))
+            {
+                return null;
+            }
+        }
+        catch (IOException)
+        {
+            return null;
+        }
         return bytes;
     }
 

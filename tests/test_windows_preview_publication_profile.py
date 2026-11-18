@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from test_release_shelf_generation import MODULE, ROOT
+from test_release_shelf_generation import (
+    MODULE,
+    ROOT,
+    _select_startup_only_installer,
+    _write_startup_only_preview_candidate,
+    startup_only_public_receipt,
+)
 
 
 PROFILE = 'windows_unsigned_preview_v1'
@@ -31,14 +37,17 @@ def candidate(root):
     return root
 
 
-def test_profile_uses_existing_immutable_generation_and_preserves_disclosure(tmp_path):
-    source = candidate(tmp_path / 'candidate')
+def test_profile_uses_existing_immutable_generation_and_preserves_disclosure(tmp_path, startup_only_public_receipt):
+    source = _select_startup_only_installer(
+        _write_startup_only_preview_candidate(tmp_path / 'candidate', startup_only_public_receipt)
+    )
+    scope = json.loads((source / MODULE.CANONICAL_MANIFEST).read_text())['publicationScope']
     pointer = MODULE.prepare_layout(source, tmp_path / 'prepared', generation_id='synthetic-windows-preview')
     generation = tmp_path / 'prepared/generations/synthetic-windows-preview'
     MODULE.verify_generation(generation, pointer)
     payload = json.loads((generation / MODULE.CANONICAL_MANIFEST).read_text())
     assert payload['publicationProfile'] == PROFILE
-    assert payload['publicationScope']['linux'] == 'outside_profile'
+    assert payload['publicationScope'] == scope
     assert payload['artifacts'][0]['downloadUrl'].startswith('/downloads/g/synthetic-windows-preview/files/')
     # Exercise the shipped runtime contract, including its real review-required floor.
     privacy = MODULE.load_privacy_launch_gate_contract()
