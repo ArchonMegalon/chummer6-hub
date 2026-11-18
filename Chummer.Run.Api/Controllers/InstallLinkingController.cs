@@ -221,10 +221,20 @@ public sealed class InstallLinkingController : ControllerBase
         [FromQuery] string? installLinkCallbackUri,
         CancellationToken cancellationToken,
         [FromQuery] string? installLinkTransport = null,
-        [FromQuery] string? publicKey = null)
+        [FromQuery] string? publicKey = null,
+        [FromQuery] string? installLinkOperationId = null)
     {
         ApplySensitiveResponseHeaders();
-        bool proofPoll = string.Equals(installLinkTransport, "proof_poll", StringComparison.Ordinal);
+        bool proofPoll = installLinkTransport is not null
+            && InstallBrowserCallbackTransports.IsProofPoll(installLinkTransport);
+        if ((Request.Query.TryGetValue("installLinkOperationId", out var operationValues)
+                && (operationValues.Count != 1 || installLinkOperationId is null))
+            || (installLinkOperationId is not null
+                && (!string.Equals(installLinkTransport, InstallLinkingService.LegacyProofPollTransport, StringComparison.Ordinal)
+                    || !AndroidLinkedV2RequestProof.IsValidOperationId(installLinkOperationId))))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link operation id is invalid.");
+        }
         if (!proofPoll && !string.IsNullOrWhiteSpace(installLinkTransport))
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link transport is invalid.");
@@ -240,12 +250,19 @@ public sealed class InstallLinkingController : ControllerBase
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link callback uri is invalid.");
         }
-        if (proofPoll
-            && (normalizedPublicKey is null
-                || !string.Equals(headId, "android", StringComparison.Ordinal)
-                || !string.Equals(platform, "android", StringComparison.Ordinal)))
+        if (proofPoll && normalizedPublicKey is null)
         {
-            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Android proof-poll install identity is invalid.");
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "remote proof public key is required.");
+        }
+        bool androidProofPoll = proofPoll
+            && string.Equals(headId, "android", StringComparison.Ordinal)
+            && string.Equals(platform, "android", StringComparison.Ordinal);
+        if (proofPoll && !androidProofPoll
+            && (string.IsNullOrWhiteSpace(headId)
+                || string.IsNullOrWhiteSpace(platform)
+                || string.IsNullOrWhiteSpace(arch)))
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "proof-poll install identity is invalid.");
         }
 
         try
@@ -253,10 +270,12 @@ public sealed class InstallLinkingController : ControllerBase
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             PublicReleaseManifestDto manifest = _releases.LoadManifest();
-            PublicReleaseArtifactDto? artifact = proofPoll
+            // The release catalog and its existing target matcher own desktop support.
+            // Only the exact Android identity may approve without a desktop artifact.
+            PublicReleaseArtifactDto? artifact = androidProofPoll
                 ? null
                 : ResolveBrowserCallbackArtifact(manifest, headId, platform, arch);
-            if (!proofPoll && artifact is null)
+            if (!androidProofPoll && artifact is null)
             {
                 return BuildBrowserInstallLinkStatusPage(
                     statusCode: StatusCodes.Status404NotFound,
@@ -280,7 +299,7 @@ public sealed class InstallLinkingController : ControllerBase
             IssueInstallBrowserCallbackResponseDto issued = _installLinking.IssueBrowserCallback(
                 new IssueInstallBrowserCallbackRequestDto(
                     InstallationId: installationId ?? string.Empty,
-                    ArtifactId: proofPoll ? "android-play-app" : artifact!.Id,
+                    ArtifactId: androidProofPoll ? "android-play-app" : artifact!.Id,
                     ApplicationVersion: applicationVersion ?? manifest.Version,
                     ChannelId: releaseChannel ?? manifest.Channel,
                     HeadId: headId ?? artifact?.Head ?? "desktop",
@@ -289,9 +308,15 @@ public sealed class InstallLinkingController : ControllerBase
                     CallbackUri: normalizedCallbackUri,
                     PublicKey: normalizedPublicKey,
                     HostLabel: null,
-                    InstallAccessClass: proofPoll ? InstallAccessClasses.AccountRequired : artifact!.InstallAccessClass),
+                    InstallAccessClass: androidProofPoll
+                        ? InstallAccessClasses.AccountRequired
+                        : artifact!.InstallAccessClass),
                 user.UserId,
-                subject.SubjectId);
+                subject.SubjectId,
+                proofPoll
+                    ? installLinkTransport
+                    : InstallBrowserCallbackTransports.GrantCallback,
+                proofOperationId: installLinkOperationId);
 
             if (proofPoll)
             {
@@ -357,8 +382,9 @@ public sealed class InstallLinkingController : ControllerBase
                 platform,
                 arch,
                 normalizedCallbackUri,
-                proofPoll ? "proof_poll" : null,
-                normalizedPublicKey);
+                proofPoll ? installLinkTransport : null,
+                normalizedPublicKey,
+                installLinkOperationId);
             return Redirect($"/login?next={Uri.EscapeDataString(returnPath)}");
         }
         catch (HubRequestAuthException ex)
@@ -733,10 +759,17 @@ public sealed class InstallLinkingController : ControllerBase
             return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "installation grant is unknown or expired.");
         }
 
-        InstallLinkedWorkspaceSnapshotDto[] snapshots = _workspaceSnapshots.ListForInstallation(installation)
-            .Select(static snapshot => ToSnapshotDto(snapshot))
-            .ToArray();
-        return Ok(new InstallLinkedWorkspaceSnapshotListResponse(snapshots));
+        try
+        {
+            InstallLinkedWorkspaceSnapshotDto[] snapshots = _workspaceSnapshots.ListForInstallation(installation)
+                .Select(static snapshot => ToSnapshotDto(snapshot))
+                .ToArray();
+            return Ok(new InstallLinkedWorkspaceSnapshotListResponse(snapshots));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost("continuation/workspaces/upsert")]
@@ -778,7 +811,13 @@ public sealed class InstallLinkingController : ControllerBase
                     AppVersion: request.AppVersion,
                     Karma: request.Karma,
                     Nuyen: request.Nuyen,
-                    Created: request.Created));
+                    Created: request.Created,
+                    WorkspaceSnapshot: request.WorkspaceSnapshot,
+                    WorkspaceSnapshotDigest: request.WorkspaceSnapshotDigest,
+                    WorkspaceContinuation: request.WorkspaceContinuation,
+                    WorkspaceContinuationDigest: request.WorkspaceContinuationDigest),
+                request.ExpectedRemoteRevision,
+                request.ExpectedServerToken);
             return Ok(new InstallLinkedWorkspaceSnapshotUpsertResponse(ToSnapshotDto(stored)));
         }
         catch (InstallLinkingOperationException ex)
@@ -2578,7 +2617,13 @@ public sealed class InstallLinkingController : ControllerBase
                 AppVersion: snapshot.AppVersion ?? snapshot.RulesetId,
                 Karma: snapshot.Karma,
                 Nuyen: snapshot.Nuyen,
-                Created: snapshot.Created));
+                Created: snapshot.Created),
+            RemoteRevision: snapshot.RemoteRevision,
+            ServerToken: snapshot.ServerToken,
+            WorkspaceSnapshot: snapshot.WorkspaceSnapshot,
+            WorkspaceSnapshotDigest: snapshot.WorkspaceSnapshotDigest,
+            WorkspaceContinuation: snapshot.WorkspaceContinuation,
+            WorkspaceContinuationDigest: snapshot.WorkspaceContinuationDigest);
 
 }
 
@@ -2782,7 +2827,13 @@ public sealed record InstallLinkedWorkspaceSnapshotUpsertRequest(
     string? AppVersion,
     decimal Karma,
     decimal Nuyen,
-    bool Created);
+    bool Created,
+    long? ExpectedRemoteRevision = null,
+    string? ExpectedServerToken = null,
+    JsonElement? WorkspaceSnapshot = null,
+    string? WorkspaceSnapshotDigest = null,
+    JsonElement? WorkspaceContinuation = null,
+    string? WorkspaceContinuationDigest = null);
 
 public sealed record InstallLinkedWorkspaceSnapshotUpsertResponse(
     InstallLinkedWorkspaceSnapshotDto Snapshot);
@@ -2796,4 +2847,10 @@ public sealed record InstallLinkedWorkspaceSnapshotDto(
     string Payload,
     DateTimeOffset UpdatedAtUtc,
     string? OriginInstallationId,
-    CharacterFileSummary Summary);
+    CharacterFileSummary Summary,
+    long RemoteRevision = 0,
+    string? ServerToken = null,
+    JsonElement? WorkspaceSnapshot = null,
+    string? WorkspaceSnapshotDigest = null,
+    JsonElement? WorkspaceContinuation = null,
+    string? WorkspaceContinuationDigest = null);

@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Xunit;
 
+using Chummer.Storage.Teable;
+
 namespace Chummer.Tests;
 
 public sealed class InstallLinkingStoreActivationTests

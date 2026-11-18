@@ -4,7 +4,8 @@
     <TargetFrameworks Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == 'true'">net10.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(RunIdentityTestsOnly)' == 'true'">net10.0</TargetFrameworks>
     <TargetFrameworks Condition="'$(RunPlayReviewAccessTestsOnly)' == 'true'">net10.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true'">net10.0;net10.0-windows</TargetFrameworks>
+    <TargetFrameworks Condition="'$(RunAndroidLinkedV2BearerProofTestsOnly)' == 'true'">net10.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(RunAndroidLinkedV2BearerProofTestsOnly)' != 'true'">net10.0;net10.0-windows</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -14,7 +15,8 @@
     <RunBrowserSurfaceProxyTimeoutTestsOnly Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == ''">false</RunBrowserSurfaceProxyTimeoutTestsOnly>
     <RunIdentityTestsOnly Condition="'$(RunIdentityTestsOnly)' == ''">false</RunIdentityTestsOnly>
     <RunPlayReviewAccessTestsOnly Condition="'$(RunPlayReviewAccessTestsOnly)' == ''">false</RunPlayReviewAccessTestsOnly>
-    <EnableDefaultCompileItems Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == 'true' or '$(RunIdentityTestsOnly)' == 'true' or '$(RunPlayReviewAccessTestsOnly)' == 'true'">false</EnableDefaultCompileItems>
+    <RunAndroidLinkedV2BearerProofTestsOnly Condition="'$(RunAndroidLinkedV2BearerProofTestsOnly)' == ''">false</RunAndroidLinkedV2BearerProofTestsOnly>
+    <EnableDefaultCompileItems Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == 'true' or '$(RunIdentityTestsOnly)' == 'true' or '$(RunPlayReviewAccessTestsOnly)' == 'true' or '$(RunAndroidLinkedV2BearerProofTestsOnly)' == 'true'">false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,7 +34,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true'">
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(RunAndroidLinkedV2BearerProofTestsOnly)' != 'true'">
     <Reference Include="Chummer.Media.Contracts">
       <HintPath>$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>
     </Reference>
@@ -62,6 +64,11 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(RunIdentityTestsOnly)' == 'true'">
+    <Compile Include="IdentityEmailEntryTests.cs" />
+    <Compile Include="IdentityEmailDeliveryServiceTests.cs" />
+    <Compile Include="IdentityTeablePersistenceTests.cs" />
+    <Compile Include="IdentityEmailTeablePersistenceTests.cs" />
+    <Compile Include="TeableRevisionStoreTests.Remote.cs" />
     <Compile Include="IdentitySubjectErasureTests.cs" />
     <Compile Include="IdentityAdminRouteAuthorizationTests.cs" />
     <Compile Include="IdentityEmailWebhookAuthorizationTests.cs" />
@@ -77,7 +84,81 @@
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true'">
+  <ItemGroup Condition="'$(RunAndroidLinkedV2BearerProofTestsOnly)' == 'true'">
+    <Compile Include="AndroidLinkedV2BearerProofTests.cs" />
+    <Compile Include="InstallLinkedWorkspaceSnapshotTests.cs" />
+    <Compile Include="InstallLinkedWorkspaceSnapshotTransferTests.cs" />
+    <Compile Include="InstallLinkedWorkspaceTeablePersistenceTests.cs" />
+    <Compile Include="AccountAuxiliaryDataErasureServiceTests.cs" />
+    <Compile Include="OriginChapterAuthoringServiceTests.cs" />
+    <Compile Include="OriginChapterSceneRequestBridgeTests.cs" />
+    <Compile Include="OriginChapterSceneMediaClientTests.cs" />
+    <Compile Include="OriginChapterWorkerTests.cs" />
+    <Compile Include="OriginChapterTeablePersistenceTests.cs" />
+    <Compile Include="OriginDocumentTeablePersistenceTests.cs" />
+    <Compile Include="OriginDossierPublicationServiceTests.cs" />
+    <Compile Include="OriginPublicationTeablePersistenceTests.cs" />
+    <Compile Include="AuthoringLedgerTeablePersistenceTests.cs" />
+    <Compile Include="MembershipTeablePersistenceTests.cs" />
+    <Compile Include="AccountHubRouteTests.cs" />
+    <Compile Include="HorizonTeablePersistenceTests.cs" />
+    <Compile Include="HorizonGovernedRenderRequestComposerServiceTests.cs" />
+    <Compile Include="HorizonCapabilityServiceTests.cs" />
+    <Compile Include="RunsiteOrientationRequestComposerServiceTests.cs" />
+    <Compile Include="PropertyquarryApartmentVideoArtifactRequestBridgeServiceTests.cs" />
+    <Compile Include="BrilliantDirectoriesBillingTests.cs" />
+    <Compile Include="RepoPaths.cs" />
+    <Compile Include="OriginDossierProviderCreditReservationServiceTests.cs" />
+    <Compile Include="OriginDossierFirstPartyDocumentServiceTests.cs" />
+    <Compile Include="DataProtectionKeyProtectionConfiguratorTests.cs" />
+    <Compile Include="TeableRevisionStoreTests.cs" />
+    <Compile Include="TeableRevisionStoreTests.Remote.cs" />
+    <Compile Include="TeableRecoveryBundleTests.cs" />
+    <Compile Include="TeableApiActivationTests.cs" />
+    <Compile Include="InstallLinkingPostgresCoordinatorStoreTests.cs" />
+    <Compile Include="InstallLinkingStoreActivationTests.cs" />
+    <Compile Include="IdentityTeablePersistenceTests.cs" />
+    <Compile Include="IdentityEmailTeablePersistenceTests.cs" />
+    <Compile Include="IdentityEmailDeliveryServiceTests.cs" />
+    <Compile Include="CommunityTeablePersistenceTests.cs" />
+    <Compile Include="ParticipationNotificationTests.cs" />
+    <Compile Include="ParticipationNotificationTeableTests.cs" />
+    <Compile Include="PlaySessionAuthorizationServiceTests.cs" />
+    <Compile Include="PlayAuthorizationEndpointIntegrationTests.cs" />
+    <Compile Include="FactionTeablePersistenceTests.cs" />
+    <Compile Include="SponsorTeablePersistenceTests.cs" />
+    <Compile Include="CampaignArtifactTeablePersistenceTests.cs" />
+    <Compile Include="CampaignSpineGuardrailTests.cs" />
+    <Compile Include="CampaignSpineTeablePersistenceTests.cs" />
+    <Compile Include="CampaignCollaborationTeablePersistenceTests.cs" />
+    <Compile Include="CampaignCollaborationServiceTests.cs" />
+    <Compile Include="CampaignMovementServiceTests.cs" />
+    <Compile Include="CampaignAdoptionLoopServiceTests.cs" />
+    <Compile Include="SupportTeablePersistenceTests.cs" />
+    <Compile Include="SupportStoreAccountErasureTests.cs" />
+    <Compile Include="CrashSupportServiceTests.cs" />
+    <Compile Include="SupportCasesControllerUploadTests.cs" />
+    <Compile Include="AccountErasureServiceTests.cs" />
+    <Compile Include="CodexParticipationGuardrailTests.cs" />
+    <Compile Include="BlackLedgerFactionOnboardingTests.cs" />
+    <Compile Include="TeableUserProjectionServiceTests.cs" />
+    <Compile Include="TeableImportantWorkServiceTests.cs" />
+    <Compile Include="AccountCanonicalCaptureTests.cs" />
+    <Compile Include="IdentityLinkServiceTests.cs" />
+    <Compile Include="GroupInviteFlowTests.cs" />
+    <Compile Include="LedgerServiceTests.cs" />
+    <Compile Include="UserExperienceServiceTests.cs" />
+    <Compile Include="CommunityAccountErasureTests.cs" />
+    <Compile Include="IdentitySubjectErasureTests.cs" />
+    <Compile Include="IdentityAdminRouteAuthorizationTests.cs" />
+    <Compile Include="IdentityEmailWebhookAuthorizationTests.cs" />
+    <ProjectReference Include="..\Chummer.Run.Identity\Chummer.Run.Identity.csproj" />
+    <Compile Include="InstallLinkingBrowserCallbackTests.cs" />
+    <Compile Include="InstallLinkingStoreSecurityTests.cs" />
+    <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(RunAndroidLinkedV2BearerProofTestsOnly)' != 'true'">
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />
     <ProjectReference Include="..\Chummer.Run.AI\Chummer.Run.AI.csproj" />
     <ProjectReference Include="..\Chummer.Run.Identity\Chummer.Run.Identity.csproj" />
@@ -92,13 +173,13 @@
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' == 'true'">
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(RunAndroidLinkedV2BearerProofTestsOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' == 'true'">
     <ProjectReference Include="$(ChummerHubRegistryRoot)/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj" />
     <ProjectReference Include="$(ChummerHubRegistryRoot)/Chummer.Run.Registry/Chummer.Run.Registry.csproj" />
     <ProjectReference Include="$(ChummerMediaFactoryRoot)/src/Chummer.Media.Factory.Runtime/Chummer.Media.Factory.Runtime.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' != 'true'">
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' != 'true' and '$(RunIdentityTestsOnly)' != 'true' and '$(RunPlayReviewAccessTestsOnly)' != 'true' and '$(RunAndroidLinkedV2BearerProofTestsOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' != 'true'">
     <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerHubRegistryContractsPackageVersion)" />
     <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerRunRegistryPackageVersion)" />
   </ItemGroup>

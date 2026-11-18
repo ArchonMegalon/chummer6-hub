@@ -81,7 +81,7 @@ public sealed class CampaignSpineService
         WorkspaceLifecyclePolicyService lifecyclePolicy,
         CampaignArtifactRegistryBridge artifactRegistry,
         IHubPublicationDraftService? publicationDrafts = null)
-        : this(store, lifecyclePolicy, artifactRegistry, CreateDefaultSupportStore(), publicationDrafts)
+        : this(store, lifecyclePolicy, artifactRegistry, CreateDefaultSupportStore(store), publicationDrafts)
     {
     }
 
@@ -99,8 +99,10 @@ public sealed class CampaignSpineService
         _publicationDrafts = publicationDrafts;
     }
 
-    private static SupportStore CreateDefaultSupportStore()
+    private static SupportStore CreateDefaultSupportStore(CommunityStore communityStore)
     {
+        if (communityStore.IsPrimary)
+            throw new InvalidOperationException("Primary campaign storage requires an explicit support-store dependency.");
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -119,8 +121,9 @@ public sealed class CampaignSpineService
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            user = RequireCurrentUserLocked(user);
             DateTimeOffset now = DateTimeOffset.UtcNow;
             WorkspaceLifecycleCleanupResult cleanup = _lifecyclePolicy.ApplyLocked(_store, now);
             var changed = cleanup.Changed;
@@ -281,10 +284,11 @@ public sealed class CampaignSpineService
     {
         ArgumentNullException.ThrowIfNull(user);
 
+        using var summaryScope = _store.Enter();
         AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
         IReadOnlyList<OrganizerSupportCaseProjection> supportCases = BuildOrganizerSupportCases(user);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var items = summary.CommunityOperations
                 .Select(operation => BuildOrganizerOperationProjectionLocked(user, summary, operation, supportCases))
@@ -315,12 +319,13 @@ public sealed class CampaignSpineService
     {
         ArgumentNullException.ThrowIfNull(user);
 
+        using var summaryScope = _store.Enter();
         AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
         HashSet<string> accessibleCampaignIds = summary.Workspaces
             .Select(static item => item.CampaignId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.OpenRuns
                 .Where(item => IsOpenRunVisibleToUser(item, user.UserId, accessibleCampaignIds, _store.OpenRunJoinRequests, _store.OpenRunRoster))
@@ -334,6 +339,7 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
 
+        using var summaryScope = _store.Enter();
         AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
         HashSet<string> accessibleCampaignIds = summary.Workspaces
             .Select(static item => item.CampaignId)
@@ -341,7 +347,7 @@ public sealed class CampaignSpineService
         string normalizedOpenRunId = AccountService.NormalizeOptional(openRunId)
             ?? throw new ArgumentException("openRunId is required.", nameof(openRunId));
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             OpenRunListingProjection? listing = _store.OpenRuns
                 .FirstOrDefault(item => string.Equals(item.OpenRunId, normalizedOpenRunId, StringComparison.OrdinalIgnoreCase));
@@ -365,6 +371,7 @@ public sealed class CampaignSpineService
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
         ArgumentNullException.ThrowIfNull(request);
 
+        using var workspaceScope = _store.Enter();
         CampaignWorkspaceProjection workspace = GetWorkspace(user, workspaceId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown workspace: {workspaceId}");
         string normalizedRunId = NormalizeOptional(request.RunId, nameof(OpenRunCreateRequest.RunId), MaxIdentifierLength)
@@ -391,7 +398,7 @@ public sealed class CampaignSpineService
             throw new ArgumentOutOfRangeException(nameof(request), "open run expected_duration_minutes must be positive.");
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
             IReadOnlyList<string> reservedSeatRoles = FinalizeLines(NormalizeLines(request.ReservedSeatRoles, nameof(OpenRunCreateRequest.ReservedSeatRoles)));
@@ -452,8 +459,10 @@ public sealed class CampaignSpineService
         ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
         ArgumentNullException.ThrowIfNull(request);
 
+        using var openRunScope = _store.Enter();
         OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
+        using var summaryScope = _store.Enter();
         AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
         string? normalizedDossierId = NormalizeOptional(request.DossierId, nameof(OpenRunJoinRequestCommand.DossierId), MaxIdentifierLength);
         string? normalizedQuickstartPackId = NormalizeOptional(request.QuickstartPackId, nameof(OpenRunJoinRequestCommand.QuickstartPackId), MaxIdentifierLength);
@@ -536,7 +545,7 @@ public sealed class CampaignSpineService
             SubmittedAtUtc: now,
             UpdatedAtUtc: now);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             UpsertOpenRunJoinRequestLocked(_store, joinRequest);
             _store.PersistLocked();
@@ -556,6 +565,7 @@ public sealed class CampaignSpineService
         ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
         ArgumentNullException.ThrowIfNull(request);
 
+        using var openRunScope = _store.Enter();
         OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
         if (!string.Equals(openRun.Listing.CreatedByUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
@@ -573,7 +583,7 @@ public sealed class CampaignSpineService
         };
         string? normalizedNote = NormalizeOptional(request.Note, nameof(OpenRunJoinReviewRequest.Note), MaxNoteLength);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             OpenRunJoinRequestProjection existingRequest = _store.OpenRunJoinRequests
                 .FirstOrDefault(item =>
@@ -647,6 +657,7 @@ public sealed class CampaignSpineService
         ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
         ArgumentNullException.ThrowIfNull(request);
 
+        using var openRunScope = _store.Enter();
         OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
         if (!string.Equals(openRun.Listing.CreatedByUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
@@ -696,7 +707,7 @@ public sealed class CampaignSpineService
                 evidenceRef: openRun.Listing.OpenRunId,
                 reviewState: "scheduled"));
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             UpsertOpenRunScheduleLocked(_store, receipt);
             UpsertOpenRunListingLocked(_store, openRun.Listing with
@@ -720,6 +731,7 @@ public sealed class CampaignSpineService
         ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
         ArgumentNullException.ThrowIfNull(request);
 
+        using var openRunScope = _store.Enter();
         OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
         if (!string.Equals(openRun.Listing.CreatedByUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
@@ -770,7 +782,7 @@ public sealed class CampaignSpineService
             CreatedByUserId: user.UserId,
             CreatedAtUtc: now);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             UpsertOpenRunMeetingHandoffLocked(_store, handoff);
             UpsertOpenRunListingLocked(_store, openRun.Listing with
@@ -792,7 +804,22 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
         ArgumentNullException.ThrowIfNull(request);
+        return _store.IsPrimary
+            ? _store.ExecutePrimaryTransaction(() => CloseOutOpenRunCore(user, openRunId, request, installLinking))
+            : CloseOutOpenRunCore(user, openRunId, request, installLinking);
+    }
 
+    private OpenRunCloseoutProjection CloseOutOpenRunCore(
+        HubUserDto user,
+        string openRunId,
+        OpenRunCloseoutRequest request,
+        InstallLinkingSummaryDto? installLinking)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        using var openRunScope = _store.Enter();
         OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
         if (!string.Equals(openRun.Listing.CreatedByUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
@@ -820,7 +847,7 @@ public sealed class CampaignSpineService
             NextSafeAction: request.NextSafeAction,
             Note: request.Note));
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
             var closeout = new OpenRunCloseoutProjection(
@@ -869,10 +896,11 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
 
+        using var workspaceScope = _store.Enter();
         CampaignWorkspaceProjection workspace = GetWorkspace(user, workspaceId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown workspace: {workspaceId}");
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             CampaignAdoptionProjection? adoption = _store.CampaignAdoptions
                 .Where(item => string.Equals(item.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
@@ -934,7 +962,7 @@ public sealed class CampaignSpineService
         string normalizedPacketSummary = NormalizeOptional(packetSummary, nameof(packetSummary), MaxSummaryLength) ?? normalizedPacketTitle;
         string? normalizedNote = NormalizeOptional(note, nameof(note), MaxCompactNoteLength);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (RunProjection? storedTargetRun, SceneProjection? storedTargetScene) =
                 RequireCurrentWorkspaceMutationLocked(user, workspace, targetRun, targetScene);
@@ -993,7 +1021,7 @@ public sealed class CampaignSpineService
         string normalizedPrefetchSummary = NormalizeRequired(prefetchSummary, nameof(prefetchSummary), MaxSummaryLength);
         string? normalizedNote = NormalizeOptional(note, nameof(note), MaxCompactNoteLength);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             RequireCurrentWorkspaceMutationLocked(user, workspace, run: null, scene: null);
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -1046,7 +1074,7 @@ public sealed class CampaignSpineService
         string normalizedSummary = NormalizeOptional(summary, nameof(summary), MaxSummaryLength)
             ?? normalizedTitle;
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (RunProjection? storedRun, _) =
                 RequireCurrentWorkspaceMutationLocked(user, workspace, run, scene: null);
@@ -1138,6 +1166,7 @@ public sealed class CampaignSpineService
         RunProjection? run,
         SceneProjection? scene)
     {
+        user = RequireCurrentUserLocked(user);
         if (!_store.UsersById.ContainsKey(user.UserId))
         {
             throw new CommunityAccessDeniedException("The workspace user is no longer active.");
@@ -1192,6 +1221,16 @@ public sealed class CampaignSpineService
         return (storedRun, storedScene);
     }
 
+    private HubUserDto RequireCurrentUserLocked(HubUserDto user)
+    {
+        if (!_store.IsPrimary) return user;
+        if (!_store.UsersById.TryGetValue(user.UserId, out var current)
+            || !_store.UserIdBySubjectId.TryGetValue(user.SubjectId, out string? owner)
+            || !string.Equals(owner, current.UserId, StringComparison.OrdinalIgnoreCase))
+            throw new CommunityAccessDeniedException("The campaign account authority is no longer current.");
+        return current;
+    }
+
     public CampaignConsequenceProjection UpsertCampaignConsequence(
         HubUserDto user,
         CampaignWorkspaceProjection workspace,
@@ -1208,7 +1247,7 @@ public sealed class CampaignSpineService
         string? normalizedReturnLoopRoute = NormalizeOptional(request.ReturnLoopRoute, nameof(CampaignConsequenceUpdateRequest.ReturnLoopRoute), MaxRouteLength);
         string? normalizedNote = NormalizeOptional(request.Note, nameof(CampaignConsequenceUpdateRequest.Note), MaxNoteLength);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             RequireCurrentWorkspaceMutationLocked(user, workspace, run: null, scene: null);
             if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
@@ -1261,7 +1300,7 @@ public sealed class CampaignSpineService
         IReadOnlyList<string> normalizedBlockers = NormalizeLines(request.Blockers, nameof(RunboardContinuityUpdateRequest.Blockers));
         IReadOnlyList<string> normalizedResolutionNotes = NormalizeLines(request.ResolutionNotes, nameof(RunboardContinuityUpdateRequest.ResolutionNotes));
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.RunsById.TryGetValue(normalizedRunId, out RunProjection? requestedRun)
                 || !string.Equals(requestedRun.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
@@ -1419,7 +1458,7 @@ public sealed class CampaignSpineService
             throw new ArgumentOutOfRangeException(nameof(request), "campaign adoption counts cannot be negative.");
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             RequireCurrentWorkspaceMutationLocked(user, workspace, run: null, scene: null);
             if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
@@ -1504,7 +1543,7 @@ public sealed class CampaignSpineService
             throw new ArgumentOutOfRangeException(nameof(request), "runner goal resource values cannot be negative.");
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             RequireCurrentWorkspaceMutationLocked(user, workspace, run: null, scene: null);
             if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
@@ -1592,7 +1631,7 @@ public sealed class CampaignSpineService
         string? normalizedNextSafeAction = NormalizeOptional(request.NextSafeAction, nameof(ResolutionReportApprovalRequest.NextSafeAction), MaxNextSafeActionLength);
         string? normalizedNote = NormalizeOptional(request.Note, nameof(ResolutionReportApprovalRequest.Note), MaxNoteLength);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.RunsById.TryGetValue(normalizedRunId, out RunProjection? requestedRun)
                 || !string.Equals(requestedRun.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
@@ -1839,6 +1878,7 @@ public sealed class CampaignSpineService
     {
         ArgumentNullException.ThrowIfNull(user);
 
+        using var summaryScope = _store.Enter();
         AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
         return summary.Workspaces
             .Select(workspace => BuildWorkspaceDigest(summary, workspace))
@@ -1887,6 +1927,7 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
 
+        using var summaryScope = _store.Enter();
         AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
         CampaignWorkspaceProjection? workspace = summary.Workspaces
             .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase));
@@ -1901,7 +1942,7 @@ public sealed class CampaignSpineService
             .ThenBy(item => item.RunnerHandle, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var sourceCampaign = _store.CampaignSpinesById.GetValueOrDefault(workspace.CampaignId);
             var sourceGroup = sourceCampaign is null
@@ -1968,6 +2009,7 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
 
+        using var summaryScope = _store.Enter();
         AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
         CampaignWorkspaceProjection? workspace = summary.Workspaces
             .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase));
@@ -1982,7 +2024,7 @@ public sealed class CampaignSpineService
             .ThenBy(item => item.RunnerHandle, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var sourceCampaign = _store.CampaignSpinesById.GetValueOrDefault(workspace.CampaignId);
             var sourceGroup = sourceCampaign is null
@@ -2060,13 +2102,14 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
 
+        using var workspaceScope = _store.Enter();
         CampaignWorkspaceProjection? workspace = GetWorkspace(user, workspaceId, installLinking);
         if (workspace is null)
         {
             return Array.Empty<DossierMovementReceiptProjection>();
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.DossierMovements
                 .Where(item =>
@@ -2095,8 +2138,9 @@ public sealed class CampaignSpineService
             TargetOwnerUserId: NormalizeOptional(request.TargetOwnerUserId, nameof(DossierMovementRequest.TargetOwnerUserId), MaxIdentifierLength),
             Note: NormalizeOptional(request.Note, nameof(DossierMovementRequest.Note), MaxCompactNoteLength));
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            requester = RequireCurrentUserLocked(requester);
             MovementResolution movement = ExecuteDossierMovementLocked(requester, command);
             bool groupChanged = !string.Equals(movement.SourceGroup.GroupId, movement.TargetGroup.GroupId, StringComparison.OrdinalIgnoreCase);
             bool campaignChanged = !string.Equals(movement.SourceCampaign.CampaignId, movement.TargetCampaign.CampaignId, StringComparison.OrdinalIgnoreCase);
@@ -2206,8 +2250,9 @@ public sealed class CampaignSpineService
         string? targetOwnerUserId = NormalizeOptional(request.TargetOwnerUserId, nameof(RosterTransferRequest.TargetOwnerUserId), MaxIdentifierLength);
         string? normalizedNote = NormalizeOptional(request.Note, nameof(RosterTransferRequest.Note), MaxCompactNoteLength);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            requester = RequireCurrentUserLocked(requester);
             DateTimeOffset now = DateTimeOffset.UtcNow;
             var dossier = _store.DossiersById.GetValueOrDefault(dossierId)
                 ?? throw new KeyNotFoundException($"Unknown dossier: {dossierId}");
@@ -4595,7 +4640,7 @@ public sealed class CampaignSpineService
 
     private string ResolveGroupSupportEscalationSummary(HubUserDto user)
     {
-        lock (_supportStore.Gate)
+        using (_supportStore.Enter())
         {
             var cases = _supportStore.CasesById.Values
                 .Where(item =>
@@ -4808,7 +4853,7 @@ public sealed class CampaignSpineService
 
     private IReadOnlyList<OrganizerSupportCaseProjection> BuildOrganizerSupportCases(HubUserDto user)
     {
-        lock (_supportStore.Gate)
+        using (_supportStore.Enter())
         {
             return _supportStore.CasesById.Values
                 .Where(item =>

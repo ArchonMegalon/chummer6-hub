@@ -1,4 +1,7 @@
 using System.Text.Json.Nodes;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using Chummer.Run.Api.ViewModels;
 using Microsoft.Extensions.Configuration;
 
@@ -466,6 +469,28 @@ public sealed class HorizonCapabilityService
             FreeWeeklyLimit = freeWeeklyLimit,
             SupporterWeeklyLimit = supporterWeeklyLimit
         };
+    }
+
+    // Operator-sponsored private trial, not billing membership or provider credit.
+    // Uses the existing weekly usage ledger; changing this limit never resets use.
+    internal int? PrivateOriginSceneSponsoredLimit(string userId, DateTimeOffset now)
+    {
+        const string prefix = "CHUMMER_ORIGIN_SCENE_SPONSOR_";
+        string? owner = _configuration[prefix + "USER_SHA256"];
+        if (owner is not { Length: 64 } || owner.Any(static c => c is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+            return null;
+        string actual = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(userId.Trim().ToUpperInvariant())));
+        if (actual != owner
+            || !int.TryParse(_configuration[prefix + "LIMIT"], NumberStyles.None, CultureInfo.InvariantCulture, out int limit)
+            || limit is < 1 or > 8
+            || !DateTimeOffset.TryParseExact(_configuration[prefix + "WEEK_START_UTC"], "yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var start)
+            || !DateTimeOffset.TryParseExact(_configuration[prefix + "EXPIRES_AT_UTC"], "yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var end)
+            || start.DayOfWeek != DayOfWeek.Monday || start.TimeOfDay != TimeSpan.Zero
+            || end <= start || end - start > TimeSpan.FromDays(7) || now < start || now >= end)
+            return null;
+        return limit;
     }
 
     private bool ReadBool(string configKey, string envKey, bool fallback)

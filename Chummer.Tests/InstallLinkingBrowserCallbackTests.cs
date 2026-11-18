@@ -154,6 +154,44 @@ public sealed class InstallLinkingBrowserCallbackTests
         Assert.True(SecretsMatch(exchanged.Grant.AccessToken, repeated.Grant.AccessToken));
     }
 
+    [Theory]
+    [InlineData("installation")]
+    [InlineData("key")]
+    [InlineData("body")]
+    [InlineData("owner")]
+    public void Redeemed_callback_retry_rejects_changed_binding_without_minting_grant(string hostileChange)
+    {
+        using Fixture fixture = new();
+        (IssueInstallBrowserCallbackResponseDto issued, ExchangeInstallBrowserCallbackResponseDto exchanged) =
+            CreateBrowserLink(fixture, "ins-hostile-retry-1");
+        if (hostileChange == "owner")
+        {
+            lock (fixture.Store.Gate)
+            {
+                fixture.Store.InstallationsById[issued.Callback.InstallationId] =
+                    exchanged.Installation with { SubjectId = "other-subject" };
+            }
+        }
+
+        ExchangeInstallBrowserCallbackRequestDto request = new(
+            issued.Callback.CallbackCode,
+            hostileChange == "installation" ? "another-installation" : issued.Callback.InstallationId,
+            "avalonia",
+            hostileChange == "body" ? "6.0.2-preview" : "6.0.1-preview",
+            "preview",
+            "linux",
+            "x64",
+            hostileChange == "key" ? "other-public-key" : "public-key",
+            "Linux Workstation");
+
+        InstallLinkingOperationException denied = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.ExchangeBrowserCallback(request));
+
+        Assert.Equal(StatusCodes.Status409Conflict, denied.StatusCode);
+        Assert.Single(fixture.Store.GrantsById.Values, item =>
+            item.InstallationId == issued.Callback.InstallationId);
+    }
+
     [Fact]
     public void Revocation_scrubs_redeemed_callback_and_replay_cannot_reactivate_installation()
     {
@@ -224,19 +262,25 @@ public sealed class InstallLinkingBrowserCallbackTests
                 InstallAccessClasses.AccountRecommended),
             "user-archon",
             "subject-archon");
-        ExchangeInstallBrowserCallbackResponseDto secondExchange = RepeatExchange(
-            fixture,
+        var secondRequest = new ExchangeInstallBrowserCallbackRequestDto(
             second.Callback.CallbackCode,
-            second.Callback.InstallationId);
+            second.Callback.InstallationId,
+            "avalonia",
+            "6.0.2-preview",
+            "preview",
+            "linux",
+            "x64",
+            "rotated-public-key",
+            "Linux Workstation");
+        ExchangeInstallBrowserCallbackResponseDto secondExchange =
+            fixture.Service.ExchangeBrowserCallback(secondRequest);
         fixture.Reload();
 
         InstallLinkingOperationException firstReplay = Assert.Throws<InstallLinkingOperationException>(() =>
             RepeatExchange(fixture, first.Callback.CallbackCode, first.Callback.InstallationId));
         Assert.Equal(StatusCodes.Status404NotFound, firstReplay.StatusCode);
-        ExchangeInstallBrowserCallbackResponseDto secondReplay = RepeatExchange(
-            fixture,
-            second.Callback.CallbackCode,
-            second.Callback.InstallationId);
+        ExchangeInstallBrowserCallbackResponseDto secondReplay =
+            fixture.Service.ExchangeBrowserCallback(secondRequest);
         Assert.True(secondReplay.AlreadyClaimed);
         Assert.NotEqual(firstExchange.Grant.GrantId, secondExchange.Grant.GrantId);
         Assert.Equal(secondExchange.Grant.GrantId, secondReplay.Grant.GrantId);

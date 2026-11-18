@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,11 @@ from typing import Iterable, Mapping
 
 INVENTORY_NAME = "chummer-hub-packages.inventory.json"
 RECEIPT_CONTRACT = "chummer-hub.no-siblings-package-plane/v2"
+TEST_TRX_FILES = (
+    "package-plane.trx",
+    "build-ghost-tough-tongue-package-plane.trx",
+    "postgres-package-plane.trx",
+)
 HUB_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub.git"
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
@@ -38,6 +44,8 @@ LOCKED_PROJECTS = (
     "Chummer.World.Contracts",
     "Chummer.Run.Api",
     "Chummer.Run.Api.Tests",
+    "Chummer.BuildGhost.ToughTongue.Tests",
+    "Chummer.Run.Api.Postgres.Tests",
 )
 LOCAL_PROJECT_PACKAGE_IDS = frozenset(
     {
@@ -52,6 +60,11 @@ RELEASE_CONTROL_PYTHON_TESTS = (
     "tests/test_finalize_staged_release.py",
     "tests/test_mac_release_bootstrap_authority_closure.py",
     "tests/test_mac_release_stage_only.py",
+    "tests/test_build_ghost_private_nonprod_ai_deploy.py",
+    "tests/test_build_ghost_private_nonprod_presentation_deploy.py",
+    "tests/test_build_ghost_private_nonprod_compose.py",
+    "tests/test_build_ghost_private_rook_hosting.py",
+    "tests/test_build_ghost_tough_tongue_runtime_config.py",
 )
 
 
@@ -149,22 +162,30 @@ def _clean_commit(repo_root: Path) -> str:
 def _write_nuget_config(
     path: Path,
     feed: Path,
+    core_feed: Path,
     remote: str,
     package_ids: Iterable[str],
+    core_package_ids: Iterable[str],
 ) -> None:
     exact_patterns = "".join(
         f'<package pattern="{package_id}" />'
         for package_id in package_ids
+    )
+    core_patterns = "".join(
+        f'<package pattern="{package_id}" />'
+        for package_id in core_package_ids
     )
     path.write_text(
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
         "<configuration>\n"
         "  <packageSources><clear />"
         f'<add key="locked-chummer" value="{feed}" />'
+        f'<add key="locked-core-runtime" value="{core_feed}" />'
         f'<add key="nuget.org" value="{remote}" protocolVersion="3" />'
         "</packageSources>\n"
         "  <packageSourceMapping>\n"
         f'    <packageSource key="locked-chummer">{exact_patterns}</packageSource>\n'
+        f'    <packageSource key="locked-core-runtime">{core_patterns}</packageSource>\n'
         '    <packageSource key="nuget.org"><package pattern="*" /></packageSource>\n'
         "  </packageSourceMapping>\n"
         "</configuration>\n",
@@ -182,9 +203,26 @@ def _audit_assets(
         consumer / "Chummer.Run.Contracts/obj/project.assets.json",
         consumer / "Chummer.Run.Api/obj/project.assets.json",
         consumer / "Chummer.Run.Api.Tests/obj/project.assets.json",
+        consumer / "Chummer.BuildGhost.ToughTongue.Tests/obj/project.assets.json",
+        consumer / "Chummer.Run.Api.Postgres.Tests/obj/project.assets.json",
     )
     expected_root = package_root.resolve()
     observed_libraries: dict[str, dict] = {}
+    required_owner_ids = set(LOCAL_PROJECT_PACKAGE_IDS)
+    for project_name in LOCKED_PROJECTS:
+        lock_payload = json.loads(
+            (consumer / project_name / "packages.lock.json").read_text(encoding="utf-8")
+        )
+        for dependencies in (lock_payload.get("dependencies") or {}).values():
+            if not isinstance(dependencies, dict):
+                continue
+            required_owner_ids.update(
+                package_id
+                for package_id, metadata in dependencies.items()
+                if package_id in owner_versions
+                and isinstance(metadata, dict)
+                and metadata.get("type") != "Project"
+            )
     for path in asset_paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         roots = [Path(value).resolve() for value in (payload.get("packageFolders") or {})]
@@ -197,6 +235,17 @@ def _audit_assets(
     for package_id, package_version in owner_versions.items():
         identity = f"{package_id}/{package_version}"
         metadata = observed_libraries.get(identity)
+        observed_identities = {
+            candidate
+            for candidate in observed_libraries
+            if candidate.rpartition("/")[0].casefold() == package_id.casefold()
+        }
+        if observed_identities and observed_identities != {identity}:
+            raise VerificationError(
+                f"owner package resolved with an unbound identity: {sorted(observed_identities)}"
+            )
+        if package_id not in required_owner_ids and metadata is None:
+            continue
         expected_type = (
             "project" if package_id in LOCAL_PROJECT_PACKAGE_IDS else "package"
         )
@@ -299,15 +348,112 @@ def _audit_contract_packages(
     return rows
 
 
-def _trx_counts(path: Path) -> dict[str, int]:
-    root = ET.fromstring(path.read_text(encoding="utf-8-sig"))
+def _read_trx_bytes(path: Path) -> bytes:
+    identity = lambda value: (value.st_dev, value.st_ino, value.st_nlink, value.st_size,
+                              value.st_mtime_ns, value.st_ctime_ns)
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor, "rb") as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or not 0 < before.st_size <= 16 * 1024 * 1024:
+                raise VerificationError(f"TRX must be a bounded regular file: {path.name}")
+            raw = stream.read(16 * 1024 * 1024 + 1)
+            if len(raw) != before.st_size or identity(before) != identity(os.fstat(stream.fileno())) or identity(before) != identity(path.lstat()):
+                raise VerificationError(f"TRX changed while reading: {path.name}")
+    except OSError as exc:
+        raise VerificationError(f"TRX must be a bounded regular file: {path.name}") from exc
+    if not 0 < len(raw) <= 16 * 1024 * 1024:
+        raise VerificationError(f"TRX must be a bounded regular file: {path.name}")
+    return raw
+
+
+def _trx_counts_from_bytes(raw: bytes, label: str) -> dict[str, int]:
+    root = ET.fromstring(raw)
     counters = next(
         element for element in root.iter() if element.tag.rsplit("}", 1)[-1] == "Counters"
     )
+    if any(
+        int(counters.get(key, "0")) != 0
+        for key in ("notExecuted", "notRunnable", "inconclusive", "passedButRunAborted",
+                    "disconnected", "warning", "completed", "inProgress", "pending")
+    ):
+        raise VerificationError(f"TRX contains skipped or incomplete tests: {label}")
     return {
         key: int(counters.get(key, "0"))
         for key in ("total", "executed", "passed", "failed", "error", "timeout", "aborted")
     }
+
+
+def _trx_counts(path: Path) -> dict[str, int]:
+    return _trx_counts_from_bytes(_read_trx_bytes(path), path.name)
+
+
+def _require_passing_tests(counts: Mapping[str, int], label: str) -> None:
+    if (
+        counts.get("total", 0) <= 0
+        or counts.get("executed", 0) != counts.get("total", 0)
+        or counts.get("passed", 0) != counts.get("total", 0)
+        or any(counts.get(key, 0) != 0 for key in ("failed", "error", "timeout", "aborted"))
+    ):
+        raise VerificationError(f"{label} did not fully pass: {dict(counts)}")
+
+
+def _test_evidence(
+    results: Path, expected_counts: Mapping[str, Mapping[str, int]],
+) -> dict[str, dict[str, object]]:
+    if set(expected_counts) != set(TEST_TRX_FILES):
+        raise VerificationError("original TRX evidence must bind all three test suites")
+    evidence = {}
+    for name in TEST_TRX_FILES:
+        raw = _read_trx_bytes(results / name)
+        counts = _trx_counts_from_bytes(raw, name)
+        _require_passing_tests(counts, name)
+        if counts != expected_counts[name]:
+            raise VerificationError(f"original TRX counters changed before receipt: {name}")
+        evidence[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "size_bytes": len(raw)}
+    return evidence
+
+
+def _prepare_test_results_directory(repo_root: Path, path: Path) -> Path:
+    """Keep original runner evidence outside disposable/source trees; never reuse it."""
+    if not path.is_absolute() or ".." in path.parts or path == Path(path.anchor):
+        raise VerificationError("test results directory must be an explicit absolute child path")
+    if path.is_relative_to(repo_root) or path in repo_root.parents:
+        raise VerificationError("test results directory must be outside the source checkout")
+    if any(parent.is_symlink() for parent in (path, *path.parents)):
+        raise VerificationError("test results directory must not traverse symlinks")
+    if not path.parent.is_dir() or path.exists():
+        raise VerificationError("test results directory must start absent beneath an existing directory")
+    path.mkdir(mode=0o700)
+    return path
+
+
+def _run_postgres_tests(
+    consumer: Path, results: Path, nuget_config: Path, package_root: Path,
+    dotnet: str, common: tuple[str, ...], env: Mapping[str, str],
+) -> dict[str, int]:
+    project = consumer / "Chummer.Run.Api.Postgres.Tests/Chummer.Run.Api.Postgres.Tests.csproj"
+    trx = results / "postgres-package-plane.trx"
+    if trx.exists() or trx.is_symlink():
+        raise VerificationError("PostgreSQL TRX must start absent")
+    _run(
+        (dotnet, "restore", str(project), "--configfile", str(nuget_config),
+         "--packages", str(package_root), "--locked-mode", "--no-cache", "--nologo", "-m:1", *common),
+        cwd=consumer, env=env,
+    )
+    # The actual fixture creates a unique loopback-only, 1 CPU / 512 MiB database
+    # and disposes it on initialization failure and normal/failed test teardown.
+    # Disable the reaper only for this fixture-owned test process, not globally.
+    postgres_env = dict(env, TESTCONTAINERS_RYUK_DISABLED="true")
+    _run(
+        (dotnet, "test", str(project), "--configuration", "Release", "--framework", "net10.0",
+         "--no-restore", "--nologo", "-m:1", "--logger", "trx;LogFileName=postgres-package-plane.trx",
+         "--results-directory", str(results), *common),
+        cwd=consumer, env=postgres_env,
+    )
+    counts = _trx_counts(trx)
+    _require_passing_tests(counts, "PostgreSQL package-plane tests")
+    return counts
 
 
 def _atomic_json(path: Path, payload: dict[str, object]) -> None:
@@ -326,7 +472,10 @@ def _atomic_json(path: Path, payload: dict[str, object]) -> None:
             temporary_path.unlink()
 
 
-def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
+def verify(
+    repo_root: Path, receipt_path: Path, core_bundle: Path, dotnet: str,
+    test_results_directory: Path | None = None,
+) -> None:
     repo_root = repo_root.resolve()
     commit = _clean_commit(repo_root)
     bootstrap = _load_bootstrap(repo_root)
@@ -337,22 +486,32 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
     toolchain = _audit_dotnet_toolchain(
         dotnet, lock.dotnet_sdk, lock.toolchain_sha256
     )
+    receipt_parent = receipt_path.absolute().parent
+    results = _prepare_test_results_directory(
+        repo_root,
+        test_results_directory if test_results_directory is not None
+        else receipt_parent / f"{receipt_path.stem}-test-results",
+    )
     with tempfile.TemporaryDirectory(prefix="chummer-hub-no-siblings-") as temporary:
         root = Path(temporary)
         feed = root / "feed"
+        core_feed = root / "core-feed"
         consumer_parent = root / "consumer"
         consumer = consumer_parent / "chummer6-hub"
         package_root = root / "packages"
         cli_home = root / "dotnet-cli"
         http_cache = root / "nuget-http-cache"
-        results = root / "results"
         contract_output = root / "contract-packages"
-        for directory in (consumer_parent, package_root, cli_home, http_cache, results, contract_output):
+        for directory in (consumer_parent, package_root, cli_home, http_cache, contract_output):
             directory.mkdir(parents=True, exist_ok=True)
+        bootstrap.materialize_core_runtime_feed(
+            core_bundle.resolve(), core_feed, lock.core_runtime
+        )
         bootstrap.build_feed(
             lock,
             lock_sha256=lock_sha,
             feed=feed,
+            core_feed=core_feed,
             dotnet=dotnet,
         )
         inventory_path = feed / INVENTORY_NAME
@@ -398,8 +557,10 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
         _write_nuget_config(
             nuget_config,
             feed,
+            core_feed,
             lock.approved_remote_source,
             (spec.package_id for spec in lock.packages),
+            (spec.package_id for spec in lock.core_runtime.packages),
         )
         env = bootstrap.isolated_environment(os.environ, package_root, cli_home, http_cache)
         _run(
@@ -413,7 +574,13 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             cwd=consumer,
             env=env,
         )
-        owner_versions = {spec.package_id: spec.version for spec in lock.packages}
+        owner_versions = {
+            **{
+                spec.package_id: spec.version
+                for spec in lock.core_runtime.packages
+            },
+            **{spec.package_id: spec.version for spec in lock.packages},
+        }
         common = (
             "-p:ChummerUseLocalCompatibilityTree=false",
             f"-p:ChummerPackagePlaneVersion={lock.package_version}",
@@ -431,11 +598,33 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "-p:UseSharedCompilation=false",
         )
         test_project = consumer / "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj"
+        build_ghost_test_project = (
+            consumer
+            / "Chummer.BuildGhost.ToughTongue.Tests/Chummer.BuildGhost.ToughTongue.Tests.csproj"
+        )
         _run(
             (
                 dotnet,
                 "restore",
                 str(test_project),
+                "--configfile",
+                str(nuget_config),
+                "--packages",
+                str(package_root),
+                "--locked-mode",
+                "--no-cache",
+                "--nologo",
+                "-m:1",
+                *common,
+            ),
+            cwd=consumer,
+            env=env,
+        )
+        _run(
+            (
+                dotnet,
+                "restore",
+                str(build_ghost_test_project),
                 "--configfile",
                 str(nuget_config),
                 "--packages",
@@ -468,6 +657,27 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             (
                 dotnet,
                 "test",
+                str(build_ghost_test_project),
+                "--configuration",
+                "Release",
+                "--framework",
+                "net10.0",
+                "--no-restore",
+                "--nologo",
+                "-m:1",
+                "--logger",
+                "trx;LogFileName=build-ghost-tough-tongue-package-plane.trx",
+                "--results-directory",
+                str(results),
+                *common,
+            ),
+            cwd=consumer,
+            env=env,
+        )
+        _run(
+            (
+                dotnet,
+                "test",
                 str(test_project),
                 "--configuration",
                 "Release",
@@ -485,14 +695,23 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             cwd=consumer,
             env=env,
         )
+        postgres_test_counts = _run_postgres_tests(
+            consumer, results, nuget_config, package_root, dotnet, common, env
+        )
         asset_count = _audit_assets(consumer, package_root, owner_versions)
         package_locks = _audit_package_locks(consumer, owner_versions)
         contract_packages = _audit_contract_packages(
             consumer, contract_output, commit, lock.package_version, dotnet, common, env
         )
         test_counts = _trx_counts(results / "package-plane.trx")
-        if test_counts["failed"] or test_counts["error"] or test_counts["timeout"] or test_counts["aborted"]:
-            raise VerificationError(f"package-plane tests did not pass: {test_counts}")
+        build_ghost_test_counts = _trx_counts(
+            results / "build-ghost-tough-tongue-package-plane.trx"
+        )
+        _require_passing_tests(test_counts, "package-plane API tests")
+        _require_passing_tests(
+            build_ghost_test_counts,
+            "Build Ghost Tough Tongue package-plane tests",
+        )
         payload: dict[str, object] = {
             "contract": RECEIPT_CONTRACT,
             "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -512,6 +731,22 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
                 }
                 for spec in lock.packages
             ],
+            "core_runtime_authority": {
+                "repository": lock.core_runtime.repository,
+                "runtime_source_commit": lock.core_runtime.runtime_source_commit,
+                "package_recipe_commit": lock.core_runtime.package_recipe_commit,
+                "package_version": lock.core_runtime.package_version,
+                "bundle_sha256": lock.core_runtime.bundle_sha256,
+                "packages": [
+                    {
+                        "id": spec.package_id,
+                        "version": spec.version,
+                        "sha256": spec.sha256,
+                        "size_bytes": spec.size_bytes,
+                    }
+                    for spec in lock.core_runtime.packages
+                ],
+            },
             "owner_package_versions": owner_versions,
             "external_packages": [
                 {
@@ -526,7 +761,8 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "no_sibling_directories": True,
             "isolated_package_cache": True,
             "package_source_mapping": {
-                "locked_external_ids": "locked-chummer",
+                "locked_non_core_ids": "locked-chummer",
+                "locked_core_runtime_ids": "locked-core-runtime",
                 "other": lock.approved_remote_source,
             },
             "asset_files_audited": asset_count,
@@ -534,6 +770,13 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "locked_mode_restore": True,
             "api_build": "pass",
             "api_tests": test_counts,
+            "build_ghost_tough_tongue_tests": build_ghost_test_counts,
+            "postgres_tests": postgres_test_counts,
+            "test_evidence": _test_evidence(results, {
+                "package-plane.trx": test_counts,
+                "build-ghost-tough-tongue-package-plane.trx": build_ghost_test_counts,
+                "postgres-package-plane.trx": postgres_test_counts,
+            }),
             "release_control_python_tests": {
                 "status": "pass",
                 "files": list(RELEASE_CONTROL_PYTHON_TESTS),
@@ -541,7 +784,10 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "contract_pack_license_gate": "pass",
         }
         _atomic_json(receipt_path.resolve(), payload)
-    print(f"hub-no-siblings-package-plane: ok ({test_counts['passed']} tests)")
+    print(
+        "hub-no-siblings-package-plane: ok "
+        f"({test_counts['passed'] + build_ghost_test_counts['passed'] + postgres_test_counts['passed']} tests)"
+    )
     print(f"receipt: {receipt_path.resolve()}")
 
 
@@ -549,13 +795,15 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
+    parser.add_argument("--core-bundle", type=Path, required=True)
     parser.add_argument("--dotnet", default="dotnet")
+    parser.add_argument("--test-results-directory", type=Path)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    verify(args.repo_root, args.receipt, args.dotnet)
+    verify(args.repo_root, args.receipt, args.core_bundle, args.dotnet, args.test_results_directory)
     return 0
 
 

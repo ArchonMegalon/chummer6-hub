@@ -1,4 +1,5 @@
 using Chummer.Run.AI.Services.BuildGhost;
+using Chummer.Run.AI.Security;
 using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,7 @@ namespace Chummer.Run.AI.Controllers;
 public sealed class BuildGhostController(
     IToughTongueBuildGhostAdapter adapter,
     IBuildGhostPersonaReleaseRegistry releases,
+    IBuildGhostLiveSupportService liveSupport,
     IBuildGhostPrivateToolAuthorityClient privateToolAuthority,
     ILogger<BuildGhostController> logger,
     IConfiguration configuration) : ControllerBase
@@ -53,47 +55,68 @@ public sealed class BuildGhostController(
     public ActionResult<BuildGhostPersonaReleaseProjection> RookRelease()
         => Ok(releases.ResolveRook());
 
-    [HttpGet("readiness")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public IActionResult Readiness()
+    [HttpGet("support-experience")]
+    [ProducesResponseType<BuildGhostSupportExperienceProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public ActionResult<BuildGhostSupportExperienceProjection> SupportExperience()
     {
-        BuildGhostPrivateToolDeploymentValidation deployment =
-            BuildGhostPrivateToolDeploymentContract.FromConfiguration(configuration);
-        if (!deployment.Accepted || deployment.Package is null)
+        if (!IsInternallyAuthorized())
         {
-            return Problem(
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Build Ghost private tool unavailable",
-                detail: "The private tool deployment contract is not active.");
-        }
-
-        string authorityEndpoint = configuration[
-            BuildGhostPrivateToolAuthorityClient.AuthorityEndpointConfigurationKey]?.Trim() ?? string.Empty;
-        string serviceToken = configuration[
-            BuildGhostPrivateToolAuthorityClient.ServiceTokenConfigurationKey]?.Trim() ?? string.Empty;
-        if (!Uri.TryCreate(authorityEndpoint, UriKind.Absolute, out Uri? authorityUri)
-            || !string.Equals(authorityUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            || (!string.Equals(authorityUri.Host, "chummer.run", StringComparison.OrdinalIgnoreCase)
-                && !authorityUri.Host.EndsWith(".chummer.run", StringComparison.OrdinalIgnoreCase))
-            || !string.Equals(authorityUri.AbsolutePath, "/api/internal/build-ghost/tool/resolve", StringComparison.Ordinal)
-            || serviceToken.Length < 32)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Build Ghost authority unavailable",
-                detail: "The packet authority endpoint or service credential is not configured.");
+            return Unauthorized();
         }
 
         Response.Headers.CacheControl = "no-store";
-        return Ok(new
+        return Ok(liveSupport.BuildExperience());
+    }
+
+    [HttpPost("live-support")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(16 * 1024)]
+    [ProducesResponseType<BuildGhostLiveSupportSessionProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<BuildGhostLiveSupportSessionProjection>> RequestLiveSupport(
+        [FromBody] BuildGhostLiveSupportRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsInternallyAuthorized())
         {
-            service = "chummer.run.ai.build-ghost",
-            status = "ready",
-            providerNeutral = deployment.Package.ProviderNeutral,
-            remoteExecutionEnabled = deployment.Package.RemoteExecutionEnabled,
-            deploymentDigest = deployment.Package.PackageDigest
-        });
+            return Unauthorized();
+        }
+
+        if (request is null)
+        {
+            return BadRequest("Build Ghost live-support request is required.");
+        }
+
+        Response.Headers.CacheControl = "no-store";
+        return Ok(await liveSupport.RequestAsync(request, cancellationToken).ConfigureAwait(false));
+    }
+
+    [HttpPost("live-support/status")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(8 * 1024)]
+    [ProducesResponseType<BuildGhostLiveSupportSessionProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<BuildGhostLiveSupportSessionProjection>> LiveSupportStatus(
+        [FromBody] BuildGhostLiveSupportStatusRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsInternallyAuthorized())
+        {
+            return Unauthorized();
+        }
+
+        if (request is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers.CacheControl = "no-store";
+        BuildGhostLiveSupportSessionProjection? session =
+            await liveSupport.GetAsync(request, cancellationToken).ConfigureAwait(false);
+        return session is null ? NotFound() : Ok(session);
     }
 
     [HttpPost("tool")]
@@ -108,6 +131,7 @@ public sealed class BuildGhostController(
         [FromBody] BuildGhostPrivateToolRequest? request,
         CancellationToken cancellationToken)
     {
+        Response.Headers.CacheControl = "no-store";
         IReadOnlyList<string> validationReasons = BuildGhostPrivateToolAuthorityClient.ValidateRequest(request);
         if (validationReasons.Count != 0 || request is null)
         {
@@ -120,24 +144,102 @@ public sealed class BuildGhostController(
             || deployment.Package is null
             || !string.Equals(deployment.Package.AuthenticationAudience, "build-ghost-private-tool", StringComparison.Ordinal))
         {
-            return Problem(
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Build Ghost private tool unavailable",
-                detail: "The private tool deployment contract is not active.");
+            return PrivateToolUnavailable();
         }
 
+        BuildGhostPrivateToolDeploymentPackage legacyPackage;
+        if (deployment.Package.AuthenticationScheme == BuildGhostPrivateToolDeploymentContract.LegacyBearerAuthenticationScheme)
+        {
+            legacyPackage = deployment.Package;
+        }
+        else if (deployment.Package.AuthenticationScheme == BuildGhostPrivateToolDeploymentContract.ProviderBodyKeyAuthenticationScheme)
+        {
+            UriBuilder legacyEndpoint = new(deployment.Package.Tool.Endpoint)
+            {
+                Path = BuildGhostPrivateToolDeploymentContract.LegacyV1Path,
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+            legacyPackage = BuildGhostPrivateToolDeploymentContract.Create(
+                legacyEndpoint.Uri,
+                deployment.Package.AuthenticationAudience);
+        }
+        else
+        {
+            return PrivateToolUnavailable();
+        }
         string suppliedContract = Request.Headers["X-Chummer-Build-Ghost-Tool-Contract"].ToString().Trim();
-        if (!FixedTimeEquals(suppliedContract, deployment.Package.Tool.ContractDigest)
+        if (!FixedTimeEquals(suppliedContract, legacyPackage.Tool.ContractDigest)
             || !EphemeralBearerMatches(request.PacketAccessKey))
         {
             return Unauthorized();
         }
 
+        return await ResolveToolAsync(request, deployment.Package.Tool.ContractDigest, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    [HttpPost("~/api/v2/ai/build-ghost/tool")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(16 * 1024)]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> ProviderToolV2(
+        [FromBody] BuildGhostPrivateToolProviderRequest? request,
+        CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        IReadOnlyList<string> validationReasons =
+            BuildGhostPrivateToolAuthorityClient.ValidateProviderRequest(request);
+        if (validationReasons.Count != 0 || request is null)
+        {
+            return BadRequest(new { error = "private_tool_provider_request_invalid", reasons = validationReasons });
+        }
+
+        BuildGhostPrivateToolDeploymentValidation deployment =
+            BuildGhostPrivateToolDeploymentContract.FromConfiguration(configuration);
+        if (!deployment.Accepted
+            || deployment.Package is null
+            || !string.Equals(deployment.Package.AuthenticationAudience, "build-ghost-private-tool", StringComparison.Ordinal)
+            || BuildGhostPrivateToolDeploymentContract.ValidateProviderBodyCredentialDeployment(deployment.Package).Count != 0)
+        {
+            return PrivateToolUnavailable();
+        }
+
+        string suppliedContract = Request.Headers["X-Chummer-Build-Ghost-Tool-Contract"].ToString().Trim();
+        string cacheControl = Request.Headers.CacheControl.ToString().Trim();
+        if (Request.Headers.ContainsKey("Authorization")
+            || Request.Headers.ContainsKey("Cookie")
+            || Request.QueryString.HasValue
+            || !string.Equals(cacheControl, "no-store", StringComparison.OrdinalIgnoreCase)
+            || !FixedTimeEquals(suppliedContract, deployment.Package.Tool.ContractDigest))
+        {
+            return Unauthorized();
+        }
+
+        BuildGhostPrivateToolRequest normalized = new(
+            request.PacketAccessKey,
+            request.PacketDigest,
+            request.Locale,
+            request.RequestKind,
+            request.Question);
+        return await ResolveToolAsync(normalized, deployment.Package.Tool.ContractDigest, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<IActionResult> ResolveToolAsync(
+        BuildGhostPrivateToolRequest request,
+        string authorityContractDigest,
+        CancellationToken cancellationToken)
+    {
         try
         {
             string packetJson = await privateToolAuthority.ResolveAsync(
                 request,
-                deployment.Package.Tool.ContractDigest,
+                authorityContractDigest,
                 cancellationToken).ConfigureAwait(false);
             Response.Headers["X-Chummer-Build-Ghost-Packet-Digest"] = request.PacketDigest;
             Response.Headers.CacheControl = "no-store";
@@ -149,28 +251,31 @@ public sealed class BuildGhostController(
                 "Build Ghost private tool resolution failed with {Reason}; trace {TraceId}.",
                 exception.Reason,
                 HttpContext.TraceIdentifier);
-            return Problem(
-                statusCode: exception.StatusCode,
-                title: "Build Ghost private tool request failed",
-                detail: exception.Reason);
+            return PrivateToolResolutionFailure(exception);
         }
     }
+
+    private JsonResult PrivateToolResolutionFailure(
+        BuildGhostPrivateToolResolutionException exception)
+    {
+        Response.Headers.CacheControl = "no-store";
+        return new JsonResult(new { error = exception.Reason })
+        {
+            StatusCode = exception.StatusCode
+        };
+    }
+
+    private ObjectResult PrivateToolUnavailable()
+        => Problem(
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: "Build Ghost private tool unavailable",
+            detail: "The private tool deployment contract is not active.");
 
     private bool IsInternallyAuthorized()
-    {
-        string configured = configuration["FLEET_INTERNAL_API_TOKEN"]?.Trim() ?? string.Empty;
-        const string prefix = "Bearer ";
-        string header = Request.Headers.Authorization.ToString();
-        if (string.IsNullOrWhiteSpace(configured)
-            || !header.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        byte[] supplied = Encoding.UTF8.GetBytes(header[prefix.Length..].Trim());
-        byte[] expected = Encoding.UTF8.GetBytes(configured);
-        return supplied.Length == expected.Length && CryptographicOperations.FixedTimeEquals(supplied, expected);
-    }
+        => HttpContext.Items.TryGetValue(
+                AiMutationAuthorizationMiddleware.AuthorizationMarker,
+                out object? authorized)
+            && authorized is true;
 
     private bool EphemeralBearerMatches(string packetAccessKey)
     {

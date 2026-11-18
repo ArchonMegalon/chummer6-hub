@@ -21,7 +21,7 @@ public sealed class LedgerService
     public ReceiptIngestResultDto Ingest(ContributionReceiptDto receipt)
     {
         var canonicalReceipt = Canonicalize(receipt);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (canonicalReceipt.GroupId is { } groupId
                 && !_store.GroupsById.ContainsKey(groupId))
@@ -89,7 +89,7 @@ public sealed class LedgerService
 
     public IReadOnlyList<LedgerEntryDto> ListForUser(string userId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.LedgerEntries
                 .Where(entry => string.Equals(entry.UserId, userId, StringComparison.OrdinalIgnoreCase))

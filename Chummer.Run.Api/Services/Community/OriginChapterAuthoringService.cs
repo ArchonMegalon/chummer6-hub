@@ -1,0 +1,631 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Chummer.Run.Contracts.Community;
+using Chummer.Run.Api.Services.Teable;
+
+namespace Chummer.Run.Api.Services.Community;
+
+/// <summary>
+/// Durable private authoring requests. Does not execute a provider or reserve
+/// credits. A worker must separately obtain execution/quota authority. The
+/// durable dispatch fence is never automatically reset after a lost response.
+/// </summary>
+public sealed class OriginChapterAuthoringService : IDisposable
+{
+    private readonly IConfiguration configuration;
+    private readonly TeableOriginChapterStorage? _primary;
+    private TeableOriginChapterStorage.Session? _primarySession;
+    public OriginChapterAuthoringService(IConfiguration configuration, TeableOriginChapterStorage? primary = null)
+    {
+        this.configuration = configuration;
+        string provider = configuration["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"]?.Trim() ?? "local";
+        if (provider is not ("local" or "teable") || (provider == "teable") != (primary is not null))
+            throw new InvalidOperationException("Origin storage provider and registration do not match.");
+        _primary = primary;
+    }
+
+    public void Dispose() => _primary?.Dispose();
+    public const int MaximumRequestBytes = 64 * 1024;
+    public const int MaximumDraftBytes = 64 * 1024;
+    private const int MaximumFileBytes = 512 * 1024;
+    private const string Schema = "chummer.origin.chapter-job/v1";
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 16 };
+    private readonly object _gate = new();
+    private sealed record StoredDraft(string Text, string ProviderReceiptDigest)
+    {
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public OriginChapterEditorialProvenance? Editorial { get; init; }
+    }
+    private sealed record StoredJob(string Schema, string OwnerDigest, OriginChapterAuthoringJob Job, string Digest,
+        string? ExecutionAdmission = null)
+    {
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public StoredDraft[]? SupersededDrafts { get; init; }
+    }
+
+    public bool IsConfigured => _primary is not null || !string.IsNullOrWhiteSpace(configuration["CHUMMER_RUNTIME_STATE_ROOT"]);
+
+    public OriginChapterAuthoringJob Create(string subjectId, OriginChapterAuthoringRequest request, Func<bool> stillAuthorized)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        RequireId(request.RequestId);
+        if (!request.ExternalProcessingConsent) throw new ArgumentException("External processing consent is required.");
+        OriginChapterSource source = OriginChapterSourceIdentity.Capture(request.Source);
+        string sourceDigest = OriginChapterSourceIdentity.Digest(source);
+        OriginChapterPredecessor? previous = OriginChapterSourceIdentity.CapturePredecessor(request.Previous);
+        if (previous?.RequestId == request.RequestId)
+            throw new ArgumentException("A chapter cannot precede itself.");
+        return Locked(root =>
+        {
+            if (!stillAuthorized()) throw new UnauthorizedAccessException();
+            string owner = Owner(subjectId);
+            string path = JobPath(root, owner, request.RequestId);
+            if (Read(path, owner, request.RequestId) is { } existing)
+            {
+                if (existing.SourceDigest != sourceDigest || existing.Previous != previous)
+                    throw new InvalidOperationException("The authoring request already belongs to a different source or predecessor.");
+                return existing;
+            }
+            if (previous is not null)
+            {
+                var predecessor = Read(JobPath(root, owner, previous.RequestId), owner, previous.RequestId)
+                    ?? throw new InvalidOperationException("The reader-accepted predecessor is unavailable.");
+                RequirePredecessor(predecessor, previous, source);
+            }
+            if (_primarySession is not null)
+                _primarySession.Register(WorkId(owner, request.RequestId));
+            else if (Directory.EnumerateFiles(root, owner + ".*.json").Take(128).Count() >= 128
+                || Directory.EnumerateFiles(root, "*.json").Take(2048).Count() >= 2048)
+                throw new InvalidOperationException("The private authoring queue is full.");
+            if (!stillAuthorized()) throw new UnauthorizedAccessException();
+            var job = new OriginChapterAuthoringJob(request.RequestId, sourceDigest, source,
+                OriginChapterAuthoringStates.AwaitingAuthoring, "first_book_ai", null, null) { Previous = previous };
+            Write(path, owner, job);
+            return job;
+        });
+    }
+
+    private static void RequirePredecessor(OriginChapterAuthoringJob predecessor,
+        OriginChapterPredecessor expected, OriginChapterSource source)
+    {
+        if (predecessor.State != OriginChapterAuthoringStates.ReviewRequired
+            || predecessor.SourceDigest != expected.SourceDigest
+            || predecessor.ProviderReceiptDigest != expected.ProviderReceiptDigest
+            || predecessor.ReaderAcceptedTextDigest != expected.TextDigest
+            || predecessor.Source.WorkspaceId != source.WorkspaceId || predecessor.Source.Locale != source.Locale
+            || predecessor.Source.RunnerName != source.RunnerName
+            || predecessor.Source.ChapterId == source.ChapterId
+            || predecessor.Source.AcceptedDecisionId == source.AcceptedDecisionId
+            || predecessor.Source.Facts.Any(fact =>
+                source.Facts.Any(next => next.FactId == fact.FactId && next != fact)
+                || !IsChapterScopedBrief(fact) && !source.Facts.Contains(fact)))
+            throw new InvalidOperationException("The exact reader-accepted predecessor does not match this book continuation.");
+    }
+
+    private static bool IsChapterScopedBrief(OriginChapterSourceFact fact)
+    {
+        // Existing native clients freeze a single-module refinement in Facts,
+        // under its own content-addressed player identity, NOT a Core decision.
+        // It remains bound to the old job/source/text but need not be reissued
+        // for every later chapter. Opening/background briefs and all accepted
+        // rules facts still accumulate. Inspect the retained predecessor's
+        // identity, never a replacement label supplied by the successor.
+        const string prefix = "player-chapter-brief-";
+        return fact.FactId == fact.DecisionId
+            && fact.FactId.StartsWith(prefix, StringComparison.Ordinal)
+            && IsDigest(fact.FactId[prefix.Length..]);
+    }
+
+    public OriginChapterAuthoringJob? Get(string subjectId, string requestId)
+    {
+        RequireId(requestId);
+        string owner = Owner(subjectId);
+        return ReadOnly(
+            session => ReadPrimaryForReader(session, WorkId(owner, requestId), owner, requestId),
+            root => Read(JobPath(root, owner, requestId), owner, requestId));
+    }
+
+    // Account readers use an owner-bound opaque reference, never a worker ID or
+    // execution admission. Reading does not accept prose or enqueue more work.
+    internal sealed record ReaderChapter(string Reference, OriginChapterAuthoringJob Job);
+
+    internal IReadOnlyList<ReaderChapter> ListForReader(string subjectId)
+    {
+        string owner = Owner(subjectId);
+        return ReadOnly(session =>
+        {
+            string[] references = OwnedReaderReferences(session.WorkIds(), owner);
+            var chapters = new List<ReaderChapter>(references.Length);
+            foreach (string[] batch in references.Chunk(TeableOriginChapterStorage.ReaderBatchSize))
+            {
+                byte[]?[] records = session.ReadBatchForReader(batch);
+                try
+                {
+                    for (int index = 0; index < batch.Length; index++)
+                        if (records[index] is { } bytes)
+                        {
+                            var stored = DecodeStored(bytes, batch[index] + ".json", owner, null);
+                            chapters.Add(new ReaderChapter(batch[index][65..], stored.Job));
+                        }
+                }
+                finally
+                {
+                    foreach (byte[]? bytes in records)
+                        if (bytes is not null) CryptographicOperations.ZeroMemory(bytes);
+                }
+            }
+            return chapters.ToArray();
+        }, root => OwnedReaderReferences(WorkIds(root), owner)
+                .Select(id => (Id: id, Stored: ReadStored(Path.Combine(root, id + ".json"), owner, null)))
+                .Where(item => item.Stored is not null)
+                .Select(item => new ReaderChapter(item.Id[65..], item.Stored!.Job)).ToArray());
+    }
+
+    internal OriginChapterAuthoringJob? GetForReader(string subjectId, string reference)
+    {
+        if (!IsDigest(reference)) return null;
+        string owner = Owner(subjectId);
+        string workId = owner + "." + reference;
+        return ReadOnly(session => ReadPrimaryForReader(session, workId, owner, null),
+            root => ReadStored(Path.Combine(root, workId + ".json"), owner, null)?.Job);
+    }
+
+    private T ReadOnly<T>(Func<TeableOriginChapterStorage.Session, T> primaryRead, Func<string, T> localRead)
+    {
+        if (_primary is null) return Locked(localRead);
+        // Remote records are immutable, digest-checked revisions. A reader owns
+        // its own bounded session, never the worker/writer session or mutation
+        // heads. Do not wait behind a whole worker scan just to read one chapter.
+        // Local files still need their existing lock; controller authorization
+        // is still checked again after storage reads before private disclosure.
+        using var session = _primary.OpenSession();
+        return primaryRead(session);
+    }
+
+    private static string[] OwnedReaderReferences(IEnumerable<string> workIds, string owner)
+    {
+        string[] references = workIds.Where(id => id.StartsWith(owner + ".", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal).Take(129).ToArray();
+        if (references.Length > 128)
+            throw new InvalidDataException("The private chapter inventory exceeds its limit.");
+        return references;
+    }
+
+    private static OriginChapterAuthoringJob? ReadPrimaryForReader(TeableOriginChapterStorage.Session session,
+        string workId, string owner, string? requestId)
+    {
+        byte[]? bytes = session.ReadBatchForReader([workId])[0];
+        try { return bytes is null ? null : DecodeStored(bytes, workId + ".json", owner, requestId).Job; }
+        finally { if (bytes is not null) CryptographicOperations.ZeroMemory(bytes); }
+    }
+
+    public OriginChapterAuthoringJob AcceptReading(string subjectId, string requestId, string sourceDigest,
+        string providerReceiptDigest, string textDigest, bool explicitlyConfirmed, Func<bool> stillAuthorized)
+    {
+        RequireId(requestId);
+        if (!explicitlyConfirmed || !IsDigest(sourceDigest) || !IsDigest(providerReceiptDigest) || !IsDigest(textDigest))
+            throw new ArgumentException("Exact reader confirmation is required.");
+        return Locked(root =>
+        {
+            if (!stillAuthorized()) throw new UnauthorizedAccessException();
+            string owner = Owner(subjectId);
+            string path = JobPath(root, owner, requestId);
+            var stored = ReadStored(path, owner, requestId) ?? throw new KeyNotFoundException();
+            var job = stored.Job;
+            if (job.State != OriginChapterAuthoringStates.ReviewRequired || job.SourceDigest != sourceDigest
+                || job.ProviderReceiptDigest != providerReceiptDigest || TextDigest(job.DraftText!) != textDigest)
+                throw new InvalidOperationException("The reviewed text or source changed.");
+            // Reading primary storage may block while the install is revoked.
+            // Revalidate before accepting either a prior result or a new write.
+            if (!stillAuthorized()) throw new UnauthorizedAccessException();
+            if (job.ReaderAcceptedTextDigest is not null) return job;
+            var accepted = job with { ReaderAcceptedTextDigest = textDigest };
+            Write(path, owner, accepted, stored.ExecutionAdmission, stored.SupersededDrafts);
+            return accepted;
+        });
+    }
+
+    // Provider workers get opaque work identities, not identity subjects or
+    // install credentials. This seam does not select accounts or authorize quota.
+    internal IReadOnlyList<OriginChapterWorkerItem> PendingForWorker(int limit, string? bookRef = null)
+    {
+        if (limit is < 1 or > 20) throw new ArgumentException("Invalid worker page size.");
+        if (bookRef is not null && !IsDigest(bookRef)) throw new ArgumentException("Invalid book reference.");
+        // Discovery cannot authorize execution. It must not hold the mutation
+        // lock while reading every historical remote chapter: that blocks new
+        // requests/reader acceptance behind a slow queue sweep. Admission still
+        // rereads the exact current record under the lock and compare-exchanges it.
+        return ReadOnly(session =>
+        {
+            var pending = new List<OriginChapterWorkerItem>(limit);
+            foreach (string[] batch in session.WorkIds().Order(StringComparer.Ordinal)
+                .Chunk(TeableOriginChapterStorage.ReaderBatchSize))
+            {
+                byte[]?[] records = session.ReadBatchForReader(batch);
+                try
+                {
+                    for (int index = 0; index < batch.Length; index++)
+                    {
+                        if (records[index] is not { } bytes) continue;
+                        var stored = DecodeStored(bytes, batch[index] + ".json", batch[index][..64], null);
+                        if (stored.Job.State == OriginChapterAuthoringStates.ReviewRequired) continue;
+                        var work = WorkerItem(stored);
+                        if (bookRef is not null && work.BookRef != bookRef) continue;
+                        pending.Add(work);
+                        if (pending.Count == limit) return pending.ToArray();
+                    }
+                }
+                finally
+                {
+                    foreach (byte[]? bytes in records)
+                        if (bytes is not null) CryptographicOperations.ZeroMemory(bytes);
+                }
+            }
+            return pending.ToArray();
+        }, root => WorkIds(root).Order(StringComparer.Ordinal)
+            .Select(workId => ReadStored(Path.Combine(root, workId + ".json"), workId[..64], null))
+            // A remote catalogue reservation may outlive an interrupted initial
+            // create. Missing bytes are inert, never permission to generate.
+            .Where(stored => stored is not null && stored.Job.State != OriginChapterAuthoringStates.ReviewRequired)
+            .Select(stored => stored!)
+            .Select(WorkerItem).Where(work => bookRef is null || work.BookRef == bookRef)
+            .Take(limit).ToArray());
+    }
+
+    private IEnumerable<string> WorkIds(string root)
+    {
+        if (_primarySession is not null) return _primarySession.WorkIds();
+        return Directory.EnumerateFiles(root, "*.json").Select(path =>
+        {
+            string workId = Path.GetFileNameWithoutExtension(path);
+            TeableOriginChapterStorage.ValidateWorkId(workId);
+            return workId;
+        });
+    }
+
+    internal OriginChapterWorkerItem GetForWorker(string workId)
+        => Locked(root => WorkerItem(ReadWorkerRecord(root, workId)));
+
+    internal OriginChapterWorkerAdmission AdmitForWorker(string workId, string sourceDigest, string executionAdmission)
+    {
+        RequireId(executionAdmission);
+        return Locked(root =>
+        {
+            StoredJob stored = ReadWorkerRecord(root, workId);
+            if (stored.Job.SourceDigest != sourceDigest)
+                throw new InvalidOperationException("The authoring source changed.");
+            if (stored.ExecutionAdmission is not null)
+            {
+                if (stored.ExecutionAdmission != executionAdmission)
+                    throw new InvalidOperationException("The request has a different execution admission.");
+                return new OriginChapterWorkerAdmission(WorkerItem(stored), MayStartGeneration: false);
+            }
+            if (stored.Job.State != OriginChapterAuthoringStates.AwaitingAuthoring)
+                throw new InvalidOperationException("Reconcile this existing dispatch; do not redispatch.");
+            var fenced = stored.Job with { State = OriginChapterAuthoringStates.ReconciliationRequired };
+            string path = JobPath(root, stored.OwnerDigest, fenced.RequestId);
+            Write(path, stored.OwnerDigest, fenced, executionAdmission);
+            return new OriginChapterWorkerAdmission(WorkerItem(ReadWorkerRecord(root, workId)), MayStartGeneration: true);
+        });
+    }
+
+    internal OriginChapterWorkerItem CompleteForWorker(string workId, string sourceDigest, string executionAdmission,
+        string draftText, string providerReceiptDigest, OriginChapterEditorialProvenance? editorial = null)
+    {
+        RequireId(executionAdmission);
+        ValidateResult(draftText, providerReceiptDigest);
+        ValidateEditorial(editorial, draftText, providerReceiptDigest);
+        return Locked(root =>
+        {
+            StoredJob stored = ReadWorkerRecord(root, workId);
+            if (stored.ExecutionAdmission != executionAdmission || stored.Job.SourceDigest != sourceDigest)
+                throw new InvalidOperationException("The admitted chapter source does not match.");
+            OriginChapterAuthoringJob completed = Completed(stored.Job, draftText, providerReceiptDigest, editorial);
+            Write(JobPath(root, stored.OwnerDigest, completed.RequestId), stored.OwnerDigest, completed, executionAdmission,
+                stored.SupersededDrafts);
+            return WorkerItem(ReadWorkerRecord(root, workId));
+        });
+    }
+
+    // Explicit editorial handoff only. Ordinary completion remains immutable;
+    // this does not reset dispatch, generate, accept a reading or alter source.
+    // The trusted worker retains the exact provider capture and, for a separate
+    // editorial stage, the original input and attributed derivative receipt.
+    internal OriginChapterWorkerItem ReviseUnacceptedForWorker(string workId, string sourceDigest,
+        string executionAdmission, string expectedProviderReceiptDigest, string expectedTextDigest,
+        string draftText, string providerReceiptDigest, OriginChapterEditorialProvenance? editorial = null)
+    {
+        RequireId(executionAdmission);
+        ValidateResult(draftText, providerReceiptDigest);
+        ValidateEditorial(editorial, draftText, providerReceiptDigest);
+        if (!IsDigest(sourceDigest) || !IsDigest(expectedProviderReceiptDigest) || !IsDigest(expectedTextDigest))
+            throw new ArgumentException("An exact previous draft is required.");
+        return Locked(root =>
+        {
+            StoredJob stored = ReadWorkerRecord(root, workId);
+            var job = stored.Job;
+            if (stored.ExecutionAdmission != executionAdmission || job.SourceDigest != sourceDigest
+                || job.State != OriginChapterAuthoringStates.ReviewRequired || job.ReaderAcceptedTextDigest is not null)
+                throw new InvalidOperationException("Only the exact unaccepted chapter may be revised.");
+            StoredDraft[] history = stored.SupersededDrafts ?? [];
+            // A lost response can read back the same revision, never append it
+            // twice or replace a newer revision with an old request.
+            if (job.DraftText == draftText && job.ProviderReceiptDigest == providerReceiptDigest && job.Editorial == editorial
+                && history.LastOrDefault() is { } prior && prior.ProviderReceiptDigest == expectedProviderReceiptDigest
+                && TextDigest(prior.Text) == expectedTextDigest)
+                return WorkerItem(stored);
+            if (job.ProviderReceiptDigest != expectedProviderReceiptDigest || TextDigest(job.DraftText!) != expectedTextDigest
+                || draftText == job.DraftText || providerReceiptDigest == job.ProviderReceiptDigest
+                || history.Length >= 3 || history.Any(d => d.ProviderReceiptDigest == providerReceiptDigest || d.Text == draftText))
+                throw new InvalidOperationException("The previous draft changed or the revision is not new.");
+            // Once prose is editorially derived, its original provider input
+            // cannot be silently cleared or relabelled on a subsequent edit.
+            if (job.Editorial is { } existingEditorial
+                ? editorial is null || editorial.OriginalTextDigest != existingEditorial.OriginalTextDigest
+                    || editorial.OriginalProviderReceiptDigest != existingEditorial.OriginalProviderReceiptDigest
+                : editorial is not null && (editorial.OriginalTextDigest != TextDigest(job.DraftText!)
+                    || editorial.OriginalProviderReceiptDigest != job.ProviderReceiptDigest))
+                throw new InvalidOperationException("The original editorial input changed.");
+            var revised = job with { DraftText = draftText, ProviderReceiptDigest = providerReceiptDigest, Editorial = editorial };
+            Write(JobPath(root, stored.OwnerDigest, job.RequestId), stored.OwnerDigest, revised, executionAdmission,
+                [..history, new(job.DraftText!, job.ProviderReceiptDigest!) { Editorial = job.Editorial }]);
+            return WorkerItem(ReadWorkerRecord(root, workId));
+        });
+    }
+
+    // Trusted worker seam, deliberately not a public HTTP endpoint. A successful
+    // fence is not credit approval. Recovery reads/reconciles the provider job;
+    // it must not call generation again when this method returns false.
+    internal bool TryFenceDispatch(string subjectId, string requestId, string sourceDigest)
+        => Locked(root =>
+        {
+            string owner = Owner(subjectId);
+            string path = JobPath(root, owner, requestId);
+            var job = Read(path, owner, requestId) ?? throw new KeyNotFoundException();
+            if (job.SourceDigest != sourceDigest) throw new InvalidOperationException("The authoring source changed.");
+            if (job.State != OriginChapterAuthoringStates.AwaitingAuthoring) return false;
+            Write(path, owner, job with { State = OriginChapterAuthoringStates.ReconciliationRequired });
+            return true;
+        });
+
+    internal OriginChapterAuthoringJob Complete(string subjectId, string requestId, string sourceDigest,
+        string draftText, string providerReceiptDigest)
+    {
+        ValidateResult(draftText, providerReceiptDigest);
+        return Locked(root =>
+        {
+            string owner = Owner(subjectId);
+            string path = JobPath(root, owner, requestId);
+            var stored = ReadStored(path, owner, requestId) ?? throw new KeyNotFoundException();
+            var job = stored.Job;
+            if (job.SourceDigest != sourceDigest) throw new InvalidOperationException("The authoring source changed.");
+            if (stored.ExecutionAdmission is not null)
+                throw new InvalidOperationException("Use the bound worker completion path for this admitted job.");
+            var result = Completed(job, draftText, providerReceiptDigest);
+            Write(path, owner, result);
+            return result;
+        });
+    }
+
+    private static void ValidateResult(string draftText, string providerReceiptDigest)
+    {
+        if (string.IsNullOrWhiteSpace(draftText) || Encoding.UTF8.GetByteCount(draftText) > MaximumDraftBytes
+            || !IsDigest(providerReceiptDigest)) throw new ArgumentException("The chapter result is invalid or oversized.");
+    }
+
+    private static void ValidateEditorial(OriginChapterEditorialProvenance? editorial, string text, string receipt)
+    {
+        if (!ValidEditorial(editorial, text, receipt))
+            throw new ArgumentException("The editorial provenance is invalid.");
+    }
+
+    private static bool ValidEditorial(OriginChapterEditorialProvenance? editorial, string? text, string? receipt)
+        => editorial is null || text is not null && IsDigest(receipt)
+            && IsDigest(editorial.OriginalTextDigest) && IsDigest(editorial.OriginalProviderReceiptDigest)
+            && editorial.OriginalTextDigest != TextDigest(text) && editorial.OriginalProviderReceiptDigest != receipt
+            && editorial.Method is "ea_ai" or "ea_ai_with_codex_edit";
+
+    private static OriginChapterAuthoringJob Completed(OriginChapterAuthoringJob job, string text, string receipt,
+        OriginChapterEditorialProvenance? editorial = null)
+    {
+        if (job.State == OriginChapterAuthoringStates.ReviewRequired)
+        {
+            if (job.DraftText != text || job.ProviderReceiptDigest != receipt || job.Editorial != editorial)
+                throw new InvalidOperationException("A retained chapter result cannot be replaced.");
+            return job;
+        }
+        if (job.State != OriginChapterAuthoringStates.ReconciliationRequired)
+            throw new InvalidOperationException("This authoring request was not dispatched.");
+        return job with { State = OriginChapterAuthoringStates.ReviewRequired, DraftText = text,
+            ProviderReceiptDigest = receipt, Editorial = editorial };
+    }
+
+    public void EnsureAccountErasureSupported()
+    {
+        if (_primary is not null)
+            throw new InvalidOperationException("Primary authoring erasure requires historical payload cleanup before activation.");
+    }
+
+    public int EraseForSubject(string subjectId)
+    {
+        EnsureAccountErasureSupported();
+        if (!IsConfigured) return 0;
+        return Locked(root =>
+        {
+            string owner = Owner(subjectId);
+            // A crash between flush and rename may leave an owned temporary
+            // source packet. Account erasure also removes these exact files.
+            string[] paths = Directory.EnumerateFiles(root, owner + ".*")
+                .Where(path =>
+                {
+                    string[] parts = Path.GetFileName(path).Split('.');
+                    return parts.Length is 3 or 4 && parts[0] == owner && IsDigest(parts[1]) && parts[2] == "json"
+                        && (parts.Length == 3 || parts[3].StartsWith("tmp-", StringComparison.Ordinal)
+                            && Guid.TryParseExact(parts[3][4..], "N", out _));
+                }).ToArray();
+            foreach (string path in paths) { RejectLink(path); File.Delete(path); }
+            return paths.Length;
+        });
+    }
+
+    private T Locked<T>(Func<string, T> operation)
+    {
+        if (!IsConfigured) throw new InvalidOperationException("Private authoring storage is not configured.");
+        lock (_gate)
+        {
+            if (_primary is not null)
+            {
+                if (_primarySession is not null) throw new InvalidOperationException("Primary authoring operations cannot be nested.");
+                using var session = _primary.OpenSession();
+                _primarySession = session;
+                try { return operation(string.Empty); }
+                finally { _primarySession = null; }
+            }
+            string root = Path.GetFullPath(Path.Combine(configuration["CHUMMER_RUNTIME_STATE_ROOT"]!, "origin-chapter-jobs"));
+            for (string? part = root; part is not null; part = Path.GetDirectoryName(part))
+                if (Directory.Exists(part) || File.Exists(part)) RejectLink(part);
+            if (OperatingSystem.IsWindows()) Directory.CreateDirectory(root);
+            else Directory.CreateDirectory(root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            string lockPath = Path.Combine(root, ".writer.lock");
+            RejectLink(lockPath);
+            using var custody = OpenPrivate(lockPath, FileMode.OpenOrCreate);
+            return operation(root);
+        }
+    }
+
+    private OriginChapterAuthoringJob? Read(string path, string owner, string requestId)
+        => ReadStored(path, owner, requestId)?.Job;
+
+    private StoredJob? ReadStored(string path, string owner, string? requestId)
+    {
+        if (_primarySession is not null)
+        {
+            byte[]? primaryBytes = _primarySession.Read(Path.GetFileNameWithoutExtension(path));
+            if (primaryBytes is null) return null;
+            try { return DecodeStored(primaryBytes, path, owner, requestId); }
+            finally { CryptographicOperations.ZeroMemory(primaryBytes); }
+        }
+        RejectLink(path);
+        if (!File.Exists(path)) return null;
+        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (file.Length > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
+        byte[] bytes = new byte[MaximumFileBytes + 1];
+        int used = 0, count;
+        while (used < bytes.Length && (count = file.Read(bytes, used, bytes.Length - used)) != 0) used += count;
+        if (used > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
+        try { return DecodeStored(bytes.AsSpan(0, used), path, owner, requestId); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
+    }
+
+    private static StoredJob DecodeStored(ReadOnlySpan<byte> bytes, string path, string owner, string? requestId)
+    {
+        var stored = JsonSerializer.Deserialize<StoredJob>(bytes, Json);
+        if (stored is null || stored.Schema != Schema || stored.OwnerDigest != owner
+            || stored.Job is not { } job || !ValidId(job.RequestId) || requestId is not null && job.RequestId != requestId
+            || stored.Digest != StoredDigest(job, stored.ExecutionAdmission, stored.SupersededDrafts)
+            || !ValidHistory(stored)
+            || Path.GetFileNameWithoutExtension(path) != WorkId(owner, job.RequestId)
+            || stored.ExecutionAdmission is not null && (!ValidId(stored.ExecutionAdmission)
+                || job.State == OriginChapterAuthoringStates.AwaitingAuthoring)
+            || job.Previous is not null && (job.Previous.RequestId == job.RequestId
+                || !ValidId(job.Previous.RequestId) || !IsDigest(job.Previous.SourceDigest)
+                || !IsDigest(job.Previous.ProviderReceiptDigest) || !IsDigest(job.Previous.TextDigest))
+            || job.SourceDigest != OriginChapterSourceIdentity.Digest(job.Source) || job.Provider != "first_book_ai"
+            || !ValidEditorial(job.Editorial, job.DraftText, job.ProviderReceiptDigest)
+            || job.ReaderAcceptedTextDigest is not null && (job.State != OriginChapterAuthoringStates.ReviewRequired
+                || job.DraftText is null || job.ReaderAcceptedTextDigest != TextDigest(job.DraftText))
+            || job.State is not (OriginChapterAuthoringStates.AwaitingAuthoring
+                or OriginChapterAuthoringStates.ReconciliationRequired or OriginChapterAuthoringStates.ReviewRequired)
+            || (job.State == OriginChapterAuthoringStates.ReviewRequired
+                ? string.IsNullOrWhiteSpace(job.DraftText) || Encoding.UTF8.GetByteCount(job.DraftText) > MaximumDraftBytes || !IsDigest(job.ProviderReceiptDigest)
+                : job.DraftText is not null || job.ProviderReceiptDigest is not null || job.Editorial is not null))
+            throw new InvalidDataException("The private authoring record is invalid.");
+        return stored;
+    }
+
+    private void Write(string path, string owner, OriginChapterAuthoringJob job, string? executionAdmission = null,
+        StoredDraft[]? history = null)
+    {
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(
+            new StoredJob(Schema, owner, job, StoredDigest(job, executionAdmission, history), executionAdmission)
+                { SupersededDrafts = history }, Json);
+        try
+        {
+            if (bytes.Length > MaximumFileBytes) throw new InvalidDataException("The private authoring record is oversized.");
+            if (_primarySession is not null)
+            {
+                _primarySession.Write(Path.GetFileNameWithoutExtension(path), bytes);
+                return;
+            }
+            string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                using (var file = OpenPrivate(temporary, FileMode.CreateNew)) { file.Write(bytes); file.Flush(true); }
+                RejectLink(path);
+                File.Move(temporary, path, overwrite: true);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
+    }
+
+    private static FileStream OpenPrivate(string path, FileMode mode)
+    {
+        var options = new FileStreamOptions { Mode = mode, Access = FileAccess.ReadWrite, Share = FileShare.None };
+        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        return new(path, options);
+    }
+
+    private static void RequireId(string? value)
+    {
+        if (!ValidId(value))
+            throw new ArgumentException("The authoring identity is invalid.");
+    }
+    private static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 256
+        && value == value.Trim() && !value.Any(char.IsControl);
+    private static bool ValidHistory(StoredJob stored)
+        => stored.SupersededDrafts is null || stored.ExecutionAdmission is not null
+            && stored.Job.State == OriginChapterAuthoringStates.ReviewRequired
+            && stored.SupersededDrafts.Length is > 0 and <= 3
+            && stored.SupersededDrafts.All(d => d is not null && !string.IsNullOrWhiteSpace(d.Text)
+                && Encoding.UTF8.GetByteCount(d.Text) <= MaximumDraftBytes && IsDigest(d.ProviderReceiptDigest)
+                && ValidEditorial(d.Editorial, d.Text, d.ProviderReceiptDigest)
+                && d.ProviderReceiptDigest != stored.Job.ProviderReceiptDigest && d.Text != stored.Job.DraftText)
+            && stored.SupersededDrafts.Select(d => d.ProviderReceiptDigest).Distinct(StringComparer.Ordinal).Count()
+                == stored.SupersededDrafts.Length;
+    private static string StoredDigest(OriginChapterAuthoringJob job, string? admission, StoredDraft[]? history = null)
+        => history is not null ? Digest(new { Job = job, ExecutionAdmission = admission, SupersededDrafts = history })
+            : admission is null ? Digest(job) : Digest(new { Job = job, ExecutionAdmission = admission });
+    private static string WorkId(string owner, string request) => owner + "." + Digest(request);
+    private StoredJob ReadWorkerRecord(string root, string workId)
+    {
+        if (workId is not { Length: 129 } || workId[64] != '.' || !IsDigest(workId[..64]) || !IsDigest(workId[65..]))
+            throw new ArgumentException("The worker identity is invalid.");
+        return ReadStored(Path.Combine(root, workId + ".json"), workId[..64], null) ?? throw new KeyNotFoundException();
+    }
+    private static OriginChapterWorkerItem WorkerItem(StoredJob stored)
+        => new(WorkId(stored.OwnerDigest, stored.Job.RequestId), stored.Job, stored.ExecutionAdmission,
+            Digest(new { Scope = "origin-reader-book/v1", stored.OwnerDigest,
+                stored.Job.Source.WorkspaceId, stored.Job.Source.Locale }))
+        { PreviousWorkId = stored.Job.Previous is { } previous ? WorkId(stored.OwnerDigest, previous.RequestId) : null };
+    private static string Owner(string subject) { RequireId(subject); return Digest(subject); }
+    private static string JobPath(string root, string owner, string request) { RequireId(request); return Path.Combine(root, owner + "." + Digest(request) + ".json"); }
+    private static string Digest<T>(T value) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, Json))).ToLowerInvariant();
+    private static string TextDigest(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+    private static bool IsDigest(string? value) => value is { Length: 64 } && value.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+    private static void RejectLink(string path)
+    {
+        if (new FileInfo(path).LinkTarget is not null || new DirectoryInfo(path).LinkTarget is not null)
+            throw new IOException("Linked private authoring storage is not allowed.");
+    }
+}
+
+// Private worker API DTOs, not public package contracts or provider account data.
+public sealed record OriginChapterWorkerItem(string WorkId, OriginChapterAuthoringJob Job, string? ExecutionAdmission,
+    string BookRef)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? PreviousWorkId { get; init; }
+}
+public sealed record OriginChapterWorkerAdmission(OriginChapterWorkerItem Work, bool MayStartGeneration);

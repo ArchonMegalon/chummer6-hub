@@ -68,6 +68,34 @@ def test_build_receipt_keeps_operator_state_but_fails_on_missing_components(monk
     assert receipt["secret_leak_detected"] is False
 
 
+def test_missing_noncritical_audiobook_probe_does_not_fail_structure(monkeypatch) -> None:
+    module = _load(MATERIALIZE, "materialize_ea_operator_readiness_no_audiobook")
+    payload = {
+        "observed_at": "2026-08-27T08:00:00Z",
+        "probe_ok": True,
+        "ready": True,
+        "status": "ready",
+        "source": "/docker/EA/scripts/ea_live_ops.py",
+        "components": [
+            {"key": key, "probe_ok": True, "ready": True, "status": "ready"}
+            for key in module.REQUIRED_COMPONENT_KEYS
+        ],
+    }
+    monkeypatch.setattr(
+        module,
+        "_run_probe",
+        lambda timeout_seconds: (0, payload, json.dumps(payload), ""),
+    )
+
+    receipt = module.build_receipt(timeout_seconds=5.0)
+
+    assert "mymedia_alexa" not in module.REQUIRED_COMPONENT_KEYS
+    assert "mymedia_alexa" not in receipt["component_keys"]
+    assert receipt["missing_component_keys"] == []
+    assert receipt["structural_status"] == "pass"
+    assert receipt["status"] == "pass"
+
+
 def test_build_receipt_treats_presence_flags_as_secret_safe(monkeypatch) -> None:
     module = _load(MATERIALIZE, "materialize_ea_operator_readiness_presence")
     payload = {

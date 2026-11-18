@@ -580,7 +580,7 @@ public sealed class TeableUserProjectionService : IHubUserProjectionSyncQueue
     {
         string defaultWhatsappAiSupportPurpose = ResolveWhatsappAiSupportPurpose();
         string defaultWhatsappAiSupportOpeningPrompt = ResolveWhatsappAiSupportOpeningPrompt();
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.UsersById.Values
                 .OrderBy(static item => item.DisplayName, StringComparer.OrdinalIgnoreCase)

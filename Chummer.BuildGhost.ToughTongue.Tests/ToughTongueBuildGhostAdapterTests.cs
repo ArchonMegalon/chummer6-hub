@@ -14,7 +14,25 @@ public sealed class ToughTongueBuildGhostAdapterTests
     private const string AccountOne = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
     private const string AccountTwo = "sha256:2222222222222222222222222222222222222222222222222222222222222222";
     private const string AccountThree = "sha256:3333333333333333333333333333333333333333333333333333333333333333";
+    private const string AccountFour = "sha256:4444444444444444444444444444444444444444444444444444444444444444";
     private const string VoiceReleaseDigest = "sha256:05ed9fff46ddb5a447e1d21cfd0f71cfb2a9286460fd112bb7514eb3eaa57e26";
+    private const string CartesiaVoiceId = "f161df88-b5a0-4ea8-aa21-6be12859f761";
+    private const string OtherCartesiaVoiceId = "86c6b891-3195-4e85-8be9-74f889d80620";
+    private const string ProviderResponseDigest = "sha256:4e6db0b62942d0ca42575d86ac47599458190e29210e86cb503635e1f86204df";
+    private const string CustomFunctionId = "custom-function-rook-private-v1";
+    private const string CustomFunctionAccountRef = "sha256:689642aa853d240436dd28773f760a289be65a9ecf36783aae1ffe1934b74b15";
+    private const string StockAvatarId = "11111111-2222-4333-8444-555555555555";
+    private const string StockScenarioRef = "private-stock-scenario-ref";
+    private static readonly string OperatorContractDirectory = Path.Combine(
+        Path.GetTempPath(),
+        $"chummer-stock-avatar-contract-tests-{Environment.ProcessId}");
+    private static readonly object OperatorContractLock = new();
+
+    [ClassCleanup]
+    public static void CleanupOperatorContracts()
+    {
+        if (Directory.Exists(OperatorContractDirectory)) Directory.Delete(OperatorContractDirectory, recursive: true);
+    }
 
     [TestMethod]
     public async Task Remote_execution_is_disabled_by_default_and_returns_audited_deterministic_fallback()
@@ -47,7 +65,124 @@ public sealed class ToughTongueBuildGhostAdapterTests
             new[] { AccountOne, AccountTwo, AccountThree },
             new[] { first.Receipt.AccountSlotId, second.Receipt.AccountSlotId, third.Receipt.AccountSlotId });
         Assert.IsFalse(JsonSerializer.Serialize(new[] { first.Receipt, second.Receipt, third.Receipt }).Contains("secret-", StringComparison.Ordinal));
+        Assert.IsTrue(new[] { first, second, third }.All(static result => result.Receipt.AccountSelectionPosture == "round-robin"));
         Assert.IsTrue(new[] { first, second, third }.All(static result => !result.UsedDeterministicFallback));
+    }
+
+    [TestMethod]
+    public async Task Exact_preferred_account_pin_selects_one_aligned_governed_slot()
+    {
+        Dictionary<string, string?> values = WithSlotConfiguration(
+            "secret-one;secret-two;secret-three;secret-four",
+            $"{AccountOne};{AccountTwo};{AccountThree};{AccountFour}");
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountFour;
+        FakeTransport transport = new(request => Success(request));
+        ToughTongueBuildGhostAdapter adapter = CreateAdapter(values, transport);
+
+        ToughTongueBuildGhostResult result = await adapter.ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "secret-four" }, transport.Credentials.ToArray());
+        Assert.AreEqual(AccountFour, result.Receipt.AccountSlotId);
+        Assert.AreEqual("exact-pin", result.Receipt.AccountSelectionPosture);
+        string serialized = JsonSerializer.Serialize(result.Receipt);
+        Assert.IsFalse(serialized.Contains("secret-four", StringComparison.Ordinal));
+        Assert.IsFalse(serialized.Contains("@", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task Preferred_account_pin_rejects_email_ordinal_credential_and_malformed_values()
+    {
+        string[] invalidSelectors =
+        [
+            "private-account@example.test",
+            "team-slot-2",
+            "secret-two",
+            $"sha256:{new string('A', 64)}",
+            $"sha256:{new string('a', 63)}"
+        ];
+        foreach (string selector in invalidSelectors)
+        {
+            Dictionary<string, string?> values = RemoteConfiguration();
+            values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = selector;
+            FakeTransport transport = new(request => Success(request));
+            ToughTongueBuildGhostAdapter adapter = CreateAdapter(values, transport);
+
+            ToughTongueBuildGhostResult result = await adapter.ExplainAsync(CreateRequest(), CancellationToken.None);
+
+            Assert.AreEqual("preferred-account-ref-invalid", result.OutcomeStatus);
+            Assert.AreEqual("exact-pin-invalid", result.Receipt.AccountSelectionPosture);
+            Assert.IsFalse(result.Receipt.RemoteAttempted);
+            Assert.IsEmpty(transport.Credentials);
+            Assert.IsFalse(JsonSerializer.Serialize(result.Receipt).Contains(selector, StringComparison.Ordinal));
+        }
+    }
+
+    [TestMethod]
+    public async Task Preferred_account_pin_rejects_zero_and_duplicate_matches()
+    {
+        Dictionary<string, string?> unmatchedValues = RemoteConfiguration();
+        unmatchedValues["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountFour;
+        FakeTransport unmatchedTransport = new(request => Success(request));
+        ToughTongueBuildGhostResult unmatched = await CreateAdapter(unmatchedValues, unmatchedTransport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.AreEqual("preferred-account-ref-unmatched", unmatched.OutcomeStatus);
+        Assert.AreEqual("exact-pin-unmatched", unmatched.Receipt.AccountSelectionPosture);
+        Assert.IsEmpty(unmatchedTransport.Credentials);
+
+        Dictionary<string, string?> ambiguousValues = WithSlotConfiguration(
+            "secret-one;secret-two;secret-three",
+            $"{AccountOne};{AccountTwo};{AccountTwo}");
+        ambiguousValues["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountTwo;
+        FakeTransport ambiguousTransport = new(request => Success(request));
+        ToughTongueBuildGhostResult ambiguous = await CreateAdapter(ambiguousValues, ambiguousTransport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.AreEqual("preferred-account-ref-ambiguous", ambiguous.OutcomeStatus);
+        Assert.AreEqual("exact-pin-ambiguous", ambiguous.Receipt.AccountSelectionPosture);
+        Assert.IsEmpty(ambiguousTransport.Credentials);
+    }
+
+    [TestMethod]
+    public async Task Remote_disabled_keeps_exact_pin_from_calling_provider_transport()
+    {
+        Dictionary<string, string?> values = RemoteConfiguration();
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED"] = "false";
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountTwo;
+        FakeTransport transport = new(request => Success(request));
+
+        ToughTongueBuildGhostResult result = await CreateAdapter(values, transport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.AreEqual("remote-disabled", result.OutcomeStatus);
+        Assert.AreEqual("exact-pin", result.Receipt.AccountSelectionPosture);
+        Assert.IsFalse(result.Receipt.RemoteAttempted);
+        Assert.IsEmpty(transport.Credentials);
+    }
+
+    [TestMethod]
+    public async Task Unhealthy_exact_pin_fails_closed_without_falling_back_to_other_slots()
+    {
+        Dictionary<string, string?> values = RemoteConfiguration();
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF"] = AccountTwo;
+        values["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_DAILY_QUOTA_PER_SLOT"] = "1";
+        FakeTransport transport = new(request => Success(request));
+        ToughTongueBuildGhostAdapter adapter = CreateAdapter(values, transport);
+
+        ToughTongueBuildGhostResult first = await adapter.ExplainAsync(
+            CreateRequest("preferred-first", "preferred-idem-first"),
+            CancellationToken.None);
+        ToughTongueBuildGhostResult blocked = await adapter.ExplainAsync(
+            CreateRequest("preferred-blocked", "preferred-idem-blocked"),
+            CancellationToken.None);
+
+        Assert.IsFalse(first.UsedDeterministicFallback);
+        Assert.AreEqual("preferred-account-slot-unhealthy", blocked.OutcomeStatus);
+        Assert.AreEqual(AccountTwo, blocked.Receipt.AccountSlotId);
+        Assert.AreEqual("exact-pin", blocked.Receipt.AccountSelectionPosture);
+        Assert.AreEqual("quota-exhausted", blocked.Receipt.CircuitPosture);
+        Assert.IsFalse(blocked.Receipt.RemoteAttempted);
+        CollectionAssert.AreEqual(new[] { "secret-two" }, transport.Credentials.ToArray());
     }
 
     [TestMethod]
@@ -83,12 +218,13 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
-    public async Task Remote_execution_requires_exactly_three_distinct_credentials_and_opaque_account_refs()
+    public async Task Remote_execution_requires_aligned_bounded_distinct_credentials_and_opaque_account_refs()
     {
         Dictionary<string, string?>[] invalidConfigurations =
         [
+            WithSlotConfiguration("", ""),
             WithSlotConfiguration("secret-one;secret-two", $"{AccountOne};{AccountTwo}"),
-            WithSlotConfiguration("secret-one;secret-two;secret-three;secret-four", $"{AccountOne};{AccountTwo};{AccountThree};sha256:{new string('4', 64)}"),
+            WithSlotConfiguration("secret-one;secret-two", $"{AccountOne};{AccountTwo};{AccountThree}"),
             WithSlotConfiguration("secret-one;secret-one;secret-three", $"{AccountOne};{AccountTwo};{AccountThree}"),
             WithSlotConfiguration("secret-one;secret-two;secret-three", "account-one;account-two;account-three"),
             WithSlotConfiguration("secret-one;secret-two;secret-three", $"{AccountOne};{AccountOne};{AccountThree}")
@@ -107,7 +243,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             Assert.AreEqual(0, result.Receipt.HealthySlotCount);
             CollectionAssert.Contains(
                 result.Receipt.ValidationReasons.ToArray(),
-                "exactly-three-distinct-credentials-and-opaque-account-refs-required");
+                "three-to-thirty-two-aligned-distinct-credentials-and-opaque-account-refs-required");
             Assert.IsEmpty(transport.Credentials);
         }
     }
@@ -201,6 +337,90 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
+    public async Task Provider_answer_with_unknown_json_member_fails_closed()
+    {
+        FakeTransport transport = new(request =>
+        {
+            JsonObject answer = JsonSerializer.SerializeToNode(CreateAnswer(request))!.AsObject();
+            answer["UnreviewedInstruction"] = "apply the character directly";
+            return new ToughTongueBuildGhostTransportResult(true, "ok", answer.ToJsonString());
+        });
+
+        ToughTongueBuildGhostResult result = await CreateAdapter(RemoteConfiguration(), transport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.IsTrue(result.UsedDeterministicFallback);
+        Assert.AreEqual("provider-answer-rejected", result.OutcomeStatus);
+        CollectionAssert.Contains(result.Receipt.ValidationReasons.ToArray(), "provider-answer-invalid-json");
+    }
+
+    [TestMethod]
+    public async Task Provider_answer_requires_every_reference_collection_and_at_least_one_grounding_reference()
+    {
+        FakeTransport missingCollectionTransport = new(request =>
+        {
+            JsonObject answer = JsonSerializer.SerializeToNode(CreateAnswer(request))!.AsObject();
+            answer.Remove(nameof(ToughTongueBuildGhostProviderAnswer.ReferencedSourceAnchorIds));
+            return new ToughTongueBuildGhostTransportResult(true, "ok", answer.ToJsonString());
+        });
+        ToughTongueBuildGhostResult missingCollection = await CreateAdapter(
+                RemoteConfiguration(),
+                missingCollectionTransport)
+            .ExplainAsync(CreateRequest("request-missing-collection", "idem-missing-collection"), CancellationToken.None);
+
+        Assert.AreEqual("provider-answer-rejected", missingCollection.OutcomeStatus);
+        CollectionAssert.Contains(
+            missingCollection.Receipt.ValidationReasons.ToArray(),
+            "provider-source-anchor-references-missing");
+
+        FakeTransport ungroundedTransport = new(request =>
+        {
+            ToughTongueBuildGhostProviderAnswer answer = CreateAnswer(request) with
+            {
+                ReferencedFactIds = [],
+                ReferencedStrategyIds = [],
+                ReferencedRuleExplanationIds = [],
+                ReferencedVariantIds = [],
+                ReferencedMemberRefs = [],
+                ReferencedSourceAnchorIds = []
+            };
+            return new ToughTongueBuildGhostTransportResult(true, "ok", JsonSerializer.Serialize(answer));
+        });
+        ToughTongueBuildGhostResult ungrounded = await CreateAdapter(RemoteConfiguration(), ungroundedTransport)
+            .ExplainAsync(CreateRequest("request-ungrounded", "idem-ungrounded"), CancellationToken.None);
+
+        Assert.AreEqual("provider-answer-rejected", ungrounded.OutcomeStatus);
+        CollectionAssert.Contains(
+            ungrounded.Receipt.ValidationReasons.ToArray(),
+            "provider-grounding-reference-missing");
+    }
+
+    [TestMethod]
+    public async Task Provider_answer_rejects_blank_and_duplicate_authority_references()
+    {
+        FakeTransport transport = new(request =>
+        {
+            ToughTongueBuildGhostProviderAnswer answer = CreateAnswer(request) with
+            {
+                ReferencedFactIds = ["fact:matrix", "fact:matrix"],
+                ReferencedSourceAnchorIds = [" "]
+            };
+            return new ToughTongueBuildGhostTransportResult(true, "ok", JsonSerializer.Serialize(answer));
+        });
+
+        ToughTongueBuildGhostResult result = await CreateAdapter(RemoteConfiguration(), transport)
+            .ExplainAsync(CreateRequest(), CancellationToken.None);
+
+        Assert.AreEqual("provider-answer-rejected", result.OutcomeStatus);
+        CollectionAssert.Contains(
+            result.Receipt.ValidationReasons.ToArray(),
+            "provider-fact-reference-duplicate:fact:matrix");
+        CollectionAssert.Contains(
+            result.Receipt.ValidationReasons.ToArray(),
+            "provider-source-anchor-reference-invalid");
+    }
+
+    [TestMethod]
     public async Task Provider_cannot_reference_group_members_without_authorized_visible_scope()
     {
         FakeTransport transport = new(request => Success(request));
@@ -265,17 +485,29 @@ public sealed class ToughTongueBuildGhostAdapterTests
     {
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
-            new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            RuntimeBinding());
+            StockAvatarBinding(),
+            RuntimeBinding(),
+            ScenarioSchemaReceipt(),
+            CustomFunctionBinding());
 
         Assert.AreEqual(ToughTongueBuildGhostContractVersions.ScenarioContractV1, candidate.Schema);
         Assert.IsFalse(candidate.Payload["is_public"]!.GetValue<bool>());
         Assert.IsFalse(candidate.Payload["is_recording"]!.GetValue<bool>());
         Assert.AreEqual("never", candidate.Payload["analysis_access"]!.GetValue<string>());
         Assert.IsFalse(candidate.Payload["memory"]!["is_memory"]!.GetValue<bool>());
+        JsonObject sessionAnalysis = candidate.Payload["session_analysis"]!.AsObject();
+        Assert.IsTrue(new[] { "is_auto_analysis", "is_auto_submit", "email_analysis", "email_transcript", "multimodal_analysis", "enable_extraction" }
+            .All(field => sessionAnalysis[field]!.GetValue<bool>() == false));
         Assert.AreEqual("Landmass", candidate.Payload["ai_model_config"]!["provider"]!.GetValue<string>());
-        Assert.AreEqual("cascade", candidate.Payload["ai_model_config"]!["model"]!.GetValue<string>());
-        Assert.AreEqual("private-provider-rook-voice-ref", candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
+        Assert.AreEqual("gemini", candidate.Payload["ai_model_config"]!["model"]!.GetValue<string>());
+        Assert.AreEqual(CartesiaVoiceId, candidate.Payload["appearance"]!["voice"]!.GetValue<string>());
+        Assert.AreEqual("Cartesia", candidate.Payload["tts_provider"]!.GetValue<string>());
+        Assert.AreEqual(CartesiaVoiceId, candidate.Payload["tts_voice_id"]!.GetValue<string>());
+        Assert.AreEqual(BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsProviderFieldPath, candidate.TtsProviderFieldPath);
+        Assert.AreEqual(BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsVoiceIdFieldPath, candidate.TtsVoiceIdFieldPath);
+        Assert.IsTrue(candidate.ProviderSchemaReadVerified);
+        Assert.IsTrue(candidate.CustomFunctionBindingReadVerified);
+        Assert.IsEmpty(candidate.BlockingReasons);
         CollectionAssert.AreEqual(
             new[] { "de-DE", "en-US", "fr-FR", "ja-JP", "pt-BR", "zh-CN" },
             candidate.SupportedLocales.ToArray());
@@ -286,9 +518,14 @@ public sealed class ToughTongueBuildGhostAdapterTests
         StringAssert.Contains(candidate.Tool.BodySchemaJson, "group-gaps");
         StringAssert.StartsWith(candidate.Tool.ContractDigest, "sha256:");
         StringAssert.StartsWith(candidate.ContractDigest, "sha256:");
+        Assert.AreEqual(CustomFunctionId, candidate.Payload["custom_function_ids"]![0]!.GetValue<string>());
+        Assert.IsNull(candidate.Payload["tools_config"]!["tools"]!["custom_function"]);
+        Assert.AreEqual(CustomFunctionBinding().ContractDigest, candidate.Payload["user_metadata"]!["custom_function_binding_digest"]!.GetValue<string>());
         StringAssert.Contains(candidate.Payload["ai_instructions"]!.GetValue<string>(), "never speak");
         Assert.AreEqual(ToolDeployment().ContractDigest, candidate.Payload["user_metadata"]!["tool_deployment_digest"]!.GetValue<string>());
         Assert.AreEqual(RuntimeBinding().ContractDigest, candidate.Payload["user_metadata"]!["runtime_binding_digest"]!.GetValue<string>());
+        Assert.AreEqual("Cartesia", candidate.Payload["user_metadata"]!["tts_provider"]!.GetValue<string>());
+        Assert.AreEqual("cartesia", candidate.Payload["user_metadata"]!["provider_namespace"]!.GetValue<string>());
     }
 
     [TestMethod]
@@ -312,6 +549,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         {
             [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = package.Tool.Endpoint.AbsoluteUri,
             [BuildGhostPrivateToolDeploymentContract.AudienceConfigurationKey] = package.AuthenticationAudience,
+            [BuildGhostPrivateToolDeploymentContract.TransportModeConfigurationKey] = BuildGhostPrivateToolDeploymentContract.LegacyBearerV1TransportMode,
             [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "true"
         }).Build();
         BuildGhostPrivateToolDeploymentValidation blocked = BuildGhostPrivateToolDeploymentContract.FromConfiguration(enabled);
@@ -320,33 +558,107 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
-    public void Cascade_private_voice_binding_rejects_unverified_or_nonopaque_authority()
+    public void Provider_body_key_v2_deployment_is_explicit_provider_scoped_and_fails_closed_on_mode_drift()
+    {
+        BuildGhostPrivateToolDeploymentPackage package = ProviderToolDeployment();
+
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.PrivateToolDeploymentV2, package.Schema);
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.PrivateToolContractV2, package.Tool.Schema);
+        Assert.AreEqual(BuildGhostPrivateToolDeploymentContract.ProviderBodyKeyAuthenticationScheme, package.AuthenticationScheme);
+        Assert.IsFalse(package.ProviderNeutral);
+        Assert.IsFalse(package.RemoteExecutionEnabled);
+        Assert.AreEqual("https://canary.chummer.run/api/v2/ai/build-ghost/tool", package.Tool.Endpoint.AbsoluteUri);
+        Assert.AreEqual("sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104", package.Tool.ContractDigest);
+        Assert.AreEqual("sha256:50707c6ba39796bad7bb1d924dfc1ab2d626b48232561c5ec98a0e72a22827a5", package.ContractDigest);
+        CollectionAssert.AreEqual(
+            new[] { "Cache-Control", "X-Chummer-Build-Ghost-Tool-Contract" },
+            package.Tool.RequiredHeaderNames.ToArray());
+        Assert.IsFalse(package.Tool.RequiredHeaderNames.Contains("Authorization", StringComparer.Ordinal));
+        Assert.IsEmpty(BuildGhostPrivateToolDeploymentContract.ValidateProviderBodyCredentialDeployment(package));
+        StringAssert.StartsWith(BuildGhostPrivateToolDeploymentContract.BodyCredentialEvidenceDigest(package), "sha256:");
+
+        IConfiguration missingMode = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = package.Tool.Endpoint.AbsoluteUri,
+            [BuildGhostPrivateToolDeploymentContract.AudienceConfigurationKey] = package.AuthenticationAudience,
+            [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "false"
+        }).Build();
+        CollectionAssert.Contains(
+            BuildGhostPrivateToolDeploymentContract.FromConfiguration(missingMode).RejectionReasons.ToArray(),
+            "private-tool-transport-mode-missing-or-invalid");
+
+        IConfiguration crossedMode = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostPrivateToolDeploymentContract.EndpointConfigurationKey] = "https://canary.chummer.run/api/v1/ai/build-ghost/tool",
+            [BuildGhostPrivateToolDeploymentContract.AudienceConfigurationKey] = package.AuthenticationAudience,
+            [BuildGhostPrivateToolDeploymentContract.TransportModeConfigurationKey] = BuildGhostPrivateToolDeploymentContract.ProviderBodyKeyV2TransportMode,
+            [BuildGhostPrivateToolDeploymentContract.RemoteExecutionConfigurationKey] = "false"
+        }).Build();
+        Assert.IsFalse(BuildGhostPrivateToolDeploymentContract.FromConfiguration(crossedMode).Accepted);
+    }
+
+    [TestMethod]
+    public void Cascade_private_voice_binding_requires_an_exact_private_owned_Cartesia_read_receipt()
     {
         BuildGhostCascadePrivateVoiceBinding binding = RuntimeBinding();
         Assert.AreEqual("Landmass", binding.ModelProvider);
         Assert.AreEqual("cascade", binding.ModelId);
-        Assert.IsTrue(binding.Private);
-        Assert.IsTrue(binding.SyntheticOrigin);
-        Assert.IsTrue(binding.ReadVerified);
+        Assert.AreEqual("Cartesia", binding.TtsProvider);
+        Assert.AreEqual("cartesia", binding.ProviderNamespace);
+        Assert.AreEqual(CartesiaVoiceId, binding.ProviderVoiceRef);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.RookVoice, binding.VoiceAlias);
+        Assert.AreEqual(VoiceReleaseDigest, binding.VoiceReleaseDigest);
+        StringAssert.StartsWith(binding.VoiceReadReceiptDigest, "sha256:");
         StringAssert.StartsWith(binding.ContractDigest, "sha256:");
+        string serialized = JsonSerializer.Serialize(binding);
+        Assert.IsFalse(serialized.Contains("\"Private\":", StringComparison.Ordinal));
+        Assert.IsFalse(serialized.Contains("ReadVerified", StringComparison.Ordinal));
 
-        Assert.ThrowsExactly<ArgumentException>(() => BuildGhostCascadePrivateVoiceBindingContract.Create(
-            "https://provider.invalid/voice",
-            VoiceReleaseDigest,
-            ToughTongueBuildGhostScenarioContract.CanonicalLocales));
-        Assert.ThrowsExactly<ArgumentException>(() => BuildGhostCascadePrivateVoiceBindingContract.Create(
-            "private-provider-rook-voice-ref",
-            "sha256:not-a-release-digest",
-            ToughTongueBuildGhostScenarioContract.CanonicalLocales));
+    }
+
+    [TestMethod]
+    public void Cartesia_voice_binding_rejects_Unmixr_cross_wires_and_sha256_voice_refs()
+    {
+        BuildGhostCartesiaPrivateVoiceReadReceipt receipt = VoiceReadReceipt();
+        AssertVoiceReceiptRejected(receipt with { ProviderNamespace = "unmixr" }, "cartesia-provider-namespace-invalid");
+        AssertVoiceReceiptRejected(
+            receipt with
+            {
+                RequestedVoiceId = $"sha256:{new string('a', 64)}",
+                ReturnedVoiceId = $"sha256:{new string('a', 64)}"
+            },
+            "cartesia-voice-id-invalid");
+
+        BuildGhostCascadePrivateVoiceBinding binding = RuntimeBinding();
+        CollectionAssert.Contains(
+            BuildGhostCascadePrivateVoiceBindingContract.Validate(binding with { TtsProvider = "Unmixr" }).ToArray(),
+            "voice-binding-tts-provider-invalid");
+        CollectionAssert.Contains(
+            BuildGhostCascadePrivateVoiceBindingContract.Validate(binding with { ProviderNamespace = "unmixr" }).ToArray(),
+            "voice-binding-provider-namespace-invalid");
+    }
+
+    [TestMethod]
+    public void Cartesia_voice_binding_rejects_mismatch_nonowner_nonprivate_and_unverified_provenance()
+    {
+        BuildGhostCartesiaPrivateVoiceReadReceipt receipt = VoiceReadReceipt();
+        AssertVoiceReceiptRejected(receipt with { ReturnedVoiceId = OtherCartesiaVoiceId }, "cartesia-voice-id-read-mismatch");
+        AssertVoiceReceiptRejected(receipt with { IsOwner = false }, "cartesia-voice-owner-invalid");
+        AssertVoiceReceiptRejected(receipt with { Access = "public" }, "cartesia-voice-access-not-private");
+        AssertVoiceReceiptRejected(receipt with { Visibility = "shared" }, "cartesia-voice-visibility-not-owner");
+        AssertVoiceReceiptRejected(receipt with { SyntheticProvenance = "caller-asserted-synthetic" }, "cartesia-voice-synthetic-provenance-invalid");
+        AssertVoiceReceiptRejected(receipt with { SourceVoiceReleaseDigest = "sha256:not-a-release-digest" }, "cartesia-voice-source-release-digest-invalid");
+        AssertVoiceReceiptRejected(receipt with { ReadHttpStatus = 201 }, "cartesia-voice-read-http-status-invalid");
     }
 
     [TestMethod]
     public void Scenario_validation_rejects_Cascade_or_private_voice_binding_drift()
     {
         ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
-        JsonObject drifted = (JsonObject)candidate.Payload.DeepClone();
-        drifted["id"] = "0123456789abcdef01234567";
+        JsonObject drifted = ProviderScenario(candidate);
         drifted["ai_model_config"]!["model"] = "other-model";
+        drifted["ai_model_config"]!["tts_provider"] = "Unmixr";
+        drifted["ai_model_config"]!["tts_voice_id"] = OtherCartesiaVoiceId;
         drifted["user_metadata"]!["runtime_binding_digest"] = $"sha256:{new string('0', 64)}";
         drifted["user_metadata"]!["voice_release_digest"] = $"sha256:{new string('1', 64)}";
 
@@ -354,25 +666,69 @@ public sealed class ToughTongueBuildGhostAdapterTests
 
         Assert.IsFalse(validation.Accepted);
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-model-invalid");
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-tts-provider-mismatch");
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-tts-voice-id-mismatch");
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "runtime-binding-digest-mismatch");
         CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "voice-release-digest-mismatch");
     }
 
     [TestMethod]
-    public async Task Documented_scenario_create_and_read_contract_use_only_the_official_private_API_boundary()
+    public void Scenario_readback_rejects_every_privacy_and_custom_tool_binding_drift()
     {
-        ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
-            ToolDeployment(),
-            new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            RuntimeBinding());
-        JsonObject providerScenario = (JsonObject)candidate.Payload.DeepClone();
-        providerScenario["id"] = "0123456789abcdef01234567";
-        RecordingHttpHandler handler = new(
-            JsonResponse(providerScenario),
-            JsonResponse(providerScenario));
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        JsonObject drifted = ProviderScenario(candidate);
+        drifted["is_public"] = true;
+        drifted["is_recording"] = true;
+        drifted["analysis_access"] = "provider";
+        drifted["memory"]!["is_memory"] = true;
+        JsonObject sessionAnalysis = drifted["session_analysis"]!.AsObject();
+        foreach (string field in new[] { "is_auto_analysis", "is_auto_submit", "email_analysis", "email_transcript", "multimodal_analysis", "enable_extraction" })
+        {
+            sessionAnalysis[field] = true;
+        }
+        drifted["custom_function_ids"]![0] = "attacker-function";
+        drifted["user_metadata"]!["tool_deployment_digest"] = $"sha256:{new string('0', 64)}";
+        drifted["user_metadata"]!["tool_contract_digest"] = $"sha256:{new string('1', 64)}";
+        drifted["user_metadata"]!["tool_endpoint"] = "https://attacker.invalid/tool";
+        drifted["user_metadata"]!["tool_authentication_audience"] = "other-audience";
+
+        ToughTongueBuildGhostScenarioValidation validation =
+            ToughTongueBuildGhostScenarioContract.Validate(drifted, candidate);
+
+        Assert.IsFalse(validation.Accepted);
+        string[] reasons = validation.RejectionReasons.ToArray();
+        foreach (string expected in new[]
+        {
+            "scenario-must-be-private",
+            "scenario-recording-must-be-disabled",
+            "scenario-analysis-access-invalid",
+            "scenario-memory-must-be-disabled",
+            "scenario-auto-analysis-must-be-disabled",
+            "scenario-auto-submit-must-be-disabled",
+            "scenario-email-analysis-must-be-disabled",
+            "scenario-email-transcript-must-be-disabled",
+            "scenario-multimodal-analysis-must-be-disabled",
+            "scenario-extraction-must-be-disabled",
+            "custom-function-scenario-attachment-mismatch",
+            "tool-deployment-digest-mismatch",
+            "tool-contract-digest-mismatch",
+            "tool-endpoint-mismatch",
+            "tool-authentication-audience-mismatch"
+        })
+        {
+            CollectionAssert.Contains(reasons, expected);
+        }
+    }
+
+    [TestMethod]
+    public async Task Scenario_payload_serializes_exact_attachment_readback_is_valid_and_mutation_stays_blocked()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        JsonObject providerScenario = ProviderScenario(candidate);
+        RecordingHttpHandler handler = new(JsonResponse(providerScenario));
         HttpClient client = new(handler)
         {
-            BaseAddress = new Uri("https://app.toughtongueai.com/api/public/")
+            BaseAddress = new Uri("https://api.toughtongueai.com/api/public/")
         };
         ToughTongueBuildGhostScenarioClient scenarios = new(
             client,
@@ -382,23 +738,27 @@ public sealed class ToughTongueBuildGhostAdapterTests
         (ToughTongueBuildGhostScenarioValidation created, string? scenarioId) =
             await scenarios.CreatePrivateCandidateAsync(candidate, "fresh-test-token", CancellationToken.None);
         ToughTongueBuildGhostScenarioValidation verified = await scenarios.VerifyPrivateScenarioAsync(
-            scenarioId!,
+            "0123456789abcdef01234567",
             candidate,
             "fresh-test-token",
             CancellationToken.None);
 
-        Assert.IsTrue(created.Accepted, string.Join(',', created.RejectionReasons));
+        Assert.IsFalse(created.Accepted);
+        CollectionAssert.Contains(created.RejectionReasons.ToArray(), BuildGhostToughTongueCustomFunctionContract.ScenarioMutationPublicApiBlocker);
         Assert.IsTrue(verified.Accepted, string.Join(',', verified.RejectionReasons));
-        Assert.AreEqual("0123456789abcdef01234567", scenarioId);
-        Assert.HasCount(2, handler.Requests);
-        Assert.AreEqual(HttpMethod.Post, handler.Requests[0].Method);
-        Assert.AreEqual("https://app.toughtongueai.com/api/public/scenarios", handler.Requests[0].Uri.AbsoluteUri);
-        Assert.AreEqual(HttpMethod.Get, handler.Requests[1].Method);
-        Assert.AreEqual("https://app.toughtongueai.com/api/public/scenarios/0123456789abcdef01234567", handler.Requests[1].Uri.AbsoluteUri);
+        Assert.IsNull(scenarioId);
+        Assert.HasCount(1, handler.Requests);
+        Assert.AreEqual(HttpMethod.Get, handler.Requests[0].Method);
+        Assert.AreEqual("https://api.toughtongueai.com/api/public/scenarios/0123456789abcdef01234567", handler.Requests[0].Uri.AbsoluteUri);
         Assert.IsTrue(handler.Requests.All(static request => request.HasBearerCredential));
-        JsonObject posted = JsonNode.Parse(handler.Requests[0].Body!)!.AsObject();
+        JsonObject posted = ToughTongueBuildGhostScenarioContract.SerializeCreatePayload(candidate);
         Assert.IsFalse(posted["is_public"]!.GetValue<bool>());
+        Assert.AreEqual("Cartesia", posted["tts_provider"]!.GetValue<string>());
+        Assert.AreEqual(CartesiaVoiceId, posted["tts_voice_id"]!.GetValue<string>());
+        Assert.IsNull(posted["ai_model_config"]!["tts_provider"]);
+        Assert.IsNull(posted["ai_model_config"]!["tts_voice_id"]);
         Assert.AreEqual(candidate.ContractDigest, posted["user_metadata"]!["scenario_contract_digest"]!.GetValue<string>());
+        CollectionAssert.AreEqual(new[] { CustomFunctionId }, posted["custom_function_ids"]!.AsArray().Select(static value => value!.GetValue<string>()).ToArray());
     }
 
     [TestMethod]
@@ -411,7 +771,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
             ["expires_at"] = clock.UtcNow.AddHours(1).ToString("O")
         }));
         ToughTongueBuildGhostScenarioClient scenarios = new(
-            new HttpClient(handler) { BaseAddress = new Uri("https://app.toughtongueai.com/api/public/") },
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
             clock,
             ScenarioConfiguration(mutationsEnabled: true));
 
@@ -421,13 +781,13 @@ public sealed class ToughTongueBuildGhostAdapterTests
             CancellationToken.None);
 
         Assert.AreEqual(clock.UtcNow.AddHours(1), grant.ExpiresAtUtc);
-        Assert.AreEqual("https://app.toughtongueai.com/api/public/scenario-access-token", handler.Requests.Single().Uri.AbsoluteUri);
+        Assert.AreEqual("https://api.toughtongueai.com/api/public/scenario-access-token", handler.Requests.Single().Uri.AbsoluteUri);
         Assert.AreEqual("0123456789abcdef01234567", JsonNode.Parse(handler.Requests.Single().Body!)!["scenario_id"]!.GetValue<string>());
         Assert.IsFalse(JsonSerializer.Serialize(new ToughTongueBuildGhostReceipt(
             ToughTongueBuildGhostContractVersions.ReceiptV1,
             "receipt", "request", $"sha256:{new string('a', 64)}", "en-US", $"sha256:{new string('b', 64)}",
             "remote-disabled", "tough-tongue", "interactive-session", "scenario", "voice", false, false,
-            null, "not-selected", 3, 3, null, null, null, "remote-disabled", [], clock.UtcNow, clock.UtcNow, 0))
+            null, "round-robin", "not-selected", 3, 3, null, null, null, "remote-disabled", [], clock.UtcNow, clock.UtcNow, 0))
             .Contains(grant.AccessToken, StringComparison.Ordinal));
     }
 
@@ -444,11 +804,176 @@ public sealed class ToughTongueBuildGhostAdapterTests
             "0123456789abcdef01234567",
             ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
                 ToolDeployment(),
-                new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-                RuntimeBinding()),
+                StockAvatarBinding(),
+                RuntimeBinding(),
+                ScenarioSchemaReceipt(),
+                CustomFunctionBinding()),
             "must-not-leave-process",
             CancellationToken.None));
         Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public void Scenario_client_accepts_only_the_current_exact_official_API_boundary()
+    {
+        Assert.IsTrue(ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(
+            new Uri("https://api.toughtongueai.com/api/public/")));
+        Assert.IsFalse(ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(
+            new Uri("https://app.toughtongueai.com/api/public/")));
+        Assert.IsFalse(ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(
+            new Uri("https://api.toughtongueai.com/other/api/public/")));
+        Assert.IsFalse(ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(
+            new Uri("https://api.toughtongueai.com:8443/api/public/")));
+    }
+
+    [TestMethod]
+    public async Task Scenario_client_rejects_the_stale_app_host_before_sending_a_provider_credential()
+    {
+        RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+        ToughTongueBuildGhostScenarioClient scenarios = new(
+            new HttpClient(handler) { BaseAddress = new Uri("https://app.toughtongueai.com/api/public/") },
+            new FixedClock(),
+            ScenarioConfiguration(mutationsEnabled: true));
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.VerifyPrivateScenarioAsync(
+            "0123456789abcdef01234567",
+            ScenarioCandidate(),
+            "must-not-leave-process",
+            CancellationToken.None));
+
+        Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Scenario_creation_is_blocked_without_a_provider_schema_backed_Cartesia_bundle_receipt()
+    {
+        RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+        ToughTongueBuildGhostScenarioClient scenarios = new(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
+            new FixedClock(),
+            ScenarioConfiguration(mutationsEnabled: true));
+        ToughTongueBuildGhostScenarioCandidate blockedCandidate =
+            ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                ToolDeployment(),
+                StockAvatarBinding(),
+                RuntimeBinding());
+
+        (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
+            await scenarios.CreatePrivateCandidateAsync(
+                blockedCandidate,
+                "must-not-leave-process",
+                CancellationToken.None);
+
+        Assert.IsFalse(validation.Accepted);
+        Assert.IsNull(scenarioId);
+        CollectionAssert.Contains(
+            validation.RejectionReasons.ToArray(),
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.MissingOrUnverifiedBlocker);
+        Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Scenario_creation_is_blocked_without_a_read_verified_custom_function_binding()
+    {
+        RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+        ToughTongueBuildGhostScenarioClient scenarios = new(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
+            new FixedClock(),
+            ScenarioConfiguration(mutationsEnabled: true));
+        ToughTongueBuildGhostScenarioCandidate missing =
+            ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                ToolDeployment(),
+                StockAvatarBinding(),
+                RuntimeBinding(),
+                ScenarioSchemaReceipt());
+        (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
+            await scenarios.CreatePrivateCandidateAsync(missing, "must-not-leave-process", CancellationToken.None);
+        Assert.IsFalse(validation.Accepted);
+        Assert.IsNull(scenarioId);
+        CollectionAssert.Contains(
+            missing.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.MissingBindingBlocker);
+        Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public void Scenario_serialization_rejects_post_construction_attachment_drift()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        JsonObject tamperedPayload = (JsonObject)candidate.Payload.DeepClone();
+        tamperedPayload["custom_function_ids"]![0] = "attacker-value";
+        ToughTongueBuildGhostScenarioCandidate tampered = candidate with { Payload = tamperedPayload };
+        Assert.ThrowsExactly<InvalidDataException>(() => ToughTongueBuildGhostScenarioContract.SerializeCreatePayload(tampered));
+    }
+
+    [TestMethod]
+    public void Scenario_serialization_rejects_recomputed_digest_stock_avatar_and_model_drift()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        foreach (Action<JsonObject> mutate in new Action<JsonObject>[]
+        {
+            payload => payload["appearance"]!["avatar_url"] = "https://attacker.invalid/amelia.png",
+            payload => payload["appearance"]!["live_avatar_id"] = "22222222-3333-4444-8555-666666666666",
+            payload => payload["appearance"]!["live_avatar_provider"] = "attacker",
+            payload => payload["ai_model_config"]!["provider"] = "attacker",
+            payload => payload["ai_model_config"]!["model"] = "future-model",
+            payload => payload["user_metadata"]!["avatar_provider_response_digest"] = $"sha256:{new string('0', 64)}",
+            payload => payload["user_metadata"]!["avatar_operator_read_only_contract_digest"] = $"sha256:{new string('1', 64)}",
+            payload => payload["user_metadata"]!["avatar_operator_read_only_contract_file_digest"] = $"sha256:{new string('2', 64)}",
+            payload => payload["user_metadata"]!["avatar_provider_readback_receipt_file_digest"] = $"sha256:{new string('3', 64)}"
+        })
+        {
+            JsonObject payload = (JsonObject)candidate.Payload.DeepClone();
+            mutate(payload);
+            string recomputed = ScenarioPayloadDigest(payload);
+            payload["user_metadata"]!["scenario_contract_digest"] = recomputed;
+            ToughTongueBuildGhostScenarioCandidate drifted = candidate with
+            {
+                Payload = payload,
+                ContractDigest = recomputed
+            };
+
+            Assert.ThrowsExactly<InvalidDataException>(
+                () => ToughTongueBuildGhostScenarioContract.SerializeCreatePayload(drifted));
+        }
+    }
+
+    [TestMethod]
+    public async Task Scenario_creation_rejects_bundle_deployment_digest_url_size_and_field_drift_before_transport()
+    {
+        BuildGhostToughTongueCartesiaScenarioSchemaReceipt receipt = ScenarioSchemaReceipt();
+        BuildGhostToughTongueCartesiaScenarioSchemaReceipt[] driftedReceipts =
+        [
+            receipt with { DeploymentId = "dpl_other" },
+            receipt with { ScenarioReadBundleDigest = $"sha256:{new string('0', 64)}" },
+            receipt with { ScenarioCreateBundleDigest = $"sha256:{new string('1', 64)}" },
+            receipt with { ScenarioReadBundleUrl = new Uri("https://app.toughtongueai.com/_next/static/chunks/other.js") },
+            receipt with { ScenarioCreateBundleBytes = receipt.ScenarioCreateBundleBytes + 1 },
+            receipt with { CreateTtsProviderFieldPath = "ai_model_config.tts_provider" },
+            receipt with { ReadTtsVoiceIdFieldPath = "tts_voice_id" }
+        ];
+        foreach (BuildGhostToughTongueCartesiaScenarioSchemaReceipt driftedReceipt in driftedReceipts)
+        {
+            RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
+            ToughTongueBuildGhostScenarioClient scenarios = new(
+                new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
+                new FixedClock(),
+                ScenarioConfiguration(mutationsEnabled: true));
+            ToughTongueBuildGhostScenarioCandidate blocked = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                ToolDeployment(),
+                StockAvatarBinding(),
+                RuntimeBinding(),
+                driftedReceipt,
+                CustomFunctionBinding());
+
+            (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) =
+                await scenarios.CreatePrivateCandidateAsync(blocked, "must-not-leave-process", CancellationToken.None);
+
+            Assert.IsFalse(validation.Accepted);
+            Assert.IsNull(scenarioId);
+            Assert.IsNotEmpty(validation.RejectionReasons);
+            Assert.IsEmpty(handler.Requests);
+        }
     }
 
     [TestMethod]
@@ -456,23 +981,531 @@ public sealed class ToughTongueBuildGhostAdapterTests
     {
         RecordingHttpHandler handler = new(JsonResponse(new JsonObject()));
         ToughTongueBuildGhostScenarioClient scenarios = new(
-            new HttpClient(handler) { BaseAddress = new Uri("https://app.toughtongueai.com/api/public/") },
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.toughtongueai.com/api/public/") },
             new FixedClock(),
             ScenarioConfiguration(mutationsEnabled: false));
         ToughTongueBuildGhostScenarioCandidate candidate = ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
-            new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            RuntimeBinding());
+            StockAvatarBinding(),
+            RuntimeBinding(),
+            ScenarioSchemaReceipt(),
+            CustomFunctionBinding());
 
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.CreatePrivateCandidateAsync(
+        (ToughTongueBuildGhostScenarioValidation validation, string? scenarioId) = await scenarios.CreatePrivateCandidateAsync(
             candidate,
             "must-not-leave-process",
-            CancellationToken.None));
+            CancellationToken.None);
+        Assert.IsFalse(validation.Accepted);
+        Assert.IsNull(scenarioId);
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), BuildGhostToughTongueCustomFunctionContract.ScenarioMutationPublicApiBlocker);
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => scenarios.CreateAccessGrantAsync(
             "0123456789abcdef01234567",
             "must-not-leave-process",
             CancellationToken.None));
         Assert.IsEmpty(handler.Requests);
+    }
+
+    [TestMethod]
+    public void Custom_function_bundle_receipt_pins_exact_deployment_chunks_paths_fields_and_runtime_attachment()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt receipt = CustomFunctionLibrarySchemaReceipt();
+
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateLibrarySchema(receipt));
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateLibrarySchema(
+                receipt with { ServiceChunkDigest = $"sha256:{new string('0', 64)}" }).ToArray(),
+            "custom-function-service-chunk-digest-drift");
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateLibrarySchema(
+                receipt with { ScenarioAttachmentField = "tools" }).ToArray(),
+            "custom-function-scenario-attachment-field-drift");
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateLibrarySchema(
+                receipt with { CreateFields = receipt.CreateFields.Reverse().ToArray() }).ToArray(),
+            "custom-function-create-fields-drift");
+    }
+
+    [TestMethod]
+    public void Empty_authenticated_library_array_uses_pinned_schema_without_claiming_observed_row_fields()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt schemaReceipt =
+            CustomFunctionLibrarySchemaReceipt();
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt readReceipt =
+            CustomFunctionLibraryReadReceipt(schemaObserved: false);
+
+        Assert.AreEqual(BuildGhostToughTongueCustomFunctionContract.JsonArrayResponseShape, readReceipt.JsonResponseShape);
+        Assert.AreEqual(0, readReceipt.RowCount);
+        Assert.IsFalse(readReceipt.JsonSchemaObserved);
+        Assert.IsEmpty(readReceipt.ReturnedFields);
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+            readReceipt,
+            schemaReceipt,
+            CustomFunctionAccountRef));
+
+        BuildGhostToughTongueCustomFunctionDefinition withoutDynamicAuthorization =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                ToolDeployment(),
+                schemaReceipt,
+                readReceipt,
+                CustomFunctionAccountRef);
+        Assert.IsTrue(withoutDynamicAuthorization.AuthenticatedLibraryReadVerified);
+        Assert.IsFalse(withoutDynamicAuthorization.DynamicAuthorizationVerified);
+        CollectionAssert.Contains(
+            withoutDynamicAuthorization.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.DynamicAuthorizationBlocker);
+        Assert.ThrowsExactly<InvalidDataException>(() =>
+            BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(withoutDynamicAuthorization));
+
+        BuildGhostToughTongueCustomFunctionDefinition definition =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                ToolDeployment(),
+                schemaReceipt,
+                readReceipt,
+                CustomFunctionAccountRef,
+                DynamicAuthorizationReceipt(),
+                DynamicAuthorizationReceiptDigest());
+        Assert.IsTrue(definition.LibrarySchemaVerified);
+        Assert.IsTrue(definition.AuthenticatedLibraryReadVerified);
+        Assert.IsTrue(definition.DynamicAuthorizationVerified);
+        Assert.IsEmpty(definition.BlockingReasons);
+        Assert.AreEqual(
+            BuildGhostToughTongueCustomFunctionContract.DigestLibraryReadReceipt(readReceipt),
+            definition.LibraryReadReceiptDigest);
+    }
+
+    [TestMethod]
+    public void Nonempty_authenticated_library_array_requires_exact_observed_row_fields()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt schemaReceipt =
+            CustomFunctionLibrarySchemaReceipt();
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt readReceipt =
+            CustomFunctionLibraryReadReceipt();
+
+        Assert.AreEqual(1, readReceipt.RowCount);
+        Assert.IsTrue(readReceipt.JsonSchemaObserved);
+        CollectionAssert.AreEqual(
+            BuildGhostToughTongueCustomFunctionContract.ReturnedFields.ToArray(),
+            readReceipt.ReturnedFields.ToArray());
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+            readReceipt,
+            schemaReceipt,
+            CustomFunctionAccountRef));
+
+        IReadOnlyList<string> missingFields =
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                readReceipt with { JsonSchemaObserved = false, ReturnedFields = [] },
+                schemaReceipt,
+                CustomFunctionAccountRef);
+        CollectionAssert.Contains(
+            missingFields.ToArray(),
+            "custom-function-library-read-schema-unverified");
+    }
+
+    [TestMethod]
+    public void Empty_library_receipt_rejects_field_claims_invalid_shape_count_and_legacy_version()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt schemaReceipt =
+            CustomFunctionLibrarySchemaReceipt();
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt empty =
+            CustomFunctionLibraryReadReceipt(schemaObserved: false);
+
+        IReadOnlyList<string> inventedFields =
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty with
+                {
+                    JsonSchemaObserved = true,
+                    ReturnedFields = BuildGhostToughTongueCustomFunctionContract.ReturnedFields
+                },
+                schemaReceipt,
+                CustomFunctionAccountRef);
+        CollectionAssert.Contains(
+            inventedFields.ToArray(),
+            "custom-function-library-read-empty-schema-claim-invalid");
+        CollectionAssert.Contains(
+            inventedFields.ToArray(),
+            "custom-function-library-read-empty-fields-claim-invalid");
+
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty with { JsonResponseShape = "object" },
+                schemaReceipt,
+                CustomFunctionAccountRef).ToArray(),
+            "custom-function-library-read-response-shape-invalid");
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty with { RowCount = -1 },
+                schemaReceipt,
+                CustomFunctionAccountRef).ToArray(),
+            "custom-function-library-read-row-count-invalid");
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty with { Schema = ToughTongueBuildGhostContractVersions.CustomFunctionLibraryReadReceiptV1 },
+                schemaReceipt,
+                CustomFunctionAccountRef).ToArray(),
+            "custom-function-library-read-version-invalid");
+    }
+
+    [TestMethod]
+    public void Empty_library_receipt_fails_closed_when_separately_pinned_schema_drifts()
+    {
+        BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt driftedSchema =
+            CustomFunctionLibrarySchemaReceipt() with
+            {
+                ReturnedFields = BuildGhostToughTongueCustomFunctionContract.ReturnedFields.Reverse().ToArray()
+            };
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt empty =
+            CustomFunctionLibraryReadReceipt(schemaObserved: false);
+
+        IReadOnlyList<string> failures =
+            BuildGhostToughTongueCustomFunctionContract.ValidateAuthenticatedRead(
+                empty,
+                driftedSchema,
+                CustomFunctionAccountRef);
+        CollectionAssert.Contains(
+            failures.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.AuthenticatedLibraryReadSchemaBlocker);
+
+        BuildGhostToughTongueCustomFunctionDefinition definition =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                ToolDeployment(),
+                driftedSchema,
+                empty,
+                CustomFunctionAccountRef,
+                DynamicAuthorizationReceipt(),
+                DynamicAuthorizationReceiptDigest());
+        Assert.IsFalse(definition.LibrarySchemaVerified);
+        Assert.IsFalse(definition.AuthenticatedLibraryReadVerified);
+        CollectionAssert.Contains(
+            definition.BlockingReasons.ToArray(),
+            "custom-function-returned-fields-drift");
+        CollectionAssert.Contains(
+            definition.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.AuthenticatedLibraryReadSchemaBlocker);
+        Assert.ThrowsExactly<InvalidDataException>(() =>
+            BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(definition));
+    }
+
+    [TestMethod]
+    public void Sanitized_401_library_probe_and_missing_dynamic_header_semantics_block_serialization()
+    {
+        BuildGhostToughTongueCustomFunctionDefinition definition =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                ToolDeployment(),
+                CustomFunctionLibrarySchemaReceipt(),
+                CustomFunctionLibraryReadReceipt(status: 401, schemaObserved: false),
+                CustomFunctionAccountRef);
+
+        CollectionAssert.Contains(
+            definition.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.AuthenticatedLibraryReadBlocker);
+        CollectionAssert.Contains(
+            definition.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.DynamicAuthorizationBlocker);
+        Assert.ThrowsExactly<InvalidDataException>(() =>
+            BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(definition));
+        string serialized = JsonSerializer.Serialize(definition);
+        Assert.IsFalse(serialized.Contains("team-slot-4", StringComparison.Ordinal));
+        Assert.IsFalse(serialized.Contains(CustomFunctionId, StringComparison.Ordinal));
+        Assert.IsFalse(serialized.Contains("credential", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public void Verified_custom_function_definition_serializes_exact_provider_fields_and_rejects_auth_drift()
+    {
+        BuildGhostToughTongueCustomFunctionDefinition definition = CustomFunctionDefinition();
+        JsonObject payload = BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(definition);
+
+        CollectionAssert.AreEqual(
+            BuildGhostToughTongueCustomFunctionContract.CreateFields.ToArray(),
+            payload.Select(static pair => pair.Key).ToArray());
+        Assert.AreEqual("get_chummer_build_analysis", payload["name"]!.GetValue<string>());
+        Assert.AreEqual("default", payload["function_type"]!.GetValue<string>());
+        Assert.AreEqual("POST", payload["method"]!.GetValue<string>());
+        Assert.AreEqual("https://canary.chummer.run/api/v1/ai/build-ghost/tool", payload["url"]!.GetValue<string>());
+        Assert.AreEqual(120_000, payload["timeout_ms"]!.GetValue<int>());
+        Assert.AreEqual("Bearer {{packet_access_key}}", payload["headers"]!["Authorization"]!.GetValue<string>());
+        Assert.AreEqual(definition.ToolContractDigest, payload["headers"]!["X-Chummer-Build-Ghost-Tool-Contract"]!.GetValue<string>());
+        Assert.IsEmpty(payload["query_params"]!.AsObject());
+        Assert.IsNotNull(payload["parameters"]!["properties"]!["packet_access_key"]);
+
+        JsonObject driftedPayload = (JsonObject)definition.Payload.DeepClone();
+        driftedPayload["headers"]!["Authorization"] = "Bearer static-secret";
+        BuildGhostToughTongueCustomFunctionDefinition drifted = definition with { Payload = driftedPayload };
+        Assert.ThrowsExactly<InvalidDataException>(() =>
+            BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(drifted));
+    }
+
+    [TestMethod]
+    public void Provider_v2_custom_function_uses_only_body_credential_and_rejects_dynamic_header_ambiguity()
+    {
+        BuildGhostPrivateToolDeploymentPackage deployment = ProviderToolDeployment();
+        BuildGhostToughTongueCustomFunctionDefinition definition =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                deployment,
+                CustomFunctionLibrarySchemaReceipt(),
+                CustomFunctionLibraryReadReceipt(schemaObserved: false),
+                CustomFunctionAccountRef);
+
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.CustomFunctionDefinitionV2, definition.Schema);
+        Assert.AreEqual(BuildGhostToughTongueCustomFunctionContract.BodyCredentialAuthenticationMode, definition.AuthenticationMode);
+        Assert.IsTrue(definition.AuthenticationVerified);
+        Assert.IsFalse(definition.DynamicAuthorizationVerified);
+        Assert.AreEqual(string.Empty, definition.DynamicAuthorizationReceiptDigest);
+        Assert.AreEqual(
+            BuildGhostPrivateToolDeploymentContract.BodyCredentialEvidenceDigest(deployment),
+            definition.AuthenticationEvidenceDigest);
+        Assert.IsEmpty(definition.BlockingReasons);
+
+        JsonObject payload = BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(definition);
+        JsonObject headers = payload["headers"]!.AsObject();
+        Assert.AreEqual(2, headers.Count);
+        Assert.IsFalse(headers.ContainsKey("Authorization"));
+        Assert.AreEqual("no-store", headers["Cache-Control"]!.GetValue<string>());
+        Assert.AreEqual(deployment.Tool.ContractDigest, headers["X-Chummer-Build-Ghost-Tool-Contract"]!.GetValue<string>());
+        Assert.AreEqual(deployment.Tool.Endpoint.AbsoluteUri, payload["url"]!.GetValue<string>());
+        Assert.AreEqual(
+            ToughTongueBuildGhostContractVersions.PrivateToolRequestV2,
+            payload["parameters"]!["properties"]!["schema"]!["enum"]![0]!.GetValue<string>());
+
+        BuildGhostToughTongueCustomFunctionDefinition ambiguous =
+            BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+                deployment,
+                CustomFunctionLibrarySchemaReceipt(),
+                CustomFunctionLibraryReadReceipt(schemaObserved: false),
+                CustomFunctionAccountRef,
+                DynamicAuthorizationReceipt(),
+                DynamicAuthorizationReceiptDigest());
+        Assert.IsFalse(ambiguous.AuthenticationVerified);
+        CollectionAssert.Contains(
+            ambiguous.BlockingReasons.ToArray(),
+            BuildGhostToughTongueCustomFunctionContract.BodyCredentialDynamicHeaderBlocker);
+        Assert.ThrowsExactly<InvalidDataException>(() =>
+            BuildGhostToughTongueCustomFunctionContract.SerializeCreatePayload(ambiguous));
+
+        JsonObject stored = (JsonObject)definition.Payload.DeepClone();
+        stored["id"] = CustomFunctionId;
+        BuildGhostToughTongueCustomFunctionBinding binding =
+            BuildGhostToughTongueCustomFunctionContract.CreateBinding(
+                definition,
+                CustomFunctionId,
+                200,
+                stored,
+                $"sha256:{new string('b', 64)}",
+                DateTimeOffset.Parse("2026-08-22T04:00:00Z"));
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateBinding(binding, deployment));
+        Assert.IsFalse(JsonSerializer.Serialize(binding).Contains(CustomFunctionId, StringComparison.Ordinal));
+
+        ToughTongueBuildGhostScenarioCandidate candidate =
+            ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
+                deployment,
+                StockAvatarBinding(),
+                RuntimeBinding(),
+                ScenarioSchemaReceipt(),
+                binding);
+        Assert.AreEqual(ToughTongueBuildGhostContractVersions.ScenarioContractV2, candidate.Schema);
+        Assert.IsEmpty(candidate.BlockingReasons);
+        Assert.AreEqual(
+            deployment.Tool.Endpoint.AbsoluteUri,
+            candidate.Payload["user_metadata"]!["tool_endpoint"]!.GetValue<string>());
+        Assert.AreEqual(
+            deployment.Tool.ContractDigest,
+            candidate.Payload["user_metadata"]!["tool_contract_digest"]!.GetValue<string>());
+        Assert.AreEqual(
+            deployment.ContractDigest,
+            candidate.Payload["user_metadata"]!["tool_deployment_digest"]!.GetValue<string>());
+    }
+
+    [TestMethod]
+    public void Custom_function_binding_requires_exact_stored_readback_and_serializes_only_digests()
+    {
+        BuildGhostToughTongueCustomFunctionDefinition definition = CustomFunctionDefinition();
+        BuildGhostToughTongueCustomFunctionBinding binding = CustomFunctionBinding();
+
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateBinding(binding, ToolDeployment()));
+        string serialized = JsonSerializer.Serialize(binding);
+        Assert.IsFalse(serialized.Contains(CustomFunctionId, StringComparison.Ordinal));
+        StringAssert.Contains(serialized, binding.ProviderCustomFunctionIdDigest);
+
+        JsonObject drifted = StoredCustomFunction(definition);
+        drifted["url"] = "https://attacker.invalid/tool";
+        Assert.ThrowsExactly<ArgumentException>(() => BuildGhostToughTongueCustomFunctionContract.CreateBinding(
+            definition,
+            CustomFunctionId,
+            200,
+            drifted,
+            $"sha256:{new string('a', 64)}",
+            DateTimeOffset.Parse("2026-08-21T19:05:00Z")));
+    }
+
+    [TestMethod]
+    public void Custom_function_attachment_receipt_requires_both_exact_reads_and_redacts_raw_ids()
+    {
+        BuildGhostToughTongueCustomFunctionBinding binding = CustomFunctionBinding();
+        BuildGhostToughTongueCustomFunctionDefinition definition = CustomFunctionDefinition();
+        JsonObject scenario = ProviderScenario(ScenarioCandidate());
+        BuildGhostToughTongueCustomFunctionAttachmentReceipt receipt =
+            BuildGhostToughTongueCustomFunctionContract.CreateAttachmentReceipt(
+                "0123456789abcdef01234567",
+                scenario,
+                200,
+                new JsonArray(StoredCustomFunction(definition)),
+                200,
+                binding,
+                definition,
+                DateTimeOffset.Parse("2026-08-21T19:10:00Z"));
+
+        Assert.IsEmpty(receipt.BlockingReasons);
+        Assert.IsEmpty(BuildGhostToughTongueCustomFunctionContract.ValidateAttachmentReceipt(receipt, binding));
+        string serialized = JsonSerializer.Serialize(receipt);
+        Assert.IsFalse(serialized.Contains("0123456789abcdef01234567", StringComparison.Ordinal));
+        Assert.IsFalse(serialized.Contains(CustomFunctionId, StringComparison.Ordinal));
+
+        BuildGhostToughTongueCustomFunctionAttachmentReceipt mismatch =
+            BuildGhostToughTongueCustomFunctionContract.CreateAttachmentReceipt(
+                "0123456789abcdef01234567",
+                scenario,
+                200,
+                new JsonArray(),
+                200,
+                binding,
+                definition,
+                DateTimeOffset.Parse("2026-08-21T19:10:00Z"));
+        CollectionAssert.Contains(
+            mismatch.BlockingReasons.ToArray(),
+            "custom-function-by-scenario-readback-mismatch");
+        JsonObject driftedFunction = StoredCustomFunction(definition);
+        driftedFunction["url"] = "https://attacker.invalid/tool";
+        BuildGhostToughTongueCustomFunctionAttachmentReceipt payloadDrift =
+            BuildGhostToughTongueCustomFunctionContract.CreateAttachmentReceipt(
+                "0123456789abcdef01234567",
+                scenario,
+                200,
+                new JsonArray(driftedFunction),
+                200,
+                binding,
+                definition,
+                DateTimeOffset.Parse("2026-08-21T19:10:00Z"));
+        CollectionAssert.Contains(
+            payloadDrift.BlockingReasons.ToArray(),
+            "custom-function-by-scenario-readback-mismatch");
+        CollectionAssert.Contains(
+            BuildGhostToughTongueCustomFunctionContract.ValidateAttachmentReceipt(
+                receipt with { RawIdsExposed = true }, binding).ToArray(),
+            "custom-function-attachment-redaction-invalid");
+    }
+
+    [TestMethod]
+    public async Task Cartesia_voice_deletion_requires_204_404_and_complete_owner_list_absence()
+    {
+        const string credential = "cartesia-test-credential-must-stay-redacted";
+        RecordingHttpHandler handler = new(
+            new HttpResponseMessage(System.Net.HttpStatusCode.NoContent),
+            new HttpResponseMessage(System.Net.HttpStatusCode.NotFound),
+            JsonResponse(new JsonObject
+            {
+                ["data"] = new JsonArray(),
+                ["has_more"] = false,
+                ["next_page"] = null
+            }));
+        BuildGhostCartesiaVoiceDeletionClient client = CartesiaDeletionClient(handler, enabled: true);
+
+        BuildGhostCartesiaVoiceDeletionReceipt receipt = await client.DeleteAndVerifyAsync(
+            CartesiaVoiceId,
+            credential,
+            CancellationToken.None);
+
+        Assert.AreEqual("deleted-and-absence-verified", receipt.OutcomeStatus);
+        Assert.AreEqual(204, receipt.DeleteHttpStatus);
+        Assert.AreEqual(404, receipt.ReadbackHttpStatus);
+        Assert.AreEqual(200, receipt.OwnerListHttpStatus);
+        Assert.IsTrue(receipt.OwnerListAbsenceVerified);
+        Assert.HasCount(3, handler.Requests);
+        Assert.AreEqual(HttpMethod.Delete, handler.Requests[0].Method);
+        Assert.AreEqual($"https://api.cartesia.ai/voices/{CartesiaVoiceId}", handler.Requests[0].Uri.AbsoluteUri);
+        Assert.AreEqual(HttpMethod.Get, handler.Requests[1].Method);
+        Assert.AreEqual($"https://api.cartesia.ai/voices/{CartesiaVoiceId}", handler.Requests[1].Uri.AbsoluteUri);
+        Assert.AreEqual("https://api.cartesia.ai/voices?is_owner=true&limit=100", handler.Requests[2].Uri.AbsoluteUri);
+        Assert.IsTrue(handler.Requests.All(static request => request.HasBearerCredential));
+        Assert.IsTrue(handler.Requests.All(static request => request.ApiVersion == BuildGhostCartesiaVoiceDeletionClient.ApiVersion));
+        string rendered = JsonSerializer.Serialize(receipt);
+        Assert.IsFalse(rendered.Contains(CartesiaVoiceId, StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Contains(credential, StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task Cartesia_voice_deletion_disabled_mismatched_and_replayed_authorizations_make_zero_calls()
+    {
+        RecordingHttpHandler disabledHandler = new();
+        BuildGhostCartesiaVoiceDeletionReceipt disabled = await CartesiaDeletionClient(disabledHandler, enabled: false)
+            .DeleteAndVerifyAsync(CartesiaVoiceId, "credential", CancellationToken.None);
+        Assert.AreEqual("blocked", disabled.OutcomeStatus);
+        Assert.IsEmpty(disabledHandler.Requests);
+
+        RecordingHttpHandler mismatchHandler = new();
+        IConfiguration mismatchConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostCartesiaVoiceDeletionClient.ExecuteEnabledConfigurationKey] = "true",
+            [BuildGhostCartesiaVoiceDeletionClient.AuthorizedVoiceDigestConfigurationKey] = $"sha256:{new string('0', 64)}"
+        }).Build();
+        BuildGhostCartesiaVoiceDeletionClient mismatchClient = new(
+            new HttpClient(mismatchHandler) { BaseAddress = new Uri("https://api.cartesia.ai/") },
+            mismatchConfiguration,
+            new FixedClock());
+        BuildGhostCartesiaVoiceDeletionReceipt mismatch = await mismatchClient.DeleteAndVerifyAsync(
+            CartesiaVoiceId,
+            "credential",
+            CancellationToken.None);
+        Assert.AreEqual("blocked", mismatch.OutcomeStatus);
+        Assert.IsEmpty(mismatchHandler.Requests);
+
+        RecordingHttpHandler replayHandler = new(
+            new HttpResponseMessage(System.Net.HttpStatusCode.NoContent),
+            new HttpResponseMessage(System.Net.HttpStatusCode.NotFound),
+            JsonResponse(new JsonObject { ["data"] = new JsonArray(), ["has_more"] = false, ["next_page"] = null }));
+        BuildGhostCartesiaVoiceDeletionClient replayClient = CartesiaDeletionClient(replayHandler, enabled: true);
+        BuildGhostCartesiaVoiceDeletionReceipt first = await replayClient.DeleteAndVerifyAsync(
+            CartesiaVoiceId,
+            "credential",
+            CancellationToken.None);
+        BuildGhostCartesiaVoiceDeletionReceipt replay = await replayClient.DeleteAndVerifyAsync(
+            CartesiaVoiceId,
+            "credential",
+            CancellationToken.None);
+        Assert.AreEqual("deleted-and-absence-verified", first.OutcomeStatus);
+        Assert.AreEqual("blocked", replay.OutcomeStatus);
+        CollectionAssert.Contains(replay.BlockingReasons.ToArray(), "cartesia-voice-deletion-authorization-replay-rejected");
+        Assert.HasCount(3, replayHandler.Requests);
+    }
+
+    [TestMethod]
+    public async Task Cartesia_voice_deletion_errors_and_Tough_Tongue_cleanup_blocker_are_redacted()
+    {
+        const string credential = "cartesia-error-secret";
+        HttpResponseMessage failure = new(System.Net.HttpStatusCode.InternalServerError)
+        {
+            Content = new StringContent($"provider leaked {credential} {CartesiaVoiceId}")
+        };
+        RecordingHttpHandler handler = new(failure);
+        BuildGhostCartesiaVoiceDeletionReceipt receipt = await CartesiaDeletionClient(handler, enabled: true)
+            .DeleteAndVerifyAsync(CartesiaVoiceId, credential, CancellationToken.None);
+        string rendered = JsonSerializer.Serialize(receipt);
+
+        Assert.AreEqual("failed", receipt.OutcomeStatus);
+        Assert.HasCount(1, handler.Requests);
+        Assert.IsFalse(rendered.Contains(credential, StringComparison.Ordinal));
+        Assert.IsFalse(rendered.Contains(CartesiaVoiceId, StringComparison.Ordinal));
+        Assert.IsFalse(receipt.RawResponseExposed);
+        Assert.IsFalse(receipt.RawVoiceIdExposed);
+        Assert.IsFalse(receipt.CredentialExposed);
+
+        const string scenarioId = "0123456789abcdef01234567";
+        ToughTongueBuildGhostScenarioDeletionBlockerReceipt blocker =
+            ToughTongueBuildGhostScenarioCleanupContract.CreateBlockedReceipt(scenarioId, new FixedClock());
+        Assert.AreEqual("blocked", blocker.OutcomeStatus);
+        Assert.IsFalse(blocker.TransportAttempted);
+        CollectionAssert.Contains(blocker.BlockingReasons.ToArray(),
+            ToughTongueBuildGhostScenarioCleanupContract.UndocumentedDeletionBlocker);
+        Assert.IsFalse(JsonSerializer.Serialize(blocker).Contains(scenarioId, StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -530,26 +1563,210 @@ public sealed class ToughTongueBuildGhostAdapterTests
     }
 
     [TestMethod]
-    public void Persona_registry_requires_Chummer_owned_verified_releases_and_synthetic_voice_provenance()
+    public void Persona_registry_keeps_Rook_VidBoard_as_default_and_separates_live_stock_avatar_authority()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-19T12:00:00Z");
-        BuildGhostPersonaMediaRelease avatar = Release(ToughTongueBuildGhostPersonaIds.RookAvatar, "avatar", "generated-original", now);
+        BuildGhostPersonaMediaRelease video = Release(
+            ToughTongueBuildGhostPersonaIds.RookVidBoardSupport,
+            "vidboard-support-video",
+            "synthetic-rook-rendered-by-vidboard",
+            now);
         BuildGhostPersonaMediaRelease unverifiedVoice = Release(ToughTongueBuildGhostPersonaIds.RookVoice, "synthetic-voice", "human-recording", now) with
         {
             ProviderVerificationState = "pending-operator"
         };
-        BuildGhostPersonaReleaseProjection blocked = new BuildGhostPersonaReleaseRegistry([avatar, unverifiedVoice]).ResolveRook();
+        BuildGhostPersonaReleaseRegistry registry = new([video, unverifiedVoice], StockAvatarBinding());
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, registry.ResolveRook().AvatarId);
+        BuildGhostPersonaReleaseProjection blocked = registry.ResolveRookVidBoard();
 
         Assert.IsTrue(blocked.AvatarReady);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.RookAvatar, blocked.AvatarId);
+        Assert.AreEqual("approved", blocked.AvatarReleaseState);
         Assert.IsFalse(blocked.VoiceReady);
-        Assert.AreEqual("governed-avatar-and-text-only", blocked.FallbackPosture);
+        Assert.AreEqual("rook-vidboard-pre-rendered-only", blocked.FallbackPosture);
         CollectionAssert.Contains(blocked.BlockingReasons.ToArray(), "voice-provenance-is-not-declared-synthetic");
 
         BuildGhostPersonaMediaRelease voice = Release(ToughTongueBuildGhostPersonaIds.RookVoice, "synthetic-voice", "synthetic-voice-generated-from-consented-seed", now);
-        BuildGhostPersonaReleaseProjection ready = new BuildGhostPersonaReleaseRegistry([avatar, voice]).ResolveRook();
+        BuildGhostPersonaReleaseProjection ready = new BuildGhostPersonaReleaseRegistry([video, voice], StockAvatarBinding()).ResolveRookVidBoard();
         Assert.IsTrue(ready.AvatarReady);
         Assert.IsTrue(ready.VoiceReady);
-        Assert.AreEqual("governed-avatar-and-voice", ready.FallbackPosture);
+        Assert.AreEqual("rook-vidboard-and-synthetic-voice", ready.FallbackPosture);
+    }
+
+    [TestMethod]
+    public void Stock_avatar_binding_requires_an_opaque_readback_id_and_defaults_to_exact_Amelia_Avatario_Gemini_semantics()
+    {
+        IConfiguration missingId = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>()).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation blocked =
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(missingId);
+        Assert.IsFalse(blocked.Accepted);
+        CollectionAssert.Contains(blocked.RejectionReasons.ToArray(), "stock-avatar-provider-id-missing-or-invalid");
+        CollectionAssert.Contains(blocked.RejectionReasons.ToArray(), "stock-avatar-provider-readback-digest-missing-or-invalid");
+        CollectionAssert.Contains(blocked.RejectionReasons.ToArray(), "stock-avatar-operator-contract-path-missing-or-invalid");
+
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration()).Build();
+
+        BuildGhostToughTongueStockAvatarBindingValidation validation =
+            ValidateStockAvatarConfiguration(configuration);
+
+        Assert.IsTrue(validation.Accepted);
+        Assert.IsNotNull(validation.Binding);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace, validation.Binding.ProviderNamespace);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.ProviderStock, validation.Binding.SelectionMode);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName, validation.Binding.AvatarName);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath, validation.Binding.AvatarAssetPath);
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.CurrentModelId, validation.Binding.ModelId);
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, validation.Binding.AvatarAlias);
+        Assert.IsTrue(validation.Binding.ProviderReadVerified);
+        Assert.AreEqual(
+            BuildGhostToughTongueStockAvatarBindingContract.RequiredReadbackSource,
+            validation.Binding.ProviderReadbackSource);
+        Assert.IsTrue(validation.Binding.ContractDigest.StartsWith("sha256:", StringComparison.Ordinal));
+        Assert.IsEmpty(BuildGhostToughTongueStockAvatarBindingContract.Validate(validation.Binding));
+        Assert.IsFalse(JsonSerializer.Serialize(validation.Binding).Contains(StockAvatarId, StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Stock_avatar_operator_contract_rejects_reseal_and_symlink_swap_even_when_the_digest_environment_is_changed()
+    {
+        Dictionary<string, string?> resealed = StockAvatarConfiguration();
+        string contractPath = resealed[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey]!;
+        JsonObject hostileContract = JsonNode.Parse(File.ReadAllText(contractPath))!.AsObject();
+        hostileContract["stock_avatar_readback_receipt_digest"] = $"sha256:{new string('0', 64)}";
+        string hostileRaw = CanonicalJson(hostileContract);
+        string hostilePath = Path.Combine(OperatorContractDirectory, "hostile-resealed.json");
+        File.WriteAllText(hostilePath, hostileRaw);
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(hostilePath, UnixFileMode.UserRead);
+        resealed[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey] = hostilePath;
+        resealed[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractDigestConfigurationKey] = TextDigest(hostileRaw);
+        BuildGhostToughTongueStockAvatarBindingValidation resealedValidation =
+            ValidateStockAvatarConfiguration(
+                new ConfigurationBuilder().AddInMemoryCollection(resealed).Build());
+        Assert.IsFalse(resealedValidation.Accepted);
+        CollectionAssert.Contains(
+            resealedValidation.RejectionReasons.ToArray(),
+            "stock-avatar-operator-contract-receipt-digest-mismatch");
+
+        Dictionary<string, string?> swapped = StockAvatarConfiguration();
+        string realPath = swapped[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey]!;
+        string symlinkPath = Path.Combine(OperatorContractDirectory, "hostile-swap-link.json");
+        if (File.Exists(symlinkPath)) File.Delete(symlinkPath);
+        File.CreateSymbolicLink(symlinkPath, realPath);
+        swapped[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey] = symlinkPath;
+        BuildGhostToughTongueStockAvatarBindingValidation swappedValidation =
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(
+                new ConfigurationBuilder().AddInMemoryCollection(swapped).Build());
+        Assert.IsFalse(swappedValidation.Accepted);
+        CollectionAssert.Contains(
+            swappedValidation.RejectionReasons.ToArray(),
+            "stock-avatar-operator-contract-path-missing-or-invalid");
+    }
+
+    [TestMethod]
+    public void Stock_avatar_configuration_rejects_provider_misspellings_and_arbitrary_models_and_gates_legacy_Cascade_explicitly()
+    {
+        IConfiguration current = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration()).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation accepted =
+            ValidateStockAvatarConfiguration(current);
+        Assert.IsTrue(accepted.Accepted);
+
+        IConfiguration misspelledProvider = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration(new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderConfigurationKey] = "avatari0"
+            })).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation rejected =
+            ValidateStockAvatarConfiguration(misspelledProvider);
+        Assert.IsFalse(rejected.Accepted);
+        Assert.IsNull(rejected.Binding);
+        CollectionAssert.Contains(rejected.RejectionReasons.ToArray(), "stock-avatar-provider-invalid");
+
+        IConfiguration arbitraryModel = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration(new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = "future-model"
+            })).Build();
+        Assert.IsFalse(ValidateStockAvatarConfiguration(arbitraryModel).Accepted);
+
+        IConfiguration currentWithLegacyFlag = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration(new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.AllowLegacyCascadeConfigurationKey] = "true"
+            })).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation invalidCurrent =
+            ValidateStockAvatarConfiguration(currentWithLegacyFlag);
+        Assert.IsFalse(invalidCurrent.Accepted);
+        CollectionAssert.Contains(invalidCurrent.RejectionReasons.ToArray(), "stock-avatar-legacy-model-flag-invalid");
+
+        BuildGhostToughTongueStockAvatarReadbackReceipt legacyReceipt = StockAvatarReadbackReceipt(
+            modelId: ToughTongueBuildGhostStockAvatarSelections.LegacyModelId,
+            allowLegacyCascade: true);
+        IConfiguration explicitLegacy = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration(new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = "cascade",
+                [BuildGhostToughTongueStockAvatarBindingContract.AllowLegacyCascadeConfigurationKey] = "true",
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = legacyReceipt.ReceiptDigest,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] = BuildGhostToughTongueStockAvatarBindingContract.SerializeReadbackReceiptFile(legacyReceipt)
+            })).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation legacy =
+            ValidateStockAvatarConfiguration(explicitLegacy);
+        Assert.IsTrue(legacy.Accepted);
+        Assert.IsTrue(legacy.Binding!.LegacyModelCompatibilityEnabled);
+    }
+
+    [TestMethod]
+    public void Stock_avatar_receipt_rejects_fabricated_digest_wrong_status_stale_readback_and_scenario_drift()
+    {
+        BuildGhostToughTongueStockAvatarReadbackReceipt valid = StockAvatarReadbackReceipt();
+        BuildGhostToughTongueStockAvatarReadbackReceipt[] hostile =
+        [
+            valid with { HttpStatus = 500 },
+            valid with { CanonicalWhitelistedResponseDigest = $"sha256:{new string('0', 64)}" },
+            valid with { ObservedAtUtc = DateTimeOffset.UtcNow.AddHours(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'") },
+            valid with { ScenarioRefDigest = $"sha256:{new string('1', 64)}" }
+        ];
+        foreach (BuildGhostToughTongueStockAvatarReadbackReceipt drifted in hostile)
+        {
+            bool preserveInvalidResponseDigest = drifted.CanonicalWhitelistedResponseDigest
+                == $"sha256:{new string('0', 64)}";
+            BuildGhostToughTongueStockAvatarReadbackReceipt sealedDrifted = SealStockAvatarReadbackReceipt(
+                drifted,
+                preserveInvalidResponseDigest);
+            Dictionary<string, string?> values = StockAvatarConfiguration(new Dictionary<string, string?>
+            {
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = sealedDrifted.ReceiptDigest,
+                [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] = BuildGhostToughTongueStockAvatarBindingContract.SerializeReadbackReceiptFile(sealedDrifted)
+            });
+            Assert.IsFalse(ValidateStockAvatarConfiguration(
+                new ConfigurationBuilder().AddInMemoryCollection(values).Build()).Accepted);
+        }
+    }
+
+    [TestMethod]
+    public void Stock_avatar_scenario_binds_Amelia_by_path_and_opaque_id_and_rejects_post_creation_avatar_injection()
+    {
+        ToughTongueBuildGhostScenarioCandidate candidate = ScenarioCandidate();
+        JsonObject appearance = candidate.Payload["appearance"]!.AsObject();
+        JsonObject metadata = candidate.Payload["user_metadata"]!.AsObject();
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath, appearance["avatar_url"]!.GetValue<string>());
+        Assert.AreEqual(StockAvatarId, appearance["live_avatar_id"]!.GetValue<string>());
+        Assert.AreEqual("avatario", appearance["live_avatar_provider"]!.GetValue<string>());
+        Assert.AreEqual(ToughTongueBuildGhostPersonaIds.StockDefaultAvatar, metadata["avatar_id"]!.GetValue<string>());
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace, metadata["avatar_provider"]!.GetValue<string>());
+        Assert.AreEqual(ToughTongueBuildGhostStockAvatarSelections.ProviderStock, metadata["avatar_selection_mode"]!.GetValue<string>());
+        Assert.AreEqual("Amelia", metadata["avatar_name"]!.GetValue<string>());
+        Assert.AreEqual("gemini", metadata["model_id"]!.GetValue<string>());
+
+        JsonObject injected = ProviderScenario(candidate);
+        injected["appearance"]!["avatar_url"] = "https://attacker.invalid/rook.png";
+        ToughTongueBuildGhostScenarioValidation validation =
+            ToughTongueBuildGhostScenarioContract.Validate(injected, candidate);
+        Assert.IsFalse(validation.Accepted);
+        CollectionAssert.Contains(validation.RejectionReasons.ToArray(), "scenario-avatar-path-mismatch");
     }
 
     private static ToughTongueBuildGhostAdapter CreateAdapter(
@@ -565,23 +1782,374 @@ public sealed class ToughTongueBuildGhostAdapterTests
             new Uri("https://canary.chummer.run/api/v1/ai/build-ghost/tool"),
             "build-ghost-private-tool");
 
+    private static BuildGhostPrivateToolDeploymentPackage ProviderToolDeployment()
+        => BuildGhostPrivateToolDeploymentContract.CreateProviderBodyKeyV2(
+            new Uri("https://canary.chummer.run/api/v2/ai/build-ghost/tool"),
+            "build-ghost-private-tool");
+
     private static BuildGhostCascadePrivateVoiceBinding RuntimeBinding()
         => BuildGhostCascadePrivateVoiceBindingContract.Create(
-            "private-provider-rook-voice-ref",
-            VoiceReleaseDigest,
+            VoiceReadReceipt(),
             ToughTongueBuildGhostScenarioContract.CanonicalLocales);
+
+    private static BuildGhostCartesiaPrivateVoiceReadReceipt VoiceReadReceipt()
+        => new(
+            ToughTongueBuildGhostContractVersions.CartesiaPrivateVoiceReadReceiptV1,
+            ToughTongueBuildGhostVoiceProviders.CartesiaNamespace,
+            CartesiaVoiceId,
+            CartesiaVoiceId,
+            200,
+            true,
+            "private",
+            "owner",
+            ToughTongueBuildGhostVoiceProviders.FullySyntheticProvenance,
+            VoiceReleaseDigest,
+            ProviderResponseDigest,
+            DateTimeOffset.Parse("2026-08-21T08:00:00Z"));
+
+    private static BuildGhostToughTongueCartesiaScenarioSchemaReceipt ScenarioSchemaReceipt()
+        => new(
+            ToughTongueBuildGhostContractVersions.CartesiaScenarioSchemaReceiptV1,
+            ToughTongueBuildGhostVoiceProviders.CartesiaNamespace,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedDeploymentId,
+            new Uri(BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioReadBundleUrl),
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioReadBundleDigest,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioReadBundleBytes,
+            new Uri(BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioCreateBundleUrl),
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioCreateBundleDigest,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.VerifiedScenarioCreateBundleBytes,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsProviderFieldPath,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsVoiceIdFieldPath,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsProviderFieldPath,
+            BuildGhostToughTongueCartesiaScenarioSchemaContract.ReadTtsVoiceIdFieldPath,
+            ToughTongueBuildGhostVoiceProviders.CartesiaTtsProvider,
+            DateTimeOffset.Parse("2026-08-21T17:21:00Z"));
+
+    private static BuildGhostToughTongueCustomFunctionLibrarySchemaReceipt CustomFunctionLibrarySchemaReceipt()
+        => new(
+            ToughTongueBuildGhostContractVersions.CustomFunctionLibrarySchemaReceiptV1,
+            BuildGhostToughTongueCustomFunctionContract.ProviderNamespace,
+            BuildGhostToughTongueCustomFunctionContract.VerifiedDeploymentId,
+            BuildGhostToughTongueCustomFunctionContract.ServiceChunkName,
+            BuildGhostToughTongueCustomFunctionContract.ServiceChunkDigest,
+            BuildGhostToughTongueCustomFunctionContract.ServiceChunkBytes,
+            BuildGhostToughTongueCustomFunctionContract.StudioChunkName,
+            BuildGhostToughTongueCustomFunctionContract.StudioChunkDigest,
+            BuildGhostToughTongueCustomFunctionContract.StudioChunkBytes,
+            BuildGhostToughTongueCustomFunctionContract.ScenarioServiceChunkName,
+            BuildGhostToughTongueCustomFunctionContract.ScenarioServiceChunkDigest,
+            BuildGhostToughTongueCustomFunctionContract.ScenarioServiceChunkBytes,
+            BuildGhostToughTongueCustomFunctionContract.RuntimeChunkName,
+            BuildGhostToughTongueCustomFunctionContract.RuntimeChunkDigest,
+            BuildGhostToughTongueCustomFunctionContract.RuntimeChunkBytes,
+            new Uri(BuildGhostToughTongueCustomFunctionContract.ApiBaseUrl),
+            BuildGhostToughTongueCustomFunctionContract.ListPath,
+            BuildGhostToughTongueCustomFunctionContract.ByScenarioPathTemplate,
+            BuildGhostToughTongueCustomFunctionContract.CreatePath,
+            BuildGhostToughTongueCustomFunctionContract.UpdatePathTemplate,
+            BuildGhostToughTongueCustomFunctionContract.ExecutePathTemplate,
+            BuildGhostToughTongueCustomFunctionContract.DeletePathTemplate,
+            BuildGhostToughTongueCustomFunctionContract.ScenarioUpsertPath,
+            BuildGhostToughTongueCustomFunctionContract.CreateFields,
+            BuildGhostToughTongueCustomFunctionContract.ReturnedFields,
+            BuildGhostToughTongueCustomFunctionContract.ScenarioAttachmentField,
+            BuildGhostToughTongueCustomFunctionContract.RuntimeRegistrationPrefix,
+            DateTimeOffset.Parse("2026-08-21T18:45:00Z"));
+
+    private static BuildGhostToughTongueCustomFunctionLibraryReadReceipt CustomFunctionLibraryReadReceipt(
+        int status = 200,
+        bool schemaObserved = true)
+        => new(
+            ToughTongueBuildGhostContractVersions.CustomFunctionLibraryReadReceiptV2,
+            new Uri("https://api.toughtongueai.com/api/custom-functions/"),
+            "GET",
+            "team-slot-4",
+            CustomFunctionAccountRef,
+            status,
+            BuildGhostToughTongueCustomFunctionContract.JsonArrayResponseShape,
+            schemaObserved ? 1 : 0,
+            schemaObserved,
+            schemaObserved ? BuildGhostToughTongueCustomFunctionContract.ReturnedFields : [],
+            status == 200 ? $"sha256:{new string('8', 64)}" : string.Empty,
+            RawResponseExposed: false,
+            RawIdsExposed: false,
+            CredentialExposed: false,
+            DateTimeOffset.Parse("2026-08-21T18:50:31Z"));
+
+    private static BuildGhostToughTongueDynamicAuthorizationReceipt DynamicAuthorizationReceipt()
+        => new(
+            ToughTongueBuildGhostContractVersions.CustomFunctionDynamicAuthorizationReceiptV1,
+            BuildGhostToughTongueCustomFunctionContract.ProviderNamespace,
+            BuildGhostToughTongueCustomFunctionContract.VerifiedDeploymentId,
+            "future-official-dynamic-header-evidence.js",
+            $"sha256:{new string('9', 64)}",
+            "Authorization",
+            "Bearer {{packet_access_key}}",
+            "packet_access_key",
+            "stored-header-values-interpolate-execute-args",
+            StoredHeaderValuesInterpolateToolArguments: true,
+            DateTimeOffset.Parse("2026-08-21T19:00:00Z"));
+
+    private static string DynamicAuthorizationReceiptDigest()
+        => BuildGhostToughTongueCustomFunctionContract.DigestDynamicAuthorizationReceipt(DynamicAuthorizationReceipt());
+
+    private static BuildGhostToughTongueCustomFunctionDefinition CustomFunctionDefinition(
+        BuildGhostToughTongueCustomFunctionLibraryReadReceipt? readReceipt = null,
+        BuildGhostToughTongueDynamicAuthorizationReceipt? dynamicReceipt = null,
+        string? trustedDynamicReceiptDigest = null)
+        => BuildGhostToughTongueCustomFunctionContract.CreateDefinition(
+            ToolDeployment(),
+            CustomFunctionLibrarySchemaReceipt(),
+            readReceipt ?? CustomFunctionLibraryReadReceipt(),
+            CustomFunctionAccountRef,
+            dynamicReceipt ?? DynamicAuthorizationReceipt(),
+            trustedDynamicReceiptDigest ?? DynamicAuthorizationReceiptDigest());
+
+    private static JsonObject StoredCustomFunction(BuildGhostToughTongueCustomFunctionDefinition definition)
+    {
+        JsonObject stored = (JsonObject)definition.Payload.DeepClone();
+        stored["id"] = CustomFunctionId;
+        return stored;
+    }
+
+    private static BuildGhostToughTongueCustomFunctionBinding CustomFunctionBinding()
+    {
+        BuildGhostToughTongueCustomFunctionDefinition definition = CustomFunctionDefinition();
+        return BuildGhostToughTongueCustomFunctionContract.CreateBinding(
+            definition,
+            CustomFunctionId,
+            200,
+            StoredCustomFunction(definition),
+            $"sha256:{new string('a', 64)}",
+            DateTimeOffset.Parse("2026-08-21T19:05:00Z"));
+    }
 
     private static ToughTongueBuildGhostScenarioCandidate ScenarioCandidate()
         => ToughTongueBuildGhostScenarioContract.CreatePrivateRookCandidate(
             ToolDeployment(),
-            new Uri("https://canary.chummer.run/assets/build-ghosts/rook-female-ork-decker-v1.png"),
-            RuntimeBinding());
+            StockAvatarBinding(),
+            RuntimeBinding(),
+            ScenarioSchemaReceipt(),
+            CustomFunctionBinding());
+
+    internal static BuildGhostToughTongueStockAvatarBinding StockAvatarBinding()
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            StockAvatarConfiguration()).Build();
+        BuildGhostToughTongueStockAvatarBindingValidation validation =
+            ValidateStockAvatarConfiguration(configuration);
+        Assert.IsTrue(validation.Accepted);
+        return validation.Binding!;
+    }
+
+    private static BuildGhostToughTongueStockAvatarReadbackReceipt StockAvatarReadbackReceipt(
+        string modelId = ToughTongueBuildGhostStockAvatarSelections.CurrentModelId,
+        bool allowLegacyCascade = false)
+    {
+        BuildGhostToughTongueStockAvatarReadbackReceipt receipt = new(
+            ToughTongueBuildGhostContractVersions.StockAvatarReadbackReceiptV1,
+            200,
+            string.Empty,
+            ToughTongueBuildGhostStockAvatarSelections.ProviderNamespace,
+            ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarName,
+            ToughTongueBuildGhostStockAvatarSelections.SelectedAvatarAssetPath,
+            StockAvatarId,
+            ToughTongueBuildGhostStockAvatarSelections.RequiredModelProvider,
+            modelId,
+            allowLegacyCascade,
+            TextDigest(StockScenarioRef),
+            BuildGhostToughTongueStockAvatarBindingContract.RequiredReadbackSource,
+            DateTimeOffset.UtcNow.AddMinutes(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+            BuildGhostToughTongueStockAvatarBindingContract.MaximumPermittedAgeSeconds,
+            string.Empty);
+        return SealStockAvatarReadbackReceipt(receipt);
+    }
+
+    private static BuildGhostToughTongueStockAvatarReadbackReceipt SealStockAvatarReadbackReceipt(
+        BuildGhostToughTongueStockAvatarReadbackReceipt receipt,
+        bool preserveResponseDigest = false)
+    {
+        if (!preserveResponseDigest)
+        {
+            receipt = receipt with
+            {
+                CanonicalWhitelistedResponseDigest =
+                    BuildGhostToughTongueStockAvatarBindingContract.ComputeCanonicalWhitelistedResponseDigest(receipt)
+            };
+        }
+        return receipt with
+        {
+            ReceiptDigest = BuildGhostToughTongueStockAvatarBindingContract.ComputeReadbackReceiptDigest(receipt)
+        };
+    }
+
+    private static Dictionary<string, string?> StockAvatarConfiguration(
+        IReadOnlyDictionary<string, string?>? overrides = null)
+    {
+        BuildGhostToughTongueStockAvatarReadbackReceipt receipt = StockAvatarReadbackReceipt();
+        Dictionary<string, string?> values = new(StringComparer.Ordinal)
+        {
+            [BuildGhostToughTongueStockAvatarBindingContract.ProviderConfigurationKey] = receipt.ObservedProvider,
+            [BuildGhostToughTongueStockAvatarBindingContract.NameConfigurationKey] = receipt.ObservedAvatarName,
+            [BuildGhostToughTongueStockAvatarBindingContract.AssetPathConfigurationKey] = receipt.ObservedAvatarAssetPath,
+            [BuildGhostToughTongueStockAvatarBindingContract.ProviderAvatarIdConfigurationKey] = receipt.ObservedLiveAvatarId,
+            [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackDigestConfigurationKey] = receipt.ReceiptDigest,
+            [BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] = BuildGhostToughTongueStockAvatarBindingContract.SerializeReadbackReceiptFile(receipt),
+            [BuildGhostToughTongueStockAvatarBindingContract.ModelProviderConfigurationKey] = receipt.ObservedModelProvider,
+            [BuildGhostToughTongueStockAvatarBindingContract.ModelIdConfigurationKey] = receipt.ObservedModelId,
+            [BuildGhostToughTongueStockAvatarBindingContract.AllowLegacyCascadeConfigurationKey] = receipt.LegacyCascadePolicyOptIn.ToString(),
+            [BuildGhostToughTongueStockAvatarBindingContract.ScenarioIdConfigurationKey] = StockScenarioRef
+        };
+        if (overrides is not null)
+        {
+            foreach ((string key, string? value) in overrides) values[key] = value;
+        }
+        string receiptJson = values[BuildGhostToughTongueStockAvatarBindingContract.ProviderReadbackReceiptJsonConfigurationKey] ?? string.Empty;
+        (string contractPath, string contractDigest) = WriteOperatorContract(receiptJson);
+        values[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey] = contractPath;
+        values[BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractDigestConfigurationKey] = contractDigest;
+        return values;
+    }
+
+    private static BuildGhostToughTongueStockAvatarBindingValidation ValidateStockAvatarConfiguration(
+        IConfiguration configuration)
+    {
+        string path = configuration[
+            BuildGhostToughTongueStockAvatarBindingContract.OperatorReadOnlyContractPathConfigurationKey]
+            ?? string.Empty;
+        if (!File.Exists(path))
+        {
+            return BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(configuration);
+        }
+        return BuildGhostToughTongueStockAvatarBindingContract.FromCanonicalOperatorContractForTesting(
+            configuration,
+            File.ReadAllBytes(path));
+    }
+
+    private static (string Path, string Digest) WriteOperatorContract(string receiptJson)
+    {
+        string receiptFileDigest = TextDigest(receiptJson);
+        JsonObject contract = new()
+        {
+            ["schema"] = ToughTongueBuildGhostContractVersions.ReadOnlyBindingContractV3,
+            ["provider_key"] = "tough_tongue",
+            ["base_url"] = "https://api.toughtongueai.com/api/public",
+            ["source_type"] = "provider_documentation",
+            ["verified_at"] = DateTimeOffset.UtcNow.AddMinutes(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+            ["authority"] = new JsonObject
+            {
+                ["operator_verified"] = true,
+                ["source_ref_sha256"] = $"sha256:{new string('b', 64)}"
+            },
+            ["slot_cardinality"] = 6,
+            ["maximum_snapshot_age_seconds"] = 900,
+            ["premium_plan_values"] = new JsonArray("premium"),
+            ["live_avatar_providers"] = new JsonArray("anam", "avatario", "heygen", "liveavatar"),
+            ["documented_get_allowlist"] = new JsonObject
+            {
+                ["balance"] = new JsonObject { ["method"] = "GET", ["path"] = "balance" },
+                ["subscriptions"] = new JsonObject { ["method"] = "GET", ["path"] = "subscriptions" },
+                ["organizations"] = new JsonObject { ["method"] = "GET", ["path"] = "v2/organizations" },
+                ["scenario"] = new JsonObject { ["method"] = "GET", ["path"] = "scenarios/{resource_ref}" }
+            },
+            ["normalization"] = new JsonObject
+            {
+                ["plan"] = "subscriptions.active.product_name",
+                ["remaining_minutes"] = "balance.available_minutes",
+                ["refresh_at"] = "balance.last_updated",
+                ["organization"] = "organizations.id",
+                ["resource_ownership"] = "organization_scoped_scenario_readback"
+            },
+            ["unsupported_direct_resources"] = new JsonArray("agent", "voice", "function", "avatar"),
+            ["stock_avatar_readback_receipt_digest"] = receiptFileDigest
+        };
+        string raw = CanonicalJson(contract);
+        string digest = TextDigest(raw);
+        string path = Path.Combine(OperatorContractDirectory, digest[7..] + ".json");
+        lock (OperatorContractLock)
+        {
+            Directory.CreateDirectory(OperatorContractDirectory);
+            if (!File.Exists(path)) File.WriteAllText(path, raw);
+            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead);
+        }
+        return (path, digest);
+    }
+
+    private static string CanonicalJson(JsonNode node)
+    {
+        JsonNode canonical = node switch
+        {
+            JsonObject value => new JsonObject(value.OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                .Select(static pair => KeyValuePair.Create(pair.Key, pair.Value is null ? null : CanonicalNode(pair.Value)))),
+            _ => CanonicalNode(node)
+        };
+        return canonical.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+    }
+
+    private static JsonNode CanonicalNode(JsonNode node)
+        => node switch
+        {
+            JsonObject value => new JsonObject(value.OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                .Select(static pair => KeyValuePair.Create(pair.Key, pair.Value is null ? null : CanonicalNode(pair.Value)))),
+            JsonArray value => new JsonArray(value.Select(static item => item is null ? null : CanonicalNode(item)).ToArray()),
+            _ => node.DeepClone()
+        };
+
+    private static string ScenarioPayloadDigest(JsonObject payload)
+    {
+        JsonObject authority = (JsonObject)payload.DeepClone();
+        authority["user_metadata"]!.AsObject().Remove("scenario_contract_digest");
+        return $"sha256:{Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(authority))).ToLowerInvariant()}";
+    }
+
+    private static string TextDigest(string value)
+        => $"sha256:{Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
+
+    private static JsonObject ProviderScenario(ToughTongueBuildGhostScenarioCandidate candidate)
+    {
+        JsonObject scenario = (JsonObject)candidate.Payload.DeepClone();
+        string ttsProvider = scenario[BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsProviderFieldPath]!.GetValue<string>();
+        string ttsVoiceId = scenario[BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsVoiceIdFieldPath]!.GetValue<string>();
+        scenario.Remove(BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsProviderFieldPath);
+        scenario.Remove(BuildGhostToughTongueCartesiaScenarioSchemaContract.CreateTtsVoiceIdFieldPath);
+        scenario["ai_model_config"]!["tts_provider"] = ttsProvider;
+        scenario["ai_model_config"]!["tts_voice_id"] = ttsVoiceId;
+        scenario["id"] = "0123456789abcdef01234567";
+        return scenario;
+    }
+
+    private static void AssertVoiceReceiptRejected(
+        BuildGhostCartesiaPrivateVoiceReadReceipt receipt,
+        string expectedReason)
+    {
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() =>
+            BuildGhostCascadePrivateVoiceBindingContract.Create(
+                receipt,
+                ToughTongueBuildGhostScenarioContract.CanonicalLocales));
+        StringAssert.Contains(exception.Message, expectedReason);
+    }
 
     private static IConfiguration ScenarioConfiguration(bool mutationsEnabled)
         => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED"] = mutationsEnabled.ToString()
         }).Build();
+
+    private static BuildGhostCartesiaVoiceDeletionClient CartesiaDeletionClient(
+        HttpMessageHandler handler,
+        bool enabled)
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [BuildGhostCartesiaVoiceDeletionClient.ExecuteEnabledConfigurationKey] = enabled.ToString(),
+            [BuildGhostCartesiaVoiceDeletionClient.AuthorizedVoiceDigestConfigurationKey] =
+                BuildGhostCartesiaVoiceDeletionClient.VoiceIdDigest(CartesiaVoiceId)
+        }).Build();
+        return new BuildGhostCartesiaVoiceDeletionClient(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.cartesia.ai/") },
+            configuration,
+            new FixedClock());
+    }
 
     private static Dictionary<string, string?> RemoteConfiguration()
         => new(StringComparer.Ordinal)
@@ -626,7 +2194,7 @@ public sealed class ToughTongueBuildGhostAdapterTests
         {
             ["schema"] = ToughTongueBuildGhostContractVersions.AnalysisV1,
             ["personaId"] = ToughTongueBuildGhostPersonaIds.Rook,
-            ["avatarId"] = ToughTongueBuildGhostPersonaIds.RookAvatar,
+            ["avatarId"] = ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
             ["voiceId"] = ToughTongueBuildGhostPersonaIds.RookVoice,
             ["locale"] = locale,
             ["localeFallbackChain"] = new JsonArray(locale, "en-US"),
@@ -810,7 +2378,10 @@ public sealed class ToughTongueBuildGhostAdapterTests
                 request.RequestUri!,
                 string.Equals(request.Headers.Authorization?.Scheme, "Bearer", StringComparison.Ordinal)
                     && !string.IsNullOrWhiteSpace(request.Headers.Authorization?.Parameter),
-                body));
+                body,
+                request.Headers.TryGetValues("Cartesia-Version", out IEnumerable<string>? versions)
+                    ? versions.Single()
+                    : string.Empty));
             if (_responses.Count == 0)
             {
                 throw new AssertFailedException("Unexpected provider HTTP request.");
@@ -824,5 +2395,6 @@ public sealed class ToughTongueBuildGhostAdapterTests
         HttpMethod Method,
         Uri Uri,
         bool HasBearerCredential,
-        string? Body);
+        string? Body,
+        string ApiVersion);
 }

@@ -55,6 +55,19 @@ public sealed class HubApiRequestGuardrailMiddleware
         {
             await _next(context);
         }
+        catch (BadHttpRequestException error) when (error.StatusCode == StatusCodes.Status413PayloadTooLarge
+            && HubApiGuardrailPolicy.IsAndroidDiagnosticPath(context.Request.Path))
+        {
+            // A chunked oversized body throws during model binding. Preserve 413
+            // before the outer production handler converts exceptions to 500.
+            if (context.Response.HasStarted) { context.Abort(); return; }
+            context.Response.Clear();
+            context.Response.Headers.CacheControl = "no-store";
+            await WriteProblemAsync(context, StatusCodes.Status413PayloadTooLarge,
+                "Diagnostic payload exceeds the configured limit.",
+                "https://chummer.run/problems/request-too-large",
+                "Only a bounded technical observation is accepted.");
+        }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !originalRequestAborted.IsCancellationRequested)
         {
             if (context.Response.HasStarted)

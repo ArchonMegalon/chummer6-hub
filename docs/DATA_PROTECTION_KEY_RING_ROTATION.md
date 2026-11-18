@@ -38,10 +38,24 @@ host-side chown. The runtime attestation requires the portal, initializer, and b
 images to resolve the same positive numeric identity. `1654:1654` remains the Compose default for
 other installations, not a production override for this host.
 
-The offline-generated flagship custody certificate is RSA 3072, has critical key-encipherment and
-data-encipherment usage, remains valid through 2028-10-25, and is stored with its password as
-owner-`1000`, mode-`0600` files. Preserve those modes; do not copy either secret into the volume or
-receipts.
+The production custody bundle must contain only RSA private-key certificates with at least 2048-bit
+keys and encryption-capable key usage. The certificate with the unique latest expiry is the primary
+encryptor; it must already be valid and retain more than seven days of lifetime. Every other
+private-key certificate is decrypt-only rotation custody. The application accepts at most eight
+unique private-key certificates, performs its startup round trip against the exact mixed ring, and
+fails closed on an ambiguous latest expiry, duplicate identity, unsupported key, or near-expiry
+primary. Do not infer current custody validity from a date in source documentation; the exact
+mounted bundle is the runtime authority.
+
+For non-destructive certificate rotation, export the new primary certificate and every still-needed
+prior certificate, including each private key, into one PKCS#12 collection protected by the existing
+owner-only password-file contract. Keep the same container mount targets. New keys are protected by
+the unique latest-expiry primary while existing keys can still be decrypted by the retained prior
+certificates. A renewed certificate alone is not sufficient, even when it reuses the same RSA key,
+because Data Protection resolves the certificate identity recorded in each encrypted key file.
+Retain prior certificates until every supported protected payload and rollback window that depends
+on them has expired. Preserve owner-`1000`, mode-`0400` or `0600` files; do not copy the bundle,
+password, or private keys into the state volume or receipts.
 
 ## Consumer impact
 
@@ -95,6 +109,64 @@ the incumbent at v2. A later rollback after public traffic has created new Data 
 ciphertexts also requires the normal application/data recovery decision; retained legacy keys
 preserve cryptographic rollback capability but cannot make forward-created ciphertext readable by
 the old ring.
+
+## Governed bundle materialization
+
+Use `scripts/Chummer.DataProtectionBundleMaterializer` to combine the incumbent decrypting
+certificate with the renewed primary. The helper accepts two PKCS#12 inputs protected by the same
+existing password file. It opens all three inputs with `O_NOFOLLOW`, requires UID `1000`, mode
+`0400` or `0600`, link count one, bounded size, and independently supplied SHA-256 pins. It applies
+the exact application contract: at most 16 certificates, two through eight unique private-key
+certificates for this rotation operation, RSA keys of at least 2048 bits, encryption-capable key
+usage, and one already-valid fresh certificate with the unique latest expiry and more than seven
+days of remaining life.
+
+The helper exports and reopens the collection before committing it. The destination must be an
+existing UID-`1000`, mode-`0700` real directory. Installation is no-clobber; the resulting bundle is
+UID `1000`, mode `0400`, link count one, file- and directory-fsynced. Standard output contains only
+the contract/status, certificate counts, SHA-256 fingerprints, UTC validity bounds, RSA key sizes,
+primary/decrypt-only roles, and output digest/size/mode/UID/link count. It never emits a password,
+private key, subject, source path, or bundle bytes.
+
+From a reviewed clean Hub worktree, build outside the repository's SDK-selection directory and run
+the exact built DLL. The digest values below are external inputs: capture and review them before
+the invocation rather than deriving them inside the materializer command.
+
+```bash
+SOURCE=/absolute/path/to/clean/chummer6-hub-worktree
+EXPECTED_HEAD=<reviewed-40-hex-pushed-commit>
+INCUMBENT_PFX=/absolute/owner-only/incumbent.pfx
+FRESH_PFX=/absolute/owner-only/fresh.pfx
+PASSWORD_FILE=/absolute/owner-only/data-protection.password
+OUTPUT_PFX=/absolute/uid-1000-mode-0700-directory/rotation-bundle.pfx
+INCUMBENT_PFX_SHA256=<externally-reviewed-lowercase-sha256>
+FRESH_PFX_SHA256=<externally-reviewed-lowercase-sha256>
+PASSWORD_FILE_SHA256=<externally-reviewed-lowercase-sha256>
+
+test "$(/usr/bin/git -C "$SOURCE" rev-parse --verify HEAD)" = "$EXPECTED_HEAD"
+test -z "$(/usr/bin/git -C "$SOURCE" status --porcelain=v1 --untracked-files=all)"
+test "$(/usr/bin/git -C "$SOURCE" rev-parse --verify '@{upstream}^{commit}')" = "$EXPECTED_HEAD"
+cd /tmp
+/usr/bin/dotnet build \
+  "$SOURCE/scripts/Chummer.DataProtectionBundleMaterializer/Chummer.DataProtectionBundleMaterializer.csproj" \
+  --configuration Release --disable-build-servers --maxcpucount:1 \
+  -p:UseSharedCompilation=false --nologo
+/usr/bin/env -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+  /usr/bin/dotnet \
+  "$SOURCE/scripts/Chummer.DataProtectionBundleMaterializer/bin/Release/net10.0/Chummer.DataProtectionBundleMaterializer.dll" \
+  --incumbent-pfx "$INCUMBENT_PFX" \
+  --incumbent-pfx-sha256 "$INCUMBENT_PFX_SHA256" \
+  --fresh-pfx "$FRESH_PFX" \
+  --fresh-pfx-sha256 "$FRESH_PFX_SHA256" \
+  --password-file "$PASSWORD_FILE" \
+  --password-file-sha256 "$PASSWORD_FILE_SHA256" \
+  --output "$OUTPUT_PFX"
+```
+
+Do not overwrite the incumbent PKCS#12 file. Mount the newly materialized bundle at the existing
+container certificate target only through the normal governed deployment configuration, keep the
+incumbent file for rollback, and require candidate `/api/ready` plus decryption of the retained v2
+ring before any tunnel is started.
 
 ## Post-stability maintenance
 

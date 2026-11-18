@@ -8,6 +8,7 @@ public static class HubApiGuardrailPolicy
     public const string ApiWriteBucket = "api-write";
     public const string PublicPageBucket = "public-page";
     public const string FileTransferBucket = "file-transfer";
+    public const int AndroidDiagnosticBodyBytes = 2048;
 
     public static string ResolveRateLimitBucket(HttpRequest request)
     {
@@ -31,12 +32,17 @@ public static class HubApiGuardrailPolicy
 
         return IsBodylessMethod(request.Method)
             ? null
+            : IsAndroidDiagnosticPath(request.Path)
+                ? Math.Min(options.MaxJsonBodyBytes, AndroidDiagnosticBodyBytes)
             : IsReleaseBundleUploadPath(request.Path)
                 ? options.MaxReleaseBundleBodyBytes
                 : IsMultipartSupportPath(request.Path)
                 ? options.MaxMultipartBodyBytes
                 : options.MaxJsonBodyBytes;
     }
+
+    public static bool IsAndroidDiagnosticPath(PathString path)
+        => string.Equals(path.Value?.TrimEnd('/'), "/api/v1/support/android-diagnostics", StringComparison.OrdinalIgnoreCase);
 
     public static TimeSpan ResolveTimeout(HttpRequest request, HubApiGuardrailOptions options)
     {

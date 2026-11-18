@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Run.Contracts.Identity;
+using Chummer.Storage.Teable;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -118,7 +119,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
                         Delivered: false,
                         PreviewNote: "Emailit could not accept the message on this host.",
                         Status: "failed",
-                        FailureReason: $"Emailit returned {(int)response.StatusCode}: {body}",
+                        FailureReason: $"Emailit returned HTTP {(int)response.StatusCode}.",
                         Configured: true);
                 }
 
@@ -133,16 +134,16 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
                     ProviderMessageId: providerMessageId,
                     Configured: true);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError(ex, "Failed to deliver Chummer sign-in link to {Email} via Emailit API.", message.RecipientEmail);
+                _logger.LogWarning("Emailit sign-in delivery outcome is unavailable.");
                 return new IdentityEmailTransportResult(
                     TransportKey,
                     "emailit_api_failed",
                     Delivered: false,
                     PreviewNote: "Emailit delivery failed on this host.",
                     Status: "failed",
-                    FailureReason: ex.Message,
+                    FailureReason: "Provider outcome unavailable; acceptance may have occurred.",
                     Configured: true);
             }
         }
@@ -222,16 +223,16 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
                     Status: "accepted",
                     Configured: true);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError(ex, "Failed to deliver Chummer sign-in link to {Email} via SMTP host {Host}:{Port}.", message.RecipientEmail, host, port);
+                _logger.LogWarning("SMTP sign-in delivery outcome is unavailable.");
                 return new IdentityEmailTransportResult(
                     TransportKey,
                     "smtp_failed",
                     Delivered: false,
                     PreviewNote: "SMTP delivery failed on this host.",
                     Status: "failed",
-                    FailureReason: ex.Message,
+                    FailureReason: "Provider outcome unavailable; acceptance may have occurred.",
                     Configured: true);
             }
         }
@@ -260,7 +261,18 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
     private sealed record DeliverySnapshot(
         IReadOnlyList<EmailDeliveryEventState> Deliveries,
         IReadOnlyList<RecipientState> Recipients,
-        IReadOnlyDictionary<string, string> ProviderMessageRecipients);
+        IReadOnlyDictionary<string, string> ProviderMessageRecipients,
+        string? Schema = null,
+        IReadOnlyDictionary<string, DispatchState>? Dispatches = null);
+
+    // No ticket, callback URL or message body is persisted. The fingerprint binds
+    // retries to the exact original message; fences outlive the recent-event list.
+    private sealed record DispatchState(string Fingerprint, string RecipientEmail,
+        string TransportKey, string State, IdentityEmailDeliveryResult? Result = null);
+
+    private const string PrimaryStream = "identity-email-delivery";
+    private const string PrimarySchema = "chummer.identity.email-delivery-primary/v1";
+    private const int MaximumPrimarySnapshotBytes = 16 * 1024 * 1024;
 
     private readonly IConfiguration _configuration;
     private readonly ILogger<IdentityEmailDeliveryService> _logger;
@@ -270,17 +282,27 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
     private readonly Dictionary<string, RecipientState> _recipientStates = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<EmailDeliveryEventState> _recentDeliveries = new();
     private readonly Dictionary<string, string> _providerMessageRecipients = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DispatchState> _dispatches = new(StringComparer.Ordinal);
+    private readonly TeableRevisionStore? _primaryStore;
+    private TeableRevisionStore.Head? _primaryHead;
+    private bool _primaryWriteUncertain;
 
-    public IdentityEmailDeliveryService(IConfiguration configuration, ILogger<IdentityEmailDeliveryService> logger)
-        : this(configuration, logger, new HttpClient())
+    public IdentityEmailDeliveryService(IConfiguration configuration, ILogger<IdentityEmailDeliveryService> logger,
+        TeableRevisionStore? primaryStore = null)
+        : this(configuration, logger, new HttpClient(), primaryStore)
     {
     }
 
-    public IdentityEmailDeliveryService(IConfiguration configuration, ILogger<IdentityEmailDeliveryService> logger, HttpClient httpClient)
+    public IdentityEmailDeliveryService(IConfiguration configuration, ILogger<IdentityEmailDeliveryService> logger,
+        HttpClient httpClient, TeableRevisionStore? primaryStore = null)
     {
         _configuration = configuration;
         _logger = logger ?? NullLogger<IdentityEmailDeliveryService>.Instance;
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        string storageProvider = configuration["CHUMMER_IDENTITY_STORAGE_PROVIDER"]?.Trim() ?? "local";
+        if (storageProvider is not ("local" or "teable") || (storageProvider == "teable") != (primaryStore is not null))
+            throw new InvalidOperationException("Identity email storage provider and registration do not match.");
+        _primaryStore = primaryStore;
         _storagePath = ResolveStoragePath(configuration);
         LoadSnapshot();
     }
@@ -289,6 +311,8 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var message = BuildMagicLinkMessage(normalizedEmail, displayName, ticketId, nextPath, expiresAtUtc);
+        if (_primaryStore is not null)
+            return DeliverPrimary(message);
         foreach (var transport in CreateTransportOrder())
         {
             var result = transport.Send(message);
@@ -331,10 +355,67 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
             ExposeInlinePreviewTicket: true);
     }
 
+    private IdentityEmailDeliveryResult DeliverPrimary(IdentityEmailMessage message)
+    {
+        string fingerprint = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(message, JsonOptions)));
+        IIdentityEmailTransport? selected = null;
+        lock (_mutate)
+        {
+            RefreshPrimaryLocked();
+            if (_dispatches.TryGetValue(message.IdempotencyKey, out var prior))
+            {
+                if (prior.Fingerprint != fingerprint || prior.RecipientEmail != message.RecipientEmail)
+                    throw new InvalidOperationException("Email dispatch identity does not match its admitted message.");
+                return prior.Result ?? UnknownDelivery();
+            }
+
+            selected = CreateTransportOrder().FirstOrDefault(transport => transport.TransportKey switch
+            {
+                "emailit_api" => !string.IsNullOrWhiteSpace(ResolveEmailitApiKey(_configuration)),
+                "smtp" => !string.IsNullOrWhiteSpace(_configuration["IDENTITY_SMTP_HOST"]),
+                _ => false
+            });
+            if (selected is not null)
+            {
+                _dispatches.Add(message.IdempotencyKey,
+                    new(fingerprint, message.RecipientEmail, selected.TransportKey, "pending"));
+                _recentDeliveries.Add(new(message.IdempotencyKey, message.EmailKind, selected.TransportKey,
+                    "email_delivery_pending", "pending", false, message.RecipientEmail, null, null, DateTimeOffset.UtcNow));
+                TrimRecentDeliveries();
+                // This acknowledgement is the sole permission to dispatch. A
+                // conflict, lost reply or crash never entitles another send.
+                PersistLocked();
+            }
+        }
+
+        if (selected is null)
+        {
+            const string note = "Transactional email is not configured on this host.";
+            RecordDeliveryUnavailable(message, note);
+            return new("email_delivery_unavailable", note, false);
+        }
+
+        // Do not hold the local store lock over the provider. Finalization reads
+        // current primary state again, preserving intervening webhook writes.
+        var result = selected.Send(message);
+        if (!result.Delivered)
+            result = result with { Status = "delivery_unknown", DeliveryMode = "email_delivery_unknown",
+                PreviewNote = UnknownDelivery().PreviewNote, FailureReason = "Delivery outcome requires reconciliation." };
+        RecordTransportResult(message, result);
+        // No provider fallback or development inline ticket in primary mode.
+        return result.Delivered
+            ? new(result.DeliveryMode, result.PreviewNote, true, result.ProviderMessageId)
+            : UnknownDelivery();
+    }
+
+    private static IdentityEmailDeliveryResult UnknownDelivery() => new("email_delivery_unknown",
+        "The earlier delivery outcome is unconfirmed. It will not be sent again automatically.", false);
+
     public IdentityEmailDeliveryStatusResponse GetStatus()
     {
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             return new IdentityEmailDeliveryStatusResponse(
                 RecentDeliveries: _recentDeliveries
                     .OrderByDescending(static item => item.OccurredAtUtc)
@@ -370,6 +451,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
         var normalizedEmail = email.Trim().ToLowerInvariant();
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             _recentDeliveries.Add(new EmailDeliveryEventState(
                 DeliveryId: $"dly_{Guid.NewGuid():N}",
                 EmailKind: "magic_link_start",
@@ -410,6 +492,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
 
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             if (!string.IsNullOrWhiteSpace(providerMessageId) && !string.IsNullOrWhiteSpace(recipient))
             {
                 _providerMessageRecipients[providerMessageId] = recipient;
@@ -578,13 +661,27 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
     {
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
+            if (_primaryStore is not null)
+            {
+                if (!_dispatches.TryGetValue(message.IdempotencyKey, out var admitted)
+                    || admitted.State != "pending" || admitted.TransportKey != result.TransportKey
+                    || admitted.RecipientEmail != message.RecipientEmail)
+                    throw new InvalidDataException("Email dispatch admission is no longer current.");
+                _dispatches[message.IdempotencyKey] = admitted with
+                {
+                    State = result.Delivered ? "accepted" : "delivery_unknown",
+                    Result = result.Delivered ? new(result.DeliveryMode, result.PreviewNote, true, result.ProviderMessageId) : null
+                };
+                _recentDeliveries.RemoveAll(item => item.DeliveryId == message.IdempotencyKey);
+            }
             if (!string.IsNullOrWhiteSpace(result.ProviderMessageId))
             {
                 _providerMessageRecipients[result.ProviderMessageId] = message.RecipientEmail;
             }
 
             _recentDeliveries.Add(new EmailDeliveryEventState(
-                DeliveryId: $"dly_{Guid.NewGuid():N}",
+                DeliveryId: _primaryStore is null ? $"dly_{Guid.NewGuid():N}" : message.IdempotencyKey,
                 EmailKind: message.EmailKind,
                 TransportKey: result.TransportKey,
                 DeliveryMode: result.DeliveryMode,
@@ -595,13 +692,19 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
                 FailureReason: result.FailureReason,
                 OccurredAtUtc: DateTimeOffset.UtcNow));
 
-            _recipientStates[message.RecipientEmail] = new RecipientState(
-                Email: message.RecipientEmail,
-                State: result.Delivered ? "active" : "failed",
-                LastEvent: result.Status,
-                LastEventAtUtc: DateTimeOffset.UtcNow,
-                Provider: result.TransportKey,
-                ProviderDetail: result.ProviderMessageId ?? result.FailureReason);
+            // A webhook can arrive while the provider request is in flight.
+            // Acceptance must not overwrite that message's delivered/bounced state.
+            bool hasCurrentWebhook = _primaryStore is not null && !string.IsNullOrWhiteSpace(result.ProviderMessageId)
+                && _recipientStates.TryGetValue(message.RecipientEmail, out var currentRecipient)
+                && currentRecipient.Provider == result.TransportKey && currentRecipient.ProviderDetail == result.ProviderMessageId;
+            if (!hasCurrentWebhook)
+                _recipientStates[message.RecipientEmail] = new RecipientState(
+                    Email: message.RecipientEmail,
+                    State: result.Delivered ? "active" : "failed",
+                    LastEvent: result.Status,
+                    LastEventAtUtc: DateTimeOffset.UtcNow,
+                    Provider: result.TransportKey,
+                    ProviderDetail: result.ProviderMessageId ?? result.FailureReason);
 
             TrimRecentDeliveries();
             PersistLocked();
@@ -612,6 +715,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
     {
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             _recentDeliveries.Add(new EmailDeliveryEventState(
                 DeliveryId: $"dly_{Guid.NewGuid():N}",
                 EmailKind: message.EmailKind,
@@ -632,6 +736,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
     {
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             _recentDeliveries.Add(new EmailDeliveryEventState(
                 DeliveryId: $"dly_{Guid.NewGuid():N}",
                 EmailKind: message.EmailKind,
@@ -661,6 +766,11 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
 
     private void LoadSnapshot()
     {
+        if (_primaryStore is not null)
+        {
+            lock (_mutate) RefreshPrimaryLocked();
+            return;
+        }
         try
         {
             if (!File.Exists(_storagePath))
@@ -705,6 +815,31 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
 
     private void PersistLocked()
     {
+        if (_primaryStore is not null)
+        {
+            if (_primaryWriteUncertain) throw new InvalidOperationException("Email storage requires cold reconciliation.");
+            var snapshot = new DeliverySnapshot(_recentDeliveries.ToArray(), _recipientStates.Values.ToArray(),
+                new Dictionary<string, string>(_providerMessageRecipients, StringComparer.OrdinalIgnoreCase),
+                PrimarySchema, new Dictionary<string, DispatchState>(_dispatches, StringComparer.Ordinal));
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(snapshot, JsonOptions);
+            TeableRevisionStore.Head? committed = null;
+            try
+            {
+                if (bytes.Length > MaximumPrimarySnapshotBytes) throw new InvalidDataException("Email snapshot is oversized.");
+                ValidatePrimarySnapshot(snapshot);
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                committed = _primaryStore.CompareExchangeAsync(PrimaryStream, _primaryHead, Guid.NewGuid(), bytes, deadline.Token)
+                    .GetAwaiter().GetResult();
+                _primaryHead = committed with { Bytes = [] };
+                return;
+            }
+            catch { _primaryWriteUncertain = true; throw; }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(bytes);
+                if (committed is not null) CryptographicOperations.ZeroMemory(committed.Bytes);
+            }
+        }
         try
         {
             var directory = Path.GetDirectoryName(_storagePath);
@@ -722,6 +857,64 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to persist identity email delivery snapshot to {Path}.", _storagePath);
+        }
+    }
+
+    private void RefreshPrimaryLocked()
+    {
+        if (_primaryStore is null) return;
+        if (_primaryWriteUncertain) throw new InvalidOperationException("Email storage requires cold reconciliation.");
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var head = _primaryStore.ReadAsync(PrimaryStream, deadline.Token).GetAwaiter().GetResult();
+        try
+        {
+            if (head is null && _primaryHead is not null
+                || head is not null && _primaryHead is not null && (head.Revision < _primaryHead.Revision
+                    || head.Revision == _primaryHead.Revision && (head.Commit != _primaryHead.Commit || head.Sha256 != _primaryHead.Sha256)))
+                throw new InvalidDataException("Email primary state regressed.");
+            if (head is not null && head.Bytes.Length > MaximumPrimarySnapshotBytes)
+                throw new InvalidDataException("Email snapshot is oversized.");
+            var snapshot = head is null ? new([], [], new Dictionary<string, string>(), PrimarySchema, new Dictionary<string, DispatchState>())
+                : JsonSerializer.Deserialize<DeliverySnapshot>(head.Bytes, JsonOptions)
+                    ?? throw new InvalidDataException("Email primary snapshot is invalid.");
+            ValidatePrimarySnapshot(snapshot);
+            _recentDeliveries.Clear();
+            _recentDeliveries.AddRange(snapshot.Deliveries);
+            _recipientStates.Clear();
+            foreach (var state in snapshot.Recipients) _recipientStates.Add(state.Email, state);
+            _providerMessageRecipients.Clear();
+            foreach (var pair in snapshot.ProviderMessageRecipients) _providerMessageRecipients.Add(pair.Key, pair.Value);
+            _dispatches.Clear();
+            foreach (var pair in snapshot.Dispatches!) _dispatches.Add(pair.Key, pair.Value);
+            _primaryHead = head is null ? null : head with { Bytes = [] };
+        }
+        finally { if (head is not null) CryptographicOperations.ZeroMemory(head.Bytes); }
+    }
+
+    private static void ValidatePrimarySnapshot(DeliverySnapshot snapshot)
+    {
+        if (snapshot.Schema != PrimarySchema || snapshot.Deliveries is null || snapshot.Recipients is null
+            || snapshot.ProviderMessageRecipients is null || snapshot.Dispatches is null || snapshot.Deliveries.Count > 100
+            || snapshot.Deliveries.Any(item => item is null || string.IsNullOrWhiteSpace(item.DeliveryId)
+                || string.IsNullOrWhiteSpace(item.RecipientEmail) || string.IsNullOrWhiteSpace(item.Status))
+            || snapshot.Deliveries.Select(item => item.DeliveryId).Distinct(StringComparer.Ordinal).Count() != snapshot.Deliveries.Count
+            || snapshot.Recipients.Any(item => item is null || string.IsNullOrWhiteSpace(item.Email))
+            || snapshot.Recipients.Select(item => item.Email).Distinct(StringComparer.OrdinalIgnoreCase).Count() != snapshot.Recipients.Count
+            || snapshot.ProviderMessageRecipients.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || string.IsNullOrWhiteSpace(pair.Value)))
+            throw new InvalidDataException("Incomplete email primary snapshot.");
+        foreach (var pair in snapshot.Dispatches)
+        {
+            var item = pair.Value;
+            if (!pair.Key.StartsWith("email_magic_link_", StringComparison.Ordinal) || pair.Key.Length != 49
+                || pair.Key[17..].Any(c => c is not (>= '0' and <= '9' or >= 'a' and <= 'f'))
+                || item is null || item.Fingerprint is not { Length: 64 }
+                || item.Fingerprint.Any(c => c is not (>= '0' and <= '9' or >= 'a' and <= 'f'))
+                || string.IsNullOrWhiteSpace(item.RecipientEmail) || item.TransportKey is not ("emailit_api" or "smtp")
+                || item.State is not ("pending" or "accepted" or "delivery_unknown")
+                || item.State == "accepted" && (item.Result is not { Delivered: true, ExposeInlinePreviewTicket: false }
+                    || item.Result.DeliveryMode != item.TransportKey + "_magic_link")
+                || item.State != "accepted" && item.Result is not null)
+                throw new InvalidDataException("Invalid email dispatch fence.");
         }
     }
 
@@ -931,7 +1124,8 @@ If you did not request this, you can ignore this email.
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = true
+        WriteIndented = true,
+        MaxDepth = 12
     };
 
     private sealed record EmailitSendEmailRequest(

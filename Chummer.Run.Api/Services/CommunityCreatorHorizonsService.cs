@@ -174,7 +174,7 @@ public sealed class CommunityCreatorHorizonsService
 
     public CommunityHubPublicSummary BuildCommunitySummary()
     {
-        lock (_communityStore.Gate)
+        using (_communityStore.Enter())
         {
             OpenRunListingProjection[] openRuns = _communityStore.OpenRuns
                 .OrderByDescending(static item => item.UpdatedAtUtc)
@@ -197,9 +197,17 @@ public sealed class CommunityCreatorHorizonsService
         return new CreatorOsPublicSummary(publications, curatedLiveCount, approvalBackedCount, returnLoopCount);
     }
 
+    private (CommunityHubPublicSummary Community, int NotificationCount) CaptureCommunitySummary()
+    {
+        // Capture both projections from one primary revision. Release this scope
+        // before entering installation locks or consulting publication services.
+        using (_communityStore.Enter())
+            return (BuildCommunitySummary(), _communityStore.ParticipationNotificationReceipts.Count);
+    }
+
     public RunnerPassportPublicSummary BuildPassportSummary()
     {
-        CommunityHubPublicSummary community = BuildCommunitySummary();
+        var (community, notificationCount) = CaptureCommunitySummary();
         if (!TryGetInstallLinkingStore(out InstallLinkingStore installLinkingStore))
         {
             return new RunnerPassportPublicSummary(
@@ -207,7 +215,7 @@ public sealed class CommunityCreatorHorizonsService
                 [],
                 community.OpenRuns.Count,
                 community.PendingJoinCount,
-                _communityStore.ParticipationNotificationReceipts.Count,
+                notificationCount,
                 DateTimeOffset.UtcNow);
         }
 
@@ -230,21 +238,21 @@ public sealed class CommunityCreatorHorizonsService
                 PlatformLabels: platformLabels,
                 OpenRunCount: community.OpenRuns.Count,
                 PendingJoinCount: community.PendingJoinCount,
-                ParticipationNotificationCount: _communityStore.ParticipationNotificationReceipts.Count,
+                ParticipationNotificationCount: notificationCount,
                 LastUpdatedUtc: activeInstallations.FirstOrDefault()?.UpdatedAtUtc ?? now);
         }
     }
 
     public SignalDeckPublicSummary BuildSignalDeckSummary()
     {
-        CommunityHubPublicSummary community = BuildCommunitySummary();
+        var (community, notificationCount) = CaptureCommunitySummary();
         if (!TryGetInstallLinkingStore(out InstallLinkingStore installLinkingStore))
         {
             return new SignalDeckPublicSummary(
                 0,
                 community.OpenRuns.Count,
                 community.PendingJoinCount,
-                _communityStore.ParticipationNotificationReceipts.Count,
+                notificationCount,
                 DateTimeOffset.UtcNow);
         }
 
@@ -257,21 +265,21 @@ public sealed class CommunityCreatorHorizonsService
                 ActiveInstallationCount: activeInstallations,
                 OpenRunCount: community.OpenRuns.Count,
                 PendingJoinCount: community.PendingJoinCount,
-                ParticipationNotificationCount: _communityStore.ParticipationNotificationReceipts.Count,
+                ParticipationNotificationCount: notificationCount,
                 LastUpdatedUtc: now);
         }
     }
 
     public LivingWorldPublicSummary BuildLivingWorldSummary()
     {
-        CommunityHubPublicSummary community = BuildCommunitySummary();
+        var (community, notificationCount) = CaptureCommunitySummary();
         CreatorOsPublicSummary creator = BuildCreatorSummary();
         if (!TryGetInstallLinkingStore(out InstallLinkingStore installLinkingStore))
         {
             return new LivingWorldPublicSummary(
                 0,
                 community.OpenRuns.Count,
-                _communityStore.ParticipationNotificationReceipts.Count,
+                notificationCount,
                 creator.ReturnLoopCount,
                 DateTimeOffset.UtcNow);
         }
@@ -283,7 +291,7 @@ public sealed class CommunityCreatorHorizonsService
             return new LivingWorldPublicSummary(
                 ActiveInstallationCount: activeInstallations,
                 OpenRunCount: community.OpenRuns.Count,
-                ParticipationNotificationCount: _communityStore.ParticipationNotificationReceipts.Count,
+                ParticipationNotificationCount: notificationCount,
                 ReturnLoopPublicationCount: creator.ReturnLoopCount,
                 LastUpdatedUtc: DateTimeOffset.UtcNow);
         }

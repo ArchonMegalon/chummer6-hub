@@ -1,0 +1,253 @@
+name: chummer-build-ghost-private-nonprod
+
+services:
+  chummer-build-ghost-presentation:
+    image: chummer-build-ghost-presentation:private-nonprod
+    build:
+      context: .
+      dockerfile: ops/build-ghost-private-nonprod/Dockerfile.presentation-private-nonprod
+      args:
+        CHUMMER_RUN_SERVICES_REVISION: ${CHUMMER_RUN_SERVICES_REVISION:?set the exact clean Hub revision}
+        CHUMMER_PRESENTATION_REVISION: ${CHUMMER_PRESENTATION_REVISION:?set the exact clean Presentation revision}
+        CHUMMER_CORE_ENGINE_REVISION: ${CHUMMER_CORE_ENGINE_REVISION:?set the exact clean Core revision}
+        CHUMMER_HUB_REGISTRY_REVISION: ${CHUMMER_HUB_REGISTRY_REVISION:?set the exact clean Hub Registry revision}
+        CHUMMER_UI_KIT_REVISION: ${CHUMMER_UI_KIT_REVISION:?set the exact clean UI Kit revision}
+        CHUMMER_MEDIA_FACTORY_REVISION: ${CHUMMER_MEDIA_FACTORY_REVISION:?set the exact clean Media Factory revision}
+      additional_contexts:
+        presentation-source: ${CHUMMER_PRESENTATION_SOURCE:?set CHUMMER_PRESENTATION_SOURCE to the isolated Presentation worktree}
+        core-engine-source: ${CHUMMER_CORE_ENGINE_SOURCE:?set CHUMMER_CORE_ENGINE_SOURCE}
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:?set CHUMMER_RUN_SERVICES_SOURCE to this isolated Hub worktree}
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:?set CHUMMER_HUB_REGISTRY_SOURCE}
+        ui-kit-source: ${CHUMMER_UI_KIT_SOURCE:?set CHUMMER_UI_KIT_SOURCE}
+        media-factory-source: ${CHUMMER_MEDIA_FACTORY_SOURCE:?set CHUMMER_MEDIA_FACTORY_SOURCE}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      CHUMMER_ALLOW_OWNER_HEADER: "true"
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_DEPLOYMENT_ENABLED: "true"
+      CHUMMER_BUILD_GHOST_PACKET_ACCESS_STORE_ROOT: /app/state/build-ghost-packet-access
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN: ${CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN:?set an operator-local token of at least 32 bytes}
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST: sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104
+      CHUMMER_BUILD_GHOST_AI_BASE_URL: http://chummer-build-ghost-ai:8080
+      CHUMMER_AI_INTERNAL_API_TOKEN: ${CHUMMER_AI_INTERNAL_API_TOKEN:?set a distinct operator-local token of at least 32 bytes}
+      CHUMMER_STATE_PATH: /app/state
+    volumes:
+      - build-ghost-packet-access:/app/state
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      build-ghost-private: {}
+
+  chummer-build-ghost-ai:
+    image: chummer-build-ghost-ai:private-nonprod
+    build:
+      context: .
+      dockerfile: Chummer.Run.AI/Dockerfile.private-nonprod
+      args:
+        CHUMMER_RUN_SERVICES_REVISION: ${CHUMMER_RUN_SERVICES_REVISION:?set the exact clean Hub revision}
+        CHUMMER_CORE_ENGINE_REVISION: ${CHUMMER_CORE_ENGINE_REVISION:?set the exact clean Core revision}
+        CHUMMER_HUB_REGISTRY_REVISION: ${CHUMMER_HUB_REGISTRY_REVISION:?set the exact clean Hub Registry revision}
+        CHUMMER_MEDIA_FACTORY_REVISION: ${CHUMMER_MEDIA_FACTORY_REVISION:?set the exact clean Media Factory revision}
+      additional_contexts:
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:?set CHUMMER_RUN_SERVICES_SOURCE to this isolated Hub worktree}
+        core-engine-source: ${CHUMMER_CORE_ENGINE_SOURCE:?set CHUMMER_CORE_ENGINE_SOURCE}
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:?set CHUMMER_HUB_REGISTRY_SOURCE}
+        media-factory-source: ${CHUMMER_MEDIA_FACTORY_SOURCE:?set CHUMMER_MEDIA_FACTORY_SOURCE}
+    restart: unless-stopped
+    depends_on:
+      chummer-build-ghost-presentation:
+        condition: service_healthy
+      build-ghost-private-edge:
+        condition: service_started
+      build-ghost-private-trust-export:
+        condition: service_completed_successfully
+      build-ghost-live-support-store-init:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_ENDPOINT: https://canary.chummer.run/api/v2/ai/build-ghost/tool
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTH_AUDIENCE: build-ghost-private-tool
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_TRANSPORT_MODE: provider-body-key-v2
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_AUTHORITY_ENDPOINT: https://presentation.canary.chummer.run/api/internal/build-ghost/tool/resolve
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN: ${CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN:?set an operator-local token of at least 32 bytes}
+      CHUMMER_AI_INTERNAL_API_TOKEN: ${CHUMMER_AI_INTERNAL_API_TOKEN:?set a distinct operator-local token of at least 32 bytes}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER-avatario}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME-Amelia}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH-/live-avatars/avatars/Amelia.jpg}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER-Landmass}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID-gemini}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE-false}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID:-}
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID:-}
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED: "false"
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_RECEIPT_PATH: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_HMAC_KEY: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_ACCOUNT_SCOPE_REF_DIGEST: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SCENARIO_REF_DIGEST: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_AVATAR_BINDING_DIGEST: ""
+      CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_HREF: ""
+      CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_DIGEST: ""
+      CHUMMER_BUILD_GHOST_PERSONA_RELEASE_REGISTRY_PATH: ""
+      CHUMMER_BUILD_GHOST_MEETING_BROKER_BASE_URL: ""
+      CHUMMER_BUILD_GHOST_MEETING_BROKER_API_TOKEN: ""
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_API_KEY: ""
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_SCENARIO_ID: ""
+      CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_NAME: ""
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_PATH: /app/state/build-ghost-live-support
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY: ${CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY:?set a distinct base64-encoded 32-byte live-support store key}
+      CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SINGLE_INSTANCE: "true"
+      EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH: /run/secrets/tough-tongue-read-only-binding-contract.json
+      EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST: ${EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST:-}
+      SSL_CERT_FILE: /caddy-trust/root.crt
+    secrets:
+      - source: build-ghost-tough-tongue-read-only-binding-contract
+        target: tough-tongue-read-only-binding-contract.json
+        mode: 0400
+    volumes:
+      - caddy-trust:/caddy-trust:ro
+      - build-ghost-live-support:/app/state/build-ghost-live-support
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      build-ghost-private: {}
+
+  build-ghost-private-edge:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CHUMMER_BUILD_GHOST_PRIVATE_HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./ops/build-ghost-private-nonprod/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      build-ghost-private:
+        aliases:
+          - canary.chummer.run
+          - presentation.canary.chummer.run
+      build-ghost-loopback: {}
+
+  build-ghost-private-trust-export:
+    image: caddy:2.10.2-alpine
+    restart: "no"
+    depends_on:
+      build-ghost-private-edge:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        for attempt in $$(seq 1 30); do
+          if [ -s /caddy-data/caddy/pki/authorities/local/root.crt ]; then
+            cp /caddy-data/caddy/pki/authorities/local/root.crt /caddy-trust/root.crt
+            chmod 0444 /caddy-trust/root.crt
+            exit 0
+          fi
+          sleep 1
+        done
+        exit 1
+    network_mode: none
+    volumes:
+      - caddy-data:/caddy-data:ro
+      - caddy-trust:/caddy-trust
+
+  build-ghost-live-support-store-init:
+    image: chummer-build-ghost-ai:private-nonprod
+    restart: "no"
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        store=/live-support-store
+        runtime_uid="$${APP_UID:?runtime APP_UID is required}"
+        case "$$runtime_uid" in *[!0-9]*|'') exit 1 ;; esac
+        [ -d "$$store" ] && [ ! -L "$$store" ]
+        [ -z "$$(find "$$store" -mindepth 1 -maxdepth 1 -type l -print -quit)" ]
+        if [ -z "$$(find "$$store" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+          chown "$$runtime_uid:$$runtime_uid" "$$store"
+          chmod 0700 "$$store"
+        fi
+        [ "$$(stat -c '%a:%u' -- "$$store")" = "700:$$runtime_uid" ]
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - FOWNER
+    security_opt:
+      - no-new-privileges:true
+    network_mode: none
+    volumes:
+      - build-ghost-live-support:/live-support-store
+
+  build-ghost-cloudflare-access-edge:
+    profiles:
+      - cloudflare-access-ingress
+    image: chummer-build-ghost-cloudflare-access-edge:private-nonprod
+    build:
+      context: .
+      dockerfile: ops/build-ghost-private-nonprod/Dockerfile.cloudflare-access-edge
+      args:
+        CHUMMER_RUN_SERVICES_REVISION: ${CHUMMER_RUN_SERVICES_REVISION:?set the exact clean Hub revision}
+    restart: on-failure:5
+    depends_on:
+      chummer-build-ghost-ai:
+        condition: service_healthy
+      chummer-build-ghost-presentation:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_HOST: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_HOST:-unconfigured.invalid}
+      CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_TEAM_DOMAIN:-unconfigured.cloudflareaccess.com}
+      CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_ACCESS_AUDIENCE:-}
+      CHUMMER_BUILD_GHOST_PRIVATE_TOOL_CONTRACT_DIGEST: sha256:af7b643855bbc2220be40bfadc8cb1e89ecdc324a787c771a353d74e85f01104
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      build-ghost-private: {}
+      build-ghost-cloudflare-ingress: {}
+
+volumes:
+  build-ghost-packet-access:
+  build-ghost-live-support:
+  caddy-data:
+  caddy-config:
+  caddy-trust:
+
+secrets:
+  build-ghost-tough-tongue-read-only-binding-contract:
+    file: ${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE:-./ops/build-ghost-private-nonprod/tough-tongue-read-only-binding-contract.unconfigured.json}
+
+networks:
+  build-ghost-private:
+    internal: true
+  build-ghost-loopback: {}
+  build-ghost-cloudflare-ingress:
+    external: true
+    name: ${CHUMMER_BUILD_GHOST_CLOUDFLARE_INGRESS_NETWORK:?set the exact pre-created dedicated Cloudflare ingress network}

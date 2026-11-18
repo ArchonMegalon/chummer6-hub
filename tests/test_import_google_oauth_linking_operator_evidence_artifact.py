@@ -106,7 +106,7 @@ def test_run_post_import_chain_uses_fixed_argv_without_shell(tmp_path: Path) -> 
         observed.append(argv)
         return {
             "argv": argv,
-            "returncode": 1 if any(item.endswith("verify_google_oauth_linking_operator_evidence_request.py") for item in argv) else 0,
+            "returncode": 1 if "verify-request" in argv else 0,
             "stdout_tail": [],
             "stderr_tail": [],
         }

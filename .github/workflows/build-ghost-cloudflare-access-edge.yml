@@ -1,0 +1,63 @@
+name: Build Ghost Cloudflare Access edge
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/build-ghost-cloudflare-access-edge.yml
+      - global.json
+      - docker-compose.build-ghost-private-nonprod.yml
+      - ops/build-ghost-private-nonprod/CLOUDFLARE_ACCESS_INGRESS_HANDOFF.md
+      - ops/build-ghost-private-nonprod/README.md
+      - ops/build-ghost-private-nonprod/Dockerfile.cloudflare-access-edge
+      - ops/build-ghost-private-nonprod/cloudflare-access-edge/**
+      - ops/build-ghost-private-nonprod/cloudflare-access-edge.tests/**
+      - ops/build-ghost-private-nonprod/verify-cloudflare-access-edge.sh
+      - tests/test_build_ghost_cloudflare_access_edge.py
+      - tests/test_build_ghost_private_nonprod_compose.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ghost-cloudflare-access-edge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Install the digest-locked private .NET SDK
+        shell: bash
+        run: |
+          edge_dotnet_script="${RUNNER_TEMP}/chummer-edge-dotnet-install.sh"
+          edge_dotnet_root="${RUNNER_TEMP}/chummer-edge-dotnet"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            https://dot.net/v1/dotnet-install.sh --output "${edge_dotnet_script}"
+          echo "082f7685e156738a1b2e2ed8381a621870d4ce8e8c59278034556f05c186eb2e  ${edge_dotnet_script}" \
+            | sha256sum --check --strict
+          bash "${edge_dotnet_script}" \
+            --version 10.0.103 \
+            --install-dir "${edge_dotnet_root}" \
+            --no-path
+          echo "${edge_dotnet_root}" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=${edge_dotnet_root}" >> "${GITHUB_ENV}"
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Install hash-locked test runner
+        run: >-
+          python3 -m pip install --disable-pip-version-check --no-input
+          --only-binary=:all: --require-hashes
+          --requirement eng/ci-python-requirements.txt
+      - name: Run canonical fail-closed verifier on exact SDK 10.0.103
+        shell: bash
+        run: |
+          test "$(dotnet --version)" = "10.0.103"
+          test "$(python3 -c 'import json; print(json.load(open("global.json", encoding="utf-8"))["sdk"]["version"])')" = "10.0.103"
+          ./ops/build-ghost-private-nonprod/verify-cloudflare-access-edge.sh

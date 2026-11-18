@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -24,20 +25,27 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
 
 
-LOCK_CONTRACT = "chummer-hub.package-plane-lock/v4"
-INVENTORY_CONTRACT = "chummer-hub.external-package-inventory/v3"
+LOCK_CONTRACT = "chummer-hub.package-plane-lock/v5"
+INVENTORY_CONTRACT = "chummer-hub.external-package-inventory/v4"
 INVENTORY_FILE_NAME = "chummer-hub-packages.inventory.json"
 OBSERVED_AUTHORITY_FILE_NAME = "chummer-hub-packages.observed-authority.json"
 EXPECTED_PACKAGE_IDS = (
-    "Chummer.Engine.Contracts",
     "Chummer.Hub.Registry.Contracts",
     "Chummer.Run.Registry",
     "Chummer.Play.Contracts",
     "Chummer.Run.Contracts",
+)
+EXPECTED_CORE_RUNTIME_PACKAGE_IDS = (
+    "Chummer.Engine.Contracts",
+    "Chummer.Application",
+    "Chummer.Rulesets.Hosting",
+    "Chummer.Rulesets.Sr5",
+    "Chummer.Rulesets.Sr6",
+    "Chummer.Infrastructure",
+    "Chummer.Rulesets.Sr4",
     "Chummer.Engine.GmCharacterEdits",
 )
 EXPECTED_INTERNAL_DEPENDENCIES = {
-    "Chummer.Engine.Contracts": (),
     "Chummer.Hub.Registry.Contracts": (),
     "Chummer.Run.Registry": ("Chummer.Hub.Registry.Contracts",),
     "Chummer.Play.Contracts": (),
@@ -46,21 +54,8 @@ EXPECTED_INTERNAL_DEPENDENCIES = {
         "Chummer.Hub.Registry.Contracts",
         "Chummer.Play.Contracts",
     ),
-    "Chummer.Engine.GmCharacterEdits": (
-        "Chummer.Engine.Contracts",
-        "Chummer.Hub.Registry.Contracts",
-        "Chummer.Run.Contracts",
-    ),
 }
 EXPECTED_PACKAGE_AUTHORITIES = {
-    "Chummer.Engine.Contracts": {
-        "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
-        "checkout_directory": "chummer-core-engine",
-        "project": "Chummer.Contracts/Chummer.Contracts.csproj",
-        "license_type": "expression",
-        "license_value": "GPL-3.0-only",
-        "license_sha256": None,
-    },
     "Chummer.Hub.Registry.Contracts": {
         "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
         "checkout_directory": "chummer-hub-registry",
@@ -101,14 +96,6 @@ EXPECTED_PACKAGE_AUTHORITIES = {
             "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
         ),
     },
-    "Chummer.Engine.GmCharacterEdits": {
-        "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
-        "checkout_directory": "chummer-core-engine",
-        "project": "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
-        "license_type": "expression",
-        "license_value": "GPL-3.0-only",
-        "license_sha256": None,
-    },
 }
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -132,14 +119,13 @@ RELATIONSHIPS_NAMESPACE = (
 )
 CANONICAL_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 CANONICAL_ZIP_EXTERNAL_ATTR = 0o100644 << 16
-GM_RUNTIME_ASSEMBLIES = (
-    "Chummer.Application",
-    "Chummer.Engine.GmCharacterEdits",
-    "Chummer.Infrastructure",
-    "Chummer.Rulesets.Hosting",
-    "Chummer.Rulesets.Sr5",
-    "Chummer.Rulesets.Sr6",
+CORE_RUNTIME_BUNDLE_INPUT_CONTRACT = (
+    "chummer-hub.core-runtime-bundle-input/v1"
 )
+CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH = Path(
+    "eng/core-runtime-bundle/core-runtime-bundle-input.json"
+)
+LOCAL_CORE_RECEIPT_PATH = "eng/core-local-runtime-receipt.json"
 
 
 class PackagePlaneError(RuntimeError):
@@ -162,6 +148,36 @@ class PackageSpec:
 
 
 @dataclass(frozen=True)
+class CoreRuntimePackageSpec:
+    package_id: str
+    version: str
+    file_name: str
+    sha256: str
+    size_bytes: int
+
+
+@dataclass(frozen=True)
+class CoreRuntimeAuthority:
+    authority_path: str
+    authority_sha256: str
+    repository: str
+    runtime_source_commit: str
+    package_recipe_commit: str
+    package_version: str
+    bundle_url: str
+    bundle_file_name: str
+    bundle_sha256: str
+    bundle_size_bytes: int
+    inventory_file_name: str
+    inventory_sha256: str
+    runtime_lock_file_name: str
+    runtime_lock_sha256: str
+    receipt_file_name: str
+    receipt_sha256: str
+    packages: tuple[CoreRuntimePackageSpec, ...]
+
+
+@dataclass(frozen=True)
 class PackagePlaneLock:
     dotnet_sdk: str
     dotnet_install_url: str
@@ -171,6 +187,7 @@ class PackagePlaneLock:
     approved_remote_source: str
     build_recipe_path: str
     build_recipe_sha256: str
+    core_runtime: CoreRuntimeAuthority
     packages: tuple[PackageSpec, ...]
 
 
@@ -193,6 +210,149 @@ def _safe_relative_path(raw: str, label: str) -> str:
     return raw
 
 
+def _positive_int(payload: Mapping[str, Any], key: str) -> int:
+    value = payload.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise PackagePlaneError(f"{key} must be a positive integer")
+    return value
+
+
+def _validate_core_runtime(payload: Any) -> CoreRuntimeAuthority:
+    expected_keys = {
+        "authority_path",
+        "authority_sha256",
+        "repository",
+        "runtime_source_commit",
+        "package_recipe_commit",
+        "package_version",
+        "bundle",
+        "inventory",
+        "runtime_lock",
+        "receipt",
+        "packages",
+    }
+    if not isinstance(payload, dict) or set(payload) != expected_keys:
+        raise PackagePlaneError("core_runtime must contain the exact authority fields")
+    authority_path = _safe_relative_path(
+        _required_string(payload, "authority_path"), "core_runtime.authority_path"
+    )
+    if authority_path not in {"eng/core-main-runtime-artifact-authority.json", LOCAL_CORE_RECEIPT_PATH}:
+        raise PackagePlaneError("core_runtime.authority_path is not approved")
+    authority_sha256 = _required_string(payload, "authority_sha256")
+    repository = _required_string(payload, "repository")
+    runtime_source_commit = _required_string(payload, "runtime_source_commit")
+    package_recipe_commit = _required_string(payload, "package_recipe_commit")
+    package_version = _required_string(payload, "package_version")
+    if SHA256_PATTERN.fullmatch(authority_sha256) is None:
+        raise PackagePlaneError("core runtime authority SHA256 must be canonical")
+    if repository != "https://github.com/ArchonMegalon/chummer6-core.git":
+        raise PackagePlaneError("core runtime repository is not approved")
+    if any(
+        SHA_PATTERN.fullmatch(value) is None
+        for value in (runtime_source_commit, package_recipe_commit)
+    ):
+        raise PackagePlaneError("core runtime commits must be exact lowercase SHAs")
+    if VERSION_PATTERN.fullmatch(package_version) is None:
+        raise PackagePlaneError("core runtime package version must be exact SemVer")
+
+    def file_binding(name: str, expected_keys: set[str]) -> dict[str, Any]:
+        value = payload.get(name)
+        if not isinstance(value, dict) or set(value) != expected_keys:
+            raise PackagePlaneError(f"core_runtime.{name} must contain exact fields")
+        return value
+
+    bundle = file_binding("bundle", {"url", "file_name", "sha256", "size_bytes"})
+    bundle_url = _required_string(bundle, "url")
+    bundle_file_name = _safe_relative_path(
+        _required_string(bundle, "file_name"), "core_runtime.bundle.file_name"
+    )
+    bundle_sha256 = _required_string(bundle, "sha256")
+    bundle_size_bytes = _positive_int(bundle, "size_bytes")
+    expected_release_root = (
+        "https://github.com/ArchonMegalon/chummer6-core/releases/download/"
+        f"core-runtime-package-plane-{package_recipe_commit}/"
+    )
+    expected_bundle_name = f"chummer-core-runtime-package-plane-{package_recipe_commit}.zip"
+    if bundle_url != expected_release_root + expected_bundle_name:
+        raise PackagePlaneError("core runtime bundle URL is not the exact public release")
+    if bundle_file_name != expected_bundle_name:
+        raise PackagePlaneError("core runtime bundle file name is not canonical")
+    if SHA256_PATTERN.fullmatch(bundle_sha256) is None:
+        raise PackagePlaneError("core runtime bundle SHA256 must be canonical")
+
+    inventory = file_binding("inventory", {"file_name", "sha256"})
+    runtime_lock = file_binding("runtime_lock", {"file_name", "sha256"})
+    receipt = file_binding("receipt", {"file_name", "sha256"})
+    file_rows = (
+        (inventory, "chummer-core-runtime-packages.inventory.json"),
+        (runtime_lock, "runtime-package-plane.lock.json"),
+        (receipt, "no-siblings.v3.receipt.json"),
+    )
+    for binding, expected_name in file_rows:
+        if _safe_relative_path(
+            _required_string(binding, "file_name"),
+            f"core_runtime.{expected_name}.file_name",
+        ) != expected_name:
+            raise PackagePlaneError(f"core runtime metadata file must be {expected_name}")
+        if SHA256_PATTERN.fullmatch(_required_string(binding, "sha256")) is None:
+            raise PackagePlaneError("core runtime metadata SHA256 must be canonical")
+    if authority_path == LOCAL_CORE_RECEIPT_PATH and authority_sha256 != receipt["sha256"]:
+        raise PackagePlaneError("local Core receipt must be the exact bundled receipt")
+
+    package_rows = payload.get("packages")
+    if not isinstance(package_rows, list):
+        raise PackagePlaneError("core_runtime.packages must be a list")
+    packages: list[CoreRuntimePackageSpec] = []
+    for index, row in enumerate(package_rows):
+        if not isinstance(row, dict) or set(row) != {
+            "id",
+            "version",
+            "file_name",
+            "sha256",
+            "size_bytes",
+        }:
+            raise PackagePlaneError(
+                f"core_runtime.packages[{index}] must contain exact fields"
+            )
+        package_id = _required_string(row, "id")
+        version = _required_string(row, "version")
+        file_name = _safe_relative_path(
+            _required_string(row, "file_name"),
+            f"core_runtime.packages[{index}].file_name",
+        )
+        digest = _required_string(row, "sha256")
+        size = _positive_int(row, "size_bytes")
+        if version != package_version:
+            raise PackagePlaneError("all Core runtime packages must use the bound version")
+        if file_name != f"{package_id}.{version}.nupkg":
+            raise PackagePlaneError("Core runtime package file name is not canonical")
+        if SHA256_PATTERN.fullmatch(digest) is None:
+            raise PackagePlaneError("Core runtime package SHA256 must be canonical")
+        packages.append(CoreRuntimePackageSpec(package_id, version, file_name, digest, size))
+    if tuple(row.package_id for row in packages) != EXPECTED_CORE_RUNTIME_PACKAGE_IDS:
+        raise PackagePlaneError("core_runtime.packages must contain the exact eight Core IDs")
+
+    return CoreRuntimeAuthority(
+        authority_path,
+        authority_sha256,
+        repository,
+        runtime_source_commit,
+        package_recipe_commit,
+        package_version,
+        bundle_url,
+        bundle_file_name,
+        bundle_sha256,
+        bundle_size_bytes,
+        _required_string(inventory, "file_name"),
+        _required_string(inventory, "sha256"),
+        _required_string(runtime_lock, "file_name"),
+        _required_string(runtime_lock, "sha256"),
+        _required_string(receipt, "file_name"),
+        _required_string(receipt, "sha256"),
+        tuple(packages),
+    )
+
+
 def validate_lock_payload(payload: Any) -> PackagePlaneLock:
     expected_top_level = {
         "contract",
@@ -202,10 +362,11 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         "package_version",
         "approved_remote_source",
         "build_recipe",
+        "core_runtime",
         "packages",
     }
     if not isinstance(payload, dict) or set(payload) != expected_top_level:
-        raise PackagePlaneError("package-plane lock must contain the exact v4 fields")
+        raise PackagePlaneError("package-plane lock must contain the exact v5 fields")
     if payload.get("contract") != LOCK_CONTRACT:
         raise PackagePlaneError(f"package-plane lock contract must be {LOCK_CONTRACT}")
     dotnet_sdk = _required_string(payload, "dotnet_sdk")
@@ -254,6 +415,8 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
     build_recipe_sha256 = _required_string(build_recipe, "sha256")
     if SHA256_PATTERN.fullmatch(build_recipe_sha256) is None:
         raise PackagePlaneError("build recipe SHA256 must be canonical")
+
+    core_runtime = _validate_core_runtime(payload.get("core_runtime"))
 
     rows = payload.get("packages")
     if not isinstance(rows, list):
@@ -370,6 +533,7 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         approved_remote_source,
         build_recipe_path,
         build_recipe_sha256,
+        core_runtime,
         tuple(packages),
     )
 
@@ -391,6 +555,73 @@ def validate_build_recipe(repo_root: Path, lock: PackagePlaneLock) -> None:
         or _sha256(recipe) != lock.build_recipe_sha256
     ):
         raise PackagePlaneError("package build recipe does not match the authority lock")
+    core_authority = repo_root / lock.core_runtime.authority_path
+    if (
+        core_authority.is_symlink()
+        or not core_authority.is_file()
+        or core_authority.resolve().parent != (repo_root / "eng").resolve()
+        or _sha256(core_authority) != lock.core_runtime.authority_sha256
+    ):
+        raise PackagePlaneError(
+            "Core runtime authority does not match the package-plane lock"
+        )
+    if lock.core_runtime.authority_path == LOCAL_CORE_RECEIPT_PATH:
+        _validate_local_core_receipt(core_authority, lock.core_runtime)
+
+
+def _validate_local_core_receipt(path: Path, authority: CoreRuntimeAuthority) -> None:
+    """Consume the existing exact Core result without inventing hosted identity.
+
+    The reviewed lock pins the whole receipt, inventory, runtime lock and eight
+    package byte identities. This is local package evidence only, not public
+    release, signing, deployment or provider activation authority.
+    """
+    metadata = path.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or not 0 < metadata.st_size <= 65536:
+        raise PackagePlaneError("local Core receipt must be one bounded regular file")
+    with path.open("rb") as source:
+        raw = source.read(65537)
+    if len(raw) > 65536 or hashlib.sha256(raw).hexdigest() != authority.receipt_sha256:
+        raise PackagePlaneError("local Core receipt bytes differ from the bundled receipt")
+
+    def unique_fields(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise PackagePlaneError("local Core receipt contains duplicate fields")
+            result[key] = value
+        return result
+
+    try:
+        receipt = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_fields)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PackagePlaneError("local Core receipt is not valid JSON") from exc
+    expected = {
+        "contract": "chummer-core.no-siblings-package-plane/v3",
+        "status": "pass",
+        "core_commit": authority.package_recipe_commit,
+        "package_recipe_commit": authority.package_recipe_commit,
+        "runtime_source_commit": authority.runtime_source_commit,
+        "candidate_package_version": authority.package_version,
+        "runtime_package_inventory_sha256": authority.inventory_sha256,
+        "runtime_package_plane_lock_sha256": authority.runtime_lock_sha256,
+        "no_sibling_directories": True,
+        "isolated_package_cache": True,
+        "package_source_mapping": {"Chummer.*": "locked-owner-contracts",
+                                   "other": "https://api.nuget.org/v3/index.json"},
+        **{name: "pass" for name in (
+            "normal_local_engine_dependency_graph", "build", "package_plane_runtime_test",
+            "local_owner_isolation_tests", "candidate_engine_contract_pack",
+            "candidate_gm_edit_runtime_pack", "candidate_gm_edit_runtime_consumer",
+            "eight_package_runtime_plane")},
+    }
+    if not isinstance(receipt, dict) or any(
+        type(receipt.get(key)) is not type(value) or receipt[key] != value
+        for key, value in expected.items()
+    ):
+        raise PackagePlaneError("local Core receipt is failed, incomplete or bound to another graph")
+    # Preserve the actual producer serialization. Its whole-byte digest, not a
+    # newly sorted/reformatted JSON representation, is the reviewed authority.
 
 
 def _run(
@@ -542,7 +773,10 @@ def package_build_properties(
     package_root: Path,
 ) -> tuple[str, ...]:
     normalized_source_root = f"/_/src/{spec.checkout_directory}"
-    versions = {row.package_id: row.version for row in lock.packages}
+    versions = {
+        **{row.package_id: row.version for row in lock.core_runtime.packages},
+        **{row.package_id: row.version for row in lock.packages},
+    }
     missing_local_contracts = package_root.parent / "no-local-core-contracts.csproj"
     return (
         f"-p:PackageVersion={spec.version}",
@@ -646,10 +880,6 @@ def _validate_payload_names(names: list[str], spec: PackageSpec) -> None:
         "README.md",
         "[Content_Types].xml",
     }
-    if spec.package_id == "Chummer.Engine.GmCharacterEdits":
-        allowed_exact.update(
-            f"lib/net10.0/{assembly}.dll" for assembly in GM_RUNTIME_ASSEMBLIES
-        )
     for name in names:
         path = PurePosixPath(name)
         if path.is_absolute() or "\\" in name or ".." in path.parts:
@@ -828,7 +1058,7 @@ def validate_package(
     expected_dependencies = tuple(
         sorted(
             (package_id, versions.get(package_id, version))
-            for package_id in EXPECTED_INTERNAL_DEPENDENCIES[spec.package_id]
+            for package_id in EXPECTED_INTERNAL_DEPENDENCIES.get(spec.package_id, ())
         )
     )
     if _internal_dependencies(root) != expected_dependencies:
@@ -864,7 +1094,10 @@ def _inventory_payload(
     lock: PackagePlaneLock, feed: Path, lock_sha256: str
 ) -> dict[str, Any]:
     packages = []
-    dependency_versions = {spec.package_id: spec.version for spec in lock.packages}
+    dependency_versions = {
+        **{spec.package_id: spec.version for spec in lock.core_runtime.packages},
+        **{spec.package_id: spec.version for spec in lock.packages},
+    }
     for spec in lock.packages:
         path = validate_package(feed, spec, dependency_versions)
         packages.append(
@@ -892,6 +1125,42 @@ def _expected_feed_entry_names(lock: PackagePlaneLock) -> set[str]:
         INVENTORY_FILE_NAME,
         *(f"{spec.package_id}.{spec.version}.nupkg" for spec in lock.packages),
     }
+
+
+def _assert_exact_staged_package_entries(
+    feed: Path,
+    lock: PackagePlaneLock,
+    *,
+    include_observed_authority: bool = False,
+) -> None:
+    if feed.is_symlink() or not feed.is_dir():
+        raise PackagePlaneError("Hub package staging must be a regular directory")
+    resolved_feed = feed.resolve()
+    expected = {
+        f"{spec.package_id}.{spec.version}.nupkg" for spec in lock.packages
+    }
+    if include_observed_authority:
+        expected.add(OBSERVED_AUTHORITY_FILE_NAME)
+    entries = list(feed.iterdir())
+    if any(
+        entry.is_symlink()
+        or not entry.is_file()
+        or entry.resolve().parent != resolved_feed
+        for entry in entries
+    ):
+        raise PackagePlaneError("Hub package staging entries must be contained regular files")
+    observed = {entry.name for entry in entries}
+    portable_observed = {entry.name.casefold() for entry in entries}
+    portable_expected = {name.casefold() for name in expected}
+    if (
+        observed != expected
+        or portable_observed != portable_expected
+        or len(portable_observed) != len(entries)
+    ):
+        raise PackagePlaneError(
+            "Hub package staging must contain exactly the four bound non-Core packages"
+            + (" and one observed-authority file" if include_observed_authority else "")
+        )
 
 
 def _assert_exact_feed_entries(feed: Path, lock: PackagePlaneLock) -> None:
@@ -948,7 +1217,10 @@ def validate_feed_inventory(
     rows = payload.get("packages")
     if not isinstance(rows, list) or len(rows) != len(lock.packages):
         raise PackagePlaneError("package inventory must contain the exact locked set")
-    dependency_versions = {spec.package_id: spec.version for spec in lock.packages}
+    dependency_versions = {
+        **{spec.package_id: spec.version for spec in lock.core_runtime.packages},
+        **{spec.package_id: spec.version for spec in lock.packages},
+    }
     for spec, row in zip(lock.packages, rows, strict=True):
         if not isinstance(row, dict):
             raise PackagePlaneError(f"invalid inventory row for {spec.package_id}")
@@ -989,16 +1261,235 @@ def validate_feed_inventory(
     return hashlib.sha256(inventory_bytes).hexdigest()
 
 
+def validate_core_runtime_feed(feed: Path, authority: CoreRuntimeAuthority) -> None:
+    if feed.is_symlink() or not feed.is_dir():
+        raise PackagePlaneError("Core runtime feed must be a regular directory")
+    resolved_feed = feed.resolve()
+    expected = {spec.file_name for spec in authority.packages}
+    entries = list(feed.iterdir())
+    if any(
+        entry.is_symlink()
+        or not entry.is_file()
+        or entry.resolve().parent != resolved_feed
+        for entry in entries
+    ):
+        raise PackagePlaneError("Core runtime feed entries must be contained regular files")
+    observed = {entry.name for entry in entries}
+    if observed != expected:
+        raise PackagePlaneError("Core runtime feed must contain exactly the eight bound nupkgs")
+    for spec in authority.packages:
+        path = feed / spec.file_name
+        if path.stat().st_size != spec.size_bytes or _sha256(path) != spec.sha256:
+            raise PackagePlaneError(
+                f"Core runtime package byte authority mismatch: {spec.package_id}"
+            )
+
+
+def materialize_core_runtime_feed(
+    bundle: Path,
+    feed: Path,
+    authority: CoreRuntimeAuthority,
+) -> None:
+    if bundle.is_symlink() or not bundle.is_file():
+        raise PackagePlaneError("Core runtime bundle must be one regular file")
+    if (
+        bundle.stat().st_size != authority.bundle_size_bytes
+        or _sha256(bundle) != authority.bundle_sha256
+    ):
+        raise PackagePlaneError("Core runtime public bundle byte authority mismatch")
+    if feed.exists() or feed.is_symlink():
+        raise PackagePlaneError("Core runtime feed destination must start absent")
+    expected_members = {
+        authority.inventory_file_name: authority.inventory_sha256,
+        authority.runtime_lock_file_name: authority.runtime_lock_sha256,
+        authority.receipt_file_name: authority.receipt_sha256,
+        **{
+            f"packages/{spec.file_name}": spec.sha256
+            for spec in authority.packages
+        },
+    }
+    try:
+        with zipfile.ZipFile(bundle) as archive:
+            infos = archive.infolist()
+            names = [info.filename for info in infos]
+            if len(names) != len(set(names)) or set(names) != set(expected_members):
+                raise PackagePlaneError(
+                    "Core runtime bundle must contain the exact bound member set"
+                )
+            if archive.comment:
+                raise PackagePlaneError("Core runtime bundle comment is forbidden")
+            payloads: dict[str, bytes] = {}
+            for info in infos:
+                path = PurePosixPath(info.filename)
+                if (
+                    path.is_absolute()
+                    or "\\" in info.filename
+                    or ".." in path.parts
+                    or info.is_dir()
+                    or info.date_time != CANONICAL_ZIP_TIMESTAMP
+                    or info.compress_type != zipfile.ZIP_STORED
+                    or info.create_system != 3
+                    or info.create_version != 20
+                    or info.extract_version != 20
+                    or info.flag_bits != 0
+                    or info.external_attr != CANONICAL_ZIP_EXTERNAL_ATTR
+                    or info.extra
+                    or info.comment
+                ):
+                    raise PackagePlaneError(
+                        f"unsafe or non-canonical Core bundle member: {info.filename}"
+                    )
+                payload = archive.read(info)
+                if hashlib.sha256(payload).hexdigest() != expected_members[info.filename]:
+                    raise PackagePlaneError(
+                        f"Core runtime bundle member digest mismatch: {info.filename}"
+                    )
+                payloads[info.filename] = payload
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise PackagePlaneError(f"invalid Core runtime bundle: {exc}") from exc
+
+    feed.mkdir(parents=True, mode=0o700)
+    for spec in authority.packages:
+        target = feed / spec.file_name
+        target.write_bytes(payloads[f"packages/{spec.file_name}"])
+        target.chmod(0o600)
+    validate_core_runtime_feed(feed, authority)
+
+
+def load_core_runtime_bundle_input(
+    repo_root: Path,
+    authority: CoreRuntimeAuthority,
+) -> Path:
+    """Bind a staged Core bundle to its exact reviewed release authority."""
+
+    repo_root = repo_root.resolve()
+    bundle_root = repo_root / "eng/core-runtime-bundle"
+    receipt = repo_root / CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH
+    try:
+        bundle_root_metadata = bundle_root.lstat()
+        receipt_metadata = receipt.lstat()
+        raw = receipt.read_bytes()
+    except OSError as exc:
+        raise PackagePlaneError("Core runtime bundle input receipt is unavailable") from exc
+    if (
+        bundle_root.is_symlink()
+        or not bundle_root.is_dir()
+        or bundle_root.resolve() != bundle_root
+        or not stat.S_ISDIR(bundle_root_metadata.st_mode)
+        or receipt.is_symlink()
+        or not receipt.is_file()
+        or receipt.resolve().parent != bundle_root
+        or receipt_metadata.st_nlink != 1
+        or len(raw) > 16 * 1024
+    ):
+        raise PackagePlaneError(
+            "Core runtime bundle input receipt must be one contained regular file"
+        )
+    receipt_after = receipt.lstat()
+    if (
+        receipt_metadata.st_dev,
+        receipt_metadata.st_ino,
+        receipt_metadata.st_mode,
+        receipt_metadata.st_nlink,
+        receipt_metadata.st_size,
+        receipt_metadata.st_mtime_ns,
+        receipt_metadata.st_ctime_ns,
+    ) != (
+        receipt_after.st_dev,
+        receipt_after.st_ino,
+        receipt_after.st_mode,
+        receipt_after.st_nlink,
+        receipt_after.st_size,
+        receipt_after.st_mtime_ns,
+        receipt_after.st_ctime_ns,
+    ):
+        raise PackagePlaneError("Core runtime bundle input receipt changed while read")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise PackagePlaneError(
+                    "Core runtime bundle input receipt contains duplicate fields"
+                )
+            result[key] = value
+        return result
+
+    try:
+        payload = json.loads(
+            raw.decode("utf-8", "strict"),
+            object_pairs_hook=reject_duplicate_keys,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PackagePlaneError(
+            "Core runtime bundle input receipt is not strict JSON"
+        ) from exc
+    expected = {
+        "contract": CORE_RUNTIME_BUNDLE_INPUT_CONTRACT,
+        "file_name": authority.bundle_file_name,
+        "sha256": authority.bundle_sha256,
+        "size_bytes": authority.bundle_size_bytes,
+        "url": authority.bundle_url,
+    }
+    canonical = (json.dumps(expected, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+    if payload != expected or raw != canonical:
+        raise PackagePlaneError(
+            "Core runtime bundle input receipt does not match exact authority"
+        )
+    bundle = receipt.parent / authority.bundle_file_name
+    try:
+        metadata = bundle.lstat()
+    except OSError as exc:
+        raise PackagePlaneError("Core runtime bundle input is unavailable") from exc
+    if (
+        bundle.is_symlink()
+        or not bundle.is_file()
+        or bundle.resolve().parent != bundle_root
+        or metadata.st_nlink != 1
+        or metadata.st_size != authority.bundle_size_bytes
+        or _sha256(bundle) != authority.bundle_sha256
+    ):
+        raise PackagePlaneError(
+            "Core runtime bundle input bytes do not match exact authority"
+        )
+    bundle_after = bundle.lstat()
+    if (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    ) != (
+        bundle_after.st_dev,
+        bundle_after.st_ino,
+        bundle_after.st_mode,
+        bundle_after.st_nlink,
+        bundle_after.st_size,
+        bundle_after.st_mtime_ns,
+        bundle_after.st_ctime_ns,
+    ):
+        raise PackagePlaneError("Core runtime bundle input changed while hashed")
+    return bundle
+
+
 def build_feed(
     lock: PackagePlaneLock,
     *,
     lock_sha256: str,
     feed: Path,
     dotnet: str,
+    core_feed: Path | None = None,
     observe_package_authority: bool = False,
 ) -> str:
     if feed.exists() or feed.is_symlink():
         raise PackagePlaneError("feed destination must start absent; package reuse is forbidden")
+    if core_feed is None:
+        raise PackagePlaneError("an exact Core runtime feed is required")
+    validate_core_runtime_feed(core_feed, lock.core_runtime)
     feed.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="hub-package-plane-", dir=feed.parent) as temporary:
         root = Path(temporary)
@@ -1021,9 +1512,20 @@ def build_feed(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
             "<configuration><packageSources><clear />"
             f"<add key=\"locked-chummer\" value=\"{staged_feed}\" />"
+            f"<add key=\"locked-core-runtime\" value=\"{core_feed.resolve()}\" />"
             f"<add key=\"nuget.org\" value=\"{lock.approved_remote_source}\" protocolVersion=\"3\" />"
             "</packageSources><packageSourceMapping>"
-            "<packageSource key=\"locked-chummer\"><package pattern=\"Chummer.*\" /></packageSource>"
+            "<packageSource key=\"locked-chummer\">"
+            + "".join(
+                f"<package pattern=\"{spec.package_id}\" />" for spec in lock.packages
+            )
+            + "</packageSource>"
+            "<packageSource key=\"locked-core-runtime\">"
+            + "".join(
+                f"<package pattern=\"{spec.package_id}\" />"
+                for spec in lock.core_runtime.packages
+            )
+            + "</packageSource>"
             "<packageSource key=\"nuget.org\"><package pattern=\"*\" /></packageSource>"
             "</packageSourceMapping></configuration>\n",
             encoding="utf-8",
@@ -1099,10 +1601,17 @@ def build_feed(
             validate_package(
                 staged_feed,
                 spec,
-                {row.package_id: row.version for row in lock.packages},
+                {
+                    **{
+                        row.package_id: row.version
+                        for row in lock.core_runtime.packages
+                    },
+                    **{row.package_id: row.version for row in lock.packages},
+                },
                 enforce_locked_bytes=not observe_package_authority,
             )
         if observe_package_authority:
+            _assert_exact_staged_package_entries(staged_feed, lock)
             observed = {
                 "contract": "chummer-hub.observed-package-authority/v1",
                 "packages": [
@@ -1120,6 +1629,11 @@ def build_feed(
                 ],
             }
             _write_json(staged_feed / OBSERVED_AUTHORITY_FILE_NAME, observed)
+            _assert_exact_staged_package_entries(
+                staged_feed,
+                lock,
+                include_observed_authority=True,
+            )
             observed_bytes = (staged_feed / OBSERVED_AUTHORITY_FILE_NAME).read_bytes()
             os.replace(staged_feed, feed)
             return hashlib.sha256(observed_bytes).hexdigest()
@@ -1134,10 +1648,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--lock", type=Path)
     parser.add_argument("--feed", type=Path)
+    parser.add_argument("--core-feed", type=Path)
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--print-version", action="store_true")
     parser.add_argument("--observe-package-authority", action="store_true")
+    parser.add_argument("--core-runtime-bundle-input", action="store_true")
+    parser.add_argument("--prebuilt-hub-feed-input", action="store_true")
     return parser.parse_args()
 
 
@@ -1155,12 +1672,33 @@ def main() -> int:
         raise PackagePlaneError("--feed is required unless --print-version is used")
     feed = args.feed.resolve()
     if args.validate_only:
+        if args.core_runtime_bundle_input or args.prebuilt_hub_feed_input:
+            raise PackagePlaneError(
+                "build-input flags are invalid with --validate-only"
+            )
         digest = validate_feed_inventory(feed, lock, lock_sha256)
+    elif args.prebuilt_hub_feed_input:
+        if not args.core_runtime_bundle_input or args.core_feed is None:
+            raise PackagePlaneError(
+                "prebuilt Hub feed input requires the exact Core bundle input"
+            )
+        core_feed = args.core_feed.resolve()
+        bundle = load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+        materialize_core_runtime_feed(bundle, core_feed, lock.core_runtime)
+        digest = validate_feed_inventory(feed, lock, lock_sha256)
+        validate_core_runtime_feed(core_feed, lock.core_runtime)
     else:
+        if args.core_feed is None:
+            raise PackagePlaneError("--core-feed is required when building the Hub feed")
+        core_feed = args.core_feed.resolve()
+        if args.core_runtime_bundle_input:
+            bundle = load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+            materialize_core_runtime_feed(bundle, core_feed, lock.core_runtime)
         digest = build_feed(
             lock,
             lock_sha256=lock_sha256,
             feed=feed,
+            core_feed=core_feed,
             dotnet=args.dotnet,
             observe_package_authority=args.observe_package_authority,
         )

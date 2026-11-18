@@ -2118,7 +2118,9 @@ public sealed class PublicLandingDownloadDispatchTests
             consumeQuota: true);
 
         HorizonArtifactRequestReceiptStore reloaded = new(fixture.Configuration);
-        IReadOnlyList<HorizonArtifactRequestReceipt> recent = reloaded.ListRecent(userId: "subject.receipts", limit: 10);
+        HorizonArtifactRequestService reloadedRequests = new(capabilities,
+            new HorizonArtifactQuotaService(new HorizonArtifactUsageStore(fixture.Configuration), capabilities, fixture.Billing), reloaded);
+        IReadOnlyList<HorizonArtifactRequestReceipt> recent = reloadedRequests.ListRecentReceipts(userId: "subject.receipts", limit: 10);
 
         Assert.Equal(2, recent.Count);
         Assert.Contains(recent, receipt => receipt.RequestId == accepted.RequestId && receipt.Status == "accepted");

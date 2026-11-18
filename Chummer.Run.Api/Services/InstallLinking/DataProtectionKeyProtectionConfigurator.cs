@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
+using Chummer.Storage.Teable;
+using Chummer.Run.Api.Services.Teable;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -9,6 +12,11 @@ namespace Chummer.Run.Api.Services.InstallLinking;
 
 public static class DataProtectionKeyProtectionConfigurator
 {
+    internal const string OwnerOnlyLocalMode = "owner_only_local";
+    internal const string OwnerOnlyLocalStatus = "owner_only_local_key_ring";
+    private const int MaximumCertificatesInBundle = 16;
+    private const int MaximumPrivateKeyCertificates = 8;
+
     public static DataProtectionKeyProtectionStatus Configure(
         IServiceCollection services,
         IConfiguration configuration,
@@ -24,6 +32,48 @@ public static class DataProtectionKeyProtectionConfigurator
         {
             builder.UseEphemeralDataProtectionProvider();
             return new(false, "plaintext_certificate_password_rejected");
+        }
+
+        string protectionMode = configuration["CHUMMER_DATA_PROTECTION_KEY_PROTECTION_MODE"]?.Trim()
+            ?? "certificate";
+        if (protectionMode == TeableDataProtectionRuntime.Mode)
+        {
+            if (certificatePath is not null || passwordFile is not null)
+            {
+                builder.UseEphemeralDataProtectionProvider();
+                return new(false, "data_protection_conflicting_key_protection_modes");
+            }
+
+            try
+            {
+                var store = TeableRevisionStore.OpenFromPrivateTokenFile(
+                    new Uri(configuration["CHUMMER_TEABLE_ORIGIN"] ?? "https://app.teable.ai/"),
+                    configuration["CHUMMER_DATA_PROTECTION_TEABLE_TABLE_ID"] ?? string.Empty,
+                    configuration["CHUMMER_DATA_PROTECTION_TEABLE_TOKEN_FILE"] ?? string.Empty);
+                return ConfigureTeablePrimary(builder, store, ownsStore: true);
+            }
+            catch
+            {
+                builder.UseEphemeralDataProtectionProvider();
+                return new(false, "teable_key_ring_configuration_invalid");
+            }
+        }
+
+        if (protectionMode == OwnerOnlyLocalMode)
+        {
+            if (certificatePath is not null || passwordFile is not null)
+            {
+                builder.UseEphemeralDataProtectionProvider();
+                return new(false, "data_protection_conflicting_key_protection_modes");
+            }
+
+            return ConfigureOwnerOnlyLocal(builder, keyRingPath);
+        }
+
+        if (protectionMode != "certificate")
+        {
+            builder.UseEphemeralDataProtectionProvider();
+            return new(false, "data_protection_key_protection_mode_invalid");
         }
 
         if (certificatePath is null || passwordFile is null)
@@ -49,8 +99,8 @@ public static class DataProtectionKeyProtectionConfigurator
 
             byte[] certificateBytes = ReadSecretFile(certificatePath, 2 * 1024 * 1024, production);
             byte[] passwordBytes = [];
-            X509Certificate2? certificate = null;
-            bool certificateRegistered = false;
+            X509Certificate2Collection? certificates = null;
+            bool certificatesRegistered = false;
             try
             {
                 passwordBytes = ReadSecretFile(passwordFile, 16 * 1024, production);
@@ -60,34 +110,56 @@ public static class DataProtectionKeyProtectionConfigurator
                     throw new InvalidDataException("Certificate password file is invalid.");
                 }
 
-#pragma warning disable SYSLIB0057
-                certificate = new X509Certificate2(
+                certificates = X509CertificateLoader.LoadPkcs12Collection(
                     certificateBytes,
                     password,
                     X509KeyStorageFlags.EphemeralKeySet);
-#pragma warning restore SYSLIB0057
-                if (!certificate.HasPrivateKey
-                    || certificate.NotBefore.ToUniversalTime() > DateTime.UtcNow
-                    || certificate.NotAfter.ToUniversalTime() <= DateTime.UtcNow.AddDays(7))
+                if (certificates.Count is < 1 or > MaximumCertificatesInBundle)
                 {
-                    throw new InvalidDataException("Data-protection certificate is not currently usable.");
+                    throw new InvalidDataException(
+                        "Data-protection certificate bundle inventory is unbounded.");
                 }
 
-                using (RSA? rsa = certificate.GetRSAPrivateKey())
+                X509Certificate2[] privateKeyCertificates = certificates
+                    .Where(static candidate => candidate.HasPrivateKey)
+                    .ToArray();
+                if (privateKeyCertificates.Length is < 1 or > MaximumPrivateKeyCertificates
+                    || privateKeyCertificates
+                        .Select(static candidate => candidate.Thumbprint)
+                        .Any(static thumbprint => string.IsNullOrWhiteSpace(thumbprint))
+                    || privateKeyCertificates
+                        .Select(static candidate => candidate.Thumbprint)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Count() != privateKeyCertificates.Length)
                 {
-                    X509KeyUsageExtension? keyUsage = certificate.Extensions
-                        .OfType<X509KeyUsageExtension>()
-                        .SingleOrDefault();
-                    if (rsa is null
-                        || rsa.KeySize < 2048
-                        || (keyUsage is not null
-                            && (keyUsage.KeyUsages
-                                & (X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.DataEncipherment)) == 0))
-                    {
-                        throw new InvalidDataException(
-                            "Data-protection certificate must have an RSA encryption-capable private key.");
-                    }
+                    throw new InvalidDataException(
+                        "Data-protection certificate bundle is not bounded and unique.");
                 }
+
+                foreach (X509Certificate2 candidate in privateKeyCertificates)
+                {
+                    ValidateEncryptionCertificate(candidate);
+                }
+
+                DateTime latestExpiry = privateKeyCertificates
+                    .Max(static candidate => candidate.NotAfter.ToUniversalTime());
+                X509Certificate2[] primaryCandidates = privateKeyCertificates
+                    .Where(candidate => candidate.NotAfter.ToUniversalTime() == latestExpiry)
+                    .ToArray();
+                DateTime utcNow = DateTime.UtcNow;
+                if (primaryCandidates.Length != 1
+                    || primaryCandidates[0].NotBefore.ToUniversalTime() > utcNow
+                    || latestExpiry <= utcNow.AddDays(7))
+                {
+                    throw new InvalidDataException(
+                        "Data-protection primary certificate is not uniquely usable.");
+                }
+
+                X509Certificate2 primaryCertificate = primaryCandidates[0];
+                X509Certificate2[] decryptionCertificates = privateKeyCertificates
+                    .OrderByDescending(static candidate => candidate.NotAfter.ToUniversalTime())
+                    .ThenBy(static candidate => candidate.Thumbprint, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
 
                 if (LinuxSecureFile.IsSupportedPlatform)
                 {
@@ -98,7 +170,10 @@ public static class DataProtectionKeyProtectionConfigurator
                     Directory.CreateDirectory(keyRingPath);
                 }
 
-                VerifyDataProtectionRoundTrip(certificate, Path.GetFullPath(keyRingPath));
+                VerifyDataProtectionRoundTrip(
+                    primaryCertificate,
+                    decryptionCertificates,
+                    Path.GetFullPath(keyRingPath));
                 string? keyRingFailure = ValidateEncryptedKeyRing(
                     Path.GetFullPath(keyRingPath),
                     repairOwnerMode: true);
@@ -109,15 +184,29 @@ public static class DataProtectionKeyProtectionConfigurator
 
                 builder
                     .PersistKeysToFileSystem(new DirectoryInfo(Path.GetFullPath(keyRingPath)))
-                    .ProtectKeysWithCertificate(certificate);
-                certificateRegistered = true;
-                return new(true, "certificate_key_encryptor_configured");
+                    .ProtectKeysWithCertificate(primaryCertificate)
+                    .UnprotectKeysWithAnyCertificate(decryptionCertificates);
+                foreach (X509Certificate2 certificate in certificates
+                             .Where(static candidate => !candidate.HasPrivateKey))
+                {
+                    certificate.Dispose();
+                }
+
+                certificatesRegistered = true;
+                return new(
+                    true,
+                    decryptionCertificates.Length == 1
+                        ? "certificate_key_encryptor_configured"
+                        : "certificate_rotation_key_encryptor_configured");
             }
             finally
             {
-                if (!certificateRegistered)
+                if (!certificatesRegistered && certificates is not null)
                 {
-                    certificate?.Dispose();
+                    foreach (X509Certificate2 certificate in certificates)
+                    {
+                        certificate.Dispose();
+                    }
                 }
 
                 CryptographicOperations.ZeroMemory(certificateBytes);
@@ -128,6 +217,80 @@ public static class DataProtectionKeyProtectionConfigurator
         {
             builder.UseEphemeralDataProtectionProvider();
             return new(false, "data_protection_key_encryptor_invalid");
+        }
+    }
+
+    internal static DataProtectionKeyProtectionStatus ConfigureTeablePrimary(
+        IDataProtectionBuilder builder, TeableRevisionStore store, bool ownsStore)
+    {
+        var runtime = new TeableDataProtectionRuntime(store, ownsStore);
+        try
+        {
+            runtime.VerifyColdRoundTrip();
+            builder.Services.AddSingleton<IDataProtectionPrimaryReadinessProbe>(_ => runtime);
+            builder.Services.AddOptions<KeyManagementOptions>().Configure<IDataProtectionPrimaryReadinessProbe>((options, probe) =>
+            {
+                options.XmlRepository = (TeableDataProtectionRuntime)probe;
+                options.XmlEncryptor = null;
+            });
+            return new(true, TeableDataProtectionRuntime.ReadyCode);
+        }
+        catch
+        {
+            runtime.Dispose();
+            builder.UseEphemeralDataProtectionProvider();
+            return new(false, "teable_key_ring_configuration_invalid");
+        }
+    }
+
+    private static DataProtectionKeyProtectionStatus ConfigureOwnerOnlyLocal(
+        IDataProtectionBuilder builder,
+        string keyRingPath)
+    {
+        try
+        {
+            // This is an explicit single-host custody choice, never an automatic
+            // fallback for missing certificate secrets or an old encrypted ring.
+            var repository = new OwnerOnlyDataProtectionKeyRepository(keyRingPath);
+            _ = repository.GetAllElements();
+            VerifyDataProtectionRoundTrip(keyRingPath, verification =>
+                verification.Services.Configure<KeyManagementOptions>(options =>
+                {
+                    options.XmlRepository = repository;
+                    options.XmlEncryptor = null;
+                }));
+            builder.Services.Configure<KeyManagementOptions>(options =>
+            {
+                options.XmlRepository = repository;
+                options.XmlEncryptor = null;
+            });
+            return new(true, OwnerOnlyLocalStatus);
+        }
+        catch
+        {
+            builder.UseEphemeralDataProtectionProvider();
+            return new(false, "data_protection_owner_only_key_ring_invalid");
+        }
+    }
+
+    internal static string? ValidateConfiguredKeyRing(
+        string keyRingPath,
+        DataProtectionKeyProtectionStatus status)
+    {
+        if (status.Code == TeableDataProtectionRuntime.ReadyCode)
+            return "teable_key_ring_requires_primary_probe";
+        if (status is not { Ready: true, Code: OwnerOnlyLocalStatus })
+            return ValidateEncryptedKeyRing(keyRingPath, repairOwnerMode: false);
+
+        try
+        {
+            var repository = new OwnerOnlyDataProtectionKeyRepository(keyRingPath);
+            return repository.GetAllElements().Any(element => element.Name == "key")
+                ? null : "key_ring_empty";
+        }
+        catch
+        {
+            return "data_protection_owner_only_key_ring_invalid";
         }
     }
 
@@ -151,12 +314,38 @@ public static class DataProtectionKeyProtectionConfigurator
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : Path.GetFullPath(value.Trim());
 
-    private static void VerifyDataProtectionRoundTrip(X509Certificate2 certificate, string keyRingPath)
+    private static void ValidateEncryptionCertificate(X509Certificate2 certificate)
+    {
+        using RSA? rsa = certificate.GetRSAPrivateKey();
+        X509KeyUsageExtension? keyUsage = certificate.Extensions
+            .OfType<X509KeyUsageExtension>()
+            .SingleOrDefault();
+        if (rsa is null
+            || rsa.KeySize < 2048
+            || (keyUsage is not null
+                && (keyUsage.KeyUsages
+                    & (X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.DataEncipherment)) == 0))
+        {
+            throw new InvalidDataException(
+                "Data-protection certificate must have an RSA encryption-capable private key.");
+        }
+    }
+
+    private static void VerifyDataProtectionRoundTrip(
+        X509Certificate2 primaryCertificate,
+        X509Certificate2[] decryptionCertificates,
+        string keyRingPath)
+        => VerifyDataProtectionRoundTrip(keyRingPath, verification => verification
+            .ProtectKeysWithCertificate(primaryCertificate)
+            .UnprotectKeysWithAnyCertificate(decryptionCertificates));
+
+    private static void VerifyDataProtectionRoundTrip(
+        string keyRingPath,
+        Action<IDataProtectionBuilder> configure)
     {
         IDataProtectionProvider provider = DataProtectionProvider.Create(
             new DirectoryInfo(keyRingPath),
-            static verification => verification.SetApplicationName("Chummer.Run.Api"),
-            certificate);
+            verification => configure(verification.SetApplicationName("Chummer.Run.Api")));
         byte[] cleartext = RandomNumberGenerator.GetBytes(32);
         byte[]? protectedPayload = null;
         byte[]? recovered = null;

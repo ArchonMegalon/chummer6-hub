@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ElementTree
@@ -16,16 +18,49 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
+VERIFY_SCRIPT_PATH = ROOT / "scripts" / "ai" / "verify-hub-package-plane.py"
 PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
-PACKAGE_VERSION = "0.1.0-preview"
+CORE_RUNTIME_BUNDLE_INPUT = (
+    ROOT / "eng/core-runtime-bundle/core-runtime-bundle-input.json"
+)
+CORE_RUNTIME_BUNDLE = (
+    Path(
+        os.environ.get(
+            "CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE",
+            str(
+                ROOT.parent
+                / "core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd-input"
+            ),
+        )
+    )
+    /
+    "chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip"
+)
+PACKAGE_VERSION = "0.1.1-packageplane.20260927.1"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha8a736655c5d8",
-    "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
-    "Chummer.Run.Registry": "0.1.0-preview",
-    "Chummer.Play.Contracts": "0.1.0-preview",
-    "Chummer.Run.Contracts": "0.1.0-preview",
-    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sha8a736655c5d8",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sh5160e78a60bce",
+    "Chummer.Hub.Registry.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Registry": PACKAGE_VERSION,
+    "Chummer.Play.Contracts": PACKAGE_VERSION,
+    "Chummer.Run.Contracts": PACKAGE_VERSION,
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sh5160e78a60bce",
+}
+CORE_RUNTIME_PACKAGE_IDS = {
+    "Chummer.Engine.Contracts",
+    "Chummer.Application",
+    "Chummer.Rulesets.Hosting",
+    "Chummer.Rulesets.Sr5",
+    "Chummer.Rulesets.Sr6",
+    "Chummer.Infrastructure",
+    "Chummer.Rulesets.Sr4",
+    "Chummer.Engine.GmCharacterEdits",
+}
+HUB_PACKAGE_IDS = {
+    "Chummer.Hub.Registry.Contracts",
+    "Chummer.Run.Registry",
+    "Chummer.Play.Contracts",
+    "Chummer.Run.Contracts",
 }
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
@@ -39,6 +74,8 @@ PACKAGE_PLANE_PROJECTS = (
     "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj",
     "Chummer.Run.Api/Chummer.Run.Api.csproj",
     "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj",
+    "Chummer.BuildGhost.ToughTongue.Tests/Chummer.BuildGhost.ToughTongue.Tests.csproj",
+    "Chummer.Run.Api.Postgres.Tests/Chummer.Run.Api.Postgres.Tests.csproj",
     "Chummer.Tests/Chummer.Tests.csproj",
 )
 LOCKED_PROJECTS = (
@@ -49,6 +86,7 @@ LOCKED_PROJECTS = (
     "Chummer.World.Contracts",
     "Chummer.Run.Api",
     "Chummer.Run.Api.Tests",
+    "Chummer.BuildGhost.ToughTongue.Tests",
 )
 OWNER_VERSION_PROPERTIES = {
     "Chummer.Engine.Contracts": "ChummerEngineContractsPackageVersion",
@@ -60,6 +98,17 @@ OWNER_VERSION_PROPERTIES = {
 
 def load_module():
     spec = importlib.util.spec_from_file_location("hub_package_plane", SCRIPT_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_verifier_module():
+    spec = importlib.util.spec_from_file_location(
+        "hub_package_plane_verifier", VERIFY_SCRIPT_PATH
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -83,20 +132,79 @@ def _parent_map(root: ElementTree.Element) -> dict[ElementTree.Element, ElementT
     return {child: parent for parent in root.iter() for child in parent}
 
 
+def test_hosted_api_suite_includes_every_focused_android_linked_test() -> None:
+    focused_path = ROOT / "Chummer.Tests/Chummer.Tests.csproj"
+    focused = ElementTree.parse(focused_path).getroot()
+    focused_groups = [
+        group for group in focused.findall("ItemGroup")
+        if group.attrib.get("Condition") == "'$(RunAndroidLinkedV2BearerProofTestsOnly)' == 'true'"
+    ]
+    assert len(focused_groups) == 1
+    expected = {
+        (focused_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for item in focused_groups[0].findall("Compile")
+    }
+    assert expected
+    hosted_path = ROOT / "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj"
+    hosted = ElementTree.parse(hosted_path).getroot()
+    included = {
+        (hosted_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for group in hosted.findall("ItemGroup") if "Condition" not in group.attrib
+        for item in group.findall("Compile") if "Condition" not in item.attrib
+    }
+    assert expected <= included, f"Focused linked tests missing from hosted suite: {expected - included}"
+    expected_projects = {
+        (focused_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for item in focused_groups[0].findall("ProjectReference")
+    }
+    included_projects = {
+        (hosted_path.parent / item.attrib["Include"].replace("\\", "/")).resolve()
+        for group in hosted.findall("ItemGroup") if "Condition" not in group.attrib
+        for item in group.findall("ProjectReference") if "Condition" not in item.attrib
+    }
+    assert expected_projects <= included_projects, (
+        f"Focused linked test dependencies missing from hosted suite: {expected_projects - included_projects}"
+    )
+
+
 def test_lock_pins_exact_owner_commits_and_package_version() -> None:
     module = load_module()
     lock = module.load_lock(LOCK_PATH)
     assert lock.package_version == PACKAGE_VERSION
     assert [spec.package_id for spec in lock.packages] == [
-        "Chummer.Engine.Contracts",
         "Chummer.Hub.Registry.Contracts",
         "Chummer.Run.Registry",
         "Chummer.Play.Contracts",
         "Chummer.Run.Contracts",
+    ]
+    assert [spec.package_id for spec in lock.core_runtime.packages] == [
+        "Chummer.Engine.Contracts",
+        "Chummer.Application",
+        "Chummer.Rulesets.Hosting",
+        "Chummer.Rulesets.Sr5",
+        "Chummer.Rulesets.Sr6",
+        "Chummer.Infrastructure",
+        "Chummer.Rulesets.Sr4",
         "Chummer.Engine.GmCharacterEdits",
     ]
+    assert lock.core_runtime.package_version == (
+        "0.0.0-packageplane.candidate.sh5160e78a60bce"
+    )
+    assert lock.core_runtime.runtime_source_commit == (
+        "5160e78a60bcefd952e8720aae6032a127c3a755"
+    )
+    assert lock.core_runtime.package_recipe_commit == (
+        "1e477c0f5e036eed241f4fe723a0e2eda30c51dd"
+    )
     assert all(len(spec.commit) == 40 for spec in lock.packages)
-    assert {spec.package_id: spec.version for spec in lock.packages} == OWNER_PACKAGE_VERSIONS
+    assert {spec.package_id: spec.version for spec in lock.packages} == {
+        package_id: version
+        for package_id, version in OWNER_PACKAGE_VERSIONS.items()
+        if package_id not in {
+            "Chummer.Engine.Contracts",
+            "Chummer.Engine.GmCharacterEdits",
+        }
+    }
     assert all(spec.nupkg_sha256 and spec.nupkg_size_bytes > 0 for spec in lock.packages)
     assert lock.dotnet_install_url == "https://dot.net/v1/dotnet-install.sh"
     assert len(lock.dotnet_install_sha256) == 64
@@ -106,7 +214,7 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
     module = load_module()
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     payload["unbound"] = True
-    with pytest.raises(module.PackagePlaneError, match="exact v4 fields"):
+    with pytest.raises(module.PackagePlaneError, match="exact v5 fields"):
         module.validate_lock_payload(payload)
 
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
@@ -123,6 +231,215 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
         payload["packages"][0][key] = value
         with pytest.raises(module.PackagePlaneError, match="immutable authority mismatch"):
             module.validate_lock_payload(payload)
+
+
+def _local_core_receipt_fixture(tmp_path: Path):
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    core = lock.core_runtime
+    receipt = {
+        "contract": "chummer-core.no-siblings-package-plane/v3",
+        "status": "pass",
+        "core_commit": core.package_recipe_commit,
+        "package_recipe_commit": core.package_recipe_commit,
+        "runtime_source_commit": core.runtime_source_commit,
+        "candidate_package_version": core.package_version,
+        "runtime_package_inventory_sha256": core.inventory_sha256,
+        "runtime_package_plane_lock_sha256": core.runtime_lock_sha256,
+        "no_sibling_directories": True,
+        "isolated_package_cache": True,
+        "package_source_mapping": {"Chummer.*": "locked-owner-contracts",
+                                   "other": "https://api.nuget.org/v3/index.json"},
+        **{name: "pass" for name in (
+            "normal_local_engine_dependency_graph", "build", "package_plane_runtime_test",
+            "local_owner_isolation_tests", "candidate_engine_contract_pack",
+            "candidate_gm_edit_runtime_pack", "candidate_gm_edit_runtime_consumer",
+            "eight_package_runtime_plane")},
+    }
+    (tmp_path / "eng").mkdir()
+    (tmp_path / "scripts/ai").mkdir(parents=True)
+    shutil.copyfile(SCRIPT_PATH, tmp_path / lock.build_recipe_path)
+    path = tmp_path / "eng/core-local-runtime-receipt.json"
+    raw = (json.dumps(receipt, sort_keys=True, indent=2) + "\n").encode()
+    path.write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    lock = replace(lock, build_recipe_sha256=hashlib.sha256(SCRIPT_PATH.read_bytes()).hexdigest(),
+                   core_runtime=replace(core, authority_path="eng/core-local-runtime-receipt.json",
+                                        authority_sha256=digest, receipt_sha256=digest))
+    return module, lock, path, receipt
+
+
+def test_local_core_receipt_admits_exact_bytes_without_a_hosted_producer(tmp_path: Path) -> None:
+    module, lock, _, _ = _local_core_receipt_fixture(tmp_path)
+    module.validate_build_recipe(tmp_path, lock)
+    payload = json.loads(LOCK_PATH.read_text())
+    payload["core_runtime"]["authority_path"] = lock.core_runtime.authority_path
+    payload["core_runtime"]["authority_sha256"] = lock.core_runtime.authority_sha256
+    payload["core_runtime"]["receipt"]["sha256"] = lock.core_runtime.receipt_sha256
+    assert module.validate_lock_payload(payload).core_runtime == lock.core_runtime
+
+
+def test_local_core_receipt_preserves_the_actual_producer_serialization() -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    lock = replace(lock, build_recipe_sha256=hashlib.sha256(SCRIPT_PATH.read_bytes()).hexdigest())
+    module.validate_build_recipe(ROOT, lock)
+
+
+@pytest.mark.parametrize(("field", "value"), (
+    ("status", "failed"), ("build", "pending"), ("local_owner_isolation_tests", "failed"),
+    ("core_commit", "0" * 40), ("runtime_source_commit", "0" * 40),
+    ("candidate_package_version", "0.0.0-wrong"),
+    ("runtime_package_inventory_sha256", "0" * 64),
+    ("runtime_package_plane_lock_sha256", "0" * 64),
+    ("no_sibling_directories", 1), ("isolated_package_cache", False),
+    ("package_source_mapping", {}),
+))
+def test_local_core_receipt_rejects_rehashed_failed_or_foreign_evidence(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    module, lock, path, receipt = _local_core_receipt_fixture(tmp_path)
+    receipt[field] = value
+    raw = (json.dumps(receipt, sort_keys=True, indent=2) + "\n").encode()
+    path.write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    lock = replace(lock, core_runtime=replace(lock.core_runtime, authority_sha256=digest,
+                                             receipt_sha256=digest))
+    with pytest.raises(module.PackagePlaneError, match="local Core receipt"):
+        module.validate_build_recipe(tmp_path, lock)
+
+
+def test_local_core_receipt_rejects_duplicate_fields_and_unbound_digest(tmp_path: Path) -> None:
+    module, lock, path, _ = _local_core_receipt_fixture(tmp_path)
+    raw = path.read_bytes().replace(b'"status": "pass"', b'"status": "failed", "status": "pass"')
+    path.write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    with pytest.raises(module.PackagePlaneError):
+        module.validate_build_recipe(tmp_path, lock)
+    lock = replace(lock, core_runtime=replace(lock.core_runtime, authority_sha256=digest,
+                                             receipt_sha256=digest))
+    with pytest.raises(module.PackagePlaneError, match="local Core receipt"):
+        module.validate_build_recipe(tmp_path, lock)
+
+
+def _copy_core_runtime_bundle_input(tmp_path: Path) -> Path:
+    if not CORE_RUNTIME_BUNDLE.is_file():
+        pytest.skip("governed external Core runtime bundle is not provisioned")
+    repo_root = tmp_path / "repo"
+    target = repo_root / "eng/core-runtime-bundle"
+    target.mkdir(parents=True)
+    shutil.copyfile(CORE_RUNTIME_BUNDLE_INPUT, target / CORE_RUNTIME_BUNDLE_INPUT.name)
+    shutil.copyfile(CORE_RUNTIME_BUNDLE, target / CORE_RUNTIME_BUNDLE.name)
+    return repo_root
+
+
+def test_core_runtime_bundle_input_is_exact_offline_authority(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+
+    assert not (
+        ROOT / "eng/core-runtime-bundle" / CORE_RUNTIME_BUNDLE.name
+    ).exists()
+    repo_root = _copy_core_runtime_bundle_input(tmp_path)
+    bundle = module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+    assert bundle == (
+        repo_root / "eng/core-runtime-bundle" / CORE_RUNTIME_BUNDLE.name
+    )
+    assert bundle.stat().st_size == lock.core_runtime.bundle_size_bytes
+    assert hashlib.sha256(bundle.read_bytes()).hexdigest() == (
+        lock.core_runtime.bundle_sha256
+    )
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
+    assert "urllib" not in source
+    assert "urlopen" not in source
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    (
+        ("url", "https://example.invalid/core.zip"),
+        ("sha256", "0" * 64),
+        ("size_bytes", 1),
+        ("file_name", "other.zip"),
+        ("contract", "chummer-hub.core-runtime-bundle-input/v0"),
+        ("Url", "https://github.com/ArchonMegalon/chummer6-core.git"),
+    ),
+)
+def test_core_runtime_bundle_input_rejects_receipt_authority_drift(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    repo_root = _copy_core_runtime_bundle_input(tmp_path)
+    receipt = repo_root / module.CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    payload[field] = replacement
+    receipt.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(module.PackagePlaneError, match="exact authority"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+
+def test_core_runtime_bundle_input_rejects_duplicate_or_noncanonical_receipt(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    repo_root = _copy_core_runtime_bundle_input(tmp_path)
+    receipt = repo_root / module.CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH
+    canonical = receipt.read_text(encoding="utf-8")
+    duplicate = canonical.replace(
+        '  "contract":',
+        '  "contract": "chummer-hub.core-runtime-bundle-input/v1",\n  "contract":',
+        1,
+    )
+    receipt.write_text(duplicate, encoding="utf-8")
+    with pytest.raises(module.PackagePlaneError, match="duplicate"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+    receipt.write_text(canonical.rstrip("\n"), encoding="utf-8")
+    with pytest.raises(module.PackagePlaneError, match="exact authority"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+
+def test_core_runtime_bundle_input_rejects_symlink_or_changed_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    repo_root = _copy_core_runtime_bundle_input(tmp_path)
+    receipt = repo_root / module.CORE_RUNTIME_BUNDLE_INPUT_RELATIVE_PATH
+    bundle = receipt.parent / lock.core_runtime.bundle_file_name
+    outside = tmp_path / "outside.zip"
+    shutil.copyfile(bundle, outside)
+    bundle.unlink()
+    bundle.symlink_to(outside)
+    with pytest.raises(module.PackagePlaneError, match="bytes"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
+
+    second_root = _copy_core_runtime_bundle_input(tmp_path / "second")
+    bundle_root = second_root / "eng/core-runtime-bundle"
+    outside_root = tmp_path / "outside-root"
+    bundle_root.rename(outside_root)
+    bundle_root.symlink_to(outside_root, target_is_directory=True)
+    with pytest.raises(module.PackagePlaneError, match="receipt"):
+        module.load_core_runtime_bundle_input(second_root, lock.core_runtime)
+
+    bundle.unlink()
+    shutil.copyfile(outside, bundle)
+    with bundle.open("r+b") as stream:
+        stream.seek(0)
+        stream.write(b"hostile")
+    with pytest.raises(module.PackagePlaneError, match="bytes"):
+        module.load_core_runtime_bundle_input(repo_root, lock.core_runtime)
 
 
 def test_repository_sdk_policy_disables_roll_forward() -> None:
@@ -183,6 +500,261 @@ def test_package_plane_projects_enforce_content_hash_locks() -> None:
                     continue
                 assert metadata.get("resolved"), package_id
                 assert metadata.get("contentHash"), package_id
+
+
+@pytest.mark.parametrize(
+    "counts",
+    [
+        {"total": 0, "executed": 0, "passed": 0},
+        {"total": 2, "executed": 1, "passed": 1},
+        {"total": 2, "executed": 2, "passed": 1, "failed": 1},
+    ],
+)
+def test_package_plane_receipt_rejects_empty_or_partial_test_runs(
+    counts: dict[str, int],
+) -> None:
+    verifier = load_verifier_module()
+    with pytest.raises(verifier.VerificationError, match="did not fully pass"):
+        verifier._require_passing_tests(counts, "focused tests")
+
+    verifier._require_passing_tests(
+        {
+            "total": 2,
+            "executed": 2,
+            "passed": 2,
+            "failed": 0,
+            "error": 0,
+            "timeout": 0,
+            "aborted": 0,
+        },
+        "focused tests",
+    )
+
+
+def _postgres_trx(**overrides: int) -> bytes:
+    # Synthetic parser fixture only; never presented as database execution evidence.
+    counters = dict(total=2, executed=2, passed=2, failed=0, error=0, timeout=0,
+                    aborted=0, notExecuted=0, inconclusive=0)
+    counters.update(overrides)
+    values = " ".join(f'{key}="{value}"' for key, value in counters.items())
+    return f'<TestRun><ResultSummary><Counters {values}/></ResultSummary></TestRun>'.encode()
+
+
+@pytest.mark.parametrize("mutation", ["hardlink", "fifo", "oversized", "changed_during_read"])
+def test_original_trx_read_rejects_aliases_special_files_and_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str,
+) -> None:
+    verifier = load_verifier_module()
+    path = tmp_path / "original.trx"
+    if mutation == "fifo":
+        os.mkfifo(path)
+    else:
+        path.write_bytes(_postgres_trx())
+        if mutation == "hardlink":
+            os.link(path, tmp_path / "alias.trx")
+        elif mutation == "oversized":
+            with path.open("r+b") as stream:
+                stream.truncate(16 * 1024 * 1024 + 1)
+        else:
+            original_fstat = os.fstat
+            observations = 0
+
+            def change_after_read(descriptor):
+                nonlocal observations
+                observations += 1
+                if observations == 2:
+                    path.write_bytes(_postgres_trx() + b" ")
+                return original_fstat(descriptor)
+
+            monkeypatch.setattr(verifier.os, "fstat", change_after_read)
+    with pytest.raises(verifier.VerificationError):
+        verifier._read_trx_bytes(path)
+
+
+@pytest.mark.parametrize("bad_path", ["relative", "source", "existing", "symlink", "parent_link", "traversal", "missing_parent", "root"])
+def test_original_test_results_reject_unsafe_or_reused_paths(tmp_path: Path, bad_path: str) -> None:
+    verifier = load_verifier_module()
+    source = tmp_path / "source"
+    source.mkdir()
+    existing = tmp_path / "existing"
+    existing.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(existing, target_is_directory=True)
+    paths = {
+        "relative": Path("results"), "source": source / "results", "existing": existing,
+        "symlink": link, "parent_link": link / "results", "traversal": tmp_path / "unused/../results",
+        "missing_parent": tmp_path / "missing/results", "root": Path("/"),
+    }
+    with pytest.raises(verifier.VerificationError):
+        verifier._prepare_test_results_directory(source, paths[bad_path])
+    assert list(existing.iterdir()) == []
+
+
+def test_original_test_results_are_fresh_private_and_not_deleted_with_consumer(tmp_path: Path) -> None:
+    verifier = load_verifier_module()
+    source = tmp_path / "source"
+    source.mkdir()
+    results = verifier._prepare_test_results_directory(source, tmp_path / "retained")
+    assert results.stat().st_mode & 0o777 == 0o700
+    original = _postgres_trx(failed=1, passed=1)
+    (results / "postgres-package-plane.trx").write_bytes(original)
+    source.rmdir()
+    assert (results / "postgres-package-plane.trx").read_bytes() == original
+
+
+@pytest.mark.parametrize("outcome", ["pass", "process_failure", "zero", "failed", "skipped", "inconsistent_skip", "missing", "symlink"])
+def test_postgres_is_mandatory_and_original_failure_trx_survives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, outcome: str,
+) -> None:
+    verifier = load_verifier_module()
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    results = verifier._prepare_test_results_directory(consumer, tmp_path / "results")
+    trx = results / "postgres-package-plane.trx"
+    mutations = {"zero": dict(total=0, executed=0, passed=0), "failed": dict(passed=1, failed=1),
+                 "skipped": dict(executed=1, passed=1, notExecuted=1), "inconsistent_skip": dict(notExecuted=1)}
+    original = _postgres_trx(**mutations.get(outcome, {}))
+    calls = []
+    environment = {"PATH": "/unit-test-only", "CI": "true"}
+    common = ("-p:ChummerUseLocalCompatibilityTree=false", "-p:RestorePackagesPath=unit-test-cache")
+
+    def observe_command(command, *, cwd, env):
+        # Unit-test command observation; this test does not launch dotnet or Docker.
+        calls.append((tuple(command), cwd, dict(env)))
+        if command[1] == "test":
+            if outcome == "symlink":
+                target = tmp_path / "unrelated.trx"
+                target.write_bytes(original)
+                trx.symlink_to(target)
+            elif outcome != "missing":
+                trx.write_bytes(original)
+            if outcome == "process_failure":
+                raise verifier.VerificationError("controlled test-process failure")
+        return ""
+
+    monkeypatch.setattr(verifier, "_run", observe_command)
+    args = (consumer, results, tmp_path / "NuGet.Config", tmp_path / "packages", "dotnet", common, environment)
+    if outcome == "pass":
+        assert verifier._run_postgres_tests(*args)["passed"] == 2
+    else:
+        with pytest.raises(verifier.VerificationError):
+            verifier._run_postgres_tests(*args)
+    assert len(calls) == 2
+    restore, test = (row[0] for row in calls)
+    assert restore[1] == "restore" and "--locked-mode" in restore and "--no-cache" in restore
+    assert restore[restore.index("--configfile") + 1] == str(tmp_path / "NuGet.Config")
+    assert test[1] == "test" and "--no-restore" in test and "--filter" not in test
+    assert test[test.index("--framework") + 1] == "net10.0"
+    assert test[test.index("--configuration") + 1] == "Release"
+    assert all(row[0][2].endswith("Chummer.Run.Api.Postgres.Tests.csproj") for row in calls)
+    assert all(row[1] == consumer and row[0][-len(common):] == common for row in calls)
+    assert calls[0][2] == environment
+    assert calls[1][2] == dict(environment, TESTCONTAINERS_RYUK_DISABLED="true")
+    assert "TESTCONTAINERS_RYUK_DISABLED" not in environment
+    if outcome not in {"missing", "symlink"}:
+        assert trx.read_bytes() == original
+
+
+def test_postgres_rejects_preexisting_trx_before_any_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    verifier = load_verifier_module()
+    results = tmp_path / "results"
+    results.mkdir()
+    trx = results / "postgres-package-plane.trx"
+    original = _postgres_trx()
+    trx.write_bytes(original)
+    monkeypatch.setattr(verifier, "_run", lambda *args, **kwargs: pytest.fail("must not run with stale TRX"))
+    with pytest.raises(verifier.VerificationError, match="start absent"):
+        verifier._run_postgres_tests(tmp_path, results, tmp_path, tmp_path, "dotnet", (), {})
+    assert trx.read_bytes() == original
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_original_test_results_cli_keeps_existing_callers_compatible(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit: bool,
+) -> None:
+    verifier = load_verifier_module()
+    argv = ["verify-hub-package-plane.py", "--repo-root", str(tmp_path),
+            "--core-bundle", str(tmp_path / "core.zip"), "--receipt", str(tmp_path / "receipt.json")]
+    if explicit:
+        argv += ["--test-results-directory", str(tmp_path / "original-trx")]
+    monkeypatch.setattr(sys, "argv", argv)
+    parsed = verifier.parse_args()
+    assert parsed.test_results_directory == (tmp_path / "original-trx" if explicit else None)
+    assert parsed.dotnet == "dotnet"
+
+
+@pytest.mark.parametrize("mutation", [None, "missing", "unknown", "symlink", "changed_counts", "failed", "skipped"])
+def test_original_trx_evidence_binds_exact_three_raw_files(
+    tmp_path: Path, mutation: str | None,
+) -> None:
+    verifier = load_verifier_module()
+    originals = {name: _postgres_trx(total=index, executed=index, passed=index)
+                 for index, name in enumerate(verifier.TEST_TRX_FILES, 1)}
+    expected = {}
+    for name, raw in originals.items():
+        path = tmp_path / name
+        path.write_bytes(raw)
+        expected[name] = verifier._trx_counts(path)
+    name = "postgres-package-plane.trx"
+    if mutation == "missing":
+        expected.pop(name)
+    elif mutation == "unknown":
+        expected["unrelated.trx"] = expected.pop(name)
+    elif mutation == "symlink":
+        (tmp_path / name).unlink()
+        (tmp_path / name).symlink_to(tmp_path / "package-plane.trx")
+    elif mutation == "changed_counts":
+        (tmp_path / name).write_bytes(_postgres_trx(total=4, executed=4, passed=4))
+    elif mutation == "failed":
+        (tmp_path / name).write_bytes(_postgres_trx(passed=1, failed=1))
+    elif mutation == "skipped":
+        (tmp_path / name).write_bytes(_postgres_trx(notExecuted=1))
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+    if mutation is None:
+        assert verifier._test_evidence(tmp_path, expected) == {
+            name: {"sha256": hashlib.sha256(raw).hexdigest(), "size_bytes": len(raw)}
+            for name, raw in originals.items()
+        }
+    else:
+        with pytest.raises(verifier.VerificationError):
+            verifier._test_evidence(tmp_path, expected)
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
+
+
+def test_postgres_project_workflow_and_original_retention_are_mandatory() -> None:
+    verifier = load_verifier_module()
+    source = inspect.getsource(verifier.verify)
+    assert "postgres_test_counts = _run_postgres_tests(" in source
+    assert '"postgres_tests": postgres_test_counts' in source
+    assert '"test_evidence": _test_evidence(results,' in source
+    assert "Chummer.Run.Api.Postgres.Tests" in verifier.LOCKED_PROJECTS
+    assert "Chummer.Run.Api.Postgres.Tests/obj/project.assets.json" in inspect.getsource(verifier._audit_assets)
+    assert "results = root /" not in source
+    assert "receipt_path.stem}-test-results" in source
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text()
+    retention = workflow.split("      - name: Retain original C# test runner evidence including PostgreSQL failures\n", 1)[1].split("      - name:", 1)[0]
+    assert "if: always()" in retention and "overwrite: false" in retention
+    assert "${{ github.run_id }}-${{ github.run_attempt }}" in retention
+    assert "/*.trx" in retention and "if-no-files-found: error" in retention
+    assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in retention
+    assert '--test-results-directory "${RUNNER_TEMP}/hub-package-plane-tests-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"' in workflow
+    assert "TESTCONTAINERS_RYUK_DISABLED" not in workflow
+    project = ElementTree.parse(ROOT / "Chummer.Run.Api.Postgres.Tests/Chummer.Run.Api.Postgres.Tests.csproj").getroot()
+    assert project.findtext(".//RestorePackagesWithLockFile") == "true"
+    assert project.findtext(".//RestoreLockedMode") == "true"
+    assert "../Chummer.Run.Api/Chummer.Run.Api.csproj" in {p.get("Include") for p in project.findall(".//ProjectReference")}
+    assert {p.get("Link") for p in project.findall(".//Compile")} == {
+        "InstallLinkingPostgresAuthorityIntegrationTests.cs", "InstallLinkingPostgresCoordinatorStoreTests.cs",
+    }
+    assert all("Condition" not in group.attrib and "Condition" not in item.attrib
+               for group in project.findall("ItemGroup") for item in group.findall("Compile"))
+    fixture = (ROOT / "Chummer.Tests/InstallLinkingPostgresAuthorityIntegrationTests.cs").read_text()
+    assert 'HostIP = "127.0.0.1"' in fixture and "Guid.NewGuid()" in fixture
+    assert "NanoCPUs = 1_000_000_000L" in fixture and "Memory = 512L * 1024 * 1024" in fixture
+    initialize = fixture.split("public async Task InitializeAsync()", 1)[1].split("public async Task DisposeAsync()", 1)[0]
+    assert "catch" in initialize and "await DisposeAsync()" in initialize and "throw;" in initialize
+    dispose = fixture.split("public async Task DisposeAsync()", 1)[1].split("public async Task ResetAsync()", 1)[0]
+    assert "finally" in dispose and "await _container.DisposeAsync()" in dispose
 
 
 @pytest.mark.parametrize(
@@ -411,6 +983,81 @@ def test_inventory_rejects_metadata_valid_package_byte_replacement(tmp_path: Pat
         module.validate_feed_inventory(feed, lock, lock_sha)
 
 
+def test_hub_staging_rejects_stale_core_package_before_restore(tmp_path: Path) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    feed = tmp_path / "hub-feed"
+    feed.mkdir()
+    for name in module._expected_feed_entry_names(lock):
+        (feed / name).write_bytes(b"placeholder")
+    stale_core = feed / "Chummer.Engine.Contracts.0.1.0-preview.nupkg"
+    stale_core.write_bytes(b"stale core bytes must never enter Hub authority")
+
+    with pytest.raises(module.PackagePlaneError, match="exact locked file set"):
+        module._assert_exact_feed_entries(feed, lock)
+
+
+def test_observation_staging_rejects_extra_or_stale_core_packages(tmp_path: Path) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    feed = tmp_path / "observed-staging"
+    feed.mkdir()
+    for spec in lock.packages:
+        (feed / f"{spec.package_id}.{spec.version}.nupkg").write_bytes(b"hub")
+    module._assert_exact_staged_package_entries(feed, lock)
+
+    stale_core = feed / (
+        "Chummer.Engine.Contracts.0.0.0-packageplane.candidate.stale.nupkg"
+    )
+    stale_core.write_bytes(b"stale Core must not survive observation")
+    with pytest.raises(module.PackagePlaneError, match="exactly the four bound non-Core"):
+        module._assert_exact_staged_package_entries(feed, lock)
+
+
+def test_unused_sr4_core_authority_still_rejects_missing_extra_or_tampered_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    package_specs = []
+    trusted_payloads = {}
+    for spec in lock.core_runtime.packages:
+        payload = f"trusted:{spec.package_id}".encode()
+        trusted_payloads[spec.file_name] = payload
+        package_specs.append(
+            replace(
+                spec,
+                sha256=hashlib.sha256(payload).hexdigest(),
+                size_bytes=len(payload),
+            )
+        )
+    authority = replace(lock.core_runtime, packages=tuple(package_specs))
+
+    def write_feed(path: Path) -> None:
+        path.mkdir()
+        for name, payload in trusted_payloads.items():
+            (path / name).write_bytes(payload)
+
+    missing = tmp_path / "missing"
+    write_feed(missing)
+    sr4 = next(spec for spec in package_specs if spec.package_id == "Chummer.Rulesets.Sr4")
+    (missing / sr4.file_name).unlink()
+    with pytest.raises(module.PackagePlaneError, match="exactly the eight bound nupkgs"):
+        module.validate_core_runtime_feed(missing, authority)
+
+    extra = tmp_path / "extra"
+    write_feed(extra)
+    (extra / "Chummer.Rulesets.Sr4.stale.nupkg").write_bytes(b"stale")
+    with pytest.raises(module.PackagePlaneError, match="exactly the eight bound nupkgs"):
+        module.validate_core_runtime_feed(extra, authority)
+
+    tampered = tmp_path / "tampered"
+    write_feed(tampered)
+    (tampered / sr4.file_name).write_bytes(b"tampered-unused-sr4")
+    with pytest.raises(module.PackagePlaneError, match="byte authority mismatch"):
+        module.validate_core_runtime_feed(tampered, authority)
+
+
 def test_feed_validation_rejects_external_symlink_handoffs(tmp_path: Path) -> None:
     module = load_module()
     feed = tmp_path / "authority"
@@ -446,6 +1093,72 @@ def test_pr_ci_installs_digest_locked_private_sdk() -> None:
     assert "${RUNNER_TEMP}/chummer-hub-dotnet" in workflow
 
 
+def test_hosted_rook_rollback_checks_require_hash_locked_system_pyyaml() -> None:
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(encoding="utf-8")
+    job = workflow.split("  no-siblings:\n", 1)[1].split("\n  release-fallback-macos:", 1)[0]
+    install_name = "Install hash-locked system PyYAML for isolated Rook checks"
+    checks_name = "Verify Rook rollback authority without Docker or providers"
+    assert install_name in job
+    assert checks_name in job
+    assert job.index("Verify source policy") < job.index(install_name) < job.index(checks_name)
+    assert job.index(checks_name) < job.index("Build and test C# projection contracts")
+    install = job.split(f"      - name: {install_name}\n", 1)[1].split("      - name:", 1)[0]
+    for required in (
+        'sudo -- "$(command -v python3)" -I -m pip --python /usr/bin/python3',
+        "--isolated install", "--ignore-installed", "--break-system-packages",
+        "--no-deps", "--only-binary=:all:", "--require-hashes", "--no-cache-dir",
+        "--index-url https://pypi.org/simple",
+        "--requirement eng/ci-rook-system-python-requirements.txt",
+        "/usr/bin/python3 -I -c", 'yaml.__version__ == "6.0.3"',
+        'hasattr(yaml, "SafeLoader")',
+    ):
+        assert required in install
+    checks = job.split(f"      - name: {checks_name}\n", 1)[1].split("      - name:", 1)[0]
+    assert "bash -n ops/build-ghost-private-nonprod/deploy-first-provider-disabled-rook-lane.sh" in checks
+    assert "/usr/bin/python3 -I -m py_compile" in checks
+    assert "ops/build-ghost-private-nonprod/verify-prior-rollout-authority.py" in checks
+    assert "ops/build-ghost-private-nonprod/preflight-provider-disabled-rook-bootstrap.py" in checks
+    assert "ops/build-ghost-private-nonprod/rook_bootstrap_journal.py" in checks
+    assert "python3 -m pytest -q" in checks
+    assert {line.strip().rstrip(" \\") for line in checks.splitlines() if line.strip().startswith("tests/")} == {
+        "tests/test_build_ghost_first_provider_disabled_rollout.py",
+        "tests/test_build_ghost_private_nonprod_attestation.py",
+        "tests/test_build_ghost_local_canary_environment.py",
+        "tests/test_build_ghost_partial_bootstrap_preflight.py",
+        "tests/test_build_ghost_bootstrap_journal.py",
+    }
+    commands = "\n".join(line for line in (install + checks).splitlines() if not line.strip().startswith("#"))
+    for forbidden in ("continue-on-error", "|| true", "--user", "--target", "PYTHONPATH", "docker compose", "run-local-canary.sh"):
+        assert forbidden not in commands
+
+
+def test_diagnostic_alert_regressions_run_in_required_source_policy_step() -> None:
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(encoding="utf-8")
+    job = workflow.split("  no-siblings:\n", 1)[1].split("\n  release-fallback-macos:", 1)[0]
+    step = job.split("      - name: Verify source policy\n", 1)[1].split("      - name:", 1)[0]
+    assert "python3 -m pytest -q" in step
+    assert "            tests/test_android_diagnostic_alerts.py \\" in step
+    assert "continue-on-error:" not in job
+    assert "        if:" not in step
+
+
+def test_rook_system_python_requirement_is_closed_official_wheel_set() -> None:
+    requirement = ROOT / "eng/ci-rook-system-python-requirements.txt"
+    assert requirement.is_file()
+    source = requirement.read_text(encoding="utf-8")
+    assert "https://pypi.org/pypi/PyYAML/6.0.3/json" in source
+    lines = [line.strip().rstrip(" \\") for line in source.splitlines() if line.strip() and not line.startswith("#")]
+    assert lines[0] == "PyYAML==6.0.3"
+    assert len(lines) == 6
+    assert set(lines[1:]) == {
+        "--hash=sha256:9c7708761fccb9397fe64bbc0395abcae8c4bf7b0eac081e12b809bf47700d0b",
+        "--hash=sha256:b8bb0864c5a28024fac8a632c443c87c5aa6f215c0b126c449ae1a150412f31d",
+        "--hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+        "--hash=sha256:0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6",
+        "--hash=sha256:c458b6d084f9b935061bc36216e8a69a7e293a2f1e68bf956dcd9e6cbcd143f5",
+    }
+
+
 def test_build_feed_rejects_any_existing_destination(tmp_path: Path) -> None:
     module = load_module()
     feed = tmp_path / "feed"
@@ -468,11 +1181,13 @@ def test_build_feed_rejects_sdk_roll_forward(tmp_path: Path, monkeypatch) -> Non
         raise AssertionError(f"unexpected command after SDK mismatch: {rendered}")
 
     monkeypatch.setattr(module, "_run", fake_run)
+    monkeypatch.setattr(module, "validate_core_runtime_feed", lambda *_args: None)
     with pytest.raises(module.PackagePlaneError, match="expected 10.0.103, observed 10.0.110"):
         module.build_feed(
             lock,
             lock_sha256="0" * 64,
             feed=tmp_path / "feed",
+            core_feed=tmp_path / "core-feed",
             dotnet="dotnet",
         )
     assert calls == [("dotnet", "--version")]
@@ -535,6 +1250,10 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     for required_input in (
         "!global.json",
         "!eng/package-plane.lock.json",
+        "!eng/core-main-runtime-artifact-authority.json",
+        "!eng/core-local-runtime-receipt.json",
+        "!eng/core-runtime-bundle/",
+        "!eng/core-runtime-bundle/core-runtime-bundle-input.json",
         "!eng/NuGet.Container.Config",
         "!scripts/ai/bootstrap-hub-package-feed.py",
         "**/bin/**",
@@ -549,7 +1268,9 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert (
         "RUN [\"/usr/local/bin/python3\", \"-I\", \"-S\", "
         "\"scripts/ai/bootstrap-hub-package-feed.py\", \"--repo-root\", "
-        "\"/proof\", \"--feed\", \"/opt/chummer-package-feed\"]"
+        "\"/proof\", \"--feed\", \"/opt/chummer-package-feed\", "
+        "\"--core-feed\", \"/opt/chummer-core-runtime-feed\", "
+        "\"--core-runtime-bundle-input\", \"--prebuilt-hub-feed-input\"]"
     ) in dockerfile
     assert (
         "COPY --from=public-pwa-proof "
@@ -557,10 +1278,32 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         "/tmp/hub-package-feed-public-pwa-proof.receipt.json"
     ) in dockerfile
     assert "COPY --from=public-pwa-proof /usr/local/ /usr/local/" in dockerfile
+    assert "--download-core-runtime" not in dockerfile
+    assert "urllib" not in dockerfile
+    assert (
+        "COPY --from=run-services-source "
+        "eng/core-runtime-bundle/core-runtime-bundle-input.json "
+        "eng/core-runtime-bundle/core-runtime-bundle-input.json"
+    ) in dockerfile
+    assert (
+        "COPY --from=core-runtime-bundle "
+        "chummer-core-runtime-package-plane-"
+        "1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip "
+        "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
+        "1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip"
+    ) in dockerfile
+    assert (
+        "COPY --from=hub-package-feed-input . /opt/chummer-package-feed"
+        in dockerfile
+    )
     assert "apt-get install -y --no-install-recommends python3" not in dockerfile
     assert (
         "COPY --from=hub-package-feed /opt/chummer-package-feed "
         "/opt/chummer-package-feed"
+    ) in dockerfile
+    assert (
+        "COPY --from=hub-package-feed /opt/chummer-core-runtime-feed "
+        "/opt/chummer-core-runtime-feed"
     ) in dockerfile
     assert "--configfile /tmp/chummer-package-feed.NuGet.Config" in dockerfile
     assert "--packages /tmp/chummer-nuget/packages" in dockerfile
@@ -592,7 +1335,10 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     ) not in dockerfile
     assert "dotnet publish -c Release -o /app/publish --no-restore" in dockerfile
     for project_name in LOCKED_PROJECTS:
-        if project_name == "Chummer.Run.Api.Tests":
+        if project_name in {
+            "Chummer.Run.Api.Tests",
+            "Chummer.BuildGhost.ToughTongue.Tests",
+        }:
             continue
         assert (
             f"COPY --from=run-services-source {project_name}/packages.lock.json "
@@ -605,6 +1351,7 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     }
     assert sources == {
         "locked-chummer": "/opt/chummer-package-feed",
+        "locked-core-runtime": "/opt/chummer-core-runtime-feed",
         "nuget.org": "https://api.nuget.org/v3/index.json",
     }
     assert config.find("./packageSources/clear") is not None
@@ -615,9 +1362,11 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
         for node in config.findall("./packageSourceMapping/packageSource")
     }
     assert mappings == {
-        "locked-chummer": set(OWNER_PACKAGE_VERSIONS),
+        "locked-chummer": HUB_PACKAGE_IDS,
+        "locked-core-runtime": CORE_RUNTIME_PACKAGE_IDS,
         "nuget.org": {"*"},
     }
+    assert mappings["locked-chummer"].isdisjoint(mappings["locked-core-runtime"])
 
     preflight = load_public_edge_preflight_module()
     contract = preflight.validate_public_pwa_docker_build_contract(
@@ -634,7 +1383,55 @@ def test_container_restore_uses_only_the_validated_locked_package_feed() -> None
     assert contract["checks"]["exactPackageFeedStage"] is True
     assert contract["checks"]["packageFeedDependsOnProof"] is True
     assert contract["checks"]["buildDependsOnPackageFeed"] is True
+    assert contract["checks"]["exactCoreRuntimeFeedConsumption"] is True
     assert contract["checks"]["receiptIsFirstBuildInstruction"] is True
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda text: text.replace(
+            '"--core-runtime-bundle-input", "--prebuilt-hub-feed-input"]',
+            '"--download-core-runtime", "--prebuilt-hub-feed-input"]',
+            1,
+        ),
+        lambda text: text.replace(
+            "COPY --from=run-services-source "
+            "eng/core-runtime-bundle/core-runtime-bundle-input.json "
+            "eng/core-runtime-bundle/core-runtime-bundle-input.json\n",
+            "",
+            1,
+        ),
+        lambda text: text.replace(
+            "COPY --from=core-runtime-bundle "
+            "chummer-core-runtime-package-plane-"
+            "1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip "
+            "eng/core-runtime-bundle/chummer-core-runtime-package-plane-"
+            "1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip\n",
+            "",
+            1,
+        ),
+        lambda text: text.replace(
+            "COPY --from=public-pwa-proof /usr/local/ /usr/local/\nWORKDIR /proof\n",
+            "COPY --from=public-pwa-proof /usr/local/ /usr/local/\n"
+            "WORKDIR /proof\nRUN curl https://example.invalid/core.zip\n",
+            1,
+        ),
+    ),
+)
+def test_container_package_feed_rejects_network_or_offline_input_bypass(
+    tmp_path: Path,
+    mutation,
+) -> None:
+    module = load_public_edge_preflight_module()
+    dockerfile = tmp_path / "Dockerfile"
+    canonical = (ROOT / "Chummer.Run.Api/Dockerfile").read_text(encoding="utf-8")
+    dockerfile.write_text(mutation(canonical), encoding="utf-8")
+
+    contract = module.validate_public_pwa_docker_build_contract(dockerfile)
+
+    assert contract["status"] == "fail"
+    assert contract["checks"]["exactPackageFeedStage"] is False
 
 
 def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> None:
@@ -663,6 +1460,13 @@ def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> No
         "../Chummer.Tests/ReleaseUploadAuthorityHandoffCompatibilityTests.cs" in linked
     )
 
+    verifier = (ROOT / "scripts/ai/verify-hub-package-plane.py").read_text(
+        encoding="utf-8"
+    )
+    assert "Chummer.BuildGhost.ToughTongue.Tests" in verifier
+    assert "build-ghost-tough-tongue-package-plane.trx" in verifier
+    assert '"build_ghost_tough_tongue_tests": build_ghost_test_counts' in verifier
+
 
 def test_package_plane_runs_release_handoffs_and_candidate_ui_contracts() -> None:
     workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(
@@ -688,6 +1492,19 @@ def test_package_plane_runs_release_handoffs_and_candidate_ui_contracts() -> Non
         "test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_dependency"
         in workflow
     )
+
+
+def test_package_plane_runs_private_rook_hosting_as_nonprovider_policy() -> None:
+    verifier = load_verifier_module()
+    assert set(
+        (
+            "tests/test_build_ghost_private_nonprod_ai_deploy.py",
+            "tests/test_build_ghost_private_nonprod_presentation_deploy.py",
+            "tests/test_build_ghost_private_nonprod_compose.py",
+            "tests/test_build_ghost_private_rook_hosting.py",
+            "tests/test_build_ghost_tough_tongue_runtime_config.py",
+        )
+    ).issubset(verifier.RELEASE_CONTROL_PYTHON_TESTS)
 
 
 def test_all_packable_hub_contracts_embed_one_proprietary_license() -> None:

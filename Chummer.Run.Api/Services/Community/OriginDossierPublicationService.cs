@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Chummer.Run.Api.Services.Community;
 
-public sealed class OriginDossierPublicationService
+public sealed class OriginDossierPublicationService : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly IReadOnlyList<string> DefaultApprovedManuscriptProviderTokens = ["Subscribr"];
@@ -34,6 +34,7 @@ public sealed class OriginDossierPublicationService
     private const string ProviderReceiptReferenceToken = "provider_receipt_reference";
     private const int MinimumFullStoryWordCount = 10_000;
     private const int MinimumFullStoryChapterCount = 8;
+    private readonly TeableOriginPublicationStorage? _primary;
     private readonly IConfiguration _configuration;
     private readonly HorizonCapabilityService? _capabilities;
     private readonly MediaArtifactHorizonsService? _mediaHorizons;
@@ -51,8 +52,12 @@ public sealed class OriginDossierPublicationService
         IConfiguration configuration,
         HorizonCapabilityService? capabilities,
         MediaArtifactHorizonsService? mediaHorizons,
-        ILogger<OriginDossierPublicationService> logger)
+        ILogger<OriginDossierPublicationService> logger,
+        TeableOriginPublicationStorage? primary = null)
     {
+        if ((configuration["CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER"]?.Trim() == "teable") != (primary is not null))
+            throw new InvalidOperationException("Primary publication storage requires its explicit remote backend.");
+        _primary = primary;
         _configuration = configuration;
         _capabilities = capabilities;
         _mediaHorizons = mediaHorizons;
@@ -66,10 +71,14 @@ public sealed class OriginDossierPublicationService
     {
     }
 
+    public void Dispose() => _primary?.Dispose();
+    internal void EnsureAccountErasureSupported() => _primary?.EnsureAccountErasureSupported();
+
     public IReadOnlyList<OriginDossierPublicationViewModel> ListForAccount(string userId, string subjectId)
     {
+        using var primaryScope = _primary?.Enter();
         string? indexPath = ResolveIndexPath();
-        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        if (string.IsNullOrWhiteSpace(indexPath) || !IndexExists(indexPath))
         {
             return Array.Empty<OriginDossierPublicationViewModel>();
         }
@@ -84,7 +93,7 @@ public sealed class OriginDossierPublicationService
                 .ThenBy(static publication => publication.Title, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (_primary is null && ex is IOException or JsonException or UnauthorizedAccessException)
         {
             _logger.LogWarning(ex, "Origin Dossier publication index could not be loaded from {IndexPath}.", indexPath);
             return Array.Empty<OriginDossierPublicationViewModel>();
@@ -103,13 +112,14 @@ public sealed class OriginDossierPublicationService
         string projectId,
         string artifactKind)
     {
+        using var primaryScope = _primary?.Enter();
         if (string.IsNullOrWhiteSpace(projectId) || string.IsNullOrWhiteSpace(artifactKind))
         {
             return null;
         }
 
         string? indexPath = ResolveIndexPath();
-        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        if (string.IsNullOrWhiteSpace(indexPath) || !IndexExists(indexPath))
         {
             return null;
         }
@@ -148,10 +158,10 @@ public sealed class OriginDossierPublicationService
             };
 
             return HasArchivedArtifact(path)
-                ? new OriginDossierPublicationArtifact(path!, ResolveContentType(path!, artifactKind))
+                ? new OriginDossierPublicationArtifact(path!, ResolveContentType(path!, artifactKind), _primary?.ReadBytes(path!).ToArray())
                 : null;
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (_primary is null && ex is IOException or JsonException or UnauthorizedAccessException)
         {
             _logger.LogWarning(ex, "Origin Dossier publication artifact could not be loaded from {IndexPath}.", indexPath);
             return null;
@@ -164,13 +174,14 @@ public sealed class OriginDossierPublicationService
         string projectId,
         string shareKind = "audiobook")
     {
+        using var primaryScope = _primary?.Enter();
         if (string.IsNullOrWhiteSpace(projectId))
         {
             return null;
         }
 
         string? indexPath = ResolveIndexPath();
-        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        if (string.IsNullOrWhiteSpace(indexPath) || !IndexExists(indexPath))
         {
             return null;
         }
@@ -200,7 +211,7 @@ public sealed class OriginDossierPublicationService
                 ? shareUrl
                 : null;
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (_primary is null && ex is IOException or JsonException or UnauthorizedAccessException)
         {
             _logger.LogWarning(ex, "Origin Dossier Audiobookshelf share could not be loaded from {IndexPath}.", indexPath);
             return null;
@@ -212,6 +223,7 @@ public sealed class OriginDossierPublicationService
         string subjectId,
         OriginDossierPublicationImportRequest request)
     {
+        using var primaryScope = _primary?.Enter();
         if (request is null)
         {
             throw new ArgumentNullException(nameof(request));
@@ -230,9 +242,14 @@ public sealed class OriginDossierPublicationService
         }
 
         OriginDossierPublicationIndexEntry entry = BuildOwnedEntry(user, subjectId, request, projectId);
+        if (_primary is not null)
+        {
+            if (ContainsFakeMarker(entry)) throw new InvalidOperationException("Publication input contains unverified placeholder markers.");
+            entry = _primary.Capture(entry);
+        }
         lock (_writeGate)
         {
-            List<OriginDossierPublicationIndexEntry> entries = File.Exists(indexPath)
+            List<OriginDossierPublicationIndexEntry> entries = IndexExists(indexPath)
                 ? LoadEntries(indexPath).ToList()
                 : new List<OriginDossierPublicationIndexEntry>();
             int existingIndex = entries.FindIndex(candidate =>
@@ -255,6 +272,7 @@ public sealed class OriginDossierPublicationService
 
     public int EraseForAccount(string? userId, string subjectId)
     {
+        EnsureAccountErasureSupported();
         string normalizedSubject = Clean(subjectId, string.Empty);
         string normalizedUser = Clean(userId, string.Empty);
         if (string.IsNullOrWhiteSpace(normalizedSubject))
@@ -263,7 +281,7 @@ public sealed class OriginDossierPublicationService
         }
 
         string? indexPath = ResolveIndexPath();
-        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        if (string.IsNullOrWhiteSpace(indexPath) || !IndexExists(indexPath))
         {
             return 0;
         }
@@ -390,6 +408,7 @@ public sealed class OriginDossierPublicationService
         string runnerLinkCode,
         string? relationshipSummary)
     {
+        using var primaryScope = _primary?.Enter();
         string normalizedCode = NormalizeRunnerLinkCode(runnerLinkCode);
         if (normalizedCode.Length != 12)
         {
@@ -397,7 +416,7 @@ public sealed class OriginDossierPublicationService
         }
 
         string? indexPath = ResolveIndexPath();
-        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        if (string.IsNullOrWhiteSpace(indexPath) || !IndexExists(indexPath))
         {
             return null;
         }
@@ -447,7 +466,7 @@ public sealed class OriginDossierPublicationService
                 return BuildViewModel(source);
             }
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (_primary is null && ex is IOException or JsonException or UnauthorizedAccessException)
         {
             _logger.LogWarning(ex, "Origin Dossier runner story link could not be updated from {IndexPath}.", indexPath);
             return null;
@@ -460,13 +479,14 @@ public sealed class OriginDossierPublicationService
         string projectId,
         Func<OriginDossierPublicationIndexEntry, OriginDossierPublicationIndexEntry?> update)
     {
+        using var primaryScope = _primary?.Enter();
         if (string.IsNullOrWhiteSpace(projectId))
         {
             return null;
         }
 
         string? indexPath = ResolveIndexPath();
-        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        if (string.IsNullOrWhiteSpace(indexPath) || !IndexExists(indexPath))
         {
             return null;
         }
@@ -495,7 +515,7 @@ public sealed class OriginDossierPublicationService
                 return BuildViewModel(updated);
             }
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (_primary is null && ex is IOException or JsonException or UnauthorizedAccessException)
         {
             _logger.LogWarning(ex, "Origin Dossier publication index could not be updated from {IndexPath}.", indexPath);
             return null;
@@ -561,6 +581,7 @@ public sealed class OriginDossierPublicationService
 
     private string? ResolveIndexPath()
     {
+        if (_primary is not null) return "teable-primary-publications";
         string? configured = _configuration["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"]
             ?? _configuration["OriginDossier:PublicationIndexPath"];
         return string.IsNullOrWhiteSpace(configured)
@@ -573,10 +594,19 @@ public sealed class OriginDossierPublicationService
             ?? _configuration["OriginDossier:PublicBaseUrl"]
             ?? "https://chummer.run").Trim().TrimEnd('/');
 
+    private bool IndexExists(string path) => _primary is not null || File.Exists(path);
+    private string ReadArtifactText(string path, Encoding encoding)
+    {
+        if (_primary is null) return File.ReadAllText(path, encoding);
+        using var reader = new StreamReader(new MemoryStream(_primary.ReadBytes(path), writable: false), encoding, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
+    }
+
     private static readonly object _writeGate = new();
 
-    private static IReadOnlyList<OriginDossierPublicationIndexEntry> LoadEntries(string indexPath)
+    private IReadOnlyList<OriginDossierPublicationIndexEntry> LoadEntries(string indexPath)
     {
+        if (_primary is not null) return _primary.ReadEntries();
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(indexPath, Encoding.UTF8));
         JsonElement source = document.RootElement;
         if (source.ValueKind == JsonValueKind.Object)
@@ -600,8 +630,9 @@ public sealed class OriginDossierPublicationService
             ?? Array.Empty<OriginDossierPublicationIndexEntry>();
     }
 
-    private static void PersistEntries(string indexPath, IReadOnlyList<OriginDossierPublicationIndexEntry> entries)
+    private void PersistEntries(string indexPath, IReadOnlyList<OriginDossierPublicationIndexEntry> entries)
     {
+        if (_primary is not null) { _primary.Persist(entries); return; }
         Directory.CreateDirectory(Path.GetDirectoryName(indexPath)!);
         var snapshot = new OriginDossierPublicationIndexSnapshot(
             entries
@@ -1115,7 +1146,7 @@ public sealed class OriginDossierPublicationService
         => !string.IsNullOrWhiteSpace(path)
             && !HasFakeMarker(path);
 
-    private static bool HasArchivedArtifact(string? path)
+    private bool HasArchivedArtifact(string? path)
     {
         if (!HasRealPath(path))
         {
@@ -1124,6 +1155,7 @@ public sealed class OriginDossierPublicationService
 
         try
         {
+            if (_primary is not null) return _primary.HasAsset(path);
             var file = new FileInfo(path!);
             return file.Exists && file.Length > 0;
         }
@@ -1141,7 +1173,7 @@ public sealed class OriginDossierPublicationService
         }
     }
 
-    private static bool HasReceiptFile(
+    private bool HasReceiptFile(
         string? path,
         string expectedOperation,
         string? expectedProviderToken = null,
@@ -1154,7 +1186,7 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(path!, Encoding.UTF8));
             return document.RootElement.ValueKind == JsonValueKind.Object
                 && !ContainsFakeMarker(document.RootElement)
                 && ReceiptHasExpectedOperation(document.RootElement, expectedOperation)
@@ -1163,11 +1195,11 @@ public sealed class OriginDossierPublicationService
                 && ReceiptHasCompletionTime(document.RootElement)
                 && ReceiptContainsRequiredTokens(document.RootElement, requiredTokens);
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1177,7 +1209,7 @@ public sealed class OriginDossierPublicationService
         }
     }
 
-    private static bool HasArtifactReceipt(
+    private bool HasArtifactReceipt(
         string? artifactPath,
         string? receiptPath,
         string expectedOperation,
@@ -1207,7 +1239,7 @@ public sealed class OriginDossierPublicationService
         return ReceiptProviderMatchesAnyToken(receiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS", "OriginDossier:ManuscriptProviderTokens", DefaultApprovedManuscriptProviderTokens));
     }
 
-    private static bool HasFullChapteredStoryManuscript(string? artifactPath)
+    private bool HasFullChapteredStoryManuscript(string? artifactPath)
     {
         if (!HasArchivedArtifact(artifactPath))
         {
@@ -1216,16 +1248,16 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            string manuscript = File.ReadAllText(artifactPath!, Encoding.UTF8);
+            string manuscript = ReadArtifactText(artifactPath!, Encoding.UTF8);
             return !HasFakeMarker(manuscript)
                 && CountStoryWords(manuscript) >= MinimumFullStoryWordCount
                 && CountChapterMarkers(manuscript) >= MinimumFullStoryChapterCount;
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1313,7 +1345,7 @@ public sealed class OriginDossierPublicationService
                     ? "packaging"
                     : "manuscript";
 
-    private static bool HasSourcePacketReceipt(string? sourcePacketPath, string? receiptPath)
+    private bool HasSourcePacketReceipt(string? sourcePacketPath, string? receiptPath)
         => HasArtifactReceipt(
             sourcePacketPath,
             receiptPath,
@@ -1321,7 +1353,7 @@ public sealed class OriginDossierPublicationService
             "Chummer",
             [ApprovedSourcePacketToken, ExternalProcessingConsentToken]);
 
-    private static bool HasCanonAuditReceipt(string? sourcePacketPath, string? manuscriptPath, string? receiptPath)
+    private bool HasCanonAuditReceipt(string? sourcePacketPath, string? manuscriptPath, string? receiptPath)
     {
         string? sourcePacketHash = TryComputeSha256(sourcePacketPath);
         string? manuscriptHash = TryComputeSha256(manuscriptPath);
@@ -1392,11 +1424,11 @@ public sealed class OriginDossierPublicationService
                 DefaultApprovedPackagingProviderTokens));
     }
 
-    private static bool HasAudiobookshelfDossierImportReceipt(OriginDossierPublicationIndexEntry entry)
+    private bool HasAudiobookshelfDossierImportReceipt(OriginDossierPublicationIndexEntry entry)
         => HasArtifactReceipt(entry.EbookArtifactPath, entry.EbookAudiobookshelfImportReceiptPath, "audiobookshelf_dossier_import", "Audiobookshelf", ExternalProviderReceiptTokens())
             && ReceiptContainsOriginTaxonomy(entry.EbookAudiobookshelfImportReceiptPath, BuildOriginEditionNamespace(entry), "dossier");
 
-    private static bool HasCoverConsistencyReceipt(OriginDossierPublicationIndexEntry entry)
+    private bool HasCoverConsistencyReceipt(OriginDossierPublicationIndexEntry entry)
     {
         string? coverHash = TryComputeSha256(entry.StorySceneCoverPath);
         if (string.IsNullOrWhiteSpace(coverHash))
@@ -1411,7 +1443,7 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(entry.CoverConsistencyReceiptPath!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(entry.CoverConsistencyReceiptPath!, Encoding.UTF8));
             JsonElement root = document.RootElement;
             return root.ValueKind == JsonValueKind.Object
                 && !ContainsFakeMarker(root)
@@ -1437,11 +1469,11 @@ public sealed class OriginDossierPublicationService
                 && ReceiptSurfacePassed(root, "audiobookshelf_audiobook_cover")
                 && ReceiptSurfacePassed(root, "movie_poster");
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1451,7 +1483,7 @@ public sealed class OriginDossierPublicationService
         }
     }
 
-    private static bool HasFinalNoFallbackNoSentinelReceipt(OriginDossierPublicationIndexEntry entry)
+    private bool HasFinalNoFallbackNoSentinelReceipt(OriginDossierPublicationIndexEntry entry)
     {
         if (!HasArchivedArtifact(entry.FinalNoFallbackNoSentinelAuditReceiptPath))
         {
@@ -1460,7 +1492,7 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(entry.FinalNoFallbackNoSentinelAuditReceiptPath!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(entry.FinalNoFallbackNoSentinelAuditReceiptPath!, Encoding.UTF8));
             JsonElement root = document.RootElement;
             return root.ValueKind == JsonValueKind.Object
                 && !ContainsFakeMarker(root)
@@ -1492,11 +1524,11 @@ public sealed class OriginDossierPublicationService
                 && ReceiptSurfacePassed(root, "real_m4b_artifact")
                 && ReceiptSurfacePassed(root, "audiobookshelf_audiobook_receipt");
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1519,17 +1551,17 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(entry.TelegramShareDeliveryReceiptPath!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(entry.TelegramShareDeliveryReceiptPath!, Encoding.UTF8));
             JsonElement root = document.RootElement;
             return root.ValueKind == JsonValueKind.Object
                 && ReceiptHasEaTelegramAdapterProof(root, entry)
                 && TelegramDeliveryAliasAllowed(entry.TelegramShareDeliveryReceiptPath);
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1623,7 +1655,7 @@ public sealed class OriginDossierPublicationService
         return root;
     }
 
-    private static bool ReceiptContainsAnyToken(string? receiptPath, IReadOnlyList<string> tokens)
+    private bool ReceiptContainsAnyToken(string? receiptPath, IReadOnlyList<string> tokens)
     {
         if (!HasArchivedArtifact(receiptPath))
         {
@@ -1632,14 +1664,14 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(receiptPath!, Encoding.UTF8));
             return ReceiptContainsAnyToken(document.RootElement, tokens);
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1649,7 +1681,7 @@ public sealed class OriginDossierPublicationService
         }
     }
 
-    private static bool ReceiptContainsToken(string? receiptPath, string token)
+    private bool ReceiptContainsToken(string? receiptPath, string token)
     {
         if (!HasArchivedArtifact(receiptPath) || string.IsNullOrWhiteSpace(token))
         {
@@ -1658,14 +1690,14 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(receiptPath!, Encoding.UTF8));
             return ReceiptContainsToken(document.RootElement, token);
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1675,7 +1707,7 @@ public sealed class OriginDossierPublicationService
         }
     }
 
-    private static bool ReceiptContainsAccountAlias(string? receiptPath, string accountAlias)
+    private bool ReceiptContainsAccountAlias(string? receiptPath, string accountAlias)
     {
         if (!HasArchivedArtifact(receiptPath) || string.IsNullOrWhiteSpace(accountAlias))
         {
@@ -1684,14 +1716,14 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(receiptPath!, Encoding.UTF8));
             return ReceiptContainsAccountAlias(document.RootElement, accountAlias.Trim());
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1734,7 +1766,7 @@ public sealed class OriginDossierPublicationService
             || string.Equals(text, $"providerAccountAlias: {accountAlias}", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool ReceiptContainsOriginTaxonomy(string? receiptPath, string originNamespace, string shelfKind)
+    private bool ReceiptContainsOriginTaxonomy(string? receiptPath, string originNamespace, string shelfKind)
     {
         if (!HasArchivedArtifact(receiptPath) || string.IsNullOrWhiteSpace(originNamespace) || string.IsNullOrWhiteSpace(shelfKind))
         {
@@ -1743,16 +1775,16 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(receiptPath!, Encoding.UTF8));
             string taxonomy = $"{originNamespace.Trim().TrimEnd('/')}/{shelfKind.Trim().Trim('/')}";
             return ReceiptContainsExactNamespace(document.RootElement, originNamespace.Trim())
                 && ReceiptContainsExactTaxonomy(document.RootElement, taxonomy);
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -1804,7 +1836,7 @@ public sealed class OriginDossierPublicationService
             || string.Equals(propertyName, "relativePath", StringComparison.OrdinalIgnoreCase)
             || string.Equals(propertyName, "relative_path", StringComparison.OrdinalIgnoreCase);
 
-    private static string? TryComputeSha256(string? path)
+    private string? TryComputeSha256(string? path)
     {
         if (!HasArchivedArtifact(path))
         {
@@ -1813,14 +1845,15 @@ public sealed class OriginDossierPublicationService
 
         try
         {
+            if (_primary is not null) return Convert.ToHexStringLower(SHA256.HashData(_primary.ReadBytes(path!)));
             using FileStream stream = File.OpenRead(path!);
             return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return null;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return null;
         }
@@ -1903,7 +1936,7 @@ public sealed class OriginDossierPublicationService
             .Where(static token => !string.IsNullOrWhiteSpace(token))
             .Any(token => ReceiptContainsProviderToken(element, token));
 
-    private static bool ReceiptProviderMatchesAnyToken(string? receiptPath, IReadOnlyList<string> tokens)
+    private bool ReceiptProviderMatchesAnyToken(string? receiptPath, IReadOnlyList<string> tokens)
     {
         if (!HasArchivedArtifact(receiptPath))
         {
@@ -1912,18 +1945,18 @@ public sealed class OriginDossierPublicationService
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(receiptPath!, Encoding.UTF8));
+            using JsonDocument document = JsonDocument.Parse(ReadArtifactText(receiptPath!, Encoding.UTF8));
             return TryGetString(document.RootElement, "provider", out string? provider)
                 && provider is not null
                 && tokens
                     .Where(static token => !string.IsNullOrWhiteSpace(token))
                     .Any(token => ContainsTokenWithBoundary(provider, token));
         }
-        catch (IOException)
+        catch (IOException) when (_primary is null)
         {
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (_primary is null)
         {
             return false;
         }
@@ -2389,7 +2422,8 @@ public sealed class OriginDossierPublicationService
 
 public sealed record OriginDossierPublicationArtifact(
     string Path,
-    string ContentType);
+    string ContentType,
+    byte[]? Content = null);
 
 internal sealed record OriginDossierPublicationIndexSnapshot(
     IReadOnlyList<OriginDossierPublicationIndexEntry>? Publications);

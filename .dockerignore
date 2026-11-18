@@ -5,6 +5,10 @@
 !global.json
 !eng/
 !eng/package-plane.lock.json
+!eng/core-main-runtime-artifact-authority.json
+!eng/core-local-runtime-receipt.json
+!eng/core-runtime-bundle/
+!eng/core-runtime-bundle/core-runtime-bundle-input.json
 !eng/NuGet.Container.Config
 !.codex-design/
 !.codex-design/**
@@ -31,8 +35,15 @@ Chummer.Run.LoopbackProbe/obj/**
 !Chummer.Play.Contracts/**
 !Chummer.Run.Identity/
 !Chummer.Run.Identity/**
+!Chummer.Storage.Teable/
+!Chummer.Storage.Teable/**
 !Chummer.Run.Api/
 !Chummer.Run.Api/**
+!Chummer.Run.AI/
+!Chummer.Run.AI/**
+!ops/
+!ops/build-ghost-private-nonprod/
+!ops/build-ghost-private-nonprod/Dockerfile.presentation-private-nonprod
 !Chummer.Run.Contracts/
 !Chummer.Run.Contracts/**
 !Chummer.World.Contracts/

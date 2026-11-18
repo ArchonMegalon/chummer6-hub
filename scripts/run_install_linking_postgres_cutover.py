@@ -16,6 +16,8 @@ immunity from an actor already running as the operator UID.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
@@ -43,6 +45,8 @@ try:
         PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE,
         PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
         PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
         PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
         PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
         PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE,
@@ -59,6 +63,7 @@ try:
         docker_logical_instruction_records,
         docker_logical_instructions,
         dockerfile_parser_directive_findings,
+        docker_stage_instruction_contract_matches,
         public_edge_compose_build_syntax_failures,
         public_edge_rendered_compose_failures,
         rendered_build_contract_matches,
@@ -93,6 +98,8 @@ except ModuleNotFoundError:
         PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE,
         PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
         PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
         PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
         PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
         PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE,
@@ -109,6 +116,7 @@ except ModuleNotFoundError:
         docker_logical_instruction_records,
         docker_logical_instructions,
         dockerfile_parser_directive_findings,
+        docker_stage_instruction_contract_matches,
         public_edge_compose_build_syntax_failures,
         public_edge_rendered_compose_failures,
         rendered_build_contract_matches,
@@ -185,6 +193,19 @@ SOURCE_CONTENT_MANIFEST_CONTRACT = (
 MAX_SOURCE_FILE_BYTES = 256 * 1024 * 1024
 MAX_SOURCE_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
 MAX_SOURCE_FILE_COUNT = 200_000
+APPROVED_RELEASE_SHELF_SYMLINKS = {
+    "Chummer.Portal/downloads/.windows-installer-proof/current": (
+        "generations/generation-f51f0d99252bbe97f075587219b99a04",
+        "Chummer.Portal/downloads/.windows-installer-proof/generations/"
+        "generation-f51f0d99252bbe97f075587219b99a04",
+    ),
+    "Chummer.Portal/downloads/visual-audit/windows-installer": (
+        "../.windows-installer-proof/current/visual-audit/windows-installer",
+        "Chummer.Portal/downloads/.windows-installer-proof/generations/"
+        "generation-f51f0d99252bbe97f075587219b99a04/visual-audit/"
+        "windows-installer",
+    ),
+}
 DOCKERFILE_FRONTEND_REFERENCE = (
     "docker/dockerfile:1.4@sha256:"
     "9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc"
@@ -216,6 +237,8 @@ RUN_SERVICES_PACKAGE_INPUTS = (
     "global.json",
     "eng/NuGet.Container.Config",
     "eng/package-plane.lock.json",
+    "eng/core-main-runtime-artifact-authority.json",
+    "eng/core-runtime-bundle/core-runtime-bundle-input.json",
     "scripts/ai/bootstrap-hub-package-feed.py",
     "scripts/public_edge_postdeploy_contract.py",
     "scripts/public_edge_postdeploy_gate.v1.schema.json",
@@ -236,9 +259,56 @@ RUN_SERVICES_PACKAGE_INPUTS = (
     "Chummer.World.Contracts/Chummer.World.Contracts.csproj",
     "Chummer.World.Contracts/packages.lock.json",
 )
-PACKAGE_PLANE_CONTRACT = "chummer-hub.package-plane-lock/v4"
+PACKAGE_PLANE_CONTRACT = "chummer-hub.package-plane-lock/v5"
 PACKAGE_PLANE_BUILD_RECIPE = "scripts/ai/bootstrap-hub-package-feed.py"
 PACKAGE_PLANE_DOTNET_SDK = "10.0.103"
+CORE_RUNTIME_PACKAGE_RECIPE_COMMIT = (
+    "b8cb7dcba5a704948a6eb994c99bb3525b935845"
+)
+CORE_RUNTIME_BUNDLE_FILE_NAME = (
+    "chummer-core-runtime-package-plane-"
+    f"{CORE_RUNTIME_PACKAGE_RECIPE_COMMIT}.zip"
+)
+CORE_RUNTIME_BUNDLE_DIRECTORY_NAME = (
+    f"core-runtime-package-plane-{CORE_RUNTIME_PACKAGE_RECIPE_COMMIT}-input"
+)
+CORE_RUNTIME_BUNDLE_SHA256 = (
+    "6006a99d40ea63323b19c3e629c8b3c0810b0f599909071110409e742e5a3a12"
+)
+CORE_RUNTIME_BUNDLE_SIZE_BYTES = 3_324_929
+CORE_RUNTIME_PACKAGE_IDS = (
+    "Chummer.Engine.Contracts",
+    "Chummer.Application",
+    "Chummer.Rulesets.Hosting",
+    "Chummer.Rulesets.Sr5",
+    "Chummer.Rulesets.Sr6",
+    "Chummer.Infrastructure",
+    "Chummer.Rulesets.Sr4",
+    "Chummer.Engine.GmCharacterEdits",
+)
+HUB_PACKAGE_FEED_DIRECTORY_NAME = "hub-package-feed-0.1.1-packageplane.20260910.1-input"
+HUB_PACKAGE_FEED_INPUTS = {
+    "Chummer.Hub.Registry.Contracts.0.1.1-packageplane.20260910.1.nupkg": (
+        "01689fea55ca44f7a0f30c4678dbc9589882c62b8275cf47b5cd9ca7aa55ff69",
+        524_814,
+    ),
+    "Chummer.Play.Contracts.0.1.1-packageplane.20260910.1.nupkg": (
+        "8e454b101b0cfaeaa2c5da67fedea32a022147b4015926f63d9ee98fc50ff991",
+        322_516,
+    ),
+    "Chummer.Run.Contracts.0.1.1-packageplane.20260910.1.nupkg": (
+        "bf7ac452e17a75cc7f2ac96ebaf58b30c9a2359561c1da48a64f04df6820d6e6",
+        1_838_928,
+    ),
+    "Chummer.Run.Registry.0.1.1-packageplane.20260910.1.nupkg": (
+        "62b3a78f06af4ef54a4e0f8f9d9c14248bfd622e2e2f62500da53f298d0cfb0a",
+        345_254,
+    ),
+    "chummer-hub-packages.inventory.json": (
+        "fc1825ed1cc94ae7a5d923238387a6f61a732994a383254ab7f709523da46106",
+        2_270,
+    ),
+}
 CANONICAL_ORIGIN_URLS = {
     "run-services-source": (
         "https://github.com/ArchonMegalon/chummer6-hub.git"
@@ -253,6 +323,16 @@ CANONICAL_ORIGIN_URLS = {
         "https://github.com/ArchonMegalon/chummer6-media-factory.git"
     ),
 }
+TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATH = (
+    "ops/trusted-observability-attesters/"
+    "local-observability-operator-2026.public.pem"
+)
+TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATTERN = re.compile(
+    rb"\A-----BEGIN PUBLIC KEY-----\n"
+    rb"(?P<body>(?:[A-Za-z0-9+/]+={0,2}\n)+)"
+    rb"-----END PUBLIC KEY-----\n\Z"
+)
+TRUSTED_OPENSSL = "/usr/bin/openssl"
 SYNTHETIC_SOURCE_KIND = "standalone-git-repository"
 EXPECTED_NAMED_CONTEXT_COPY_INSTRUCTIONS_BY_STAGE = (
     PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE
@@ -939,6 +1019,44 @@ def require_path_within(
         raise CutoverError(f"{label} is outside the approved synthetic root")
 
 
+def _validated_release_shelf_symlink(
+    root: Path,
+    path: Path,
+    metadata: os.stat_result,
+) -> tuple[bytes, Path]:
+    try:
+        relative_path = path.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise CutoverError("synthetic source symlink is outside its repository") from exc
+    authority = APPROVED_RELEASE_SHELF_SYMLINKS.get(relative_path)
+    if authority is None:
+        raise CutoverError("synthetic source contains an unapproved symlink")
+    expected_target, expected_resolved_relative = authority
+    try:
+        target = os.readlink(path)
+        resolved = path.resolve(strict=True)
+        expected_resolved = (root / expected_resolved_relative).resolve(strict=True)
+    except OSError as exc:
+        raise CutoverError("approved release-shelf symlink is unavailable") from exc
+    if (
+        metadata.st_uid != os.getuid()
+        or metadata.st_nlink != 1
+        or target != expected_target
+        or resolved != expected_resolved
+        or root not in resolved.parents
+        or not resolved.is_dir()
+    ):
+        raise CutoverError("approved release-shelf symlink authority drifted")
+    try:
+        target_bytes = target.encode("utf-8", "strict")
+    except UnicodeEncodeError as exc:
+        raise CutoverError("approved release-shelf symlink target is not UTF-8") from exc
+    after = path.lstat()
+    if _synthetic_entry_identity(metadata) != _synthetic_entry_identity(after):
+        raise CutoverError("synthetic source symlink changed while inspected")
+    return target_bytes, resolved
+
+
 def _source_file_record(root: Path, relative_path: str) -> dict[str, Any]:
     relative = Path(relative_path)
     if (
@@ -954,9 +1072,22 @@ def _source_file_record(root: Path, relative_path: str) -> dict[str, Any]:
         resolved = path.resolve(strict=True)
     except OSError as exc:
         raise CutoverError("source content entry is unavailable") from exc
+    if stat.S_ISLNK(before.st_mode):
+        target_bytes, _resolved = _validated_release_shelf_symlink(
+            root,
+            path,
+            before,
+        )
+        if len(target_bytes) > MAX_SOURCE_FILE_BYTES:
+            raise CutoverError("source content symlink target exceeds governed bounds")
+        return {
+            "mode": "120000",
+            "path": relative_path,
+            "sha256": sha256_bytes(target_bytes),
+            "size": len(target_bytes),
+        }
     if (
         resolved != path
-        or stat.S_ISLNK(before.st_mode)
         or not stat.S_ISREG(before.st_mode)
         or before.st_nlink != 1
         or before.st_size > MAX_SOURCE_FILE_BYTES
@@ -1069,6 +1200,9 @@ def validate_sealed_standalone_repository(repository: Path) -> None:
             "synthetic source must use a real local .git directory"
         )
 
+    visited_directories: set[Path] = set()
+    approved_symlink_targets: set[Path] = set()
+
     def visit(directory: Path, *, require_content: bool) -> bool:
         before = directory.lstat()
         if (
@@ -1080,15 +1214,24 @@ def validate_sealed_standalone_repository(repository: Path) -> None:
             raise CutoverError(
                 "synthetic source directories must be operator-owned and sealed"
             )
+        visited_directories.add(directory)
         has_content = False
         with os.scandir(directory) as iterator:
             entries = sorted(iterator, key=lambda item: item.name)
         for entry in entries:
             path = directory / entry.name
             metadata = path.lstat()
+            if stat.S_ISLNK(metadata.st_mode):
+                _target_bytes, resolved = _validated_release_shelf_symlink(
+                    repository,
+                    path,
+                    metadata,
+                )
+                approved_symlink_targets.add(resolved)
+                has_content = True
+                continue
             if (
-                stat.S_ISLNK(metadata.st_mode)
-                or metadata.st_uid != operator_uid
+                metadata.st_uid != operator_uid
                 or stat.S_IMODE(metadata.st_mode) & 0o222
             ):
                 raise CutoverError(
@@ -1123,6 +1266,10 @@ def validate_sealed_standalone_repository(repository: Path) -> None:
         return has_content
 
     visit(repository, require_content=True)
+    if not approved_symlink_targets.issubset(visited_directories):
+        raise CutoverError(
+            "approved release-shelf symlink does not resolve to a sealed directory"
+        )
     forbidden_git_indirections = (
         git_root / "commondir",
         git_root / "worktrees",
@@ -1247,6 +1394,108 @@ class CutoverInputs:
     expected_fleet_media_factory_content_sha256: str | None = None
 
 
+def core_runtime_bundle_root(inputs: CutoverInputs) -> Path:
+    return inputs.source_root.parent / CORE_RUNTIME_BUNDLE_DIRECTORY_NAME
+
+
+def validate_core_runtime_bundle_input(inputs: CutoverInputs) -> Path:
+    """Require one caller-owned, immutable, exact external Core bundle."""
+
+    root = core_runtime_bundle_root(inputs)
+    normalized = require_safe_source_directory(
+        root,
+        label="Core runtime bundle",
+    )
+    metadata = normalized.lstat()
+    if (
+        normalized != root
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o555
+    ):
+        raise CutoverError(
+            "Core runtime bundle directory must be exact, caller-owned mode 0555"
+        )
+    try:
+        entries = sorted(entry.name for entry in os.scandir(normalized))
+    except OSError as exc:
+        raise CutoverError("Core runtime bundle directory is unavailable") from exc
+    if entries != [CORE_RUNTIME_BUNDLE_FILE_NAME]:
+        raise CutoverError(
+            "Core runtime bundle directory must contain exactly the reviewed archive"
+        )
+    archive = normalized / CORE_RUNTIME_BUNDLE_FILE_NAME
+    archive_metadata = archive.lstat()
+    if (
+        stat.S_ISLNK(archive_metadata.st_mode)
+        or not stat.S_ISREG(archive_metadata.st_mode)
+        or archive_metadata.st_nlink != 1
+        or archive_metadata.st_uid != os.getuid()
+        or stat.S_IMODE(archive_metadata.st_mode) != 0o444
+        or archive_metadata.st_size != CORE_RUNTIME_BUNDLE_SIZE_BYTES
+        or hash_regular_file(
+            archive,
+            owner_only=False,
+            maximum_bytes=CORE_RUNTIME_BUNDLE_SIZE_BYTES,
+        )
+        != CORE_RUNTIME_BUNDLE_SHA256
+    ):
+        raise CutoverError(
+            "Core runtime bundle bytes or immutable file identity drifted"
+        )
+    return normalized
+
+
+def hub_package_feed_root(inputs: CutoverInputs) -> Path:
+    return inputs.source_root.parent / HUB_PACKAGE_FEED_DIRECTORY_NAME
+
+
+def validate_hub_package_feed_input(inputs: CutoverInputs) -> Path:
+    """Require the exact prebuilt Hub feed as a sealed external input."""
+
+    root = hub_package_feed_root(inputs)
+    normalized = require_safe_source_directory(root, label="Hub package feed")
+    metadata = normalized.lstat()
+    if (
+        normalized != root
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o555
+    ):
+        raise CutoverError(
+            "Hub package feed directory must be exact, caller-owned mode 0555"
+        )
+    try:
+        entries = sorted(entry.name for entry in os.scandir(normalized))
+    except OSError as exc:
+        raise CutoverError("Hub package feed directory is unavailable") from exc
+    if entries != sorted(HUB_PACKAGE_FEED_INPUTS):
+        raise CutoverError(
+            "Hub package feed directory must contain the exact locked file set"
+        )
+    for file_name, (expected_sha256, expected_size) in (
+        HUB_PACKAGE_FEED_INPUTS.items()
+    ):
+        path = normalized / file_name
+        file_metadata = path.lstat()
+        if (
+            stat.S_ISLNK(file_metadata.st_mode)
+            or not stat.S_ISREG(file_metadata.st_mode)
+            or file_metadata.st_nlink != 1
+            or file_metadata.st_uid != os.getuid()
+            or stat.S_IMODE(file_metadata.st_mode) != 0o444
+            or file_metadata.st_size != expected_size
+            or hash_regular_file(
+                path,
+                owner_only=False,
+                maximum_bytes=expected_size,
+            )
+            != expected_sha256
+        ):
+            raise CutoverError(
+                f"Hub package feed input drifted: {file_name}"
+            )
+    return normalized
+
+
 def validate_build_workspace_paths(inputs: CutoverInputs) -> None:
     source_roots = {
         "run-services-source": inputs.source_root,
@@ -1274,6 +1523,8 @@ def validate_build_workspace_paths(inputs: CutoverInputs) -> None:
             raise CutoverError(
                 "noncanonical build sources require an approved synthetic root"
             )
+        validate_core_runtime_bundle_input(inputs)
+        validate_hub_package_feed_input(inputs)
         return
 
     synthetic_root = require_safe_source_directory(
@@ -1334,12 +1585,20 @@ def validate_build_workspace_paths(inputs: CutoverInputs) -> None:
             raise CutoverError(
                 f"{name} requires an exact synthetic content pin"
             )
+    validate_core_runtime_bundle_input(inputs)
+    validate_hub_package_feed_input(inputs)
 
 
 def build_routing_environment(inputs: CutoverInputs) -> dict[str, str]:
     return {
         "CHUMMER_BUILD_CONCURRENCY": "1",
         "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT": str(inputs.build_context_root),
+        "CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE": str(
+            core_runtime_bundle_root(inputs)
+        ),
+        "CHUMMER_HUB_PACKAGE_FEED_SOURCE": str(
+            hub_package_feed_root(inputs)
+        ),
         "CHUMMER_RUN_SERVICES_CONTEXT_DIR": str(inputs.source_root),
         "CHUMMER_RUN_SERVICES_SOURCE": str(inputs.source_root),
         "CHUMMER_HUB_REGISTRY_SOURCE": str(inputs.hub_registry_root),
@@ -1552,6 +1811,70 @@ class GovernedCutoverRunner:
             )
         )
 
+    def _tracked_context_entry_is_allowed_trusted_public_pem(
+        self,
+        repository: Path,
+        relative_path: str,
+    ) -> bool:
+        if relative_path != TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATH:
+            return False
+        public_key_path = repository / relative_path
+        try:
+            raw = read_regular_file_bytes(
+                public_key_path,
+                maximum_bytes=16 * 1024,
+            )
+        except (CutoverError, OSError):
+            return False
+        if b"PRIVATE KEY" in raw:
+            return False
+        match = TRUSTED_OBSERVABILITY_PUBLIC_PEM_PATTERN.fullmatch(raw)
+        if match is None:
+            return False
+        try:
+            decoded = base64.b64decode(
+                match.group("body").replace(b"\n", b""),
+                validate=True,
+            )
+        except (binascii.Error, ValueError):
+            return False
+        if not decoded:
+            return False
+        try:
+            parsed = self.commands.run(
+                [
+                    TRUSTED_OPENSSL,
+                    "pkey",
+                    "-pubin",
+                    "-inform",
+                    "PEM",
+                    "-in",
+                    str(public_key_path),
+                    "-noout",
+                ],
+                check=False,
+            )
+            rebound = read_regular_file_bytes(
+                public_key_path,
+                maximum_bytes=16 * 1024,
+            )
+        except (CutoverError, OSError):
+            return False
+        return parsed.returncode == 0 and not parsed.stdout and rebound == raw
+
+    def _tracked_context_entry_is_rejected(
+        self,
+        repository: Path,
+        relative_path: str,
+    ) -> bool:
+        return (
+            self._tracked_context_entry_is_sensitive_or_output(relative_path)
+            and not self._tracked_context_entry_is_allowed_trusted_public_pem(
+                repository,
+                relative_path,
+            )
+        )
+
     def _git_source_provenance(
         self,
         *,
@@ -1676,7 +1999,7 @@ class GovernedCutoverRunner:
         sensitive_tracked_entries = [
             entry
             for entry in tracked_entries
-            if self._tracked_context_entry_is_sensitive_or_output(entry)
+            if self._tracked_context_entry_is_rejected(repository, entry)
         ]
         if (
             top_level != str(repository)
@@ -1813,6 +2136,7 @@ class GovernedCutoverRunner:
         payload: dict[str, Any],
         *,
         recipe_sha256: str,
+        core_authority_sha256: str,
     ) -> int:
         if (
             set(payload)
@@ -1820,6 +2144,7 @@ class GovernedCutoverRunner:
                 "approved_remote_source",
                 "build_recipe",
                 "contract",
+                "core_runtime",
                 "dotnet_install",
                 "dotnet_sdk",
                 "package_version",
@@ -1862,6 +2187,97 @@ class GovernedCutoverRunner:
             )
         ):
             raise CutoverError("package-plane toolchain pins are invalid")
+        core_runtime = payload.get("core_runtime")
+        if (
+            not isinstance(core_runtime, dict)
+            or set(core_runtime)
+            != {
+                "authority_path",
+                "authority_sha256",
+                "bundle",
+                "inventory",
+                "package_recipe_commit",
+                "package_version",
+                "packages",
+                "receipt",
+                "repository",
+                "runtime_lock",
+                "runtime_source_commit",
+            }
+            or core_runtime.get("authority_path")
+            != "eng/core-main-runtime-artifact-authority.json"
+            or core_runtime.get("authority_sha256") != core_authority_sha256
+            or core_runtime.get("repository")
+            != "https://github.com/ArchonMegalon/chummer6-core.git"
+            or HEAD_PATTERN.fullmatch(
+                str(core_runtime.get("runtime_source_commit") or "")
+            )
+            is None
+            or core_runtime.get("package_recipe_commit")
+            != CORE_RUNTIME_PACKAGE_RECIPE_COMMIT
+            or not isinstance(core_runtime.get("package_version"), str)
+            or not core_runtime["package_version"]
+        ):
+            raise CutoverError("Core runtime package authority is invalid")
+        bundle = core_runtime.get("bundle")
+        expected_bundle_url = (
+            "https://github.com/ArchonMegalon/chummer6-core/releases/download/"
+            f"core-runtime-package-plane-{CORE_RUNTIME_PACKAGE_RECIPE_COMMIT}/"
+            f"{CORE_RUNTIME_BUNDLE_FILE_NAME}"
+        )
+        if bundle != {
+            "file_name": CORE_RUNTIME_BUNDLE_FILE_NAME,
+            "sha256": CORE_RUNTIME_BUNDLE_SHA256,
+            "size_bytes": CORE_RUNTIME_BUNDLE_SIZE_BYTES,
+            "url": expected_bundle_url,
+        }:
+            raise CutoverError("Core runtime bundle authority is invalid")
+        for name, file_name in (
+            ("inventory", "chummer-core-runtime-packages.inventory.json"),
+            ("runtime_lock", "runtime-package-plane.lock.json"),
+            ("receipt", "no-siblings.v3.receipt.json"),
+        ):
+            item = core_runtime.get(name)
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"file_name", "sha256"}
+                or item.get("file_name") != file_name
+                or HEX_SHA256_PATTERN.fullmatch(
+                    str(item.get("sha256") or "")
+                )
+                is None
+            ):
+                raise CutoverError(
+                    f"Core runtime {name.replace('_', ' ')} authority is invalid"
+                )
+        core_packages = core_runtime.get("packages")
+        if (
+            not isinstance(core_packages, list)
+            or tuple(
+                package.get("id") if isinstance(package, dict) else None
+                for package in core_packages
+            )
+            != CORE_RUNTIME_PACKAGE_IDS
+        ):
+            raise CutoverError("Core runtime package set is not exact")
+        core_version = core_runtime["package_version"]
+        for package in core_packages:
+            package_id = package.get("id")
+            if (
+                set(package)
+                != {"file_name", "id", "sha256", "size_bytes", "version"}
+                or package.get("version") != core_version
+                or package.get("file_name")
+                != f"{package_id}.{core_version}.nupkg"
+                or HEX_SHA256_PATTERN.fullmatch(
+                    str(package.get("sha256") or "")
+                )
+                is None
+                or isinstance(package.get("size_bytes"), bool)
+                or not isinstance(package.get("size_bytes"), int)
+                or package["size_bytes"] <= 0
+            ):
+                raise CutoverError("Core runtime package pin is invalid")
         packages = payload.get("packages")
         if not isinstance(packages, list) or not packages:
             raise CutoverError("package-plane package set is empty")
@@ -1894,8 +2310,26 @@ class GovernedCutoverRunner:
             identity = (package["id"], package["version"])
             if identity in identities:
                 raise CutoverError("package-plane package identity is duplicated")
+            external_file_name = (
+                f"{package['id']}.{package['version']}.nupkg"
+            )
+            if HUB_PACKAGE_FEED_INPUTS.get(external_file_name) != (
+                package["nupkg_sha256"],
+                package["nupkg_size_bytes"],
+            ):
+                raise CutoverError(
+                    "package-plane package pin drifted from the sealed Hub feed"
+                )
             identities.add(identity)
-        return len(packages)
+        expected_hub_files = set(HUB_PACKAGE_FEED_INPUTS) - {
+            "chummer-hub-packages.inventory.json"
+        }
+        if {
+            f"{package['id']}.{package['version']}.nupkg"
+            for package in packages
+        } != expected_hub_files:
+            raise CutoverError("package-plane Hub package set is not exact")
+        return len(packages) + len(core_packages)
 
     def _capture_build_dependency_provenance(self) -> dict[str, Any]:
         self._validate_build_workspace_paths()
@@ -1997,6 +2431,12 @@ class GovernedCutoverRunner:
             or context_policy["invalidCopyFromUses"]
             or context_policy["continuationUses"]
             or context_policy["onbuildUses"]
+            or not docker_stage_instruction_contract_matches(
+                dockerfile_text,
+                stage="build",
+                expected_count=PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+                expected_sha256=PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
+            )
             or any(marker in dockerfile_text for marker in forbidden_install_markers)
             or dockerfile_text.count("--locked-mode") != 2
             or dockerfile_text.count("-p:RestoreAdditionalProjectSources=") != 2
@@ -2055,6 +2495,9 @@ class GovernedCutoverRunner:
         package_count = self._validate_package_plane(
             package_plane,
             recipe_sha256=input_hashes[PACKAGE_PLANE_BUILD_RECIPE],
+            core_authority_sha256=input_hashes[
+                "eng/core-main-runtime-artifact-authority.json"
+            ],
         )
         if (
             input_hashes[
@@ -2179,6 +2622,12 @@ class GovernedCutoverRunner:
                 ),
                 "repositoryContained": True,
             },
+            "core-runtime-bundle": {
+                "contextBoundary": "sealed-external-artifact-input",
+                "dockerignoreSha256": None,
+                "effectiveDockerignoreSha256": None,
+                "repositoryContained": False,
+            },
             "hub-registry-source": {
                 "contextBoundary": "exact-clean-repository",
                 "dockerignoreSha256": hub_registry_dockerignore_sha256,
@@ -2186,6 +2635,12 @@ class GovernedCutoverRunner:
                     hub_registry_dockerignore_sha256
                 ),
                 "repositoryContained": True,
+            },
+            "hub-package-feed-input": {
+                "contextBoundary": "sealed-external-artifact-input",
+                "dockerignoreSha256": None,
+                "effectiveDockerignoreSha256": None,
+                "repositoryContained": False,
             },
             "fleet-media-factory-contracts": {
                 "contextBoundary": "exact-clean-repository-subtree",
@@ -2226,6 +2681,19 @@ class GovernedCutoverRunner:
             "contractName": BUILD_DEPENDENCY_PROVENANCE_CONTRACT,
             "dockerfileFrontend": DOCKERFILE_FRONTEND_REFERENCE,
             "dockerfileSha256": sha256_bytes(dockerfile),
+            "coreRuntimeBundleFileName": CORE_RUNTIME_BUNDLE_FILE_NAME,
+            "coreRuntimeBundlePathSha256": sha256_bytes(
+                str(core_runtime_bundle_root(self.inputs)).encode("utf-8")
+            ),
+            "coreRuntimeBundleSha256": CORE_RUNTIME_BUNDLE_SHA256,
+            "coreRuntimeBundleSizeBytes": CORE_RUNTIME_BUNDLE_SIZE_BYTES,
+            "hubPackageFeedInputs": {
+                name: {"sha256": sha256, "sizeBytes": size}
+                for name, (sha256, size) in HUB_PACKAGE_FEED_INPUTS.items()
+            },
+            "hubPackageFeedPathSha256": sha256_bytes(
+                str(hub_package_feed_root(self.inputs)).encode("utf-8")
+            ),
             "externalMediaProjectSha256": sha256_bytes(media_project),
             "externalMediaRestoreIsSdkOnly": True,
             "loopbackProbeIsSdkOnly": True,
@@ -2452,6 +2920,7 @@ class GovernedCutoverRunner:
         if not isinstance(services, dict) or not isinstance(networks, dict):
             raise CutoverError("rendered Compose contract omitted services or networks")
         expected_additional_contexts = {
+            "core-runtime-bundle": str(core_runtime_bundle_root(self.inputs)),
             "design-product": str(self.inputs.design_product_root),
             "fleet-media-factory-contracts": str(
                 self.inputs.fleet_media_factory_root
@@ -2459,6 +2928,9 @@ class GovernedCutoverRunner:
                 / "Chummer.Media.Contracts"
             ),
             "hub-registry-source": str(self.inputs.hub_registry_root),
+            "hub-package-feed-input": str(
+                hub_package_feed_root(self.inputs)
+            ),
             "run-services-source": str(self.inputs.source_root),
         }
         expected_dockerfile = str(

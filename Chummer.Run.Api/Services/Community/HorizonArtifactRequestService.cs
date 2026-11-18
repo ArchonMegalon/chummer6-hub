@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -54,6 +55,11 @@ public sealed class HorizonArtifactRequestService
 
         HorizonArtifactQuotaSnapshot? quota = null;
         bool quotaTracked = capability.QuotaTracked;
+        var preparedReceipt = new HorizonArtifactRequestReceipt(
+            requestId, blocked.Count == 0 ? "accepted" : "blocked", capability.HorizonId,
+            capability.CapabilityId, capability.ArtifactKind, capability.PublicLabel, capability.CapabilitySlot,
+            Clean(request.SourceRef), Clean(request.UserId), Clean(request.Visibility), request.ExternalProcessingConsent,
+            blocked.ToArray(), createdAtUtc, quotaTracked, GovernedRenderRequest: governedRenderRequest);
         HorizonArtifactQuotaRequest quotaRequest = new(
             UserId: request.UserId,
             HorizonId: capability.HorizonId,
@@ -69,7 +75,12 @@ public sealed class HorizonArtifactRequestService
             {
                 try
                 {
-                    quota = _quota.Consume(quotaRequest, createdAtUtc);
+                    if (FindReceipt(requestId) is not null)
+                        throw new InvalidOperationException("This request already has a receipt; read it instead of resubmitting.");
+                    quota = _quota.Consume(quotaRequest, createdAtUtc, preparedReceipt);
+                    // The usage commit includes this exact receipt. No second
+                    // write can fail after consuming the user's allowance.
+                    return preparedReceipt with { Quota = quota };
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("allowance", StringComparison.OrdinalIgnoreCase))
                 {
@@ -102,15 +113,97 @@ public sealed class HorizonArtifactRequestService
         return receipt;
     }
 
+    public HorizonArtifactRequestReceipt AdmitPrivateOriginScene(HorizonArtifactRequestCreateRequest request)
+    {
+        // Called only after composing from current reader-accepted prose and
+        // resolving a real Hub user. The charged receipt is the durable key;
+        // this is not a new Hub-owned render queue or provider-spend ledger.
+        if (request.HorizonId != "origin-dossier" || request.ArtifactKindOrCapabilityId != "origin-dossier-media"
+            || request.Visibility != "private" || request.GovernedRenderRequest is not { } render
+            || render.WorkItemId is not { Length: 64 } || request.SourceRef != "origin-dossier:scene:" + render.WorkItemId)
+            throw new ArgumentException("An exact private Origin scene is required.");
+        var capability = _capabilities.GetCapability(request.HorizonId, request.ArtifactKindOrCapabilityId);
+        var composed = _governedRenderRequests.Compose(capability, request.SourceRef, render);
+        if (Validate(request, capability, true, true).Count != 0 || !composed.Accepted)
+            throw new InvalidOperationException("Private scene admission is unavailable or lacks consent.");
+
+        HorizonArtifactRequestReceipt? Existing()
+        {
+            var rows = (_quota?.ListChargedRequests() ?? []).Where(row => row.CapabilityId == capability.CapabilityId
+                && row.SourceRef == request.SourceRef && row.RequestedByUserId == request.UserId).ToArray();
+            if (rows.Length == 0) return null;
+            if (rows.Length != 1 || rows[0].Status != "accepted" || rows[0].Quota is null
+                || JsonSerializer.Serialize(rows[0].GovernedRenderRequest) != JsonSerializer.Serialize(composed.Contract))
+                throw new InvalidOperationException("Reopen the already-admitted scene; its exact request cannot be replaced.");
+            return rows[0];
+        }
+
+        if (Existing() is { } previous) return previous;
+        try
+        {
+            var admitted = BuildRequest(request, consumeQuota: true);
+            if (admitted.Status != "accepted" || admitted.Quota is null)
+                throw new InvalidOperationException("No scene allowance is available.");
+            return admitted;
+        }
+        catch (Exception error) when (error is InvalidOperationException or Chummer.Storage.Teable.TeableRevisionConflictException)
+        {
+            // A concurrent caller may have committed the one allowance first.
+            // Return only the identical admitted request; never blind reconsume.
+            if (Existing() is { } concurrent) return concurrent;
+            throw;
+        }
+    }
+
+    public HorizonArtifactRequestReceipt? FindPrivateOriginScene(string userId, string subjectId, string assetId)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(subjectId) || subjectId.Contains('\0')
+            || assetId is not { Length: 64 }
+            || assetId.Any(static c => c is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+            throw new ArgumentException("An exact private scene identity is required.");
+        // No current allowance or enabled-capability check: retained orders stay
+        // observable after their admission window expires. An unavailable ledger
+        // must not turn into a false NotFound/permission to order again.
+        if (_quota is null) throw new IOException("Private scene admission authority is unavailable.");
+        string source = "origin-dossier:scene:" + assetId;
+        var rows = _quota.ListChargedRequests().Where(row => row.CapabilityId == "origin-dossier-media"
+            && row.SourceRef == source && row.RequestedByUserId == userId).ToArray();
+        if (rows.Length == 0) return null;
+        string owner = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(subjectId)));
+        if (rows.Length != 1 || rows[0] is not { Status: "accepted", Quota: not null, QuotaTracked: true,
+                HorizonId: "origin-dossier", Visibility: "private", ExternalProcessingConsent: true,
+                GovernedRenderRequest: { Audience: "private" } render }
+            || render.RequestedBy != "origin-owner:" + owner || render.WorkItemId != assetId || render.SourceRef != source)
+            throw new InvalidDataException("The retained private scene admission does not match its owner and source.");
+        return rows[0];
+    }
+
     public IReadOnlyList<HorizonArtifactRequestReceipt> ListRecentReceipts(
         string? horizonId = null,
         string? userId = null,
         string? artifactKindOrCapabilityId = null,
         int limit = 50)
-        => _receipts?.ListRecent(horizonId, userId, artifactKindOrCapabilityId, limit) ?? Array.Empty<HorizonArtifactRequestReceipt>();
+    {
+        var charged = (_quota?.ListChargedRequests() ?? [])
+            .Where(row => string.IsNullOrWhiteSpace(horizonId) || string.Equals(row.HorizonId, Clean(horizonId), StringComparison.OrdinalIgnoreCase))
+            .Where(row => string.IsNullOrWhiteSpace(userId) || string.Equals(row.RequestedByUserId, Clean(userId), StringComparison.OrdinalIgnoreCase))
+            .Where(row => string.IsNullOrWhiteSpace(artifactKindOrCapabilityId)
+                || string.Equals(row.ArtifactKind, Clean(artifactKindOrCapabilityId), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(row.CapabilityId, Clean(artifactKindOrCapabilityId), StringComparison.OrdinalIgnoreCase));
+        return HorizonQuotaReceipts.Merge(charged, _receipts?.ListRecent(horizonId, userId, artifactKindOrCapabilityId, limit) ?? [])
+            .OrderByDescending(row => row.CreatedAtUtc)
+            .ThenBy(row => row.RequestId, StringComparer.OrdinalIgnoreCase)
+            .Take(Math.Clamp(limit, 1, 200)).ToArray();
+    }
 
     public HorizonArtifactRequestReceipt? FindReceipt(string requestId)
-        => _receipts?.FindByRequestId(requestId);
+    {
+        if (string.IsNullOrWhiteSpace(requestId)) return null;
+        var charged = (_quota?.ListChargedRequests() ?? [])
+            .Where(row => string.Equals(row.RequestId, requestId.Trim(), StringComparison.OrdinalIgnoreCase));
+        var legacy = _receipts?.FindByRequestId(requestId);
+        return HorizonQuotaReceipts.Merge(charged, legacy is null ? [] : [legacy]).SingleOrDefault();
+    }
 
     public HorizonArtifactRequestReceipt? FindReceiptForUser(string requestId, string userId)
     {
@@ -219,13 +312,16 @@ public sealed class HorizonArtifactRequestService
         HorizonArtifactRequestCreateRequest request,
         HorizonCapabilityDefinition capability,
         DateTimeOffset createdAtUtc)
+        => BuildRequestId(capability.HorizonId, capability.CapabilityId, Clean(request.UserId), Clean(request.SourceRef), createdAtUtc);
+
+    internal static string BuildRequestId(string horizonId, string capabilityId, string userId, string sourceRef, DateTimeOffset createdAtUtc)
     {
         string material = string.Join(
             "\n",
-            capability.HorizonId,
-            capability.CapabilityId,
-            Clean(request.UserId),
-            Clean(request.SourceRef),
+            horizonId,
+            capabilityId,
+            userId,
+            sourceRef,
             createdAtUtc.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture));
         string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material))).ToLowerInvariant()[..16];
         return $"horizon-artifact-{digest}";

@@ -13,7 +13,7 @@ public sealed class LeaderboardService
 
     public IReadOnlyList<LeaderboardRowDto> IndividualLeaderboard(int limit = 20, bool publicOnly = false)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var rows = _store.UsersById.Keys
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -42,7 +42,7 @@ public sealed class LeaderboardService
 
     public IReadOnlyList<SponsorRankLeaderboardRowDto> SponsorRankLeaderboard(int limit = 20, bool publicOnly = false)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var rows = _store.UsersById.Keys
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -77,7 +77,7 @@ public sealed class LeaderboardService
 
     public IReadOnlyList<CodexUsageLeaderboardRowDto> CodexUsageLeaderboard(int limit = 20, bool publicOnly = false)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var rows = _store.UsersById.Keys
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -104,7 +104,7 @@ public sealed class LeaderboardService
 
     public IReadOnlyList<GroupLeaderboardRowDto> GroupLeaderboard(int limit = 20, bool publicOnly = false)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var rows = _store.RewardEntries
                 .Where(entry => !string.IsNullOrWhiteSpace(entry.GroupId))
@@ -145,7 +145,7 @@ public sealed class LeaderboardService
 
     public IReadOnlyList<QuestDto> Quests()
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var landed = _store.Receipts.Count(receipt => string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase));
             var reviewed = _store.Receipts.Count(receipt =>
@@ -161,7 +161,7 @@ public sealed class LeaderboardService
 
     public UserRecognitionSummaryDto UserRecognitionSummary(string userId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             var metrics = BuildUserMetricsLocked(userId);
             return new UserRecognitionSummaryDto(

@@ -1,0 +1,488 @@
+using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Contracts.Community;
+using Microsoft.Extensions.Configuration;
+using Xunit;
+
+namespace Chummer.Tests;
+
+public sealed class OriginChapterAuthoringServiceTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "origin-chapter-tests-" + Guid.NewGuid().ToString("N"));
+    private OriginChapterAuthoringService Service() => new(new ConfigurationBuilder().AddInMemoryCollection(
+        new Dictionary<string, string?> { ["CHUMMER_RUNTIME_STATE_ROOT"] = _root }).Build());
+    private static OriginChapterAuthoringRequest Request() => new("request-one", new("workspace-one", "chapter-one",
+        new string('a', 64), "decision-one", "de-AT", "Synthetic runner",
+        [new("fact-one", "decision-one", "The player selected Renraku.")]), true);
+    private static bool Authorized() => true;
+
+    [Fact]
+    public void Reader_inventory_filters_owner_before_loading_foreign_bytes_and_survives_restart()
+    {
+        using var service = Service();
+        var own = service.Create("subject-a", Request(), Authorized);
+        service.Create("subject-b", Request(), Authorized);
+        string foreignReference = Assert.Single(service.ListForReader("subject-b")).Reference;
+        string foreignOwner = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes("subject-b")));
+        string foreignPath = Path.Combine(_root, "origin-chapter-jobs", foreignOwner + "." + foreignReference + ".json");
+        Assert.True(File.Exists(foreignPath));
+        File.WriteAllText(foreignPath, "corrupt foreign chapter must never be loaded");
+        using var restarted = Service();
+        var entry = Assert.Single(restarted.ListForReader("subject-a"));
+        Assert.Equal(own.RequestId, entry.Job.RequestId);
+        Assert.Equal(own.SourceDigest, restarted.GetForReader("subject-a", entry.Reference)!.SourceDigest);
+        Assert.Empty(restarted.ListForReader("subject-c"));
+        Assert.Null(restarted.GetForReader("subject-c", entry.Reference));
+        Assert.Null(restarted.GetForReader("subject-a", "../private"));
+    }
+
+    private static OriginChapterNarrativeContext Possibilities() => new("next-turn", new string('f', 64),
+        [new("school", "Military school", OriginChapterOpportunityAvailability.Available),
+            new("corporate", "A corporate education", OriginChapterOpportunityAvailability.Unavailable)]);
+
+    [Fact]
+    public void Optional_possibilities_preserve_legacy_source_bytes_and_are_not_canonical_facts()
+    {
+        var original = Request().Source;
+        var legacy = new { original.WorkspaceId, original.ChapterId, original.ChapterDigest,
+            original.AcceptedDecisionId, original.Locale, original.RunnerName, original.Facts };
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(legacy, options),
+            System.Text.Json.JsonSerializer.Serialize(OriginChapterSourceIdentity.Capture(original), options));
+        var source = OriginChapterSourceIdentity.Capture(original with { NarrativeContext = Possibilities() });
+        Assert.Equal(original.Facts, source.Facts);
+        Assert.Equal(OriginChapterSourceIdentity.RequestId(original), OriginChapterSourceIdentity.RequestId(source));
+        Assert.NotEqual(OriginChapterSourceIdentity.Digest(original), OriginChapterSourceIdentity.Digest(source));
+        var restored = System.Text.Json.JsonSerializer.Deserialize<OriginChapterSource>(
+            System.Text.Json.JsonSerializer.Serialize(source, options), options)!;
+        Assert.Equal(OriginChapterSourceIdentity.RequestId(source), OriginChapterSourceIdentity.RequestId(restored));
+        Assert.Equal(source.NarrativeContext!.Opportunities, restored.NarrativeContext!.Opportunities);
+    }
+
+    [Fact]
+    public void Possibilities_are_captured_and_any_change_changes_the_approved_input_digest_not_the_lookup_key()
+    {
+        var opportunities = Possibilities().Opportunities.ToArray();
+        var input = Request().Source with { NarrativeContext = Possibilities() with { Opportunities = opportunities } };
+        var captured = OriginChapterSourceIdentity.Capture(input);
+        string expected = OriginChapterSourceIdentity.Digest(captured);
+        opportunities[0] = opportunities[0] with { Caption = "Changed school" };
+        Assert.Equal(expected, OriginChapterSourceIdentity.Digest(captured));
+        Assert.NotEqual(expected, OriginChapterSourceIdentity.Digest(input));
+        foreach (var changed in new[] {
+            captured.NarrativeContext! with { TurnId = "other-turn" },
+            captured.NarrativeContext! with { DecisionDigest = new string('e', 64) },
+            captured.NarrativeContext! with { Opportunities = [captured.NarrativeContext!.Opportunities[0] with
+                { Availability = OriginChapterOpportunityAvailability.Unavailable }] } })
+        {
+            var source = captured with { NarrativeContext = changed };
+            Assert.NotEqual(expected, OriginChapterSourceIdentity.Digest(source));
+            Assert.Equal(OriginChapterSourceIdentity.RequestId(captured), OriginChapterSourceIdentity.RequestId(source));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Different_device_or_later_possibilities_find_one_job_and_cannot_change_its_consent(bool originalHasContext)
+    {
+        var original = Request().Source with { NarrativeContext = originalHasContext ? Possibilities() : null };
+        var changed = original with { NarrativeContext = originalHasContext ? null : Possibilities() };
+        var request = new OriginChapterAuthoringRequest(OriginChapterSourceIdentity.RequestId(original), original, true);
+        using var service = Service();
+        var admitted = service.Create("subject-a", request, Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, admitted.SourceDigest, "admission-one");
+        using var restarted = Service();
+        var read = restarted.Get("subject-a", OriginChapterSourceIdentity.RequestId(changed))!;
+        Assert.Equal(admitted.SourceDigest, read.SourceDigest);
+        Assert.Throws<InvalidOperationException>(() => restarted.Create("subject-a",
+            new(OriginChapterSourceIdentity.RequestId(changed), changed, true), Authorized));
+        Assert.Single(restarted.PendingForWorker(20));
+        Assert.False(restarted.AdmitForWorker(work.WorkId, admitted.SourceDigest, "admission-one").MayStartGeneration);
+        Assert.Null(restarted.Get("subject-b", request.RequestId));
+    }
+
+    [Theory]
+    [InlineData("turn")]
+    [InlineData("digest")]
+    [InlineData("empty")]
+    [InlineData("null-list")]
+    [InlineData("null-choice")]
+    [InlineData("many")]
+    [InlineData("duplicate")]
+    [InlineData("id")]
+    [InlineData("caption")]
+    [InlineData("whitespace")]
+    [InlineData("controls")]
+    [InlineData("large")]
+    [InlineData("availability")]
+    public void Invalid_possibilities_cannot_create_a_job(string change)
+    {
+        var context = Possibilities();
+        var choice = context.Opportunities[0];
+        context = change switch
+        {
+            "turn" => context with { TurnId = "\ninvalid" },
+            "digest" => context with { DecisionDigest = "invalid" },
+            "empty" => context with { Opportunities = [] },
+            "null-list" => context with { Opportunities = null! },
+            "null-choice" => context with { Opportunities = [null!] },
+            "many" => context with { Opportunities = Enumerable.Range(0, 9).Select(n => choice with { ChoiceId = "choice-" + n }).ToArray() },
+            "duplicate" => context with { Opportunities = [choice, choice] },
+            "id" => context with { Opportunities = [choice with { ChoiceId = " " }] },
+            "caption" => context with { Opportunities = [choice with { Caption = "" }] },
+            "whitespace" => context with { Opportunities = [choice with { Caption = " untrimmed" }] },
+            "controls" => context with { Opportunities = [choice with { Caption = "School\nnew line" }] },
+            "large" => context with { Opportunities = [choice with { Caption = new string('x', 1025) }] },
+            "availability" => context with { Opportunities = [choice with { Availability = "already-graduated" }] },
+            _ => throw new InvalidOperationException()
+        };
+        var request = Request() with { Source = Request().Source with { NarrativeContext = context } };
+        using var service = Service();
+        Assert.Throws<ArgumentException>(() => service.Create("subject-a", request, Authorized));
+        Assert.Null(service.Get("subject-a", request.RequestId));
+        Assert.Empty(service.PendingForWorker(20));
+    }
+
+    [Fact]
+    public void Next_chapter_may_change_possibilities_without_rewriting_accepted_history_or_old_dispatch()
+    {
+        var request = Request() with { Source = Request().Source with { NarrativeContext = Possibilities() } };
+        using var service = Service();
+        var first = service.Create("subject-a", request, Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, first.SourceDigest, "admission-one");
+        service.CompleteForWorker(work.WorkId, first.SourceDigest, "admission-one", "Accepted scene.", new string('c', 64));
+        string text = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("Accepted scene.")));
+        first = service.AcceptReading("subject-a", first.RequestId, first.SourceDigest, new string('c', 64), text, true, Authorized);
+        string oldBytes = System.Text.Json.JsonSerializer.Serialize(first);
+        var next = Next(first);
+        next = next with { Source = next.Source with { NarrativeContext = new("later-turn", new string('e', 64),
+            [new("street", "Find a way on the streets", OriginChapterOpportunityAvailability.Available)]) } };
+        var created = service.Create("subject-a", next, Authorized);
+        Assert.Equal(OriginChapterSourceIdentity.Digest(next.Source), created.SourceDigest);
+        Assert.Equal(next.Source.NarrativeContext.TurnId, created.Source.NarrativeContext!.TurnId);
+        Assert.Equal(next.Source.NarrativeContext.Opportunities, created.Source.NarrativeContext.Opportunities);
+        Assert.Equal(oldBytes, System.Text.Json.JsonSerializer.Serialize(Service().Get("subject-a", first.RequestId)));
+        Assert.Throws<InvalidOperationException>(() => service.Create("subject-a", request with
+            { Source = request.Source with { NarrativeContext = null } }, Authorized));
+        Assert.False(service.AdmitForWorker(work.WorkId, first.SourceDigest, "admission-one").MayStartGeneration);
+        var worker = service.GetForWorker(Assert.Single(service.PendingForWorker(20)).WorkId);
+        Assert.Equal(created.SourceDigest, OriginChapterSourceIdentity.Digest(worker.Job.Source));
+        Assert.Equal(created.Source.NarrativeContext.Opportunities, worker.Job.Source.NarrativeContext!.Opportunities);
+        Assert.False(worker.Job.AffectsMechanics);
+        Assert.False(worker.Job.PublicationAuthorized);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Chapter_scoped_refinement_may_finish_without_rewriting_history_or_replaying_work(bool nextHasBrief)
+    {
+        string briefId = "player-chapter-brief-" + new string('b', 64);
+        var original = Request();
+        original = original with { Source = original.Source with { Facts = [.. original.Source.Facts,
+            new(briefId, briefId, "For this school chapter only: pressure to meet expectations.")] } };
+        var (old, work) = Accepted(original);
+        string oldBytes = System.Text.Json.JsonSerializer.Serialize(old);
+        var next = Next(old);
+        var facts = next.Source.Facts.Where(f => f.FactId != briefId).ToList();
+        if (nextHasBrief)
+        {
+            string nextId = "player-chapter-brief-" + new string('e', 64);
+            facts.Add(new(nextId, nextId, "For this academy chapter only: a friend offers a different future."));
+        }
+        next = next with { Source = next.Source with { Facts = facts.ToArray() } };
+        using var restarted = Service();
+        var created = restarted.Create("subject-a", next, Authorized);
+        Assert.Equal(OriginChapterSourceIdentity.Digest(next.Source), created.SourceDigest);
+        Assert.Equal(next.Source.Facts, created.Source.Facts);
+        Assert.Equal(next.Previous, created.Previous);
+        Assert.Equal(created.SourceDigest, Service().Create("subject-a", next, Authorized).SourceDigest);
+        Assert.Equal(oldBytes, System.Text.Json.JsonSerializer.Serialize(Service().Get("subject-a", old.RequestId)));
+        var pending = Assert.Single(restarted.PendingForWorker(20));
+        Assert.Equal(work.WorkId, pending.PreviousWorkId);
+        Assert.Equal(work.BookRef, pending.BookRef);
+        Assert.False(restarted.AdmitForWorker(work.WorkId, old.SourceDigest, "admission-one").MayStartGeneration);
+        Assert.Null(restarted.Get("subject-b", next.RequestId));
+        Assert.False(created.AffectsMechanics);
+        Assert.False(created.PublicationAuthorized);
+    }
+
+    [Theory]
+    [InlineData("canonical-decision")]
+    [InlineData("short-digest")]
+    [InlineData("non-digest")]
+    [InlineData("opening")]
+    [InlineData("background")]
+    [InlineData("changed-brief-text")]
+    [InlineData("changed-rule-fact")]
+    [InlineData("missing-rule-fact")]
+    [InlineData("relabel-rule-fact")]
+    public void Chapter_brief_scope_does_not_allow_rewriting_or_dropping_durable_history(string change)
+    {
+        string id = change switch
+        {
+            "short-digest" => "player-chapter-brief-abc",
+            "non-digest" => "player-chapter-brief-" + new string('z', 64),
+            "opening" => "player-story-brief-" + new string('b', 64),
+            "background" => "player-background-" + new string('b', 64),
+            _ => "player-chapter-brief-" + new string('b', 64)
+        };
+        var original = Request();
+        original = original with { Source = original.Source with { Facts = [.. original.Source.Facts,
+            new(id, change == "canonical-decision" ? original.Source.AcceptedDecisionId : id, "Retained player input.")] } };
+        var (old, _) = Accepted(original);
+        var next = Next(old);
+        var facts = next.Source.Facts.Where(f => f.FactId != id).ToList();
+        switch (change)
+        {
+            case "changed-brief-text": facts.Add(old.Source.Facts.Last() with { Text = "Changed under the same identity." }); break;
+            case "changed-rule-fact": facts[0] = facts[0] with { Text = "Different accepted history." }; break;
+            case "missing-rule-fact": facts.RemoveAt(0); break;
+            case "relabel-rule-fact": facts[0] = facts[0] with { FactId = id, DecisionId = id }; break;
+        }
+        next = next with { Source = next.Source with { Facts = facts.ToArray() } };
+        Assert.Throws<InvalidOperationException>(() => Service().Create("subject-a", next, Authorized));
+        Assert.Null(Service().Get("subject-a", next.RequestId));
+        Assert.Empty(Service().PendingForWorker(20));
+    }
+
+    private (OriginChapterAuthoringJob Job, OriginChapterWorkerItem Work) Accepted(OriginChapterAuthoringRequest? request = null)
+    {
+        using var service = Service();
+        var job = service.Create("subject-a", request ?? Request(), Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission-one");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission-one", "Accepted scene.", new string('c', 64));
+        string text = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("Accepted scene.")));
+        job = service.AcceptReading("subject-a", job.RequestId, job.SourceDigest, new string('c', 64), text, true, Authorized);
+        return (job, service.GetForWorker(work.WorkId));
+    }
+
+    private static OriginChapterAuthoringRequest Next(OriginChapterAuthoringJob old)
+        => new("request-two", old.Source with { ChapterId = "chapter-two", AcceptedDecisionId = "decision-two",
+            ChapterDigest = new string('d', 64), Facts = [.. old.Source.Facts,
+                new("fact-two", "decision-two", "The player selected corporate schooling.")] }, true)
+        { Previous = new(old.RequestId, old.SourceDigest, old.ProviderReceiptDigest!, old.ReaderAcceptedTextDigest!) };
+
+    [Fact]
+    public void Successor_retains_exact_accepted_predecessor_and_opaque_worker_edge_after_restart()
+    {
+        var (old, work) = Accepted();
+        var request = Next(old);
+        var next = Service().Create("subject-a", request, Authorized);
+        var restored = Service().Get("subject-a", next.RequestId)!;
+        Assert.Equal(request.Previous, restored.Previous);
+        Assert.Equal(next.SourceDigest, restored.SourceDigest);
+        Assert.Equal(request.Previous, Service().Create("subject-a", request, Authorized).Previous);
+        var pending = Assert.Single(Service().PendingForWorker(20));
+        Assert.Equal(work.WorkId, pending.PreviousWorkId);
+        Assert.Equal(work.BookRef, pending.BookRef);
+        Assert.NotEqual(work.WorkId, pending.WorkId);
+        Service().AdmitForWorker(pending.WorkId, next.SourceDigest, "admission-two");
+        var completed = Service().CompleteForWorker(pending.WorkId, next.SourceDigest, "admission-two", "Next scene.", new string('e', 64));
+        Assert.Equal(work.WorkId, completed.PreviousWorkId);
+        Assert.Equal(request.Previous, completed.Job.Previous);
+        Assert.Null(completed.Job.ReaderAcceptedTextDigest);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(old),
+            System.Text.Json.JsonSerializer.Serialize(Service().Get("subject-a", old.RequestId)));
+    }
+
+    [Theory]
+    [InlineData("owner")]
+    [InlineData("missing")]
+    [InlineData("source")]
+    [InlineData("receipt")]
+    [InlineData("text")]
+    [InlineData("workspace")]
+    [InlineData("locale")]
+    [InlineData("name")]
+    [InlineData("chapter")]
+    [InlineData("decision")]
+    [InlineData("history")]
+    public void Invalid_predecessor_does_not_create_or_register_a_successor(string change)
+    {
+        var (old, _) = Accepted();
+        var request = Next(old);
+        string owner = change == "owner" ? "subject-b" : "subject-a";
+        request = change switch
+        {
+            "missing" => request with { Previous = request.Previous! with { RequestId = "missing" } },
+            "source" => request with { Previous = request.Previous! with { SourceDigest = new string('0', 64) } },
+            "receipt" => request with { Previous = request.Previous! with { ProviderReceiptDigest = new string('0', 64) } },
+            "text" => request with { Previous = request.Previous! with { TextDigest = new string('0', 64) } },
+            "workspace" => request with { Source = request.Source with { WorkspaceId = "other" } },
+            "locale" => request with { Source = request.Source with { Locale = "en" } },
+            "name" => request with { Source = request.Source with { RunnerName = "Other" } },
+            "chapter" => request with { Source = request.Source with { ChapterId = old.Source.ChapterId } },
+            "decision" => request with { Source = request.Source with { AcceptedDecisionId = old.Source.AcceptedDecisionId } },
+            "history" => request with { Source = request.Source with { Facts = request.Source.Facts.Skip(1).ToArray() } },
+            _ => request
+        };
+        Assert.Throws<InvalidOperationException>(() => Service().Create(owner, request, Authorized));
+        Assert.Null(Service().Get(owner, request.RequestId));
+        Assert.Empty(Service().PendingForWorker(20));
+    }
+
+    [Fact]
+    public void Unaccepted_previous_text_is_not_an_automatic_reader_confirmation()
+    {
+        using var service = Service();
+        var old = service.Create("subject-a", Request(), Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        service.AdmitForWorker(work.WorkId, old.SourceDigest, "admission-one");
+        old = service.CompleteForWorker(work.WorkId, old.SourceDigest, "admission-one", "Unaccepted scene.", new string('c', 64)).Job;
+        var request = Next(old) with { Previous = new(old.RequestId, old.SourceDigest, old.ProviderReceiptDigest!, new string('b', 64)) };
+        Assert.Throws<InvalidOperationException>(() => service.Create("subject-a", request, Authorized));
+        Assert.Null(service.Get("subject-a", old.RequestId)!.ReaderAcceptedTextDigest);
+        Assert.Null(service.Get("subject-a", request.RequestId));
+    }
+
+    [Fact]
+    public void Immutable_request_cannot_drop_or_change_predecessor_and_revocation_blocks_new_write()
+    {
+        var (old, _) = Accepted();
+        var request = Next(old);
+        int checks = 0;
+        Assert.Throws<UnauthorizedAccessException>(() => Service().Create("subject-a", request, () => ++checks == 1));
+        Assert.Null(Service().Get("subject-a", request.RequestId));
+        Service().Create("subject-a", request, Authorized);
+        Assert.Throws<InvalidOperationException>(() => Service().Create("subject-a", request with { Previous = null }, Authorized));
+        Assert.Throws<InvalidOperationException>(() => Service().Create("subject-a", request with
+            { Previous = request.Previous! with { TextDigest = new string('f', 64) } }, Authorized));
+        Assert.Throws<ArgumentException>(() => Service().Create("subject-a", request with
+            { Previous = request.Previous! with { RequestId = request.RequestId } }, Authorized));
+        Assert.Throws<ArgumentException>(() => Service().Create("subject-a", request with
+            { Previous = request.Previous! with { SourceDigest = "invalid" } }, Authorized));
+    }
+
+    [Fact]
+    public void Historical_job_bytes_without_predecessor_keep_their_original_checksum()
+    {
+        var request = Request();
+        var job = Service().Create("subject-a", request, Authorized);
+        var legacy = new { job.RequestId, job.SourceDigest, job.Source, job.State, job.Provider, job.DraftText,
+            job.ProviderReceiptDigest, job.RequiresReaderReview, job.AffectsMechanics, job.PublicationAuthorized };
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        string path = Assert.Single(Directory.GetFiles(Path.Combine(_root, "origin-chapter-jobs"), "*.json"));
+        string owner = Path.GetFileName(path)[..64];
+        byte[] data = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(legacy, options);
+        string digest = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(data));
+        File.WriteAllBytes(path, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            { Schema = "chummer.origin.chapter-job/v1", OwnerDigest = owner, Job = legacy, Digest = digest }, options));
+        var restored = Service().Get("subject-a", request.RequestId)!;
+        Assert.Null(restored.Previous);
+        Assert.Null(Assert.Single(Service().PendingForWorker(20)).PreviousWorkId);
+        Assert.Equal(job.SourceDigest, restored.SourceDigest);
+    }
+
+    [Fact]
+    public void Same_request_survives_cold_read_and_changed_source_is_rejected()
+    {
+        var request = Request();
+        var original = Service().Create("subject-a", request, Authorized);
+        var replay = Service().Create("subject-a", request, Authorized);
+        Assert.Equal(original.SourceDigest, replay.SourceDigest);
+        Assert.Equal(OriginChapterAuthoringStates.AwaitingAuthoring, Service().Get("subject-a", request.RequestId)!.State);
+        Assert.Null(Service().Get("subject-b", request.RequestId));
+        Assert.Throws<InvalidOperationException>(() => Service().Create("subject-a",
+            request with { Source = request.Source with { RunnerName = "changed" } }, Authorized));
+    }
+
+    [Fact]
+    public void Dispatch_is_fenced_before_remote_work_and_never_reissued_after_restart()
+    {
+        var job = Service().Create("subject-a", Request(), Authorized);
+        Assert.True(Service().TryFenceDispatch("subject-a", job.RequestId, job.SourceDigest));
+        Assert.False(Service().TryFenceDispatch("subject-a", job.RequestId, job.SourceDigest));
+        Assert.Equal(OriginChapterAuthoringStates.ReconciliationRequired, Service().Get("subject-a", job.RequestId)!.State);
+        Assert.Throws<InvalidOperationException>(() => Service().TryFenceDispatch("subject-a", job.RequestId, new string('b', 64)));
+        Assert.Throws<KeyNotFoundException>(() => Service().TryFenceDispatch("subject-b", job.RequestId, job.SourceDigest));
+        var result = Service().Complete("subject-a", job.RequestId, job.SourceDigest, "Synthetic draft", new string('c', 64));
+        Assert.Equal(OriginChapterAuthoringStates.ReviewRequired, result.State);
+        Assert.Equal("Synthetic draft", Service().Get("subject-a", job.RequestId)!.DraftText);
+        Assert.False(result.AffectsMechanics);
+        Assert.False(result.PublicationAuthorized);
+        Assert.True(result.RequiresReaderReview);
+        Assert.Equal(result.SourceDigest, Service().Complete("subject-a", job.RequestId, job.SourceDigest,
+            "Synthetic draft", new string('c', 64)).SourceDigest);
+        Assert.Throws<InvalidOperationException>(() => Service().Complete("subject-a", job.RequestId, job.SourceDigest,
+            "Other text", new string('c', 64)));
+    }
+
+    [Fact]
+    public void Reader_acceptance_binds_exact_text_source_receipt_owner_and_survives_restart()
+    {
+        var service = Service();
+        var job = service.Create("subject", Request(), Authorized);
+        var work = Assert.Single(service.PendingForWorker(20));
+        string receipt = new string('c', 64), text = "Exact private draft.";
+        string digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+        Assert.Throws<InvalidOperationException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized));
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "admission");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "admission", text, receipt);
+        Assert.Null(Service().Get("subject", job.RequestId)!.ReaderAcceptedTextDigest);
+        Assert.Throws<ArgumentException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, false, Authorized));
+        Assert.Throws<UnauthorizedAccessException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, () => false));
+        Assert.Throws<KeyNotFoundException>(() => service.AcceptReading("other-owner", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized));
+        Assert.Throws<InvalidOperationException>(() => service.AcceptReading("subject", job.RequestId, new string('b', 64), receipt, digest, true, Authorized));
+        Assert.Throws<InvalidOperationException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, new string('b', 64), digest, true, Authorized));
+        Assert.Throws<InvalidOperationException>(() => service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, new string('b', 64), true, Authorized));
+        var accepted = service.AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized);
+        Assert.Equal(digest, accepted.ReaderAcceptedTextDigest);
+        Assert.Equal(digest, Service().AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized).ReaderAcceptedTextDigest);
+        Assert.Equal(digest, Service().GetForWorker(work.WorkId).Job.ReaderAcceptedTextDigest);
+        Assert.Equal(digest, Service().CompleteForWorker(work.WorkId, job.SourceDigest, "admission", text, receipt).Job.ReaderAcceptedTextDigest);
+        Assert.False(accepted.AffectsMechanics);
+        Assert.False(accepted.PublicationAuthorized);
+        Service().EraseForSubject("subject");
+        Assert.Throws<KeyNotFoundException>(() => Service().AcceptReading("subject", job.RequestId, job.SourceDigest, receipt, digest, true, Authorized));
+    }
+
+    [Fact]
+    public void Consent_source_bounds_and_current_authorization_are_required_before_storage()
+    {
+        var request = Request();
+        Assert.Throws<ArgumentException>(() => Service().Create("subject-a", request with { ExternalProcessingConsent = false }, Authorized));
+        Assert.Throws<ArgumentException>(() => Service().Create("subject-a", request with { Source = request.Source with { Locale = "fr-FR" } }, Authorized));
+        Assert.Throws<ArgumentException>(() => Service().Create("subject-a", request with { Source = request.Source with
+            { Facts = [new("fact-one", "decision-one", new string('x', 2049))] } }, Authorized));
+        Assert.Throws<UnauthorizedAccessException>(() => Service().Create("subject-a", request, () => false));
+        Assert.Null(Service().Get("subject-a", request.RequestId));
+        var job = Service().Create("subject-a", request, Authorized);
+        Assert.Throws<InvalidOperationException>(() => Service().Complete("subject-a", job.RequestId, job.SourceDigest,
+            "Undispatched draft", new string('c', 64)));
+    }
+
+    [Fact]
+    public void Erasure_is_owner_scoped_and_prevents_late_result_recreation()
+    {
+        var a = Service().Create("subject-a", Request(), Authorized);
+        string aPath = Directory.GetFiles(Path.Combine(_root, "origin-chapter-jobs"), "*.json").Single();
+        string orphan = aPath + ".tmp-" + Guid.NewGuid().ToString("N");
+        File.Copy(aPath, orphan);
+        Service().Create("subject-b", Request(), Authorized);
+        Assert.True(Service().TryFenceDispatch("subject-a", a.RequestId, a.SourceDigest));
+        Assert.Equal(2, Service().EraseForSubject("subject-a"));
+        Assert.False(File.Exists(orphan));
+        Assert.Equal(0, Service().EraseForSubject("subject-a"));
+        Assert.Null(Service().Get("subject-a", a.RequestId));
+        Assert.NotNull(Service().Get("subject-b", a.RequestId));
+        Assert.Throws<KeyNotFoundException>(() => Service().Complete("subject-a", a.RequestId, a.SourceDigest,
+            "Late draft", new string('c', 64)));
+    }
+
+    [Fact]
+    public void Invalid_stored_bytes_fail_closed_instead_of_creating_a_new_job()
+    {
+        Service().Create("subject-a", Request(), Authorized);
+        string path = Directory.GetFiles(Path.Combine(_root, "origin-chapter-jobs"), "*.json").Single();
+        File.WriteAllText(path, "{}");
+        Assert.Throws<InvalidDataException>(() => Service().Get("subject-a", Request().RequestId));
+        Assert.Throws<InvalidDataException>(() => Service().Create("subject-a", Request(), Authorized));
+    }
+
+    public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
+}

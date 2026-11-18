@@ -1,0 +1,35 @@
+@model OriginChapterReadingPageViewModel
+@{
+    ViewData["Title"] = Model.Chrome.Title;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+}
+<style>
+    .origin-chapter-reader { max-width: 70ch; margin-inline: auto; padding: clamp(1rem, 4vw, 2.5rem); background: #fbf7ef; color: #19252b; border-radius: 1rem; }
+    .origin-chapter-reader__prose { white-space: pre-wrap; overflow-wrap: anywhere; font: 1.15rem/1.85 Georgia, serif; }
+</style>
+<section class="minimal-page-hero">
+    <div>
+        <a href="/account/work/origin-chapters">Back to my chapters</a>
+        <p class="eyebrow">Origin chapter</p>
+        <h1>@Model.RunnerName</h1>
+        <p>@Model.Status</p>
+    </div>
+</section>
+@if (Model.Text is not null)
+{
+    <article class="origin-chapter-reader" lang="@Model.Locale" aria-label="Full chapter">
+        <div class="origin-chapter-reader__prose">@Model.Text</div>
+    </article>
+    <section class="minimal-section">
+        <p>Continue in the app to confirm reading and choose what happens next. Opening this page does not change your runner.</p>
+        <a href="/account/work/origin-chapters">Back to my chapters</a>
+    </section>
+}
+else
+{
+    <section class="minimal-section" role="status">
+        <p>The full text is not available yet. This page does not start or restart generation.</p>
+        <a class="button-like button-like--primary" href="@Context.Request.Path">Check chapter status</a>
+    </section>
+}

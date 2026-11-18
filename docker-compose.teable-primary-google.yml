@@ -1,0 +1,14 @@
+# Optional local auth activation on the isolated Teable primary stack.
+# Apply after docker-compose.teable-primary-local.yml with the explicit project
+# -p chummer-teable-primary-local (legacy env files can set COMPOSE_PROJECT_NAME).
+# This is NOT ingress,
+# an email-delivery activation, a new OAuth registration or a public cutover.
+# Read existing Chummer-scoped values via an explicit protected --env-file;
+# never pass that file wholesale as a container env_file or print rendered config.
+services:
+  hub:
+    environment:
+      CHUMMER_GOOGLE_OIDC_REQUIRED: "true"
+      GOOGLE_OIDC_CLIENT_ID: "${GOOGLE_OIDC_CLIENT_ID:?Supply the existing Chummer Google client ID}"
+      GOOGLE_OIDC_CLIENT_SECRET: "${GOOGLE_OIDC_CLIENT_SECRET:?Supply the existing Chummer Google client secret}"
+      GOOGLE_OIDC_REDIRECT_URI: "${GOOGLE_OIDC_REDIRECT_URI:?Supply the registered Chummer callback URI}"

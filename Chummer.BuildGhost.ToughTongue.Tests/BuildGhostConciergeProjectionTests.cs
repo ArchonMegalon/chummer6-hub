@@ -13,24 +13,25 @@ public sealed class BuildGhostConciergeProjectionTests
     {
         BuildGhostConciergeProjection projection = Create(new Dictionary<string, string?>()).Build();
 
-        StringAssert.Contains(projection.CanonicalLane, "Tough Tongue");
-        StringAssert.Contains(projection.ToughTongueStatus, "disabled");
-        StringAssert.Contains(projection.RuntimeBoundary, "validated again");
+        StringAssert.Contains(projection.CanonicalLane, "Rook");
+        StringAssert.Contains(projection.CanonicalLane, "VidBoard");
+        StringAssert.Contains(projection.ToughTongueStatus, "unavailable");
+        StringAssert.Contains(projection.RuntimeBoundary, "explicit live-support escalation");
+        Assert.HasCount(3, projection.DefaultSupportResponsibilities);
     }
 
     [TestMethod]
-    public void Concierge_reports_three_configured_slots_without_serializing_secrets()
+    public void Concierge_reports_live_support_as_capability_gated_without_serializing_configuration()
     {
         BuildGhostConciergeProjection projection = Create(new Dictionary<string, string?>
         {
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_ENABLED"] = "true",
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_1"] = "secret-one",
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_2"] = "secret-two",
-            ["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CREDENTIAL_SLOT_3"] = "secret-three"
+            ["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED"] = "true",
+            ["CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_RECEIPT_PATH"] = "/private/live-support-receipt.json",
+            ["CHUMMER_AI_INTERNAL_API_TOKEN"] = "secret-live-support-configuration-value"
         }).Build();
 
-        StringAssert.Contains(projection.ToughTongueStatus, "Three credential slots configured");
-        Assert.IsFalse(JsonSerializer.Serialize(projection).Contains("secret-", StringComparison.Ordinal));
+        StringAssert.Contains(projection.ToughTongueStatus, "capability-gated");
+        Assert.IsFalse(JsonSerializer.Serialize(projection).Contains("secret-live-support", StringComparison.Ordinal));
         Assert.HasCount(3, projection.ToughTongueResponsibilities);
     }
 

@@ -100,11 +100,25 @@ writing a new unprotected production key. Activation requires an RSA private key
 bits whose key-usage extension permits encryption (when present), a live protect/unprotect round
 trip, and structurally valid certificate-encrypted key XML.
 
+The PKCS#12 file may be a bounded rotation bundle. Its unique latest-expiry RSA certificate is the
+primary encryptor and must retain more than seven days of validity; the other unique RSA
+private-key certificates are decrypt-only custody for existing key XML. Startup tests the exact
+mixed ring before registering the provider, so replacing a prior certificate without retaining it
+cannot silently strand protected InstallLinking envelopes.
+
 The PostgreSQL rows contain protected envelopes, not a substitute for the matching Data Protection
 key ring and certificate. Back up and test-restore the database/PITR stream and encrypted key-ring
 custody as separately protected assets. A database restore behind the local protected floor stays
 failed closed; restore the matching/newer PITR point or follow a governed recovery procedure. Never
 delete the floor or promote the local mirror to make readiness green.
+
+The exceptional fresh-authority recovery controller does not make the mirror an ordinary rollback
+authority. Its default command is a read-only mirror/key-ring/floor preflight. A new authority and
+history reset requires an immutable, externally digest-pinned operator decision plus the explicit
+`--confirm-new-authority-and-history-reset` flag. It imports only after an exact empty-generation-0
+proof, retains an exact durable intent across ambiguity, and requires generation-1/one-commit and
+local-envelope/floor acknowledgement proofs before it can pass. This recovery receipt seeds the
+database only; the ordinary public-edge cutover remains seeded-authority-only.
 
 The flagship certificate cutover is a non-destructive path rotation. The candidate portal and
 import job use `/app/state/data-protection-keys-v2`, while the exact incumbent retains

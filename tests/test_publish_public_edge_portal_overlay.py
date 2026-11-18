@@ -2377,6 +2377,45 @@ def test_build_input_fingerprint_binds_frontdoor_playwright_proof_and_postdeploy
     }.issubset(paths)
 
 
+def test_noncanonical_clean_worktree_name_uses_bounded_run_services_copy_plan(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    workspace_root = tmp_path / "workspace"
+    source_root = workspace_root / "hub-main-integration.a1b2c3"
+    make_source_tree(source_root)
+    retained_generation = (
+        source_root
+        / "Chummer.Portal"
+        / "downloads"
+        / ".windows-installer-proof"
+        / "generations"
+        / "generation-current"
+    )
+    retained_generation.mkdir(parents=True)
+    (retained_generation.parent.parent / "current").symlink_to(
+        Path("generations") / retained_generation.name,
+        target_is_directory=True,
+    )
+
+    rows = module.build_input_rows(source_root)
+    build_source_root, _copied_roots = module.materialize_isolated_build_workspace(
+        source_root,
+        tmp_path / "build",
+    )
+
+    assert module.is_run_services_source_root(source_root)
+    assert any(
+        row["path"]
+        == f"{source_root.name}/Chummer.Run.Api/Chummer.Run.Api.csproj"
+        for row in rows
+    )
+    assert not any("Chummer.Portal" in str(row["path"]) for row in rows)
+    assert build_source_root.name == source_root.name
+    assert (build_source_root / "Chummer.Run.Api" / "Chummer.Run.Api.csproj").is_file()
+    assert not (build_source_root / "Chummer.Portal").exists()
+
+
 def test_build_input_fingerprint_preserves_symlinked_copy_plan_root(tmp_path: Path) -> None:
     module = load_module()
     workspace_root = tmp_path / "workspace"

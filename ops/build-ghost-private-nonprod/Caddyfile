@@ -1,0 +1,64 @@
+{
+	admin off
+	auto_https disable_redirects
+}
+
+https://canary.chummer.run {
+	tls internal
+	@private_provider_tool_v2 {
+		method POST
+		path /api/v2/ai/build-ghost/tool
+	}
+	handle @private_provider_tool_v2 {
+		header Cache-Control "no-store"
+		reverse_proxy chummer-build-ghost-ai:8080
+	}
+	@private_tool {
+		method POST
+		path /api/v1/ai/build-ghost/tool
+	}
+	handle @private_tool {
+		header Cache-Control "no-store"
+		reverse_proxy chummer-build-ghost-ai:8080
+	}
+	@workspace_import {
+		method POST
+		path /api/workspaces/import
+	}
+	handle @workspace_import {
+		reverse_proxy chummer-build-ghost-presentation:8080
+	}
+	@workspace_tool_access {
+		method POST
+		path_regexp workspace_tool_access ^/api/workspaces/[^/]+/build-ghost/tool-access$
+	}
+	handle @workspace_tool_access {
+		header Cache-Control "no-store"
+		reverse_proxy chummer-build-ghost-presentation:8080
+	}
+	@workspace_lifecycle {
+		method GET DELETE
+		path_regexp workspace_lifecycle ^/api/workspaces/[^/]+$
+	}
+	handle @workspace_lifecycle {
+		reverse_proxy chummer-build-ghost-presentation:8080
+	}
+	handle {
+		respond 404
+	}
+}
+
+https://presentation.canary.chummer.run {
+	tls internal
+	@private_resolve {
+		method POST
+		path /api/internal/build-ghost/tool/resolve
+	}
+	handle @private_resolve {
+		header Cache-Control "no-store"
+		reverse_proxy chummer-build-ghost-presentation:8080
+	}
+	handle {
+		respond 404
+	}
+}

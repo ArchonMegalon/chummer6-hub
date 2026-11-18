@@ -50,6 +50,8 @@ def build_info(tmp_path: Path) -> Path:
         "global.json",
         "eng/NuGet.Container.Config",
         "eng/package-plane.lock.json",
+        "eng/core-main-runtime-artifact-authority.json",
+        "eng/core-runtime-bundle/core-runtime-bundle-input.json",
         "scripts/ai/bootstrap-hub-package-feed.py",
         "scripts/public_edge_postdeploy_contract.py",
         "scripts/public_edge_postdeploy_gate.v1.schema.json",
@@ -179,6 +181,12 @@ def build_info(tmp_path: Path) -> Path:
                         "effectiveDockerignoreSha256": "c" * 64,
                         "repositoryContained": True,
                     },
+                    "core-runtime-bundle": {
+                        "contextBoundary": "sealed-external-artifact-input",
+                        "dockerignoreSha256": None,
+                        "effectiveDockerignoreSha256": None,
+                        "repositoryContained": False,
+                    },
                     "fleet-media-factory-contracts": {
                         "contextBoundary": (
                             "exact-clean-repository-subtree"
@@ -192,6 +200,12 @@ def build_info(tmp_path: Path) -> Path:
                         "dockerignoreSha256": "e" * 64,
                         "effectiveDockerignoreSha256": "e" * 64,
                         "repositoryContained": True,
+                    },
+                    "hub-package-feed-input": {
+                        "contextBoundary": "sealed-external-artifact-input",
+                        "dockerignoreSha256": None,
+                        "effectiveDockerignoreSha256": None,
+                        "repositoryContained": False,
                     },
                     "run-services-source": {
                         "contextBoundary": "exact-clean-repository",
@@ -208,8 +222,40 @@ def build_info(tmp_path: Path) -> Path:
                     "9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc"
                 ),
                 "dockerfileSha256": "e" * 64,
+                "coreRuntimeBundleFileName": (
+                    "chummer-core-runtime-package-plane-"
+                    "b8cb7dcba5a704948a6eb994c99bb3525b935845.zip"
+                ),
+                "coreRuntimeBundlePathSha256": "1" * 64,
+                "coreRuntimeBundleSha256": (
+                    "6006a99d40ea63323b19c3e629c8b3c0810b0f599909071110409e742e5a3a12"
+                ),
+                "coreRuntimeBundleSizeBytes": 3324929,
                 "externalMediaProjectSha256": "f" * 64,
                 "externalMediaRestoreIsSdkOnly": True,
+                "hubPackageFeedInputs": {
+                    "Chummer.Hub.Registry.Contracts.0.1.1-packageplane.20260910.1.nupkg": {
+                        "sha256": "01689fea55ca44f7a0f30c4678dbc9589882c62b8275cf47b5cd9ca7aa55ff69",
+                        "sizeBytes": 524814,
+                    },
+                    "Chummer.Play.Contracts.0.1.1-packageplane.20260910.1.nupkg": {
+                        "sha256": "8e454b101b0cfaeaa2c5da67fedea32a022147b4015926f63d9ee98fc50ff991",
+                        "sizeBytes": 322516,
+                    },
+                    "Chummer.Run.Contracts.0.1.1-packageplane.20260910.1.nupkg": {
+                        "sha256": "bf7ac452e17a75cc7f2ac96ebaf58b30c9a2359561c1da48a64f04df6820d6e6",
+                        "sizeBytes": 1838928,
+                    },
+                    "Chummer.Run.Registry.0.1.1-packageplane.20260910.1.nupkg": {
+                        "sha256": "62b3a78f06af4ef54a4e0f8f9d9c14248bfd622e2e2f62500da53f298d0cfb0a",
+                        "sizeBytes": 345254,
+                    },
+                    "chummer-hub-packages.inventory.json": {
+                        "sha256": "fc1825ed1cc94ae7a5d923238387a6f61a732994a383254ab7f709523da46106",
+                        "sizeBytes": 2270,
+                    },
+                },
+                "hubPackageFeedPathSha256": "2" * 64,
                 "loopbackProbeIsSdkOnly": True,
                 "loopbackProbeProgramSha256": package_inputs[
                     "Chummer.Run.LoopbackProbe/Program.cs"
@@ -220,9 +266,9 @@ def build_info(tmp_path: Path) -> Path:
                 "packageInputSetSha256": package_input_set_sha256,
                 "packageInputs": package_inputs,
                 "packagePlaneContract": (
-                    "chummer-hub.package-plane-lock/v4"
+                    "chummer-hub.package-plane-lock/v5"
                 ),
-                "packagePlanePackageCount": 6,
+                "packagePlanePackageCount": 12,
                 "postdeploySchemaContractName": (
                     "chummer.public_edge_postdeploy_gate.schema.v1"
                 ),

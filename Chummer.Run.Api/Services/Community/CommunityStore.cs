@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using Chummer.Storage.Teable;
 using Chummer.Campaign.Contracts;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Boosters;
@@ -6,13 +8,27 @@ using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Entitlements;
 using Chummer.Run.Contracts.Ledger;
 using Chummer.Run.Contracts.Leaderboards;
+using Chummer.Run.Contracts.Registry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Chummer.Run.Api.Services.Community;
 
-public sealed class CommunityStore
+public sealed class CommunityStore : IDisposable
 {
+    private readonly object _gate = new();
+    private readonly TeableRevisionStore? _primary;
+    private readonly bool _ownsPrimary;
+    private TeableRevisionStore.Head? _primaryHead;
+    private int _scopeDepth;
+    private bool _primaryFailed;
+    private bool _deferPrimaryCommit;
+    private const string PrimaryStream = "community";
+    // v3 retains invitation failure windows across replicas/restarts. Older
+    // writers must reject this envelope instead of dropping admission state.
+    private const string PrimarySchema = "chummer.hub.community-primary/v3";
+    private const int MaximumPrimaryBytes = 16 * 1024 * 1024;
+    private sealed record PrimaryEnvelope(string Schema, CommunityStoreSnapshot Snapshot);
     private readonly ILogger<CommunityStore> _logger;
     private readonly string _storagePath;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
@@ -20,15 +36,138 @@ public sealed class CommunityStore
         WriteIndented = true
     };
 
-    public CommunityStore(IConfiguration configuration, ILogger<CommunityStore> logger)
+    public CommunityStore(IConfiguration configuration, ILogger<CommunityStore> logger,
+        TeableRevisionStore? primary = null, bool ownsPrimary = false)
     {
         _logger = logger;
-        _storagePath = ResolveStoragePath(configuration);
-        Load();
+        string provider = configuration["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] ?? "local";
+        if (provider is not ("local" or "teable") || (provider == "teable") != (primary is not null))
+            throw new InvalidOperationException("Community storage requires an explicit, matching provider configuration.");
+        _primary = primary;
+        _ownsPrimary = ownsPrimary;
+        _storagePath = primary is null ? ResolveStoragePath(configuration) : string.Empty;
+        if (primary is null) Load();
+        else { using var scope = Enter(); }
     }
 
-    public object Gate { get; } = new();
-    public string StoragePath => _storagePath;
+    // Legacy local callers may still lock Gate. A remote operation must enter
+    // explicitly so no unconverted caller can authorize from a cached snapshot.
+    public object Gate => _primary is null || (Monitor.IsEntered(_gate) && _scopeDepth > 0)
+        ? _gate : throw new InvalidOperationException("Primary community access requires an explicit store scope.");
+    public bool IsPrimary => _primary is not null;
+    public string StoragePath => !IsPrimary ? _storagePath
+        : throw new InvalidOperationException("Primary community storage has no authoritative local file.");
+
+    public IDisposable Enter()
+    {
+        Monitor.Enter(_gate);
+        try
+        {
+            EnsurePrimaryUsable();
+            // Nested domain operations share the outer snapshot. Reloading here
+            // would discard the outer operation's uncommitted changes.
+            if (_primary is not null && _scopeDepth == 0) LoadPrimaryLocked();
+            _scopeDepth++;
+            return new Scope(this);
+        }
+        catch { Monitor.Exit(_gate); throw; }
+    }
+
+    private sealed class Scope(CommunityStore store) : IDisposable
+    {
+        private bool _disposed;
+        public void Dispose()
+        {
+            if (_disposed) return;
+            if (!Monitor.IsEntered(store._gate))
+                throw new InvalidOperationException("Community scopes are synchronous and thread-affine.");
+            _disposed = true;
+            store._scopeDepth--;
+            Monitor.Exit(store._gate);
+        }
+    }
+
+    public void Dispose() { if (_ownsPrimary) _primary?.Dispose(); }
+
+    private void EnsurePrimaryUsable()
+    {
+        if (_primaryFailed)
+            throw new InvalidOperationException("Community primary state requires cold reconciliation.");
+    }
+
+    private void LoadPrimaryLocked()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        TeableRevisionStore.Head? head = null;
+        try
+        {
+            head = _primary!.ReadAsync(PrimaryStream, deadline.Token).GetAwaiter().GetResult();
+            if (_primaryHead is not null && (head is null || head.Revision < _primaryHead.Revision
+                || (head.Revision == _primaryHead.Revision && head.Sha256 != _primaryHead.Sha256)))
+                throw new InvalidDataException("Community primary authority regressed or changed identity.");
+            CommunityStoreSnapshot snapshot;
+            if (head is null) snapshot = EmptySnapshot();
+            else
+            {
+                if (head.Bytes.Length > MaximumPrimaryBytes) throw new InvalidDataException("Community primary state is oversized.");
+                var envelope = JsonSerializer.Deserialize<PrimaryEnvelope>(head.Bytes, _jsonOptions);
+                if (envelope is not { Schema: PrimarySchema, Snapshot: not null })
+                    throw new InvalidDataException("Community primary schema is invalid.");
+                snapshot = envelope.Snapshot;
+                ValidatePrimarySnapshot(snapshot);
+            }
+            ApplySnapshotLocked(snapshot);
+            _primaryHead = head is null ? null : head with { Bytes = [] };
+        }
+        catch { _primaryFailed = true; throw; }
+        finally { if (head is not null) CryptographicOperations.ZeroMemory(head.Bytes); }
+    }
+
+    private static CommunityStoreSnapshot EmptySnapshot() => new([], [], [], [], [], [], [], [], [], [], [], [], [],
+        CampaignInviteAttempts: new Dictionary<string, CampaignInviteAttemptWindow>());
+
+    private static void ValidatePrimarySnapshot(CommunityStoreSnapshot snapshot)
+    {
+        if (snapshot.Users is null || snapshot.Groups is null || snapshot.JoinCodes is null
+            || snapshot.Campaigns is null || snapshot.BoostCodes is null || snapshot.SponsorSessions is null
+            || snapshot.LinkedIdentities is null || snapshot.ChannelLinks is null || snapshot.Receipts is null
+            || snapshot.LedgerEntries is null || snapshot.RewardEntries is null
+            || snapshot.EntitlementEntries is null || snapshot.Badges is null)
+            throw new InvalidDataException("Community primary state is incomplete.");
+        var users = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var subjects = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var user in snapshot.Users)
+        {
+            if (user is null || string.IsNullOrWhiteSpace(user.UserId) || string.IsNullOrWhiteSpace(user.SubjectId)
+                || user.LinkedPrincipals is null || user.GroupIds is null || !users.Add(user.UserId))
+                throw new InvalidDataException("Community primary user identity is invalid.");
+            foreach (string subject in user.LinkedPrincipals.Prepend(user.SubjectId))
+            {
+                if (string.IsNullOrWhiteSpace(subject) || subject != subject.Trim()
+                    || (subjects.TryGetValue(subject, out string? owner) && owner != user.UserId))
+                    throw new InvalidDataException("Community primary principal ownership is ambiguous.");
+                subjects[subject] = user.UserId;
+            }
+        }
+        if (snapshot.Groups.Any(group => group is null || string.IsNullOrWhiteSpace(group.GroupId))
+            || snapshot.Groups.Select(group => group.GroupId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != snapshot.Groups.Count)
+            throw new InvalidDataException("Community primary group identity is invalid.");
+        CampaignArtifactRegistryBridge.ValidatePrimaryBackup(snapshot.CampaignArtifactRegistry);
+        if (snapshot.CampaignInviteAttempts is null || snapshot.CampaignInviteAttempts.Any(item =>
+                !users.Contains(item.Key) || item.Value is null || item.Value.Failures is < 1 or > 10
+                || item.Value.WindowStartedAtUtc == default
+                || item.Value.WindowStartedAtUtc > DateTimeOffset.MaxValue.AddMinutes(-10))
+            || snapshot.CampaignInviteAttempts.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count()
+                != snapshot.CampaignInviteAttempts.Count)
+            throw new InvalidDataException("Primary campaign invitation admission state is invalid.");
+        if (snapshot.AftermathPackages is { Count: > 0 })
+        {
+            var artifactIds = snapshot.CampaignArtifactRegistry?.Artifacts
+                .Select(item => item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (artifactIds is null || snapshot.AftermathPackages.Any(item => !artifactIds.Contains(item.ArtifactId)))
+                throw new InvalidDataException("Primary aftermath packages require their campaign artifact metadata.");
+        }
+    }
     public Dictionary<string, HubUserDto> UsersById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> UserIdBySubjectId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, GroupDto> GroupsById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -90,6 +229,7 @@ public sealed class CommunityStore
     internal Dictionary<string, CampaignRunsiteState> CampaignRunsitesByRunId { get; } = new(StringComparer.OrdinalIgnoreCase);
     internal Dictionary<string, CampaignCreationIdempotencyState> CampaignCreationsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignInviteCreationIdempotencyState> CampaignInviteCreationsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, CampaignInviteAttemptWindow> CampaignInviteAttemptsByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
     internal Dictionary<string, CampaignRunsiteDraftIdempotencyState> CampaignRunsiteDraftCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignRunsitePublishIdempotencyState> CampaignRunsitePublishCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignRedemptionIdempotencyState> CampaignRedemptionsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
@@ -109,10 +249,17 @@ public sealed class CommunityStore
     public DateTimeOffset PlayAuthorizationTimeHighWaterUtc { get; internal set; } = DateTimeOffset.UnixEpoch;
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboardingState { get; set; }
+    internal HubArtifactStoreBackupPackage? CampaignArtifactRegistry { get; set; }
+
+    internal void EnsureAccountErasureSupported()
+    {
+        if (IsPrimary) throw new InvalidOperationException("Primary account erasure requires historical-record cleanup before admission.");
+    }
 
     internal T ExecuteAccountErasureTransactionLocked<T>(Func<T> mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
+        EnsureAccountErasureSupported();
         if (!System.Threading.Monitor.IsEntered(Gate))
         {
             throw new InvalidOperationException("Account erasure transactions require the community-store lock.");
@@ -142,6 +289,14 @@ public sealed class CommunityStore
         {
             throw new InvalidOperationException("Campaign collaboration transactions require the community-store lock.");
         }
+
+        if (IsPrimary)
+            return ExecutePrimaryTransaction(() =>
+            {
+                T result = mutation();
+                CampaignCollaborationPersistenceFaultInjector?.Invoke();
+                return result;
+            });
 
         CampaignCollaborationTransactionSnapshot before = CaptureCampaignCollaborationTransactionLocked();
         try
@@ -255,6 +410,20 @@ public sealed class CommunityStore
 
     public void PersistLocked()
     {
+        EnsurePrimaryUsable();
+        if (IsPrimary && (!Monitor.IsEntered(_gate) || _scopeDepth == 0))
+            throw new InvalidOperationException("Primary community writes require a current store scope.");
+        if (_deferPrimaryCommit) return;
+        try { PersistValidatedLocked(); }
+        catch
+        {
+            if (IsPrimary) _primaryFailed = true;
+            throw;
+        }
+    }
+
+    private void PersistValidatedLocked()
+    {
         if (!System.Threading.Monitor.IsEntered(Gate))
         {
             lock (Gate)
@@ -273,7 +442,89 @@ public sealed class CommunityStore
             PlayGrantsById.Values);
         PlaySessionAuthorizationValidator.ValidateTimeHighWater(PlayAuthorizationTimeHighWaterUtc);
 
-        var snapshot = new CommunityStoreSnapshot(
+        var snapshot = CaptureSnapshotLocked();
+
+        CampaignCollaborationStateValidator.ValidateSnapshot(
+            snapshot.CampaignCollaborationInvites ?? Array.Empty<CampaignCollaborationInviteState>(),
+            snapshot.CampaignCharacterBindings ?? Array.Empty<CampaignCharacterBindingState>(),
+            snapshot.CampaignSharedSheetAudit ?? Array.Empty<CampaignSharedSheetAuditState>(),
+            snapshot.CampaignRunsites ?? Array.Empty<CampaignRunsiteState>(),
+            snapshot.CampaignCreations ?? Array.Empty<CampaignCreationIdempotencyState>(),
+            snapshot.CampaignInviteCreations ?? Array.Empty<CampaignInviteCreationIdempotencyState>(),
+            snapshot.CampaignRunsiteDraftCommands ?? Array.Empty<CampaignRunsiteDraftIdempotencyState>(),
+            snapshot.CampaignRunsitePublishCommands ?? Array.Empty<CampaignRunsitePublishIdempotencyState>(),
+            snapshot.CampaignRedemptions ?? Array.Empty<CampaignRedemptionIdempotencyState>(),
+            snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>(),
+            snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>(),
+            snapshot.CampaignGmAuthorityCommands ?? Array.Empty<CampaignGmAuthorityIdempotencyState>(),
+            snapshot.CampaignTeardowns ?? Array.Empty<CampaignTeardownIdempotencyState>(),
+            snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>(),
+            snapshot.CampaignSpines ?? Array.Empty<CampaignProjection>());
+
+        if (_primary is not null)
+        {
+            ValidatePrimarySnapshot(snapshot);
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new PrimaryEnvelope(PrimarySchema, snapshot), _jsonOptions);
+            TeableRevisionStore.Head? written = null;
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                if (bytes.Length > MaximumPrimaryBytes) throw new InvalidDataException("Community primary state is oversized.");
+                written = _primary.CompareExchangeAsync(PrimaryStream, _primaryHead, Guid.NewGuid(), bytes,
+                    deadline.Token).GetAwaiter().GetResult();
+                _primaryHead = written with { Bytes = [] };
+            }
+            catch { _primaryFailed = true; throw; }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(bytes);
+                if (written is not null) CryptographicOperations.ZeroMemory(written.Bytes);
+            }
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
+        var tempPath = $"{_storagePath}.tmp";
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions), System.Text.Encoding.UTF8);
+        File.Move(tempPath, _storagePath, true);
+    }
+
+    // Multi-part Campaign operations share one primary revision.
+    // A nested PersistLocked stages changes; only successful callback completion
+    // may commit them. Never attempt a compensating remote overwrite on failure.
+    internal T ExecutePrimaryTransaction<T>(Func<T> mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        using var scope = Enter();
+        if (!IsPrimary || _deferPrimaryCommit)
+            throw new InvalidOperationException("Primary transactions require one non-nested primary operation.");
+        byte[] before = JsonSerializer.SerializeToUtf8Bytes(CaptureSnapshotLocked(), _jsonOptions);
+        try
+        {
+            _deferPrimaryCommit = true;
+            T result = mutation();
+            _deferPrimaryCommit = false;
+            PersistLocked();
+            return result;
+        }
+        catch
+        {
+            _deferPrimaryCommit = false;
+            // Failed/uncertain transport already poisoned this instance. Restore
+            // memory only; a new instance must reconcile the authoritative head.
+            ApplySnapshotLocked(JsonSerializer.Deserialize<CommunityStoreSnapshot>(before, _jsonOptions)
+                ?? throw new InvalidDataException("Community transaction snapshot is unavailable."));
+            throw;
+        }
+        finally
+        {
+            _deferPrimaryCommit = false;
+            CryptographicOperations.ZeroMemory(before);
+        }
+    }
+
+    private CommunityStoreSnapshot CaptureSnapshotLocked()
+        => new(
             Users: UsersById.Values.OrderBy(static user => user.UserId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Groups: GroupsById.Values.OrderBy(static group => group.GroupId, StringComparer.OrdinalIgnoreCase).ToArray(),
             JoinCodes: JoinCodesByValue.Values.OrderBy(static code => code.Code, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -366,6 +617,7 @@ public sealed class CommunityStore
             OpenRunCloseouts: OpenRunCloseouts.OrderByDescending(static item => item.ClosedAtUtc).ToArray(),
             RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray(),
             BlackLedgerFactionOnboarding: BlackLedgerFactionOnboardingState,
+            CampaignArtifactRegistry: CampaignArtifactRegistry,
             PlaySessions: PlaySessionsById.Values.OrderBy(static item => item.SessionId, StringComparer.OrdinalIgnoreCase).ToArray(),
             PlayParticipants: PlayParticipantsById.Values.OrderBy(static item => item.ParticipantId, StringComparer.OrdinalIgnoreCase).ToArray(),
             PlayInvites: PlayInvitesById.Values.OrderBy(static item => item.InviteId, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -421,30 +673,9 @@ public sealed class CommunityStore
                 .ToArray(),
             CampaignTeardowns: CampaignTeardownsByIdempotencyKey.Values
                 .OrderBy(static item => item.Key, StringComparer.Ordinal)
-                .ToArray());
-
-        CampaignCollaborationStateValidator.ValidateSnapshot(
-            snapshot.CampaignCollaborationInvites ?? Array.Empty<CampaignCollaborationInviteState>(),
-            snapshot.CampaignCharacterBindings ?? Array.Empty<CampaignCharacterBindingState>(),
-            snapshot.CampaignSharedSheetAudit ?? Array.Empty<CampaignSharedSheetAuditState>(),
-            snapshot.CampaignRunsites ?? Array.Empty<CampaignRunsiteState>(),
-            snapshot.CampaignCreations ?? Array.Empty<CampaignCreationIdempotencyState>(),
-            snapshot.CampaignInviteCreations ?? Array.Empty<CampaignInviteCreationIdempotencyState>(),
-            snapshot.CampaignRunsiteDraftCommands ?? Array.Empty<CampaignRunsiteDraftIdempotencyState>(),
-            snapshot.CampaignRunsitePublishCommands ?? Array.Empty<CampaignRunsitePublishIdempotencyState>(),
-            snapshot.CampaignRedemptions ?? Array.Empty<CampaignRedemptionIdempotencyState>(),
-            snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>(),
-            snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>(),
-            snapshot.CampaignGmAuthorityCommands ?? Array.Empty<CampaignGmAuthorityIdempotencyState>(),
-            snapshot.CampaignTeardowns ?? Array.Empty<CampaignTeardownIdempotencyState>(),
-            snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>(),
-            snapshot.CampaignSpines ?? Array.Empty<CampaignProjection>());
-
-        Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
-        var tempPath = $"{_storagePath}.tmp";
-        File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions), System.Text.Encoding.UTF8);
-        File.Move(tempPath, _storagePath, true);
-    }
+                .ToArray(),
+            CampaignInviteAttempts: CampaignInviteAttemptsByUserId.ToDictionary(
+                static item => item.Key, static item => item.Value, StringComparer.OrdinalIgnoreCase));
 
     private void Load()
     {
@@ -506,6 +737,9 @@ public sealed class CommunityStore
 
     private void ApplySnapshotLocked(CommunityStoreSnapshot snapshot)
     {
+        CampaignInviteAttemptsByUserId.Clear();
+        foreach (var item in snapshot.CampaignInviteAttempts ?? new Dictionary<string, CampaignInviteAttemptWindow>())
+            CampaignInviteAttemptsByUserId.Add(item.Key, item.Value);
         PlaySessionAuthorizationValidator.ValidateSnapshot(
             snapshot.PlaySessions ?? Array.Empty<PlaySessionBinding>(),
             snapshot.PlayParticipants ?? Array.Empty<PlaySessionParticipant>(),
@@ -810,6 +1044,7 @@ public sealed class CommunityStore
         }
 
         BlackLedgerFactionOnboardingState = snapshot.BlackLedgerFactionOnboarding;
+        CampaignArtifactRegistry = snapshot.CampaignArtifactRegistry;
     }
 
     internal static string ResolveStoragePath(IConfiguration configuration)
@@ -955,7 +1190,9 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<CampaignSheetEditIdempotencyState>? CampaignSheetEdits = null,
     IReadOnlyList<CampaignGmAuthorityAuditState>? CampaignGmAuthorityAudit = null,
     IReadOnlyList<CampaignGmAuthorityIdempotencyState>? CampaignGmAuthorityCommands = null,
-    IReadOnlyList<CampaignTeardownIdempotencyState>? CampaignTeardowns = null);
+    IReadOnlyList<CampaignTeardownIdempotencyState>? CampaignTeardowns = null,
+    HubArtifactStoreBackupPackage? CampaignArtifactRegistry = null,
+    IReadOnlyDictionary<string, CampaignInviteAttemptWindow>? CampaignInviteAttempts = null);
 
 internal sealed record CampaignCollaborationTransactionSnapshot(
     IReadOnlyList<HubUserDto> Users,

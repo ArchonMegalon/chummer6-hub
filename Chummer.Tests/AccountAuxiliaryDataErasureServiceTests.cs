@@ -4,6 +4,7 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Contracts.Billing;
+using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -14,6 +15,184 @@ namespace Chummer.Tests;
 public sealed class AccountAuxiliaryDataErasureServiceTests
 {
     private static readonly DateTimeOffset Baseline = new(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Scene_media_failure_blocks_auxiliary_deletion(bool preflight)
+    {
+        var media = new SceneErasure { FailPreflight = preflight, FailErase = !preflight };
+        using Fixture fixture = new(scenes: media);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<IOException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+    }
+
+    [Fact]
+    public void Account_erasure_includes_media_and_exact_subject_binding()
+    {
+        var media = new SceneErasure();
+        using Fixture fixture = new(scenes: media);
+        var result = fixture.Service.Erase("user-delete", "subject-delete");
+        Assert.Equal("subject-delete", media.ErasedSubject);
+        Assert.Equal(2, result.RecordsRemovedByComponent["origin_scene_media"]);
+    }
+
+    private sealed class SceneErasure : IOriginSceneAccountErasure
+    {
+        public bool FailPreflight { get; init; }
+        public bool FailErase { get; init; }
+        public string? ErasedSubject { get; private set; }
+        public void EnsureAccountErasureSupported() { if (FailPreflight) throw new IOException(); }
+        public int EraseForSubject(string subjectId)
+        {
+            if (FailErase) throw new IOException();
+            ErasedSubject = subjectId;
+            return 2;
+        }
+    }
+
+    [Fact]
+    public void Primary_publication_history_blocks_erasure_before_auxiliary_mutations()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_ORIGIN_PUBLICATION_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var publications = new OriginDossierPublicationService(configuration, null, null,
+            NullLogger<OriginDossierPublicationService>.Instance, new(remote.Store()));
+        using Fixture fixture = new(publications: publications);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Primary_artifact_history_blocks_erasure_before_any_auxiliary_side_effects(bool usage)
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_HORIZON_REQUEST_RECEIPT_STORAGE_PROVIDER"] = "teable"
+        }).Build();
+        using var primaryUsage = usage ? new HorizonArtifactUsageStore(configuration, remote.Store()) : null;
+        using var primaryReceipts = usage ? null : new HorizonArtifactRequestReceiptStore(configuration, remote.Store());
+        using Fixture fixture = new(horizonUsage: primaryUsage, artifactReceipts: primaryReceipts);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Fact]
+    public void Primary_membership_history_blocks_erasure_before_any_auxiliary_side_effects()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var membership = new BrilliantDirectoriesBillingStore(configuration, primary: remote.Store());
+        using Fixture fixture = new(membership: membership);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Primary_authoring_history_blocks_erasure_before_any_auxiliary_side_effects(bool usage)
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_ORIGIN_PROVIDER_RESERVATION_STORAGE_PROVIDER"] = "teable"
+        }).Build();
+        using var primaryUsage = usage ? new MyFirstBookUsageStore(configuration, primary: remote.Store()) : null;
+        using var primaryReservations = usage ? null : new OriginDossierProviderCreditReservationStore(configuration, remote.Store());
+        using Fixture fixture = new(usage: primaryUsage, reservations: primaryReservations);
+        fixture.HorizonUsage.Entries.Add(new HorizonArtifactUsageLedgerEntry(
+            "user-delete", "origin-dossier", "book", "epub", "month", Baseline, 1, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.HorizonUsage.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Fact]
+    public void Primary_workspace_history_blocks_erasure_before_auxiliary_side_effects()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_INSTALL_LINKED_WORKSPACE_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var workspaces = new InstallLinkedWorkspaceSnapshotStore(configuration, remote.Store());
+        using Fixture fixture = new(workspaces: workspaces);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Fact]
+    public void Primary_document_history_blocks_erasure_before_any_auxiliary_mutation()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_ORIGIN_DOCUMENT_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var documents = new OriginDossierFirstPartyDocumentService(configuration, new(remote.Store()));
+        var preview = documents.Preview("user-delete", "subject-delete", "book", new("Synthetic title", "Runner",
+            [new("school", "Approved synthetic choice", "player_note", "choice", true)], true));
+        using Fixture fixture = new(documents);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        int writes = remote.HeadPosts;
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+        Assert.Single(fixture.MyFirstBook.Entries);
+        Assert.Equal(writes, remote.HeadPosts);
+        Assert.NotNull(documents.GetForOwner("user-delete", "subject-delete", "book", preview.RevisionId));
+    }
+
+    [Fact]
+    public void Primary_chapter_history_blocks_erasure_before_local_ledger_deletion()
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var chapters = new OriginChapterAuthoringService(configuration, new(remote.Store()));
+        using Fixture fixture = new(chapters: chapters);
+        fixture.MyFirstBook.Entries.Add(new MyFirstBookUsageLedgerEntry("user-delete", Baseline, 3, Baseline));
+        fixture.MyFirstBook.PersistLocked();
+
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.Erase("user-delete", "subject-delete"));
+
+        Assert.Single(fixture.MyFirstBook.Entries);
+        using var reopened = new MyFirstBookUsageStore(fixture.Configuration);
+        Assert.Single(reopened.Entries);
+        Assert.Empty(remote.Rows);
+    }
+
+    [Fact]
+    public void Workspace_erasure_preserves_differently_cased_opaque_account_ids()
+    {
+        using Fixture fixture = new();
+        foreach (string owner in new[] { "subject:Subject", "subject:subject", "user:User", "user:user" })
+        {
+            var record = InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(
+                InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot()) with { OwnerKey = owner };
+            fixture.InstallSnapshots.SnapshotsByKey.Add(
+                InstallLinkedWorkspaceSnapshotStore.ComposeKey(owner, record.WorkspaceId), record);
+        }
+        fixture.InstallSnapshots.PersistLocked();
+        var result = fixture.Service.Erase("User", "Subject");
+        Assert.Equal(2, result.RecordsRemovedByComponent["install_workspace_snapshots"]);
+        Assert.Equal(new[] { "subject:subject", "user:user" }, fixture.InstallSnapshots.SnapshotsByKey.Values
+            .Select(static r => r.OwnerKey).OrderBy(static id => id, StringComparer.Ordinal));
+        var reloaded = new InstallLinkedWorkspaceSnapshotStore(fixture.Configuration);
+        Assert.Equal(2, reloaded.SnapshotsByKey.Count);
+        Assert.Equal(0, fixture.Service.Erase("User", "Subject").RecordsRemovedByComponent["install_workspace_snapshots"]);
+    }
 
     [Fact]
     public void Erase_removes_account_data_from_auxiliary_first_party_stores()
@@ -31,7 +210,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             "user-delete", "private", true, [], Baseline, true));
         fixture.PayFunnels.Intents.Add(new PaymentIntentDto(
             "intent-1", "user-delete", "supporter", 1000, "EUR", "created", true, "https://example.invalid", Baseline));
-        fixture.InstallSnapshots.SnapshotsByKey["subject:subject-delete|workspace-1"] =
+        fixture.InstallSnapshots.SnapshotsByKey[InstallLinkedWorkspaceSnapshotStore.ComposeKey("subject:subject-delete", "workspace-1")] =
             new InstallLinkedWorkspaceSnapshotRecord(
                 "subject:subject-delete", "workspace-1", "sr5", "chummer", 1, "character", "private payload",
                 Baseline, "installation-1", "Name", "Alias", "Human", "priority", "6", "6", 0, 0, true);
@@ -47,11 +226,17 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
         fixture.PromptFoundry.DraftsById["draft-1"] = new PromptFoundryDraftProjection(
             "draft-1", "template-1", "campaign-1", "group-1", "user-delete", null, "local", "private prompt", null,
             "negative", [], [], "passed", null, 1, "draft", Baseline, Baseline, null);
+        fixture.OriginChapters.Create("subject-delete", new OriginChapterAuthoringRequest("chapter-request",
+            new OriginChapterSource("workspace-1", "chapter-1", new string('a', 64), "decision-1", "en-US", "Runner",
+                [new OriginChapterSourceFact("fact-1", "decision-1", "Synthetic accepted choice")]), true), () => true);
 
         AccountAuxiliaryDataErasureResult result = fixture.Service.Erase("user-delete", "subject-delete");
 
         Assert.True(result.RecordsRemoved >= 11);
-        Assert.Equal(13, result.RecordsRemovedByComponent.Count);
+        Assert.Equal(15, result.RecordsRemovedByComponent.Count);
+        Assert.Equal(0, result.RecordsRemovedByComponent["origin_scene_media"]);
+        Assert.Equal(1, result.RecordsRemovedByComponent["origin_chapter_jobs"]);
+        Assert.Null(fixture.OriginChapters.Get("subject-delete", "chapter-request"));
         Assert.Empty(fixture.Brilliant.Members);
         Assert.Empty(fixture.MyFirstBook.Entries);
         Assert.Empty(fixture.HorizonUsage.Entries);
@@ -106,12 +291,22 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             "chummer-auxiliary-erasure-tests",
             Guid.NewGuid().ToString("N"));
 
-        public Fixture()
+        public Fixture(OriginDossierFirstPartyDocumentService? documents = null,
+            InstallLinkedWorkspaceSnapshotStore? workspaces = null,
+            MyFirstBookUsageStore? usage = null,
+            OriginDossierProviderCreditReservationStore? reservations = null,
+            BrilliantDirectoriesBillingStore? membership = null,
+            HorizonArtifactUsageStore? horizonUsage = null,
+            HorizonArtifactRequestReceiptStore? artifactReceipts = null,
+            OriginChapterAuthoringService? chapters = null,
+            OriginDossierPublicationService? publications = null,
+            IOriginSceneAccountErasure? scenes = null)
         {
             Directory.CreateDirectory(_directory);
             var values = new Dictionary<string, string?>
             {
                 ["ASPNETCORE_ENVIRONMENT"] = "Testing",
+                ["CHUMMER_RUNTIME_STATE_ROOT"] = _directory,
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = PathFor("brilliant.json"),
                 ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = PathFor("myfirstbook.json"),
                 ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = PathFor("horizon-usage.json"),
@@ -127,13 +322,13 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
                 ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX_PATH"] = PathFor("origin-publications.json")
             };
             Configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
-            Brilliant = new BrilliantDirectoriesBillingStore(Configuration);
-            MyFirstBook = new MyFirstBookUsageStore(Configuration);
-            HorizonUsage = new HorizonArtifactUsageStore(Configuration);
-            OriginReservations = new OriginDossierProviderCreditReservationStore(Configuration);
-            ArtifactRequests = new HorizonArtifactRequestReceiptStore(Configuration);
+            Brilliant = membership ?? new BrilliantDirectoriesBillingStore(Configuration);
+            MyFirstBook = usage ?? new MyFirstBookUsageStore(Configuration);
+            HorizonUsage = horizonUsage ?? new HorizonArtifactUsageStore(Configuration);
+            OriginReservations = reservations ?? new OriginDossierProviderCreditReservationStore(Configuration);
+            ArtifactRequests = artifactReceipts ?? new HorizonArtifactRequestReceiptStore(Configuration);
             PayFunnels = new PayFunnelsBillingStore(Configuration);
-            InstallSnapshots = new InstallLinkedWorkspaceSnapshotStore(Configuration);
+            InstallSnapshots = workspaces ?? new InstallLinkedWorkspaceSnapshotStore(Configuration);
             InstallLinking = new InstallLinkingStore(
                 Configuration,
                 new EphemeralDataProtectionProvider(),
@@ -142,9 +337,10 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
             VideoFoundry = new GmSessionVideoFoundryStore(Configuration);
             PromptFoundry = new PromptFoundryStore(Configuration);
             KarmaForge = new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance);
-            OriginDossiers = new OriginDossierPublicationService(
+            OriginDossiers = publications ?? new OriginDossierPublicationService(
                 Configuration,
                 NullLogger<OriginDossierPublicationService>.Instance);
+            OriginChapters = chapters ?? new OriginChapterAuthoringService(Configuration);
             Service = new AccountAuxiliaryDataErasureService(
                 Brilliant,
                 MyFirstBook,
@@ -158,7 +354,10 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
                 VideoFoundry,
                 PromptFoundry,
                 KarmaForge,
-                OriginDossiers);
+                OriginDossiers,
+                OriginChapters,
+                documents,
+                scenes);
         }
 
         public IConfiguration Configuration { get; }
@@ -175,6 +374,7 @@ public sealed class AccountAuxiliaryDataErasureServiceTests
         public PromptFoundryStore PromptFoundry { get; }
         public KarmaForgeStore KarmaForge { get; }
         public OriginDossierPublicationService OriginDossiers { get; }
+        public OriginChapterAuthoringService OriginChapters { get; }
         public AccountAuxiliaryDataErasureService Service { get; }
 
         private string PathFor(string name) => Path.Combine(_directory, name);

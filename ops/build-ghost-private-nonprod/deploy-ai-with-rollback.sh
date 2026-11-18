@@ -1,0 +1,1052 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Bounded private-lane deployer. This script never deploys Presentation or edge,
+# never enables a provider gate, and never deletes its immutable rollback tag.
+umask 077
+
+script_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$(cd -- "$script_root/../.." && pwd -P)"
+compose_file="$repo_root/docker-compose.build-ghost-private-nonprod.yml"
+runtime_config_materializer="$repo_root/scripts/materialize_build_ghost_tough_tongue_runtime_config.py"
+operator_runtime_config_file="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_OPERATOR_CONFIG_FILE:-}"
+operator_runtime_evidence_root="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_RUNTIME_EVIDENCE_ROOT:-}"
+quarantine_requested="${CHUMMER_BUILD_GHOST_TOUGH_TONGUE_QUARANTINE:-0}"
+unconfigured_contract_file="$script_root/tough-tongue-read-only-binding-contract.unconfigured.json"
+project_name="chummer-build-ghost-private-nonprod"
+ai_service="chummer-build-ghost-ai"
+presentation_service="chummer-build-ghost-presentation"
+edge_service="build-ghost-private-edge"
+deployment_image="chummer-build-ghost-ai:private-nonprod"
+rollback_repository="chummer-build-ghost-ai"
+deploy_lock_file="/docker/chummercomplete/.state/locks/chummer-build-ghost-private-nonprod-ai-deploy.lock"
+max_io_full_avg10="${CHUMMER_BUILD_GHOST_DEPLOY_MAX_IO_FULL_AVG10:-10}"
+minimum_free_gib="${CHUMMER_BUILD_GHOST_DEPLOY_MINIMUM_FREE_GIB:-20}"
+build_poll_seconds="${CHUMMER_BUILD_GHOST_DEPLOY_POLL_SECONDS:-10}"
+workspace_revision="${CHUMMER_BUILD_GHOST_DEPLOY_CHECK_WORKSPACE_REVISION:-1}"
+
+deploy_tmp=""
+build_pid=""
+activation_started="false"
+deploy_succeeded="false"
+rollback_started="false"
+old_ai_id=""
+old_ai_image=""
+rollback_ref=""
+presentation_id_before=""
+edge_id_before=""
+deploy_lock_fd=""
+runtime_evidence_dir=""
+runtime_environment_file=""
+runtime_contract_file=""
+runtime_receipt_file=""
+runtime_evidence_device=""
+runtime_evidence_inode=""
+runtime_environment_digest=""
+compose_environment_args=()
+tough_tongue_runtime_variables=(
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE
+    EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
+)
+
+fail() {
+    printf 'ai_deploy=failed stage=%s\n' "$1" >&2
+    exit 1
+}
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || fail "preflight-missing-$1"
+}
+
+acquire_deploy_lock() {
+    local requested_lock_file="${1:-$deploy_lock_file}"
+    local requested_lock_root
+    requested_lock_root="$(dirname -- "$requested_lock_file")"
+    mkdir -p -- "$requested_lock_root"
+    [ ! -L "$requested_lock_file" ] || fail "deploy-lock-must-not-be-symlink"
+    exec {deploy_lock_fd}>> "$requested_lock_file"
+    chmod 0600 "$requested_lock_file"
+    flock --nonblock "$deploy_lock_fd" || fail "concurrent-deploy-lock-held"
+}
+
+compose() {
+    docker compose "${compose_environment_args[@]}" \
+        --project-name "$project_name" \
+        --project-directory "$repo_root" \
+        --file "$compose_file" \
+        "$@"
+}
+
+running_container_id() {
+    local service_name="$1"
+    local resolved
+    resolved="$(docker ps --no-trunc \
+        --filter "label=com.docker.compose.project=$project_name" \
+        --filter "label=com.docker.compose.service=$service_name" \
+        --filter status=running \
+        --format '{{.ID}}')"
+    if [ "$(printf '%s\n' "$resolved" | sed '/^$/d' | wc -l)" -ne 1 ]; then
+        fail "runtime-$service_name-not-exactly-one"
+    fi
+    printf '%s' "$resolved"
+}
+
+ensure_hard_limits() {
+    local io_full_avg10 free_kib minimum_free_kib
+    io_full_avg10="$(awk '/^full / { for (field = 1; field <= NF; field++) if ($field ~ /^avg10=/) { split($field, pair, "="); print pair[2]; exit } }' /proc/pressure/io)"
+    [ -n "$io_full_avg10" ] || fail "host-io-pressure-unreadable"
+    if ! awk -v observed="$io_full_avg10" -v maximum="$max_io_full_avg10" 'BEGIN { exit !(observed <= maximum) }'; then
+        fail "host-io-pressure-cutoff"
+    fi
+
+    free_kib="$(df -Pk /docker | awk 'NR == 2 { print $4 }')"
+    minimum_free_kib="$((minimum_free_gib * 1024 * 1024))"
+    [ -n "$free_kib" ] || fail "host-free-space-unreadable"
+    if [ "$free_kib" -lt "$minimum_free_kib" ]; then
+        fail "host-free-space-cutoff"
+    fi
+}
+
+validate_control_values() {
+    [[ "$max_io_full_avg10" =~ ^([0-9]+)(\.[0-9]+)?$ ]] || fail "max-io-cutoff-invalid"
+    awk -v value="$max_io_full_avg10" 'BEGIN { exit !(value > 0 && value <= 10) }' \
+        || fail "max-io-cutoff-must-not-exceed-ten"
+    [[ "$minimum_free_gib" =~ ^[0-9]+$ ]] || fail "minimum-free-space-invalid"
+    [ "$minimum_free_gib" -ge 20 ] || fail "minimum-free-space-must-be-at-least-twenty-gib"
+    [[ "$build_poll_seconds" =~ ^[0-9]+$ ]] || fail "build-poll-invalid"
+    if [ "$build_poll_seconds" -lt 1 ] || [ "$build_poll_seconds" -gt 15 ]; then
+        fail "build-poll-must-be-one-to-fifteen-seconds"
+    fi
+    [[ "$workspace_revision" =~ ^[1-9][0-9]*$ ]] || fail "workspace-revision-invalid"
+}
+
+validate_quarantine_request() {
+    case "$quarantine_requested" in
+        0) ;;
+        1)
+            [ -z "$operator_runtime_config_file" ] \
+                || fail "tough-tongue-quarantine-conflicts-with-operator-config"
+            [ -z "$operator_runtime_evidence_root" ] \
+                || fail "tough-tongue-quarantine-conflicts-with-runtime-evidence"
+            ;;
+        *) fail "tough-tongue-quarantine-flag-invalid" ;;
+    esac
+}
+
+validate_source() {
+    local variable_name="$1"
+    local revision_variable_name="${2:-}"
+    local source_path expected_revision actual_revision dirty
+    source_path="${!variable_name:-}"
+    [ -n "$source_path" ] || fail "source-$variable_name-missing"
+    [[ "$source_path" == /* ]] || fail "source-$variable_name-not-absolute"
+    source_path="$(realpath -e -- "$source_path")"
+    [ -d "$source_path/.git" ] || git -C "$source_path" rev-parse --git-dir >/dev/null 2>&1 \
+        || fail "source-$variable_name-not-git"
+    actual_revision="$(git -C "$source_path" rev-parse --verify HEAD)"
+    [[ "$actual_revision" =~ ^[0-9a-f]{40}$ ]] || fail "source-$variable_name-head-invalid"
+    dirty="$(git -C "$source_path" status --porcelain --untracked-files=all)"
+    [ -z "$dirty" ] || fail "source-$variable_name-dirty"
+
+    if [ -n "$revision_variable_name" ]; then
+        expected_revision="${!revision_variable_name:-}"
+        [[ "$expected_revision" =~ ^[0-9a-f]{40}$ ]] || fail "revision-$revision_variable_name-invalid"
+        [ "$actual_revision" = "$expected_revision" ] || fail "source-$variable_name-revision-drift"
+    fi
+
+    printf -v "$variable_name" '%s' "$source_path"
+    export "${variable_name?}"
+}
+
+validate_sources_and_labels() {
+    validate_source CHUMMER_RUN_SERVICES_SOURCE CHUMMER_RUN_SERVICES_REVISION
+    [ "$CHUMMER_RUN_SERVICES_SOURCE" = "$repo_root" ] || fail "hub-source-does-not-own-helper"
+    validate_source CHUMMER_CORE_ENGINE_SOURCE CHUMMER_CORE_ENGINE_REVISION
+    validate_source CHUMMER_HUB_REGISTRY_SOURCE CHUMMER_HUB_REGISTRY_REVISION
+    validate_source CHUMMER_MEDIA_FACTORY_SOURCE CHUMMER_MEDIA_FACTORY_REVISION
+    validate_source CHUMMER_PRESENTATION_SOURCE
+    validate_source CHUMMER_UI_KIT_SOURCE
+}
+
+load_existing_environment() {
+    local container_id="$1"
+    local variable_name="$2"
+    local required="$3"
+    local environment line matches value
+    environment="$(docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}')"
+    line="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { print }')"
+    matches="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { count++ } END { print count + 0 }')"
+    [ "$matches" -eq 1 ] || fail "runtime-env-$variable_name-not-exactly-one"
+    value="${line#*=}"
+    if [ "$required" = "required" ] && [ -z "$value" ]; then
+        fail "runtime-env-$variable_name-empty"
+    fi
+    printf -v "$variable_name" '%s' "$value"
+    export "${variable_name?}"
+}
+
+load_existing_environment_or_empty() {
+    local container_id="$1"
+    local variable_name="$2"
+    local environment line matches value=""
+    environment="$(docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}')"
+    line="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { print }')"
+    matches="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { count++ } END { print count + 0 }')"
+    [ "$matches" -le 1 ] || fail "runtime-env-$variable_name-ambiguous"
+    if [ "$matches" -eq 1 ]; then
+        value="${line#*=}"
+    fi
+    printf -v "$variable_name" '%s' "$value"
+    export "${variable_name?}"
+}
+
+prepare_operator_runtime_config() {
+    local materializer_log owner resolved_root variable_name
+    for variable_name in "${tough_tongue_runtime_variables[@]}"; do
+        unset "$variable_name"
+    done
+    if [ -z "$operator_runtime_config_file" ]; then
+        [ -z "$operator_runtime_evidence_root" ] \
+            || fail "operator-tough-tongue-evidence-without-config"
+        return 0
+    fi
+    [ -x "$runtime_config_materializer" ] \
+        || fail "operator-tough-tongue-materializer-unavailable"
+    [ -n "$operator_runtime_evidence_root" ] \
+        || fail "operator-tough-tongue-evidence-root-required"
+    case "$operator_runtime_evidence_root" in
+        /*) ;;
+        *) fail "operator-tough-tongue-evidence-root-invalid" ;;
+    esac
+    resolved_root="$(realpath -e -- "$operator_runtime_evidence_root")" \
+        || fail "operator-tough-tongue-evidence-root-unavailable"
+    [ "$resolved_root" = "$operator_runtime_evidence_root" ] \
+        || fail "operator-tough-tongue-evidence-root-authority-invalid"
+    owner="$(id -u)"
+    if [ ! -d "$operator_runtime_evidence_root" ] \
+        || [ -L "$operator_runtime_evidence_root" ] \
+        || [ "$(stat -c '%a:%u' -- "$operator_runtime_evidence_root")" != "700:$owner" ]; then
+        fail "operator-tough-tongue-evidence-root-authority-invalid"
+    fi
+    runtime_evidence_dir="$(mktemp -d -- \
+        "$operator_runtime_evidence_root/runtime.XXXXXXXXXXXX")" \
+        || fail "operator-tough-tongue-evidence-directory-unavailable"
+    chmod 0700 "$runtime_evidence_dir"
+    runtime_environment_file="$runtime_evidence_dir/runtime.env"
+    runtime_contract_file="$runtime_evidence_dir/read-only-contract.json"
+    runtime_receipt_file="$runtime_evidence_dir/runtime-receipt.json"
+    runtime_evidence_device="$(stat -c '%d' -- "$runtime_evidence_dir")"
+    runtime_evidence_inode="$(stat -c '%i' -- "$runtime_evidence_dir")"
+    materializer_log="$deploy_tmp/tough-tongue-runtime-materializer.log"
+    if ! python3 "$runtime_config_materializer" \
+        --config "$operator_runtime_config_file" \
+        --output-env "$runtime_environment_file" \
+        --output-contract "$runtime_contract_file" \
+        --receipt "$runtime_receipt_file" >"$materializer_log" 2>&1; then
+        chmod 0600 "$materializer_log" 2>/dev/null || true
+        fail "operator-tough-tongue-config-invalid"
+    fi
+    chmod 0600 "$materializer_log"
+    verify_materialized_runtime_pair \
+        "$runtime_environment_file" "$runtime_contract_file" "$runtime_receipt_file"
+    runtime_environment_digest="$(jq -er '.environmentFileDigest' "$runtime_receipt_file")"
+    jq -e \
+        '.schema == "chummer.build_ghost.tough_tongue.runtime_config_receipt.v1"
+         and .status == "ready-for-read-only-probe"
+         and .providerReadbackVerified == false
+         and .providerActivationAuthorized == false
+         and .providerMutationPerformed == false
+         and .readyForResourceBinding == false
+         and .providerPlanLabelReadbackVerified == false
+         and (
+           ((.candidateRefDigests.live_avatar // "") != ""
+             and (.stockAvatarReadbackReceiptFileDigest | test("^sha256:[0-9a-f]{64}$"))
+             and (.stockAvatarReadbackReceiptDigest | test("^sha256:[0-9a-f]{64}$"))
+             and (.stockAvatarCanonicalResponseDigest | test("^sha256:[0-9a-f]{64}$"))
+             and (.stockAvatarReadbackScenarioRefDigest | test("^sha256:[0-9a-f]{64}$"))
+             and (.stockAvatarReadbackObservedAtUtc | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")))
+           or
+           ((.candidateRefDigests.live_avatar // "") == ""
+             and .stockAvatarReadbackReceiptFileDigest == ""
+             and .stockAvatarReadbackReceiptDigest == ""
+             and .stockAvatarCanonicalResponseDigest == ""
+             and .stockAvatarReadbackScenarioRefDigest == ""
+             and .stockAvatarReadbackObservedAtUtc == ""
+             and .stockAvatarLegacyCascadePolicyOptIn == false)
+         )
+         and (
+           .bindingCandidatesConfigured == true
+           or (
+             .bindingCandidatesConfigured == false
+             and .stockAvatarMigrationConfigured == true
+             and .candidateRefCount == 3
+             and (.candidateRefDigests | keys == ["live_avatar", "scenario", "voice"])
+             and .readyForAccountSelection == true
+             and .accountSelectionPolicySource == "user_authority"
+           )
+           or (
+             .bindingCandidatesConfigured == false
+             and .stockAvatarMigrationConfigured == false
+             and .candidateRefCount == 0
+             and .candidateRefDigests == {}
+             and .readyForAccountSelection == true
+             and .accountSelectionPolicySource == "user_authority"
+             and .premiumBasis == "operator_policy_available_minutes_gt_threshold"
+             and .premiumThresholdMinutes == 1100
+             and .premiumValidityCalendarMonths == 11
+             and .premiumGrantCount > 0
+           )
+         )
+         and .rawCredentialsInReceipt == false
+         and .rawCandidateRefsInReceipt == false' \
+        "$runtime_receipt_file" >/dev/null \
+        || fail "operator-tough-tongue-receipt-invalid"
+    compose_environment_args=(--env-file "$runtime_environment_file")
+    for variable_name in "${tough_tongue_runtime_variables[@]}"; do
+        unset "$variable_name"
+    done
+}
+
+securely_remove_runtime_environment() {
+    local cleanup_digest_args=()
+    [ -n "$runtime_environment_file" ] || return 0
+    if [ -n "$runtime_environment_digest" ]; then
+        cleanup_digest_args=(--expected-environment-digest "$runtime_environment_digest")
+    fi
+    if ! python3 "$runtime_config_materializer" \
+        --destroy-environment "$runtime_environment_file" \
+        --expected-parent-device "$runtime_evidence_device" \
+        --expected-parent-inode "$runtime_evidence_inode" \
+        "${cleanup_digest_args[@]}" >/dev/null 2>&1; then
+        printf 'ai_deploy=failed stage=operator-tough-tongue-environment-cleanup-failed\n' >&2
+        return 1
+    fi
+    compose_environment_args=()
+}
+
+verify_materialized_runtime_pair() {
+    local environment_file="$1"
+    local contract_file="$2"
+    local receipt_file="$3"
+    local owner identity_before identity_after environment_digest contract_digest
+    local receipt_evidence expected_evidence receipt_without_evidence
+    local output_device output_inode actual_output_identity
+    owner="$(id -u)"
+    if [ ! -f "$environment_file" ] || [ -L "$environment_file" ] \
+        || [ "$(stat -c '%a:%u:%h' -- "$environment_file")" != "600:$owner:1" ]; then
+        fail "operator-tough-tongue-environment-authority-invalid"
+    fi
+    if [ ! -f "$contract_file" ] || [ -L "$contract_file" ] \
+        || [ "$(stat -c '%a:%u:%h' -- "$contract_file")" != "400:$owner:1" ]; then
+        fail "operator-tough-tongue-contract-authority-invalid"
+    fi
+    if [ ! -f "$receipt_file" ] || [ -L "$receipt_file" ] \
+        || [ "$(stat -c '%a:%u:%h' -- "$receipt_file")" != "600:$owner:1" ]; then
+        fail "operator-tough-tongue-receipt-authority-invalid"
+    fi
+    identity_before="$(stat -c '%d:%i:%s:%y:%z:%f:%u:%h' -- \
+        "$environment_file" "$contract_file" "$receipt_file")"
+    environment_digest="sha256:$(sha256sum -- "$environment_file" | awk '{print $1}')"
+    contract_digest="sha256:$(sha256sum -- "$contract_file" | awk '{print $1}')"
+    receipt_evidence="$(jq -er '.evidenceDigest' "$receipt_file")"
+    receipt_without_evidence="$(jq -cS 'del(.evidenceDigest)' "$receipt_file")"
+    expected_evidence="sha256:$(printf '%s' "$receipt_without_evidence" | sha256sum | awk '{print $1}')"
+    output_device="$(jq -er '.outputDirectoryDevice | numbers' "$receipt_file")"
+    output_inode="$(jq -er '.outputDirectoryInode | numbers' "$receipt_file")"
+    if ! [[ "$output_device" =~ ^[0-9]+$ ]] \
+        || ! [[ "$output_inode" =~ ^[1-9][0-9]*$ ]]; then
+        fail "operator-tough-tongue-output-directory-binding-invalid"
+    fi
+    actual_output_identity="$(stat -c '%d:%i' -- "$(dirname -- "$environment_file")")"
+    [ "$actual_output_identity" = "$output_device:$output_inode" ] \
+        || fail "operator-tough-tongue-output-directory-changed"
+    if [ -n "$runtime_evidence_device" ] || [ -n "$runtime_evidence_inode" ]; then
+        [ "$actual_output_identity" = "$runtime_evidence_device:$runtime_evidence_inode" ] \
+            || fail "operator-tough-tongue-output-directory-changed"
+    fi
+    jq -e \
+        --arg environment_digest "$environment_digest" \
+        --arg contract_digest "$contract_digest" \
+        '.environmentFileDigest == $environment_digest
+         and .readOnlyContractFileDigest == $contract_digest
+         and .contractSnapshotMode == "0400"
+         and .publicationOrder == ["contract-snapshot", "receipt", "environment"]' \
+        "$receipt_file" >/dev/null \
+        || fail "operator-tough-tongue-pair-digest-invalid"
+    [ "$receipt_evidence" = "$expected_evidence" ] \
+        || fail "operator-tough-tongue-receipt-digest-invalid"
+    identity_after="$(stat -c '%d:%i:%s:%y:%z:%f:%u:%h' -- \
+        "$environment_file" "$contract_file" "$receipt_file")"
+    [ "$identity_before" = "$identity_after" ] \
+        || fail "operator-tough-tongue-pair-changed"
+}
+
+load_runtime_secrets_without_output() {
+    load_existing_environment "$old_ai_id" CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN required
+    load_existing_environment "$old_ai_id" CHUMMER_AI_INTERNAL_API_TOKEN required
+    load_existing_environment "$old_ai_id" CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY required
+    [[ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]] \
+        || fail "runtime-env-CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY-invalid"
+    [ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" != "$CHUMMER_AI_INTERNAL_API_TOKEN" ] \
+        && [ "$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY" != "$CHUMMER_BUILD_GHOST_PRIVATE_TOOL_SERVICE_TOKEN" ] \
+        || fail "runtime-live-support-session-store-key-not-distinct"
+    if [ "$quarantine_requested" = "1" ]; then
+        quarantine_provider_runtime_without_output
+        return 0
+    fi
+    if [ -n "$operator_runtime_config_file" ]; then
+        return 0
+    fi
+    quarantine_provider_runtime_without_output
+}
+
+quarantine_provider_runtime_without_output() {
+    local variable_name
+    for variable_name in "${tough_tongue_runtime_variables[@]}"; do
+        printf -v "$variable_name" '%s' ""
+        export "${variable_name?}"
+    done
+    CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE="$unconfigured_contract_file"
+    export CHUMMER_BUILD_GHOST_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_FILE
+}
+
+securely_remove_temp() {
+    local path
+    [ -n "$deploy_tmp" ] && [ -d "$deploy_tmp" ] || return 0
+    while IFS= read -r -d '' path; do
+        chmod u+w "$path" 2>/dev/null || true
+        shred --force --remove=unlink --zero "$path" 2>/dev/null || {
+            truncate --size 0 "$path" 2>/dev/null || true
+            unlink "$path" 2>/dev/null || true
+        }
+    done < <(find "$deploy_tmp" -mindepth 1 -maxdepth 1 -type f -print0)
+    rmdir "$deploy_tmp" 2>/dev/null || true
+}
+
+terminate_build() {
+    [ -n "$build_pid" ] || return 0
+    kill -0 "$build_pid" 2>/dev/null || {
+        build_pid=""
+        return 0
+    }
+    kill -TERM -- "-$build_pid" 2>/dev/null || true
+    for _ in 1 2 3 4 5; do
+        kill -0 "$build_pid" 2>/dev/null || break
+        sleep 1
+    done
+    if kill -0 "$build_pid" 2>/dev/null; then
+        kill -KILL -- "-$build_pid" 2>/dev/null || true
+    fi
+    wait "$build_pid" 2>/dev/null || true
+    build_pid=""
+}
+
+image_id() {
+    docker image inspect "$1" --format '{{.Id}}'
+}
+
+image_label() {
+    docker image inspect "$1" --format "{{ index .Config.Labels \"$2\" }}"
+}
+
+verify_source_labels() {
+    local image="$1"
+    [ "$(image_label "$image" org.opencontainers.image.revision)" = "$CHUMMER_RUN_SERVICES_REVISION" ] \
+        || fail "image-hub-label-drift"
+    [ "$(image_label "$image" run.chummer.build-ghost.core-revision)" = "$CHUMMER_CORE_ENGINE_REVISION" ] \
+        || fail "image-core-label-drift"
+    [ "$(image_label "$image" run.chummer.build-ghost.hub-registry-revision)" = "$CHUMMER_HUB_REGISTRY_REVISION" ] \
+        || fail "image-registry-label-drift"
+    [ "$(image_label "$image" run.chummer.build-ghost.media-factory-revision)" = "$CHUMMER_MEDIA_FACTORY_REVISION" ] \
+        || fail "image-media-label-drift"
+    [ "$(image_label "$image" run.chummer.build-ghost.profile)" = "private-nonprod" ] \
+        || fail "image-profile-label-drift"
+}
+
+preserve_rollback_image() {
+    local timestamp nonce old_short preserved_id
+    old_ai_id="$(running_container_id "$ai_service")"
+    old_ai_image="$(docker inspect "$old_ai_id" --format '{{.Image}}')"
+    [[ "$old_ai_image" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "old-ai-image-id-invalid"
+    [ "$(image_id "$old_ai_image")" = "$old_ai_image" ] || fail "old-ai-image-unresolvable"
+    assert_provider_gates_false "$old_ai_id"
+
+    timestamp="$(date -u +%Y%m%dt%H%M%Sz)"
+    nonce="$(openssl rand -hex 12)"
+    old_short="${old_ai_image#sha256:}"
+    rollback_ref="$rollback_repository:rollback-${timestamp}-${old_short:0:16}-${nonce}"
+    if docker image inspect "$rollback_ref" >/dev/null 2>&1; then
+        fail "rollback-reference-collision"
+    fi
+    docker image tag "$old_ai_image" "$rollback_ref"
+    preserved_id="$(image_id "$rollback_ref")"
+    [ "$preserved_id" = "$old_ai_image" ] || fail "rollback-reference-verification-failed"
+    printf 'ai_deploy=prepared rollback_ref=%s old_image=%s\n' "$rollback_ref" "$old_ai_image"
+}
+
+verify_rendered_compose() {
+    local rendered="$deploy_tmp/compose.rendered.json"
+    compose config --format json > "$rendered"
+    chmod 0600 "$rendered"
+    jq -e \
+        --arg service "$ai_service" \
+        --arg presentation "$presentation_service" \
+        --arg hub "$CHUMMER_RUN_SERVICES_REVISION" \
+        --arg core "$CHUMMER_CORE_ENGINE_REVISION" \
+        --arg registry "$CHUMMER_HUB_REGISTRY_REVISION" \
+        --arg media "$CHUMMER_MEDIA_FACTORY_REVISION" \
+        '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED == "false"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED == "false"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED == "false"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED == "false"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_REMOTE_EXECUTION_ENABLED == "false"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_RECEIPT_PATH == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_CAPABILITY_HMAC_KEY == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_ACCOUNT_SCOPE_REF_DIGEST == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SCENARIO_REF_DIGEST == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_AVATAR_BINDING_DIGEST == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_HREF == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_ROOK_VIDBOARD_MEDIA_DIGEST == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_PERSONA_RELEASE_REGISTRY_PATH == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_MEETING_BROKER_BASE_URL == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_MEETING_BROKER_API_TOKEN == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_API_KEY == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_SCENARIO_ID == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MEETING_BOT_NAME == ""
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_PATH == "/app/state/build-ghost-live-support"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SINGLE_INSTANCE == "true"
+         and .services[$service].environment.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY == $ENV.CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_KEY
+         and .services[$presentation].environment.CHUMMER_BUILD_GHOST_AI_BASE_URL == "http://chummer-build-ghost-ai:8080"
+         and .services[$presentation].environment.CHUMMER_AI_INTERNAL_API_TOKEN == .services[$service].environment.CHUMMER_AI_INTERNAL_API_TOKEN
+         and any(.services[$service].volumes[]?;
+             .type == "volume"
+             and .source == "build-ghost-live-support"
+             and .target == "/app/state/build-ghost-live-support"
+             and (.read_only // false) == false)
+         and .services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_PATH == "/run/secrets/tough-tongue-read-only-binding-contract.json"
+         and any(.services[$service].secrets[]?;
+             .source == "build-ghost-tough-tongue-read-only-binding-contract"
+             and .target == "tough-tongue-read-only-binding-contract.json")
+         and .services[$service].build.args.CHUMMER_RUN_SERVICES_REVISION == $hub
+         and .services[$service].build.args.CHUMMER_CORE_ENGINE_REVISION == $core
+         and .services[$service].build.args.CHUMMER_HUB_REGISTRY_REVISION == $registry
+         and .services[$service].build.args.CHUMMER_MEDIA_FACTORY_REVISION == $media
+         and ((.services[$service].ports // []) | length == 0)' \
+        "$rendered" >/dev/null || fail "compose-render-drift"
+    if [ -n "$operator_runtime_config_file" ]; then
+        jq -e --arg service "$ai_service" \
+            '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS != ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF != ""
+             and (.services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
+                  | test("^sha256:[0-9a-f]{64}$"))' \
+            "$rendered" >/dev/null || fail "compose-operator-runtime-drift"
+        if jq -e '(.candidateRefDigests.live_avatar // "") != ""' \
+            "$runtime_receipt_file" >/dev/null; then
+            jq -e --arg service "$ai_service" \
+                --slurpfile runtime "$runtime_receipt_file" \
+                '($runtime[0]) as $runtimeReceipt
+                 | (.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON | fromjson) as $avatarReceipt
+                 | .services[$service].environment as $environment
+                 | $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER == $avatarReceipt.ObservedProvider
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME == $avatarReceipt.ObservedAvatarName
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH == $avatarReceipt.ObservedAvatarAssetPath
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID == $avatarReceipt.ObservedLiveAvatarId
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST == $avatarReceipt.ReceiptDigest
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER == $avatarReceipt.ObservedModelProvider
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID == $avatarReceipt.ObservedModelId
+                 and ($environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE | fromjson) == $avatarReceipt.LegacyCascadePolicyOptIn
+                 and $avatarReceipt.ReceiptDigest == $runtimeReceipt.stockAvatarReadbackReceiptDigest
+                 and $avatarReceipt.CanonicalWhitelistedResponseDigest == $runtimeReceipt.stockAvatarCanonicalResponseDigest
+                 and $avatarReceipt.ScenarioRefDigest == $runtimeReceipt.stockAvatarReadbackScenarioRefDigest
+                 and $avatarReceipt.ObservedAtUtc == $runtimeReceipt.stockAvatarReadbackObservedAtUtc
+                 and $avatarReceipt.LegacyCascadePolicyOptIn == $runtimeReceipt.stockAvatarLegacyCascadePolicyOptIn' \
+                "$rendered" >/dev/null || fail "compose-stock-avatar-readback-drift"
+        else
+            jq -e --arg service "$ai_service" \
+                '.services[$service].environment as $environment
+                 | $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID == ""
+                 and $environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE == "false"' \
+                "$rendered" >/dev/null || fail "compose-stock-avatar-empty-posture-drift"
+        fi
+        if jq -e '.stockAvatarMigrationConfigured == true' \
+            "$runtime_receipt_file" >/dev/null; then
+            jq -e --arg service "$ai_service" \
+                '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID != ""' \
+                "$rendered" >/dev/null || fail "compose-stock-avatar-migration-candidates-drift"
+        elif jq -e '.bindingCandidatesConfigured == false' \
+            "$runtime_receipt_file" >/dev/null; then
+            jq -e --arg service "$ai_service" \
+                '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID == ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID == ""' \
+                "$rendered" >/dev/null || fail "compose-audit-only-candidates-drift"
+        else
+            jq -e --arg service "$ai_service" \
+                '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID != ""
+                 and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID != ""' \
+                "$rendered" >/dev/null || fail "compose-binding-candidates-drift"
+        fi
+    else
+        jq -e \
+            --arg service "$ai_service" \
+            --arg sentinel "$unconfigured_contract_file" \
+            '.services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID == ""
+             and .services[$service].environment.CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE == ""
+             and .services[$service].environment.EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST == ""
+             and .secrets["build-ghost-tough-tongue-read-only-binding-contract"].file == $sentinel' \
+            "$rendered" >/dev/null || fail "compose-tough-tongue-quarantine-drift"
+    fi
+    if rg --fixed-strings '/api/v1/ai/build-ghost/explain' \
+        "$script_root/Caddyfile" >/dev/null; then
+        fail "public-explain-route-present"
+    fi
+}
+
+build_candidate_under_limits() {
+    local build_status
+    ensure_hard_limits
+    setsid bash -c 'exec "$@"' deploy-build \
+        docker compose "${compose_environment_args[@]}" \
+        --project-name "$project_name" \
+        --project-directory "$repo_root" \
+        --file "$compose_file" \
+        build "$ai_service" \
+        > "$deploy_tmp/build.log" 2>&1 &
+    build_pid="$!"
+    while kill -0 "$build_pid" 2>/dev/null; do
+        if ! ensure_hard_limits; then
+            terminate_build
+            fail "candidate-build-host-cutoff"
+        fi
+        sleep "$build_poll_seconds"
+    done
+    set +e
+    wait "$build_pid"
+    build_status="$?"
+    set -e
+    build_pid=""
+    [ "$build_status" -eq 0 ] || fail "candidate-build-failed"
+    ensure_hard_limits
+    verify_source_labels "$deployment_image"
+}
+
+assert_provider_gates_false() {
+    local container_id="$1"
+    local environment required_false
+    environment="$(docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}')"
+    for required_false in \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_REMOTE_EXECUTION_ENABLED \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PRIVATE_CANARY_MUTATIONS_ENABLED \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_READ_ONLY_ENABLED \
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_CANARY_ACCESS_GRANT_ENABLED; do
+        [ "$(printf '%s\n' "$environment" | awk -v expected="$required_false=false" '$0 == expected { count++ } END { print count + 0 }')" -eq 1 ] \
+            || fail "postcheck-provider-gate-$required_false"
+    done
+}
+
+assert_provider_runtime_quarantined() {
+    local container_id="$1"
+    local environment line matches mount_source variable_name
+    local quarantined_variables=(
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_API_KEYS
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ACCOUNT_REFS
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_PREFERRED_ACCOUNT_REF
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AGENT_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_VOICE_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_FUNCTION_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_SCENARIO_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_LIVE_AVATAR_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_PROVIDER
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_NAME
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_ASSET_PATH
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_DIGEST
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_AVATAR_READBACK_RECEIPT_JSON
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_PROVIDER
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_MODEL_ID
+        CHUMMER_BUILD_GHOST_TOUGH_TONGUE_ALLOW_LEGACY_CASCADE
+        EA_TOUGH_TONGUE_READ_ONLY_BINDING_CONTRACT_DIGEST
+    )
+    environment="$(docker inspect "$container_id" --format '{{range .Config.Env}}{{println .}}{{end}}')"
+    for variable_name in "${quarantined_variables[@]}"; do
+        line="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { print }')"
+        matches="$(printf '%s\n' "$environment" | awk -v prefix="$variable_name=" 'index($0, prefix) == 1 { count++ } END { print count + 0 }')"
+        [ "$matches" -eq 1 ] && [ "$line" = "$variable_name=" ] \
+            || fail "postcheck-quarantine-$variable_name"
+    done
+    mount_source="$(docker inspect "$container_id" --format \
+        '{{range .Mounts}}{{if eq .Destination "/run/secrets/tough-tongue-read-only-binding-contract.json"}}{{println .Source}}{{end}}{{end}}')"
+    [ "$mount_source" = "$unconfigured_contract_file" ] \
+        || fail "postcheck-quarantine-contract-source"
+    if docker container inspect "$old_ai_id" >/dev/null 2>&1; then
+        fail "postcheck-quarantine-superseded-container-retained"
+    fi
+}
+
+wait_for_ai_health() {
+    local container_id="$1"
+    local enforce_limits="${2:-enforce-limits}"
+    local health
+    for _ in $(seq 1 60); do
+        if [ "$enforce_limits" = "enforce-limits" ]; then
+            ensure_hard_limits
+        fi
+        health="$(docker inspect "$container_id" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}')"
+        if [ "$health" = "healthy" ] \
+            && docker exec "$container_id" curl --fail --silent --show-error --max-time 5 \
+                http://127.0.0.1:8080/api/health >/dev/null; then
+            return 0
+        fi
+        [ "$health" != "unhealthy" ] || return 1
+        sleep 2
+    done
+    return 1
+}
+
+create_grounded_request() {
+    local request_id="$1"
+    local packet_file="$deploy_tmp/analysis-packet.json"
+    local request_file="$deploy_tmp/explain-request.json"
+    local requested_at packet_digest owner_scope_hash idempotency_key fallback_text
+    requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    fallback_text="Deterministic private Rook deployment check."
+    idempotency_key="deploy:$request_id:$workspace_revision"
+    owner_scope_hash="sha256:$(printf '%s' "$project_name:$request_id" | sha256sum | cut -d ' ' -f 1)"
+
+    jq -cS -n \
+        --arg schema 'chummer.build_ghost_analysis.v1' \
+        --arg persona 'build-ghost-rook-v1' \
+        --arg avatar 'build-ghost-tough-tongue-stock-avatar-v1' \
+        --arg voice 'build-ghost-rook-voice-v1' \
+        --arg locale 'en-US' \
+        --argjson revision "$workspace_revision" \
+        '{schema:$schema,personaId:$persona,avatarId:$avatar,voiceId:$voice,packetDigest:"",locale:$locale,
+          supportedLocales:[$locale],localeFallbackChain:[$locale],workspaceId:"synthetic-deploy-postcheck",
+          workspaceRevision:$revision,runner:{facts:[]},optimizationStrategies:[],ruleExplanations:[],variants:[],
+          groupCapabilityPosture:{visibilityPosture:"hidden",visibleMembers:[]},sourceAnchors:[],allowedSuggestedActions:[]}' \
+        > "$packet_file"
+    packet_digest="sha256:$(printf '%s' "$(< "$packet_file")" | sha256sum | cut -d ' ' -f 1)"
+    jq -cS --arg digest "$packet_digest" '.packetDigest = $digest' "$packet_file" \
+        > "$deploy_tmp/analysis-packet.bound.json"
+    mv "$deploy_tmp/analysis-packet.bound.json" "$packet_file"
+    [ "$(jq -er '.workspaceRevision' "$packet_file")" = "$workspace_revision" ] \
+        || fail "grounded-request-workspace-revision-drift"
+    [ "$(jq -er '.packetDigest' "$packet_file")" = "$packet_digest" ] \
+        || fail "grounded-request-packet-digest-drift"
+
+    jq -cS -n \
+        --arg schema 'chummer.tough_tongue.build_ghost_request.v1' \
+        --arg request_id "$request_id" \
+        --arg owner_scope_hash "$owner_scope_hash" \
+        --arg packet_digest "$packet_digest" \
+        --arg locale 'en-US' \
+        --rawfile packet "$packet_file" \
+        --arg fallback "$fallback_text" \
+        --arg idempotency_key "$idempotency_key" \
+        --arg requested_at "$requested_at" \
+        '{schema:$schema,requestId:$request_id,ownerScopeHash:$owner_scope_hash,packetDigest:$packet_digest,
+          locale:$locale,analysisPacketJson:($packet|rtrimstr("\n")),deterministicFallbackText:$fallback,
+          idempotencyKey:$idempotency_key,requestedAtUtc:$requested_at}' \
+        > "$request_file"
+    chmod 0600 "$packet_file" "$request_file"
+}
+
+verify_authenticated_fallback() {
+    local container_id="$1"
+    local request_id response status invalid_status missing_status packet_digest fallback_text
+    request_id="deploy-check-$(date -u +%Y%m%dt%H%M%Sz)-$(openssl rand -hex 8)"
+    create_grounded_request "$request_id"
+    packet_digest="$(jq -er '.packetDigest' "$deploy_tmp/explain-request.json")"
+    fallback_text="$(jq -er '.deterministicFallbackText' "$deploy_tmp/explain-request.json")"
+
+    response="$({ printf 'Authorization: Bearer %s\n' "$CHUMMER_AI_INTERNAL_API_TOKEN"; } \
+        | docker exec -i "$container_id" curl --silent --show-error --max-time 15 \
+            --output - --write-out '\n%{http_code}' \
+            --header @- --header 'Content-Type: application/json' \
+            --data-binary "$(< "$deploy_tmp/explain-request.json")" \
+            http://127.0.0.1:8080/api/v1/ai/build-ghost/explain)"
+    status="${response##*$'\n'}"
+    printf '%s' "${response%$'\n'*}" > "$deploy_tmp/explain-response.json"
+    [ "$status" = "200" ] || fail "postcheck-authenticated-explain-status"
+    jq -e \
+        --arg request_id "$request_id" \
+        --arg packet_digest "$packet_digest" \
+        --arg fallback "$fallback_text" \
+        '.usedDeterministicFallback == true
+         and .safeText == $fallback
+         and .receipt.requestId == $request_id
+         and .receipt.packetDigest == $packet_digest
+         and .receipt.remoteExecutionEnabled == false
+         and .receipt.remoteAttempted == false
+         and .receipt.fallbackReason == "remote-disabled"
+         and (.receipt.validationReasons | index("remote-execution-disabled-by-default") != null)' \
+        "$deploy_tmp/explain-response.json" >/dev/null \
+        || fail "postcheck-grounded-fallback-binding"
+
+    missing_status="$(docker exec "$container_id" curl --silent --show-error --max-time 15 \
+        --output /dev/null --write-out '%{http_code}' \
+        --header 'Content-Type: application/json' \
+        --data-binary "$(< "$deploy_tmp/explain-request.json")" \
+        http://127.0.0.1:8080/api/v1/ai/build-ghost/explain)"
+    [ "$missing_status" = "401" ] || fail "postcheck-missing-auth-not-unauthorized"
+
+    invalid_status="$({ printf 'Authorization: Bearer invalid-deploy-check-%s\n' "$request_id"; } \
+        | docker exec -i "$container_id" curl --silent --show-error --max-time 15 \
+            --output /dev/null --write-out '%{http_code}' \
+            --header @- --header 'Content-Type: application/json' \
+            --data-binary "$(< "$deploy_tmp/explain-request.json")" \
+            http://127.0.0.1:8080/api/v1/ai/build-ghost/explain)"
+    [ "$invalid_status" = "401" ] || fail "postcheck-invalid-auth-not-unauthorized"
+}
+
+verify_rook_support_fallback() {
+    local container_id="$1"
+    local response status mount_record mount_type mount_read_write volume_name volume_project volume_role
+    response="$({ printf 'Authorization: Bearer %s\n' "$CHUMMER_AI_INTERNAL_API_TOKEN"; } \
+        | docker exec -i "$container_id" curl --silent --show-error --max-time 15 \
+            --output - --write-out '\n%{http_code}' \
+            --header @- \
+            http://127.0.0.1:8080/api/v1/ai/build-ghost/support-experience)"
+    status="${response##*$'\n'}"
+    printf '%s' "${response%$'\n'*}" > "$deploy_tmp/support-experience.json"
+    [ "$status" = "200" ] || fail "postcheck-rook-support-status"
+    jq -e '
+        .schema == "chummer.build_ghost.support_experience.v1"
+        and .defaultSupport.channelKind == "rook_vidboard"
+        and .defaultSupport.personaId == "build-ghost-rook-v1"
+        and .defaultSupport.preRenderedVideoReady == false
+        and .defaultSupport.availabilityStatus == "text-fallback"
+        and .defaultSupport.deterministicTextFallback == "Rook can continue in the grounded Chummer help flow while live support is unavailable."
+        and .liveSupport.requestAvailable == false
+        and .liveSupport.meetingProviders == []
+        and (.liveSupport.blockingReasons | index("live-support-remote-execution-disabled-by-default") != null)
+        and ([.liveSupport.blockingReasons[] | select(startswith("live-support-session-store-"))] | length) == 0
+    ' "$deploy_tmp/support-experience.json" >/dev/null \
+        || fail "postcheck-rook-support-fallback-drift"
+
+    mount_record="$(docker inspect "$container_id" --format \
+        '{{range .Mounts}}{{if eq .Destination "/app/state/build-ghost-live-support"}}{{printf "%s|%t|%s\n" .Type .RW .Name}}{{end}}{{end}}')"
+    [ "$(printf '%s\n' "$mount_record" | sed '/^$/d' | wc -l)" -eq 1 ] \
+        || fail "postcheck-live-support-store-mount-ambiguous"
+    IFS='|' read -r mount_type mount_read_write volume_name <<EOF
+$mount_record
+EOF
+    [ "$mount_type" = "volume" ] && [ "$mount_read_write" = "true" ] \
+        || fail "postcheck-live-support-store-mount-invalid"
+    volume_project="$(docker volume inspect "$volume_name" --format \
+        '{{index .Labels "com.docker.compose.project"}}')"
+    volume_role="$(docker volume inspect "$volume_name" --format \
+        '{{index .Labels "com.docker.compose.volume"}}')"
+    [ "$volume_project" = "$project_name" ] && [ "$volume_role" = "build-ghost-live-support" ] \
+        || fail "postcheck-live-support-store-volume-authority-invalid"
+    docker exec "$container_id" sh -ec '
+        path="$CHUMMER_BUILD_GHOST_LIVE_SUPPORT_SESSION_STORE_PATH"
+        test -d "$path"
+        test ! -L "$path"
+        test "$(stat -c "%a:%u" -- "$path")" = "700:$(id -u)"
+    ' || fail "postcheck-live-support-store-topology-invalid"
+}
+
+verify_public_explain_absent() {
+    local edge_id="$1"
+    local binding host_ip host_port status
+    binding="$(docker inspect "$edge_id" --format '{{with (index .NetworkSettings.Ports "443/tcp")}}{{with (index . 0)}}{{.HostIp}}:{{.HostPort}}{{end}}{{end}}')"
+    host_ip="${binding%:*}"
+    host_port="${binding##*:}"
+    [ "$host_ip" = "127.0.0.1" ] || fail "postcheck-edge-not-loopback-only"
+    [[ "$host_port" =~ ^[0-9]+$ ]] || fail "postcheck-edge-port-invalid"
+    docker cp "$edge_id:/data/caddy/pki/authorities/local/root.crt" \
+        "$deploy_tmp/root.crt" >/dev/null
+    chmod 0600 "$deploy_tmp/root.crt"
+    status="$(curl --silent --show-error --max-time 15 \
+        --output /dev/null --write-out '%{http_code}' \
+        --cacert "$deploy_tmp/root.crt" \
+        --resolve "canary.chummer.run:$host_port:$host_ip" \
+        --request POST --header 'Content-Type: application/json' --data '{}' \
+        "https://canary.chummer.run:$host_port/api/v1/ai/build-ghost/explain")"
+    [ "$status" = "404" ] || fail "postcheck-public-explain-not-404"
+}
+
+run_postchecks() {
+    local current_ai_id current_ai_image
+    current_ai_id="$(running_container_id "$ai_service")"
+    [ "$current_ai_id" != "$old_ai_id" ] || fail "postcheck-ai-container-not-recreated"
+    current_ai_image="$(docker inspect "$current_ai_id" --format '{{.Image}}')"
+    [ "$current_ai_image" = "$(image_id "$deployment_image")" ] \
+        || fail "postcheck-ai-image-not-candidate"
+    verify_source_labels "$current_ai_image"
+    wait_for_ai_health "$current_ai_id" || fail "postcheck-ai-health"
+    assert_provider_gates_false "$current_ai_id"
+    if [ "$quarantine_requested" = "1" ]; then
+        assert_provider_runtime_quarantined "$current_ai_id"
+    fi
+    [ "$(running_container_id "$presentation_service")" = "$presentation_id_before" ] \
+        || fail "postcheck-presentation-container-changed"
+    [ "$(running_container_id "$edge_service")" = "$edge_id_before" ] \
+        || fail "postcheck-edge-container-changed"
+    verify_authenticated_fallback "$current_ai_id"
+    verify_rook_support_fallback "$current_ai_id"
+    verify_public_explain_absent "$edge_id_before"
+}
+
+verify_activation_authority_unchanged() {
+    local current_ai_id current_ai_image
+    [ "$(image_id "$rollback_ref")" = "$old_ai_image" ] \
+        || fail "preactivation-rollback-reference-drift"
+    current_ai_id="$(running_container_id "$ai_service")"
+    [ "$current_ai_id" = "$old_ai_id" ] \
+        || fail "preactivation-ai-container-drift"
+    current_ai_image="$(docker inspect "$current_ai_id" --format '{{.Image}}')"
+    [ "$current_ai_image" = "$old_ai_image" ] \
+        || fail "preactivation-ai-image-drift"
+    [ "$(running_container_id "$presentation_service")" = "$presentation_id_before" ] \
+        || fail "preactivation-presentation-container-drift"
+    [ "$(running_container_id "$edge_service")" = "$edge_id_before" ] \
+        || fail "preactivation-edge-container-drift"
+}
+
+rollback_if_needed() {
+    local restored_ai_id restored_image
+    if [ "$activation_started" != "true" ] || [ "$deploy_succeeded" = "true" ] \
+        || [ "$rollback_started" = "true" ]; then
+        return 0
+    fi
+    rollback_started="true"
+    printf 'ai_deploy=rollback-started rollback_ref=%s\n' "$rollback_ref" >&2
+    set +e
+    if [ -z "$rollback_ref" ] \
+        || [ "$(image_id "$rollback_ref" 2>/dev/null)" != "$old_ai_image" ]; then
+        printf 'ai_deploy=rollback-failed stage=preserved-image-unavailable\n' >&2
+        return 1
+    fi
+    docker image tag "$rollback_ref" "$deployment_image"
+    if [ "$(image_id "$deployment_image" 2>/dev/null)" != "$old_ai_image" ]; then
+        printf 'ai_deploy=rollback-failed stage=deployment-retag-verification\n' >&2
+        return 1
+    fi
+    compose up -d --no-deps --no-build --force-recreate "$ai_service"
+    restored_ai_id="$(running_container_id "$ai_service")"
+    restored_image="$(docker inspect "$restored_ai_id" --format '{{.Image}}')"
+    if [ "$restored_image" != "$old_ai_image" ] \
+        || ! wait_for_ai_health "$restored_ai_id" rollback-verification \
+        || [ "$(running_container_id "$presentation_service")" != "$presentation_id_before" ] \
+        || [ "$(running_container_id "$edge_service")" != "$edge_id_before" ]; then
+        printf 'ai_deploy=rollback-failed stage=runtime-verification\n' >&2
+        return 1
+    fi
+    assert_provider_gates_false "$restored_ai_id"
+    if [ "$quarantine_requested" = "1" ]; then
+        assert_provider_runtime_quarantined "$restored_ai_id"
+    fi
+    printf 'ai_deploy=rollback-restored rollback_ref=%s image=%s\n' "$rollback_ref" "$old_ai_image" >&2
+    return 0
+}
+
+on_exit() {
+    local status="$?"
+    trap - EXIT HUP INT TERM
+    terminate_build
+    if ! (rollback_if_needed); then
+        status=1
+    fi
+    if ! securely_remove_runtime_environment; then
+        status=1
+    fi
+    securely_remove_temp
+    exit "$status"
+}
+
+main() {
+    trap on_exit EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    for lock_required in chmod dirname flock mkdir; do
+        require_command "$lock_required"
+    done
+    acquire_deploy_lock "$deploy_lock_file"
+    for required in awk bash cut date df docker find git id jq mktemp mv openssl python3 realpath rg rmdir sed seq setsid sha256sum shred sleep stat truncate unlink wc; do
+        require_command "$required"
+    done
+    validate_control_values
+    validate_quarantine_request
+    deploy_tmp="$(mktemp -d)"
+    chmod 0700 "$deploy_tmp"
+    prepare_operator_runtime_config
+    validate_sources_and_labels
+    ensure_hard_limits
+
+    presentation_id_before="$(running_container_id "$presentation_service")"
+    edge_id_before="$(running_container_id "$edge_service")"
+    preserve_rollback_image
+    load_runtime_secrets_without_output
+    ensure_hard_limits
+    verify_rendered_compose
+    build_candidate_under_limits
+    ensure_hard_limits
+    verify_activation_authority_unchanged
+
+    activation_started="true"
+    compose up -d --no-deps --no-build --force-recreate "$ai_service"
+    run_postchecks
+    deploy_succeeded="true"
+    printf 'ai_deploy=passed rollback_ref=%s old_image=%s candidate_image=%s gates=false neighbors=unchanged public_explain=404 deterministic_fallback=true rook=text-fallback live_support=disabled live_support_store=private remote_attempted=false\n' \
+        "$rollback_ref" "$old_ai_image" "$(image_id "$deployment_image")"
+    if [ "$quarantine_requested" = "1" ]; then
+        printf 'ai_deploy_quarantine=passed scope=local-container credentials_present=false provider_side_revocation=false contract=unconfigured gates=false\n'
+    fi
+    if [ -n "$runtime_receipt_file" ]; then
+        printf 'ai_deploy_runtime_contract=retained receipt=%s contract=%s credentials_retained=false\n' \
+            "$runtime_receipt_file" "$runtime_contract_file"
+    fi
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    main "$@"
+fi

@@ -48,6 +48,51 @@ public sealed class AiMutationAuthorizationMiddlewareTests
         Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
     }
 
+    [Fact]
+    public async Task ExactBuildGhostPrivateToolPostDelegatesToEndpointOwnedAuthorization()
+    {
+        bool nextCalled = false;
+        var middleware = new AiMutationAuthorizationMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+        DefaultHttpContext context = CreateContext(
+            "POST",
+            AiMutationAuthorizationMiddleware.BuildGhostPrivateToolPath);
+        context.Request.Headers.Authorization = "Bearer opaque-ephemeral-packet-key";
+
+        await middleware.InvokeAsync(context, BuildConfiguration());
+
+        Assert.True(nextCalled);
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.False(context.Items.ContainsKey(AiMutationAuthorizationMiddleware.AuthorizationMarker));
+    }
+
+    [Theory]
+    [InlineData("PUT", "/api/v1/ai/build-ghost/tool")]
+    [InlineData("PATCH", "/api/v1/ai/build-ghost/tool")]
+    [InlineData("POST", "/api/v1/ai/build-ghost/tool/")]
+    [InlineData("POST", "/api/v1/ai/build-ghost/tool/extra")]
+    [InlineData("POST", "/api/v1/ai/build-ghost/explain")]
+    [InlineData("POST", "/api/v1/ai/session/events")]
+    public async Task PrivateToolExemptionDoesNotWidenOtherMutationBoundaries(string method, string path)
+    {
+        bool nextCalled = false;
+        var middleware = new AiMutationAuthorizationMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+        DefaultHttpContext context = CreateContext(method, path);
+        context.Request.Headers.Authorization = "Bearer opaque-ephemeral-packet-key";
+
+        await middleware.InvokeAsync(context, BuildConfiguration());
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
+    }
+
     [Theory]
     [InlineData("/api/v1/ai/status")]
     [InlineData("/api/v1/ai/prompts")]

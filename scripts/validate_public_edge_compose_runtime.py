@@ -621,8 +621,15 @@ def require_exact_build(
     expected_dockerfile = str(source_root / "Chummer.Run.Api" / "Dockerfile")
     actual_target = str(build.get("target") or "")
     expected_contexts = {
+        "core-runtime-bundle": str(
+            source_root.parent
+            / "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input"
+        ),
         "run-services-source": str(source_root),
         "hub-registry-source": EXPECTED_HUB_REGISTRY_CONTEXT,
+        "hub-package-feed-input": str(
+            source_root.parent / "hub-package-feed-0.1.1-packageplane.20260910.1-input"
+        ),
         "fleet-media-factory-contracts": EXPECTED_FLEET_MEDIA_CONTEXT,
         "design-product": EXPECTED_DESIGN_PRODUCT_CONTEXT,
     }

@@ -106,6 +106,7 @@ PROGRAM_PATHS: Mapping[str, Path] = {
     "proof_verifier": SCRIPT_DIR / "verify_google_oauth_linking_proof.py",
     "google_contract_verifier": Path(__file__).resolve(),
     "detached_attestation_verifier": SCRIPT_DIR / "verify_detached_ed25519_attestation.py",
+    "v2_cli": SCRIPT_DIR / "google_oauth_linking_evidence_v2_cli.py",
 }
 
 
@@ -368,33 +369,43 @@ def fixed_post_import_argv_plan(
     return [
         [
             "python3",
-            "scripts/materialize_google_oauth_linking_operator_evidence_request.py",
-            "--output",
+            "scripts/google_oauth_linking_evidence_v2_cli.py",
+            "materialize-request",
+            "--request",
             str(request_path),
             "--base-url",
             base_url,
         ],
         [
             "python3",
-            "scripts/verify_google_oauth_linking_operator_evidence_request.py",
-            "--receipt",
+            "scripts/google_oauth_linking_evidence_v2_cli.py",
+            "verify-request",
+            "--request",
             str(request_path),
         ],
         [
             "python3",
-            "scripts/materialize_google_oauth_linking_proof.py",
+            "scripts/google_oauth_linking_evidence_v2_cli.py",
+            "materialize-proof",
             "--base-url",
             base_url,
-            "--output",
+            "--proof",
             str(proof_path),
-            "--operator-evidence",
+            "--request",
+            str(request_path),
+            "--evidence",
             str(evidence_path),
         ],
         [
             "python3",
-            "scripts/verify_google_oauth_linking_proof.py",
-            "--receipt",
+            "scripts/google_oauth_linking_evidence_v2_cli.py",
+            "verify-proof",
+            "--proof",
             str(proof_path),
+            "--request",
+            str(request_path),
+            "--evidence",
+            str(evidence_path),
             "--require-pass",
         ],
     ]
@@ -946,7 +957,10 @@ def verify_evidence_payload(
             failures.append("import provenance source_artifact_sha256 is invalid")
         if not is_sha256(provenance.get("source_receipt_sha256")):
             failures.append("import provenance source_receipt_sha256 is invalid")
-        current_importer = request_summary.get("program_bindings", {}).get("evidence_importer", {})
+        importer_program = str(provenance.get("importer_program") or "evidence_importer").strip()
+        if importer_program not in {"evidence_importer", "v2_cli"}:
+            failures.append("import provenance importer_program is not code-owned")
+        current_importer = request_summary.get("program_bindings", {}).get(importer_program, {})
         if provenance.get("importer_program_sha256") != current_importer.get("sha256"):
             failures.append("import provenance importer_program_sha256 is stale")
         _, import_time_failures = _time_failures(

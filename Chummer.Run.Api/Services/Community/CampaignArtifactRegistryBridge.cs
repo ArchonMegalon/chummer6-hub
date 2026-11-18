@@ -9,6 +9,7 @@ public sealed class CampaignArtifactRegistryBridge
 {
     private readonly HubArtifactStore _store = new();
     private readonly object _sync = new();
+    private readonly CommunityStore? _primaryCommunity;
     private readonly string _storagePath;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -16,8 +17,11 @@ public sealed class CampaignArtifactRegistryBridge
     };
 
     public CampaignArtifactRegistryBridge(CommunityStore communityStore)
-        : this(communityStore.StoragePath)
     {
+        ArgumentNullException.ThrowIfNull(communityStore);
+        _primaryCommunity = communityStore.IsPrimary ? communityStore : null;
+        _storagePath = communityStore.IsPrimary ? string.Empty : ResolveStoragePath(communityStore.StoragePath);
+        if (_primaryCommunity is null) Load();
     }
 
     public CampaignArtifactRegistryBridge(string communityStorePath)
@@ -30,6 +34,8 @@ public sealed class CampaignArtifactRegistryBridge
     public CampaignArtifactRegistration RegisterAftermathPackage(AftermathArtifactRegistrationRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (_primaryCommunity is not null)
+            return ExecuteAftermathRegistrationTransaction(request, static registration => registration);
 
         lock (_sync)
         {
@@ -43,6 +49,24 @@ public sealed class CampaignArtifactRegistryBridge
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(operation);
+
+        if (_primaryCommunity is not null)
+        {
+            return _primaryCommunity.ExecutePrimaryTransaction(() =>
+            {
+                // Always acquire Community before the private registry lock.
+                // Restore from this operation's current primary revision, never
+                // the previous in-process HubArtifactStore instance.
+                lock (_sync)
+                {
+                    HubArtifactStoreBackupPackage current = _primaryCommunity.CampaignArtifactRegistry
+                        ?? new HubArtifactStore().ExportBackup();
+                    ValidatePrimaryBackup(current);
+                    _store.RestoreBackup(current);
+                    return operation(RegisterAftermathPackageLocked(request));
+                }
+            });
+        }
 
         lock (_sync)
         {
@@ -131,11 +155,42 @@ public sealed class CampaignArtifactRegistryBridge
 
     private void PersistLocked()
     {
+        if (_primaryCommunity is not null)
+        {
+            _primaryCommunity.CampaignArtifactRegistry = _store.ExportBackup();
+            _primaryCommunity.PersistLocked();
+            return;
+        }
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         string tempPath = $"{_storagePath}.tmp";
         string payload = JsonSerializer.Serialize(_store.ExportBackup(), _jsonOptions);
         File.WriteAllText(tempPath, payload);
         File.Move(tempPath, _storagePath, true);
+    }
+
+    internal static void ValidatePrimaryBackup(HubArtifactStoreBackupPackage? backup)
+    {
+        if (backup is null) return;
+        if (backup.ContractFamily != "hub_state_backup_v1" || backup.Artifacts is null
+            || backup.RuntimeBundleArtifacts is null || backup.RuntimeBundleHeads is null || backup.DeadLetters is null
+            || backup.RuntimeBundleArtifacts.Count != 0 || backup.RuntimeBundleHeads.Count != 0
+            || backup.DeadLetters.Count != 0 || backup.UpsertCount < backup.Artifacts.Count
+            || backup.RuntimeIssueCount != 0 || backup.RuntimeIssueIdempotentCount != 0
+            || backup.InstallCount != 0 || backup.ReviewCount != 0)
+            throw new InvalidDataException("Primary campaign metadata is not a runtime/public registry authority.");
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var artifact in backup.Artifacts)
+        {
+            if (artifact is null || string.IsNullOrWhiteSpace(artifact.Id) || !ids.Add(artifact.Id)
+                || artifact.Kind is not (HubArtifactKind.RecapPackage or HubArtifactKind.ReplayPackage)
+                || artifact.Visibility != ArtifactVisibilityModes.CampaignShared
+                || artifact.TrustTier != ArtifactTrustTiers.Curated || artifact.State != HubArtifactState.Active
+                || string.IsNullOrWhiteSpace(artifact.Owner) || string.IsNullOrWhiteSpace(artifact.Version)
+                || string.IsNullOrWhiteSpace(artifact.RulesetId) || string.IsNullOrWhiteSpace(artifact.Name)
+                || artifact.PublisherId is not null || artifact.InstallCount != 0 || artifact.ActiveRuntimeRefCount != 0
+                || artifact.ReviewScores is { Count: > 0 })
+                throw new InvalidDataException("Primary campaign artifact identity or scope is invalid.");
+        }
     }
 
     private void RestoreDurableStateLocked(byte[]? durableState)

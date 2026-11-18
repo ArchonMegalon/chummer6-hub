@@ -29,6 +29,8 @@ try:
         PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
         PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
         PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE as SHARED_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
         PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE as SHARED_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
         PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE as SHARED_DOCKER_NAMED_CONTEXTS_BY_STAGE,
         PUBLIC_EDGE_DOCKER_STAGE_ORDER as SHARED_DOCKER_STAGE_ORDER,
@@ -44,6 +46,7 @@ try:
         docker_logical_instruction_records,
         docker_logical_instructions,
         dockerfile_parser_directive_findings,
+        docker_stage_instruction_contract_matches,
         public_edge_compose_build_syntax_failures,
         public_edge_rendered_compose_failures,
         rendered_build_contract_matches,
@@ -67,6 +70,8 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
         PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
         PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
         PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE as SHARED_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
         PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE as SHARED_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
         PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE as SHARED_DOCKER_NAMED_CONTEXTS_BY_STAGE,
         PUBLIC_EDGE_DOCKER_STAGE_ORDER as SHARED_DOCKER_STAGE_ORDER,
@@ -82,6 +87,7 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
         docker_logical_instruction_records,
         docker_logical_instructions,
         dockerfile_parser_directive_findings,
+        docker_stage_instruction_contract_matches,
         public_edge_compose_build_syntax_failures,
         public_edge_rendered_compose_failures,
         rendered_build_contract_matches,
@@ -783,7 +789,9 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN = (
     'RUN ["/usr/local/bin/python3", "-I", "-S", '
     '"scripts/ai/bootstrap-hub-package-feed.py", '
     '"--repo-root", "/proof", '
-    '"--feed", "/opt/chummer-package-feed"]'
+    '"--feed", "/opt/chummer-package-feed", '
+    '"--core-feed", "/opt/chummer-core-runtime-feed", '
+    '"--core-runtime-bundle-input", "--prebuilt-hub-feed-input"]'
 )
 PUBLIC_EDGE_DOCKER_PROOF_COPY_INPUTS = (
     "scripts/validate_public_pwa_proof_authority.py",
@@ -836,6 +844,11 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE_INSTRUCTIONS = (
     "COPY --from=run-services-source global.json global.json",
     "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
     "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
+    "COPY --from=run-services-source eng/core-main-runtime-artifact-authority.json eng/core-main-runtime-artifact-authority.json",
+    "COPY --from=run-services-source eng/core-local-runtime-receipt.json eng/core-local-runtime-receipt.json",
+    "COPY --from=run-services-source eng/core-runtime-bundle/core-runtime-bundle-input.json eng/core-runtime-bundle/core-runtime-bundle-input.json",
+    "COPY --from=core-runtime-bundle chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip eng/core-runtime-bundle/chummer-core-runtime-package-plane-1e477c0f5e036eed241f4fe723a0e2eda30c51dd.zip",
+    "COPY --from=hub-package-feed-input . /opt/chummer-package-feed",
     PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN,
 )
 PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = (
@@ -856,6 +869,10 @@ PUBLIC_EDGE_DOCKER_RECEIPT_COPY = (
 PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY = (
     "COPY --from=hub-package-feed "
     "/opt/chummer-package-feed /opt/chummer-package-feed"
+)
+PUBLIC_EDGE_DOCKER_CORE_RUNTIME_FEED_COPY = (
+    "COPY --from=hub-package-feed "
+    "/opt/chummer-core-runtime-feed /opt/chummer-core-runtime-feed"
 )
 PUBLIC_EDGE_DOCKER_FINAL_PUBLISH_COPY = "COPY --from=build /app/publish ."
 PUBLIC_EDGE_DOCKER_LOOPBACK_PROBE_PUBLISH_COPY = (
@@ -886,6 +903,14 @@ PUBLIC_EDGE_COMPOSE_DOCKERFILE = (
     "Chummer.Run.Api/Dockerfile"
 )
 PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS = {
+    "core-runtime-bundle": (
+        "${CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE:?"
+        "Set the sealed Core runtime bundle input}"
+    ),
+    "hub-package-feed-input": (
+        "${CHUMMER_HUB_PACKAGE_FEED_SOURCE:?"
+        "Set the sealed Hub package feed input}"
+    ),
     "run-services-source": (
         "${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}"
     ),
@@ -1372,6 +1397,16 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         failures.append(
             "hub-package-feed must match the exact proof-gated package-feed instruction whitelist"
         )
+    exact_build_stage_instructions = docker_stage_instruction_contract_matches(
+        text,
+        stage=PUBLIC_EDGE_DOCKER_BUILD_STAGE,
+        expected_count=PUBLIC_EDGE_DOCKER_BUILD_STAGE_INSTRUCTION_COUNT,
+        expected_sha256=PUBLIC_EDGE_DOCKER_BUILD_STAGE_SHA256,
+    )
+    if not exact_build_stage_instructions:
+        failures.append(
+            "build stage must match the exact immutable instruction digest"
+        )
 
     current_stage = -1
     current_alias = ""
@@ -1397,6 +1432,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     package_feed_proof_receipt_copy_stages: list[str] = []
     package_feed_python_copy_stages: list[str] = []
     package_feed_copy_stages: list[str] = []
+    core_runtime_feed_copy_stages: list[str] = []
     tool_publish_copy_stages: list[str] = []
     final_publish_copy_stages: list[str] = []
     loopback_probe_publish_copy_stages: list[str] = []
@@ -1445,6 +1481,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             other_proof_copies.append(line_number)
         if line == PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY:
             package_feed_copy_stages.append(current_alias)
+        if line == PUBLIC_EDGE_DOCKER_CORE_RUNTIME_FEED_COPY:
+            core_runtime_feed_copy_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_TOOL_PUBLISH_COPY:
             tool_publish_copy_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_FINAL_PUBLISH_COPY:
@@ -1575,6 +1613,13 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     if not exact_package_feed_consumption:
         failures.append(
             "build stage must consume the exact validated hub-package-feed exactly once"
+        )
+    exact_core_runtime_feed_consumption = core_runtime_feed_copy_stages == [
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE
+    ]
+    if not exact_core_runtime_feed_consumption:
+        failures.append(
+            "build stage must consume the exact validated Core runtime feed exactly once"
         )
     if other_proof_copies:
         failures.append("no other COPY from public-pwa-proof is allowed")
@@ -1710,6 +1755,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "proofStageNotDerived": not derived_proof_stages and not proof_alias_redefinitions,
         "exactPackageFeedStageCount": package_feed_stage_count == 1,
         "exactBuildStage": build_stage_count == 1,
+        "exactBuildStageInstructions": exact_build_stage_instructions,
         "exactToolFinalStage": tool_final_stage_count == 1,
         "exactFinalStage": final_stage_count == 1,
         "exactStageSetAndOrder": exact_stage_set_and_order,
@@ -1721,6 +1767,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         ),
         "exactPackageFeedPythonDependency": exact_package_feed_python_dependency,
         "exactPackageFeedConsumption": exact_package_feed_consumption,
+        "exactCoreRuntimeFeedConsumption": exact_core_runtime_feed_consumption,
         "noOtherProofCopies": not other_proof_copies,
         "exactToolPublishDependency": exact_tool_publish_dependency,
         "exactFinalPublishDependency": exact_final_publish_dependency,

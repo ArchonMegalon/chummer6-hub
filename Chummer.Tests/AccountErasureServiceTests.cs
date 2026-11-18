@@ -16,6 +16,40 @@ namespace Chummer.Tests;
 
 public sealed class AccountErasureServiceTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Unsupported_primary_component_rejects_before_journal_or_any_erasure(bool primaryCommunity)
+    {
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using Fixture fixture = new(primaryCommunity ? remote : null);
+        int identityCalls = 0;
+        HubIdentityClient identity = fixture.CreateIdentityClient(_ =>
+        {
+            identityCalls++;
+            return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+        });
+        var hosted = new RecordingHostedBuildEraser();
+        var auxiliary = new EmptyAuxiliaryEraser { Unsupported = !primaryCommunity };
+        var service = new AccountErasureService(
+            fixture.Accounts, new CommunityAccountErasureService(fixture.Community), fixture.Support,
+            auxiliary, hosted, identity, fixture.Journal, fixture.Configuration);
+        byte[] support = File.ReadAllBytes(fixture.Support.StoragePath);
+        int writes = remote.HeadPosts;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.EraseAsync("subject-delete", CancellationToken.None));
+
+        Assert.False(hosted.Called);
+        Assert.Equal(0, identityCalls);
+        Assert.Equal(0, auxiliary.EraseCalls);
+        Assert.False(File.Exists(fixture.Journal.StoragePath));
+        Assert.Equal(support, File.ReadAllBytes(fixture.Support.StoragePath));
+        Assert.Single(fixture.Support.CasesById);
+        Assert.NotNull(fixture.Accounts.GetBySubject("subject-delete"));
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
     [Fact]
     public async Task Erase_completes_first_party_planes_before_revoking_identity()
     {
@@ -164,13 +198,14 @@ public sealed class AccountErasureServiceTests
             "chummer-account-erasure-tests",
             Guid.NewGuid().ToString("N"));
 
-        public Fixture()
+        public Fixture(TeableRevisionStoreTests.Remote? primary = null)
         {
             Directory.CreateDirectory(_directory);
             Configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_directory, "community.json"),
+                    ["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] = primary is null ? "local" : "teable",
                     ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(_directory, "support.json"),
                     ["CHUMMER_ACCOUNT_ERASURE_JOURNAL_PATH"] = Path.Combine(_directory, "account-erasure-journal.json"),
                     ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.test",
@@ -178,7 +213,7 @@ public sealed class AccountErasureServiceTests
                     ["CHUMMER_ACCOUNT_ERASURE_RECEIPT_HMAC_KEY"] = Convert.ToBase64String(Enumerable.Repeat((byte)0x5a, 32).ToArray())
                 })
                 .Build();
-            Community = new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance);
+            Community = new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance, primary?.Store());
             Support = new SupportStore(Configuration, NullLogger<SupportStore>.Instance);
             Accounts = new AccountService(Community);
             Journal = new AccountErasureJournalStore(
@@ -244,8 +279,19 @@ public sealed class AccountErasureServiceTests
 
     private sealed class EmptyAuxiliaryEraser : IAccountAuxiliaryDataErasureService
     {
+        public bool Unsupported { get; init; }
+        public int EraseCalls { get; private set; }
+        public void EnsureAccountErasureSupported()
+        {
+            if (Unsupported) throw new InvalidOperationException("Synthetic historical erasure is unavailable.");
+        }
+
         public AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId)
-            => new(0, new Dictionary<string, int>(StringComparer.Ordinal));
+        {
+            EraseCalls++;
+            EnsureAccountErasureSupported();
+            return new(0, new Dictionary<string, int>(StringComparer.Ordinal));
+        }
     }
 
     private sealed class DelegateHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler

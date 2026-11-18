@@ -20,7 +20,7 @@ public sealed class EntitlementService
         }
 
         var grantedKeys = new List<string>();
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase)
                 && receipt.Verified)
@@ -53,7 +53,7 @@ public sealed class EntitlementService
 
     public IReadOnlyList<EntitlementDto> ListForUser(string userId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.EntitlementEntries
                 .Where(entry => string.Equals(entry.Scope, "user", StringComparison.OrdinalIgnoreCase)

@@ -222,6 +222,8 @@ services:
       context: ${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       additional_contexts:
+        core-runtime-bundle: ${CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE:?Set the sealed Core runtime bundle input}
+        hub-package-feed-input: ${CHUMMER_HUB_PACKAGE_FEED_SOURCE:?Set the sealed Hub package feed input}
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
         hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
         fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
@@ -694,6 +696,8 @@ services:
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       target: install-linking-postgres-tool-final
       additional_contexts:
+        core-runtime-bundle: ${CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE:?Set the sealed Core runtime bundle input}
+        hub-package-feed-input: ${CHUMMER_HUB_PACKAGE_FEED_SOURCE:?Set the sealed Hub package feed input}
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
         hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
         fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
@@ -741,6 +745,8 @@ services:
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       target: install-linking-postgres-tool-final
       additional_contexts:
+        core-runtime-bundle: ${CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE:?Set the sealed Core runtime bundle input}
+        hub-package-feed-input: ${CHUMMER_HUB_PACKAGE_FEED_SOURCE:?Set the sealed Hub package feed input}
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
         hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
         fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
@@ -786,6 +792,8 @@ services:
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       target: install-linking-postgres-tool-final
       additional_contexts:
+        core-runtime-bundle: ${CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE:?Set the sealed Core runtime bundle input}
+        hub-package-feed-input: ${CHUMMER_HUB_PACKAGE_FEED_SOURCE:?Set the sealed Hub package feed input}
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
         hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
         fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
@@ -821,6 +829,8 @@ services:
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       target: install-linking-postgres-tool-final
       additional_contexts:
+        core-runtime-bundle: ${CHUMMER_CORE_RUNTIME_BUNDLE_SOURCE:?Set the sealed Core runtime bundle input}
+        hub-package-feed-input: ${CHUMMER_HUB_PACKAGE_FEED_SOURCE:?Set the sealed Hub package feed input}
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
         hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
         fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}

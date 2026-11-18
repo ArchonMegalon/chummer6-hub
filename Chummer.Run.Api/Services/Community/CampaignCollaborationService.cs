@@ -52,6 +52,8 @@ public sealed class CampaignCollaborationService
     private readonly IHubUserProjectionSyncQueue? _userProjectionSync;
     private readonly ILogger<CampaignCollaborationService> _logger;
     private readonly Dictionary<string, CampaignInviteAttemptWindow> _inviteAttemptsByUserId = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, CampaignInviteAttemptWindow> InviteAttempts => _store.IsPrimary
+        ? _store.CampaignInviteAttemptsByUserId : _inviteAttemptsByUserId;
 
     public CampaignCollaborationService(CommunityStore store)
         : this(
@@ -97,6 +99,8 @@ public sealed class CampaignCollaborationService
         _canonicalCharacterEdits = canonicalCharacterEdits
             ?? throw new ArgumentNullException(nameof(canonicalCharacterEdits));
         ArgumentNullException.ThrowIfNull(dataProtectionProvider);
+        if (store.IsPrimary && dataProtectionProvider is EphemeralDataProtectionProvider)
+            throw new InvalidOperationException("Primary campaign invitations require a recoverable Data Protection provider.");
         _inviteReplayProtector = dataProtectionProvider.CreateProtector(InviteReplayProtectionPurpose);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _userProjectionSync = userProjectionSync;
@@ -107,8 +111,9 @@ public sealed class CampaignCollaborationService
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            user = RequireCurrentUserLocked(user);
             return _store.CampaignSpinesById.Values
                 .Select(campaign => TryBuildCampaignProjectionLocked(user, campaign))
                 .Where(static campaign => campaign is not null)
@@ -124,8 +129,9 @@ public sealed class CampaignCollaborationService
         ArgumentNullException.ThrowIfNull(user);
         string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            user = RequireCurrentUserLocked(user);
             return _store.CampaignSpinesById.TryGetValue(normalizedCampaignId, out CampaignProjection? campaign)
                 ? TryBuildCampaignProjectionLocked(user, campaign)
                 : null;
@@ -155,8 +161,9 @@ public sealed class CampaignCollaborationService
             InitialRunTitle = initialRunTitle
         });
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            gm = RequireCurrentUserLocked(gm);
             if (_store.CampaignCreationsByIdempotencyKey.TryGetValue(
                     commandKey,
                     out CampaignCreationIdempotencyState? replay))
@@ -313,8 +320,9 @@ public sealed class CampaignCollaborationService
 
         CampaignTeardownReceipt result;
         HubUserDto[] usersToSync;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            owner = RequireCurrentUserLocked(owner);
             DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
             if (_store.CampaignTeardownsByIdempotencyKey.TryGetValue(
                     commandKey,
@@ -858,7 +866,7 @@ public sealed class CampaignCollaborationService
             request.MaxUses
         });
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
             DateTimeOffset now = _timeProvider.GetUtcNow();
@@ -951,7 +959,7 @@ public sealed class CampaignCollaborationService
         ArgumentNullException.ThrowIfNull(gm);
         string normalizedInviteId = NormalizeRequired(inviteId, nameof(inviteId), 128);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             _store.ExecuteCampaignCollaborationTransactionLocked(() =>
             {
@@ -996,8 +1004,9 @@ public sealed class CampaignCollaborationService
             throw new ArgumentOutOfRangeException(nameof(request.ExpectedCharacterRevision));
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            player = RequireCurrentUserLocked(player);
             DateTimeOffset now = _timeProvider.GetUtcNow();
             EnsureInviteAttemptAllowedLocked(player.UserId, now);
             if (!_store.CampaignCollaborationInvitesById.TryGetValue(normalizedInviteId, out CampaignCollaborationInviteState? invite)
@@ -1046,8 +1055,9 @@ public sealed class CampaignCollaborationService
             throw new ArgumentOutOfRangeException(nameof(request.ExpectedCharacterRevision));
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            player = RequireCurrentUserLocked(player);
             DateTimeOffset now = _timeProvider.GetUtcNow();
             EnsureInviteAttemptAllowedLocked(player.UserId, now);
             string lookup = ComputeCodeLookupSha256(normalizedCode);
@@ -1088,8 +1098,9 @@ public sealed class CampaignCollaborationService
     public IReadOnlyList<CampaignEligibleCharacterProjection> ListEligibleCharacters(HubUserDto user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            user = RequireCurrentUserLocked(user);
             return _store.DossiersById.Values
                 .Where(dossier => string.Equals(dossier.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
                 .Select(dossier =>
@@ -1127,7 +1138,7 @@ public sealed class CampaignCollaborationService
         ArgumentNullException.ThrowIfNull(user);
         string normalizedDossierId = NormalizeRequired(dossierId, nameof(dossierId), 128);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (CampaignProjection campaign, GroupDto group, string role) = RequireMemberCampaignLocked(user, campaignId);
             return BuildSharedSheetLocked(
@@ -1145,6 +1156,8 @@ public sealed class CampaignCollaborationService
     {
         ArgumentNullException.ThrowIfNull(gm);
         ArgumentNullException.ThrowIfNull(request);
+        if (_store.IsPrimary)
+            throw new InvalidOperationException("Primary delegated Core edits require a durable cross-store operation fence before execution.");
         if (request.ExpectedRevision <= 0 || request.ExpectedRevision == long.MaxValue)
         {
             throw new ArgumentOutOfRangeException(nameof(request.ExpectedRevision));
@@ -1173,7 +1186,7 @@ public sealed class CampaignCollaborationService
             Sections = requestedSections
         });
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (CampaignProjection campaign, GroupDto group, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
             CampaignCharacterBindingState binding = RequireCurrentBindingLocked(campaign.CampaignId, normalizedDossierId);
@@ -1392,8 +1405,9 @@ public sealed class CampaignCollaborationService
             Reason = reason
         });
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
+            characterOwner = RequireCurrentUserLocked(characterOwner);
             (CampaignProjection campaign, _, _) = RequireMemberCampaignLocked(characterOwner, normalizedCampaignId);
             CampaignCharacterBindingState current = RequireCurrentBindingLocked(campaign.CampaignId, normalizedDossierId);
             if (!_store.DossiersById.TryGetValue(normalizedDossierId, out RunnerDossierProjection? dossier)
@@ -1480,7 +1494,7 @@ public sealed class CampaignCollaborationService
     {
         ArgumentNullException.ThrowIfNull(gm);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, campaignId);
             string normalizedRunId = RequireCampaignRunLocked(campaign, runId).RunId;
@@ -1520,7 +1534,7 @@ public sealed class CampaignCollaborationService
             GmNotes = gmNotes
         });
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
             RunProjection run = RequireCampaignRunLocked(campaign, normalizedRunId);
@@ -1597,7 +1611,7 @@ public sealed class CampaignCollaborationService
             request.ExpectedRevision
         });
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
             RunProjection run = RequireCampaignRunLocked(campaign, normalizedRunId);
@@ -1669,7 +1683,7 @@ public sealed class CampaignCollaborationService
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             (CampaignProjection campaign, _, _) = RequireMemberCampaignLocked(user, campaignId);
             RunProjection run = RequireCampaignRunLocked(campaign, runId);
@@ -1681,7 +1695,7 @@ public sealed class CampaignCollaborationService
 
     internal IReadOnlyList<CampaignSharedSheetEditReceipt> GetSharedSheetAuditForTests(string dossierId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.CampaignSharedSheetAudit
                 .Where(item => string.Equals(item.DossierId, dossierId, StringComparison.OrdinalIgnoreCase))
@@ -1692,7 +1706,7 @@ public sealed class CampaignCollaborationService
 
     internal IReadOnlyList<CampaignGmAuthorityUpdateReceipt> GetGmAuthorityAuditForTests(string dossierId)
     {
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.CampaignGmAuthorityAudit
                 .Where(item => string.Equals(item.DossierId, dossierId, StringComparison.OrdinalIgnoreCase))
@@ -1799,6 +1813,7 @@ public sealed class CampaignCollaborationService
                 JoinedAtUtc: existingAssignment.AddedAtUtc);
             return _store.ExecuteCampaignCollaborationTransactionLocked(() =>
             {
+                if (_store.IsPrimary) InviteAttempts.Remove(player.UserId);
                 _store.CampaignRedemptionsByIdempotencyKey[commandKey] = new CampaignRedemptionIdempotencyState(
                     commandKey,
                     player.UserId,
@@ -1875,6 +1890,7 @@ public sealed class CampaignCollaborationService
 
         return _store.ExecuteCampaignCollaborationTransactionLocked(() =>
         {
+            if (_store.IsPrimary) InviteAttempts.Remove(player.UserId);
             _store.GroupsById[group.GroupId] = group;
             _store.CrewsById[crew.CrewId] = crew;
             _store.CampaignSpinesById[campaign.CampaignId] = campaign;
@@ -2010,6 +2026,7 @@ public sealed class CampaignCollaborationService
         HubUserDto user,
         string campaignId)
     {
+        user = RequireCurrentUserLocked(user);
         string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
         if (!_store.CampaignSpinesById.TryGetValue(normalizedCampaignId, out CampaignProjection? campaign)
             || !_store.GroupsById.TryGetValue(campaign.GroupId, out GroupDto? group)
@@ -2057,6 +2074,16 @@ public sealed class CampaignCollaborationService
         }
 
         return run;
+    }
+
+    private HubUserDto RequireCurrentUserLocked(HubUserDto user)
+    {
+        if (!_store.IsPrimary) return user;
+        if (!_store.UsersById.TryGetValue(user.UserId, out var current)
+            || !_store.UserIdBySubjectId.TryGetValue(user.SubjectId, out string? owner)
+            || !string.Equals(owner, current.UserId, StringComparison.OrdinalIgnoreCase))
+            throw new CampaignCollaborationAccessDeniedException("The campaign account authority is no longer current.");
+        return current;
     }
 
     private static bool CanManage(GroupDto group, string userId, string role)
@@ -2800,14 +2827,14 @@ public sealed class CampaignCollaborationService
 
     private void EnsureInviteAttemptAllowedLocked(string userId, DateTimeOffset now)
     {
-        if (!_inviteAttemptsByUserId.TryGetValue(userId, out CampaignInviteAttemptWindow? state))
+        if (!InviteAttempts.TryGetValue(userId, out CampaignInviteAttemptWindow? state))
         {
             return;
         }
 
         if (state.WindowStartedAtUtc.Add(InviteAttemptWindow) <= now)
         {
-            _inviteAttemptsByUserId.Remove(userId);
+            InviteAttempts.Remove(userId);
             return;
         }
 
@@ -2819,14 +2846,13 @@ public sealed class CampaignCollaborationService
 
     private void RecordInviteFailureLocked(string userId, DateTimeOffset now)
     {
-        if (!_inviteAttemptsByUserId.TryGetValue(userId, out CampaignInviteAttemptWindow? state)
+        if (!InviteAttempts.TryGetValue(userId, out CampaignInviteAttemptWindow? state)
             || state.WindowStartedAtUtc.Add(InviteAttemptWindow) <= now)
         {
-            _inviteAttemptsByUserId[userId] = new CampaignInviteAttemptWindow(now, 1);
-            return;
+            InviteAttempts[userId] = new CampaignInviteAttemptWindow(now, 1);
         }
-
-        _inviteAttemptsByUserId[userId] = state with { Failures = state.Failures + 1 };
+        else InviteAttempts[userId] = state with { Failures = state.Failures + 1 };
+        if (_store.IsPrimary) _store.PersistLocked();
     }
 
     private static void ValidateDossierForProjection(RunnerDossierProjection dossier)

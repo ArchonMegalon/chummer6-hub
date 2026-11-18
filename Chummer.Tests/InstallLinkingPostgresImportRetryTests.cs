@@ -15,6 +15,123 @@ namespace Chummer.Tests;
 public sealed class InstallLinkingPostgresImportRetryTests
 {
     [Fact]
+    public void Recovery_preflight_is_read_only_and_validates_the_protected_floor()
+    {
+        using var fixture = new ImportFixture();
+        fixture.WriteProtectedStoreAndFloor();
+        byte[] storeBefore = File.ReadAllBytes(fixture.StorePath);
+        byte[] floorBefore = File.ReadAllBytes(fixture.FloorPath);
+
+        InstallLinkingLocalRecoveryPreflightProof proof =
+            InstallLinkingLocalRecoveryInspector.Inspect(
+                fixture.StorePath,
+                fixture.Provider,
+                trustedStateRoot: fixture.Root);
+
+        Assert.Equal(1, proof.SourceGeneration);
+        Assert.True(proof.FloorPresent);
+        Assert.Equal(1, proof.FloorGeneration);
+        Assert.False(proof.IntentPresent);
+        Assert.Matches("^[0-9a-f]{64}$", proof.SourceEnvelopeSha256);
+        Assert.Matches("^[0-9a-f]{64}$", proof.SourceSnapshotSha256);
+        Assert.Equal(storeBefore, File.ReadAllBytes(fixture.StorePath));
+        Assert.Equal(floorBefore, File.ReadAllBytes(fixture.FloorPath));
+        Assert.False(File.Exists(fixture.IntentPath));
+        Assert.False(File.Exists($"{fixture.StorePath}.writer.lock"));
+    }
+
+    [Fact]
+    public void Recovery_preflight_refuses_a_missing_or_undecryptable_mirror()
+    {
+        using var fixture = new ImportFixture();
+        Assert.Throws<InvalidDataException>(() =>
+            InstallLinkingLocalRecoveryInspector.Inspect(
+                fixture.StorePath,
+                fixture.Provider,
+                trustedStateRoot: fixture.Root));
+
+        fixture.WriteProtectedStoreAndFloor();
+        string foreignRoot = Path.Combine(fixture.Root, "foreign-keys");
+        using var foreign = DataProtectionProvider.Create(
+            new DirectoryInfo(foreignRoot));
+        Assert.ThrowsAny<CryptographicException>(() =>
+            InstallLinkingLocalRecoveryInspector.Inspect(
+                fixture.StorePath,
+                foreign,
+                trustedStateRoot: fixture.Root));
+    }
+
+    [Fact]
+    public void Recovery_preflight_refuses_a_source_behind_its_floor()
+    {
+        using var fixture = new ImportFixture();
+        fixture.WriteBehindFloorStore();
+
+        InvalidDataException error = Assert.Throws<InvalidDataException>(() =>
+            InstallLinkingLocalRecoveryInspector.Inspect(
+                fixture.StorePath,
+                fixture.Provider,
+                trustedStateRoot: fixture.Root));
+
+        Assert.Contains("behind its floor", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Recovery_preflight_refuses_a_linked_mirror_path()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new ImportFixture();
+        fixture.WriteProtectedStoreAndFloor();
+        string realPath = $"{fixture.StorePath}.real";
+        File.Move(fixture.StorePath, realPath);
+        File.CreateSymbolicLink(fixture.StorePath, realPath);
+
+        Assert.Throws<InvalidDataException>(() =>
+            InstallLinkingLocalRecoveryInspector.Inspect(
+                fixture.StorePath,
+                fixture.Provider,
+                trustedStateRoot: fixture.Root));
+    }
+
+    [Fact]
+    public async Task Recovery_acknowledgement_requires_the_exact_generation_one_mirror()
+    {
+        using var fixture = new ImportFixture();
+        fixture.WriteExpiredLegacySnapshot();
+        using var authority = new FakeSnapshotAuthority();
+
+        InstallLinkingPostgresImportResult result =
+            await fixture.CreateCoordinator(authority).ExecuteAsync();
+        Assert.Equal(InstallLinkingPostgresImportDisposition.Imported, result.Disposition);
+        using InstallLinkingAuthoritativeEnvelope current = authority.CloneCurrent();
+
+        InstallLinkingLocalRecoveryAcknowledgementProof proof =
+            InstallLinkingLocalRecoveryInspector.ProveAcknowledged(
+                fixture.StorePath,
+                fixture.Provider,
+                current,
+                fixture.Root);
+
+        Assert.Equal(1, proof.Generation);
+        Assert.Equal(
+            Convert.ToHexStringLower(current.SnapshotSha256!),
+            proof.SnapshotSha256);
+        Assert.Equal(proof.SnapshotSha256, proof.FloorSnapshotSha256);
+        File.WriteAllText(fixture.IntentPath, "unsafe retained intent");
+        TightenMode(fixture.IntentPath);
+        Assert.Throws<InvalidDataException>(() =>
+            InstallLinkingLocalRecoveryInspector.ProveAcknowledged(
+                fixture.StorePath,
+                fixture.Provider,
+                current,
+                fixture.Root));
+    }
+
+    [Fact]
     public async Task Failed_readiness_never_opens_or_reads_the_local_source()
     {
         using var fixture = new ImportFixture();
@@ -263,6 +380,7 @@ public sealed class InstallLinkingPostgresImportRetryTests
         public string FloorPath => $"{StorePath}.floor";
         public string IntentPath => $"{StorePath}.postgres-import.intent";
         public IConfiguration Configuration { get; }
+        public IDataProtectionProvider Provider => _provider;
 
         public void WriteExpiredLegacySnapshot()
         {
@@ -325,6 +443,23 @@ public sealed class InstallLinkingPostgresImportRetryTests
             }
         }
 
+        public void WriteBehindFloorStore()
+        {
+            using var store = new InstallLinkingStore(
+                Configuration,
+                _provider,
+                NullLogger<InstallLinkingStore>.Instance);
+            lock (store.Gate)
+            {
+                store.PersistLocked();
+                byte[] firstGeneration = File.ReadAllBytes(StorePath);
+                store.PersistLocked();
+                File.WriteAllBytes(StorePath, firstGeneration);
+                TightenMode(StorePath);
+                CryptographicOperations.ZeroMemory(firstGeneration);
+            }
+        }
+
         public InstallLinkingStoreSnapshot ReadMirroredSnapshot()
         {
             byte[] envelopeBytes = File.ReadAllBytes(StorePath);
@@ -383,6 +518,16 @@ public sealed class InstallLinkingPostgresImportRetryTests
                     path,
                     UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
+        }
+    }
+
+    private static void TightenMode(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                path,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite);
         }
     }
 

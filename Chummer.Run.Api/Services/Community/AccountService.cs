@@ -11,6 +11,7 @@ public sealed record HubUserEnsureResult(
 
 public sealed class AccountService
 {
+    private static readonly UTF8Encoding ExactIdentityEncoding = new(false, true);
     private readonly CommunityStore _store;
     private readonly TeableUserProjectionService? _teableUsers;
     private readonly ILogger<AccountService> _logger;
@@ -32,7 +33,7 @@ public sealed class AccountService
         var requestedDisplayName = NormalizeUserFacingDisplayName(request.DisplayName, subjectId);
         var requestedHandle = NormalizeUserFacingHandle(request.Handle, subjectId);
         HubUserDto result;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.UserIdBySubjectId.TryGetValue(subjectId, out var existingUserId)
                 && _store.UsersById.TryGetValue(existingUserId, out var existing))
@@ -93,7 +94,7 @@ public sealed class AccountService
         HubUserDto result;
         bool wasCreated;
         bool changed;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.UserIdBySubjectId.TryGetValue(normalizedSubjectId, out var existingUserId)
                 && _store.UsersById.TryGetValue(existingUserId, out var existing))
@@ -171,7 +172,7 @@ public sealed class AccountService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (_store.UserIdBySubjectId.TryGetValue(normalized, out var userId)
                 && _store.UsersById.TryGetValue(userId, out var user))
@@ -191,17 +192,97 @@ public sealed class AccountService
             return null;
         }
 
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             return _store.UsersById.TryGetValue(normalized, out var user) ? user : null;
         }
+    }
+
+    /// <summary>
+    /// Observes an existing canonical principal-to-user mapping under one store
+    /// lock. This does not authenticate the principal or create an account, and
+    /// does not grant continuing authorization after the observation.
+    /// </summary>
+    internal string? GetExistingCanonicalUserIdBySubject(string subjectId)
+    {
+        string? normalized = NormalizeOptional(subjectId);
+        if (normalized is null) return null;
+        using (_store.Enter())
+        {
+            if (!_store.UserIdBySubjectId.TryGetValue(normalized, out string? indexedUserId)
+                || string.IsNullOrWhiteSpace(indexedUserId)
+                || !_store.UsersById.TryGetValue(indexedUserId, out HubUserDto? user)
+                || user is null
+                || !string.Equals(indexedUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            // Load() builds this index from both the primary principal and
+            // normalized historical linked principals, using ordinal-ignore-case.
+            bool belongsToUser = string.Equals(NormalizeOptional(user.SubjectId), normalized, StringComparison.OrdinalIgnoreCase)
+                || user.LinkedPrincipals?.Any(principal => string.Equals(
+                    NormalizeOptional(principal), normalized, StringComparison.OrdinalIgnoreCase)) == true;
+            return belongsToUser ? user.UserId : null;
+        }
+    }
+
+    /// <summary>
+    /// Guards an already authenticated, exact subject's existing canonical account for a
+    /// bounded synchronous capture. This does not authenticate, create, or grant consent.
+    /// The caller must enter this guard before any installation/authority/snapshot gate.
+    /// A synchronous capture may wait for a fenced worker, but that worker must never
+    /// reacquire this thread-owned account gate. No account mutations, provider HTTP,
+    /// async callbacks or nested fire-and-forget work are permitted. A separately
+    /// authorized installation-consent CAS may run here; synchronous work cannot be preempted.
+    /// </summary>
+    internal bool CaptureExistingCanonicalAccount(
+        string exactSubjectId,
+        string expectedUserId,
+        Action capture)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        foreach (Delegate callback in capture.GetInvocationList())
+        {
+            if (callback.Method.IsDefined(
+                    typeof(System.Runtime.CompilerServices.AsyncStateMachineAttribute), inherit: false))
+                throw new ArgumentException("An account capture callback must be synchronous.", nameof(capture));
+        }
+        if (!IsExactAccountIdentity(exactSubjectId) || !IsExactAccountIdentity(expectedUserId))
+            return false;
+
+        using (_store.Enter())
+        {
+            if (!_store.UserIdBySubjectId.TryGetValue(exactSubjectId, out string? indexedUserId)
+                || indexedUserId is null
+                || !string.Equals(indexedUserId, expectedUserId, StringComparison.Ordinal)
+                || !_store.UsersById.TryGetValue(indexedUserId, out HubUserDto? user)
+                || user is null
+                || !string.Equals(user.UserId, expectedUserId, StringComparison.Ordinal)
+                || !(string.Equals(user.SubjectId, exactSubjectId, StringComparison.Ordinal)
+                    || user.LinkedPrincipals?.Any(principal =>
+                        string.Equals(principal, exactSubjectId, StringComparison.Ordinal)) == true))
+                return false;
+
+            capture();
+            return true;
+        }
+    }
+
+    private static bool IsExactAccountIdentity(string? value)
+    {
+        // Match the fresh-session identifier bound without trimming, folding, or replacing
+        // malformed UTF-16. Legacy account lookups deliberately retain their old behavior.
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 128
+            || value.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
+            return false;
+        try { return ExactIdentityEncoding.GetByteCount(value) <= 128; }
+        catch (EncoderFallbackException) { return false; }
     }
 
     public HubUserDto UpdateGroupMemberships(string userId, IReadOnlyList<string> groupIds)
     {
         var normalizedUserId = NormalizeRequired(userId, nameof(userId));
         HubUserDto updated;
-        lock (_store.Gate)
+        using (_store.Enter())
         {
             if (!_store.UsersById.TryGetValue(normalizedUserId, out var user))
             {

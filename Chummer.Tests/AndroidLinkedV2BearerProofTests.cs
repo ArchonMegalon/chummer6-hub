@@ -1,0 +1,2949 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Chummer.Contracts.Workspaces;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
+using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Contracts.Community;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
+
+namespace Chummer.Tests;
+
+public sealed class AndroidLinkedV2BearerProofTests
+{
+    private static readonly JsonSerializerOptions ContinuationWebJson = new(JsonSerializerDefaults.Web);
+
+    [Theory]
+    [InlineData("revoked")]
+    [InlineData("expired")]
+    [InlineData("outage")]
+    [InlineData("wrong-token")]
+    public void Grant_authentication_reads_one_fresh_authority_without_expiry_maintenance(string change)
+    {
+        using Fixture fixture = new();
+        var probe = new ChapterReadinessProbe();
+        fixture.UseReadinessProbe(probe);
+        Assert.NotNull(fixture.Service.ResolveAndroidLinkedV2GrantForRequest("android-v2", Fixture.GrantId, Fixture.AccessToken));
+        Assert.Equal(1, probe.Calls);
+        string token = Fixture.AccessToken;
+        lock (fixture.Store.Gate)
+        {
+            var grant = fixture.Store.GrantsById[Fixture.GrantId];
+            if (change == "revoked") fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+            if (change == "expired") fixture.Store.GrantsById[Fixture.GrantId] = grant with { ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1) };
+        }
+        string before = JsonSerializer.Serialize(fixture.Store.GrantsById[Fixture.GrantId]);
+        if (change == "outage")
+        {
+            probe.FailOnCall = 2;
+            var error = Assert.Throws<InstallLinkingOperationException>(() =>
+                fixture.Service.ResolveAndroidLinkedV2GrantForRequest("android-v2", Fixture.GrantId, token));
+            Assert.Equal(503, error.StatusCode);
+        }
+        else
+        {
+            if (change == "wrong-token") token = "not-the-current-token";
+            Assert.Null(fixture.Service.ResolveAndroidLinkedV2GrantForRequest("android-v2", Fixture.GrantId, token));
+        }
+        Assert.Equal(2, probe.Calls); // A later request never borrows the prior authority.
+        Assert.Equal(before, JsonSerializer.Serialize(fixture.Store.GrantsById[Fixture.GrantId]));
+        Assert.Empty(fixture.Store.AndroidLinkedV2ReplayReceiptsByKey);
+    }
+
+    [Theory]
+    [InlineData("revoked", 401)]
+    [InlineData("owner", 401)]
+    [InlineData("outage", 503)]
+    public async Task Workspace_list_revalidates_install_authority_after_the_primary_read(string change, int status)
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["CHUMMER_INSTALL_LINKED_WORKSPACE_STORAGE_PROVIDER"] = "teable" }).Build();
+        using var store = new InstallLinkedWorkspaceSnapshotStore(config, remote.Store());
+        var snapshots = new InstallLinkedWorkspaceSnapshotService(store);
+        var installation = fixture.Store.InstallationsById["android-v2"];
+        snapshots.UpsertForInstallation(installation,
+            InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot())
+                with { Name = "Private runner must not escape revoked access" }, 0);
+        int writes = remote.HeadPosts;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/install-linking/continuation/workspaces/list",
+            "{\"installationId\":\"android-v2\"}").CreateContext(), http =>
+        {
+            var probe = new ChapterReadinessProbe();
+            fixture.UseReadinessProbe(probe);
+            remote.BeforeHeadReadResponse = () =>
+            {
+                if (change == "outage") probe.FailOnCall = probe.Calls + 1;
+                else lock (fixture.Store.Gate)
+                {
+                    if (change == "owner") fixture.Store.InstallationsById["android-v2"] = installation with { SubjectId = "different-subject" };
+                    else fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                        with { Status = InstallationGrantStates.Revoked };
+                }
+            };
+            var controller = new InstallLinkingV2Controller(fixture.Service, snapshots, fixture.TimeProvider)
+                { ControllerContext = new() { HttpContext = http } };
+            var result = controller.ListClaimedInstallWorkspaces(new("android-v2"));
+            var denied = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(status, denied.StatusCode);
+            Assert.DoesNotContain("Private runner", JsonSerializer.Serialize(denied.Value));
+            Assert.Contains("no-store", http.Response.Headers.CacheControl.ToString());
+        });
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
+    private sealed class SceneDiagnosticLogger : ILogger<AndroidLinkedOriginScenesController>
+    {
+        public List<IReadOnlyDictionary<string, object?>> Events { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel level) => true;
+        public void Log<TState>(LogLevel level, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Assert.Null(exception); // Exception messages can contain private provider or account material.
+            var fields = Assert.IsAssignableFrom<IEnumerable<KeyValuePair<string, object?>>>(state).ToDictionary();
+            Assert.Equal(new[] { "AuthorityChecks", "AuthorityMilliseconds", "CallerCanceled", "ElapsedMilliseconds", "Failure", "Operation", "Phase", "{OriginalFormat}" },
+                fields.Keys.Order(StringComparer.Ordinal));
+            Assert.True(Assert.IsType<int>(fields["AuthorityChecks"]) > 0);
+            Assert.True(Assert.IsType<long>(fields["AuthorityMilliseconds"]) >= 0);
+            Assert.IsType<bool>(fields["CallerCanceled"]);
+            Events.Add(fields);
+        }
+    }
+
+    [Theory]
+    [InlineData("request")]
+    [InlineData("read")]
+    [InlineData("decide")]
+    public async Task Origin_scene_routes_require_exact_signed_install_proof(string action)
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\"}";
+        var signed = fixture.Sign("/api/v2/android/linked/origin/scenes/" + action, body);
+        int dispatches = 0;
+        var accepted = signed.CreateContext();
+        await fixture.InvokeAsync(accepted, _ => dispatches++);
+        Assert.Equal(1, dispatches);
+        var replay = signed.CreateContext();
+        await fixture.InvokeAsync(replay, _ => dispatches++);
+        Assert.Equal(1, dispatches);
+        Assert.Equal(StatusCodes.Status409Conflict, replay.Response.StatusCode);
+        var substituted = fixture.Sign("/api/v2/android/linked/origin/scenes/" + action, body).CreateContext();
+        substituted.Request.Path = "/api/v2/android/linked/origin/scenes/different";
+        await fixture.InvokeAsync(substituted, _ => dispatches++);
+        Assert.Equal(1, dispatches);
+        Assert.Equal(StatusCodes.Status401Unauthorized, substituted.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Origin_scene_controller_rejects_unsigned_and_revoked_installs_before_any_media_access()
+    {
+        using Fixture fixture = new();
+        var config = new ConfigurationBuilder().Build();
+        using var chapters = fixture.CreateChapterAuthoring();
+        var request = new AndroidOriginSceneRead("android-v2", "request", new string('a', 64));
+        AndroidLinkedOriginScenesController Controller(HttpContext context) => new(fixture.Service,
+            null!, new(chapters), new(new(config)), new(config)) { ControllerContext = new() { HttpContext = context } };
+        Assert.IsType<UnauthorizedResult>(await Controller(new DefaultHttpContext()).ReadScene(request, default));
+        Task<ActionResult>? revoked = null;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/read",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            lock (fixture.Store.Gate)
+            {
+                var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+            }
+            revoked = Controller(http).ReadScene(request, default);
+        });
+        Assert.NotNull(revoked);
+        Assert.IsType<UnauthorizedResult>(await revoked);
+    }
+
+    private static OriginChapterAuthoringService PrimaryChapters(TeableRevisionStoreTests.Remote remote)
+        => new(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CHUMMER_ORIGIN_CHAPTER_STORAGE_PROVIDER"] = "teable"
+        }).Build(), new(remote.Store(), ownsStore: true));
+
+    [Theory]
+    [InlineData("request", "revoked", 401)]
+    [InlineData("read", "revoked", 401)]
+    [InlineData("decide", "revoked", 401)]
+    [InlineData("request", "outage", 503)]
+    [InlineData("read", "outage", 503)]
+    [InlineData("decide", "outage", 503)]
+    [InlineData("request", "revoked-before", 401)]
+    [InlineData("read", "revoked-before", 401)]
+    [InlineData("decide", "revoked-before", 401)]
+    [InlineData("request", "outage-before", 503)]
+    [InlineData("read", "outage-before", 503)]
+    [InlineData("decide", "outage-before", 503)]
+    public async Task Scene_entry_uses_one_fresh_probe_before_read_and_rechecks_before_any_account_or_media_access(
+        string action, string failure, int status)
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var chapters = PrimaryChapters(remote);
+        var request = PrepareSceneChapter(chapters);
+        int reads = 0, writes = remote.HeadPosts;
+        var probe = new ChapterReadinessProbe();
+        void WithdrawAuthority()
+        {
+            if (failure.StartsWith("outage", StringComparison.Ordinal)) probe.FailOnCall = probe.Calls + 1;
+            else lock (fixture.Store.Gate)
+                fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                    with { Status = InstallationGrantStates.Revoked };
+        }
+        remote.BeforeRecordReadResponse = (_, _) =>
+        {
+            reads++;
+            Assert.Equal(1, probe.Calls); // The bridge owns entry authorization, not two adjacent probes.
+            WithdrawAuthority();
+            return Task.CompletedTask;
+        };
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["CHUMMER_ORIGIN_SCENE_MEDIA_REQUIRED"] = "true" }).Build();
+        Task<ActionResult>? pending = null;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/" + action,
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            fixture.UseReadinessProbe(probe);
+            if (failure.EndsWith("-before", StringComparison.Ordinal)) WithdrawAuthority();
+            // Null account/admission dependencies and an unconfigured socket
+            // ensure no private account read or media handoff can run on failure.
+            var controller = new AndroidLinkedOriginScenesController(fixture.Service, null!,
+                new(chapters), null!, new(config)) { ControllerContext = new() { HttpContext = http } };
+            pending = action switch
+            {
+                "request" => controller.RequestScene(request, default),
+                "read" => controller.ReadScene(new(request.InstallationId, request.ChapterRequestId, request.TextDigest), default),
+                _ => controller.DecideScene(new(request.InstallationId, request.ChapterRequestId, request.TextDigest,
+                    new string('d', 64), true, true), default)
+            };
+        });
+        Assert.NotNull(pending);
+        var result = await pending;
+        Assert.Equal(status, result is UnauthorizedResult ? 401 : Assert.IsType<ObjectResult>(result).StatusCode);
+        if (failure.EndsWith("-before", StringComparison.Ordinal))
+        {
+            Assert.Equal(0, reads);
+            Assert.Equal(1, probe.Calls);
+        }
+        else
+        {
+            Assert.True(reads > 0);
+            Assert.Equal(2, probe.Calls);
+        }
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
+    private static IConfiguration SceneAdmissionConfig() => new ConfigurationBuilder().AddInMemoryCollection(
+        new Dictionary<string, string?>
+        {
+            ["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_HORIZON_REQUEST_RECEIPT_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_MYFIRSTBOOK_USAGE_STORAGE_PROVIDER"] = "teable",
+            ["CHUMMER_BILLING_MEMBERSHIP_STORAGE_PROVIDER"] = "teable",
+            ["HorizonCapabilities:origin-dossier:origin-dossier-media:Enabled"] = "true",
+            ["HorizonCapabilities:origin-dossier:origin-dossier-media:FreeWeeklyLimit"] = "2"
+        }).Build();
+
+    private static HorizonArtifactRequestService SceneAdmission(TeableRevisionStoreTests.Remote remote)
+    {
+        var config = SceneAdmissionConfig();
+        var billing = new BrilliantDirectoriesBillingService(new(config, primary: remote.Store()),
+            new(config, primary: remote.Store()), config);
+        return new(new(config), new(new(config, remote.Store()), new(config), billing), new(config, remote.Store()));
+    }
+
+    private static AndroidOriginSceneRequest PrepareSceneChapter(OriginChapterAuthoringService chapters)
+    {
+        const string prose = "The child watches the rain through the school window.";
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "en",
+            "Synthetic runner", [new("fact", "decision", "Selected a school.")]);
+        string requestId = OriginChapterSourceIdentity.RequestId(source);
+        var job = chapters.Create("subject-v2", new(requestId, source, true), () => true);
+        var work = Assert.Single(chapters.PendingForWorker(10));
+        string receipt = new string('b', 64);
+        string digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(prose)));
+        chapters.AdmitForWorker(work.WorkId, job.SourceDigest, "synthetic-admission");
+        chapters.CompleteForWorker(work.WorkId, job.SourceDigest, "synthetic-admission", prose, receipt);
+        chapters.AcceptReading("subject-v2", requestId, job.SourceDigest, receipt, digest, true, () => true);
+        return new("android-v2", requestId, digest, prose, "A child at a window", true);
+    }
+
+    [Theory]
+    [InlineData("before-admission")]
+    [InlineData("after-admission")]
+    [InlineData("revoked-after-admission")]
+    public async Task Origin_scene_disconnect_respects_the_durable_admission_boundary(string timing)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var community = new CommunityStore(SceneAdmissionConfig(), NullLogger<CommunityStore>.Instance, remote.Store());
+        var accounts = new AccountService(community);
+        accounts.EnsureUser("subject-v2");
+        using var chapters = fixture.CreateChapterAuthoring();
+        var request = PrepareSceneChapter(chapters);
+        using var disconnected = new CancellationTokenSource();
+        int dispatches = 0, before = remote.HeadPosts;
+        remote.BeforeHeadPost = () =>
+        {
+            disconnected.Cancel(); // The atomic quota/receipt commit still completes.
+            if (timing == "revoked-after-admission")
+                lock (fixture.Store.Gate)
+                {
+                    var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                    fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+                }
+        };
+        using var peer = new OriginChapterSceneMediaClientTests.Peer(packet =>
+        {
+            if (packet.StartsWith("POST /v1/health ", StringComparison.Ordinal))
+            {
+                if (timing == "before-admission") disconnected.Cancel();
+                return "{\"schema\":\"chummer.media.origin-scene-worker/v1\",\"accountErasureSupported\":true,\"dispatchEnabled\":true}";
+            }
+            Assert.StartsWith("POST /v1/render ", packet);
+            Assert.True(disconnected.IsCancellationRequested);
+            dispatches++;
+            return "{\"state\":\"review\",\"publicationAuthorized\":false}";
+        }, requests: timing == "after-admission" ? 2 : 1, expectedDisconnect: disconnected.Token);
+        Task<ActionResult>? pending = null;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/request",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            http.RequestAborted = disconnected.Token;
+            var controller = new AndroidLinkedOriginScenesController(fixture.Service, accounts,
+                new(chapters), SceneAdmission(remote), peer.Client) { ControllerContext = new() { HttpContext = http } };
+            pending = controller.RequestScene(request, disconnected.Token);
+        });
+        Assert.NotNull(pending);
+        var result = await pending;
+        if (timing == "after-admission") Assert.IsType<OkObjectResult>(result);
+        else if (timing == "revoked-after-admission") Assert.IsType<UnauthorizedResult>(result);
+        else Assert.Equal(503, Assert.IsType<ObjectResult>(result).StatusCode);
+        Assert.Equal(timing == "before-admission" ? 0 : 1, remote.HeadPosts - before);
+        Assert.Equal(timing == "after-admission" ? 1 : 0, dispatches);
+        await peer.Completed;
+    }
+
+    [Theory]
+    [InlineData("absent")]
+    [InlineData("admitted")]
+    [InlineData("ledger-outage")]
+    [InlineData("revoked")]
+    public async Task Origin_scene_cold_read_distinguishes_missing_media_from_a_charged_order_without_dispatch(string outcome)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var community = new CommunityStore(SceneAdmissionConfig(), NullLogger<CommunityStore>.Instance, remote.Store());
+        var accounts = new AccountService(community);
+        var user = accounts.EnsureUser("subject-v2");
+        using var chapters = fixture.CreateChapterAuthoring();
+        var request = PrepareSceneChapter(chapters);
+        var bridge = new OriginChapterSceneRequestBridge(chapters);
+        if (outcome != "absent")
+            SceneAdmission(remote).AdmitPrivateOriginScene(bridge.Compose("subject-v2", request.ChapterRequestId,
+                request.TextDigest, request.SceneExcerpt, request.AltText, true, () => true) with { UserId = user.UserId });
+        int before = remote.HeadPosts;
+        using var peer = new OriginChapterSceneMediaClientTests.Peer(packet =>
+        {
+            Assert.StartsWith("POST /v1/read ", packet);
+            if (outcome == "ledger-outage") remote.FailReads = true;
+            if (outcome == "revoked")
+                lock (fixture.Store.Gate)
+                {
+                    var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                    fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+                }
+            return "{}";
+        }, "404 Not Found");
+        Task<ActionResult>? pending = null;
+        var diagnostic = new SceneDiagnosticLogger();
+        var read = new AndroidOriginSceneRead(request.InstallationId, request.ChapterRequestId, request.TextDigest);
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/scenes/read",
+            JsonSerializer.Serialize(read, ContinuationWebJson)).CreateContext(), http =>
+        {
+            var controller = new AndroidLinkedOriginScenesController(fixture.Service, accounts,
+                bridge, SceneAdmission(remote), peer.Client, diagnostic) { ControllerContext = new() { HttpContext = http } };
+            pending = controller.ReadScene(read, default);
+        });
+        Assert.NotNull(pending);
+        var result = await pending;
+        if (outcome == "admitted")
+        {
+            var value = JsonSerializer.SerializeToElement(Assert.IsType<OkObjectResult>(result).Value, ContinuationWebJson);
+            Assert.Equal("uncertain", value.GetProperty("state").GetString());
+            Assert.Equal(bridge.ResolveIdentity("subject-v2", request.ChapterRequestId, request.TextDigest, () => true),
+                value.GetProperty("assetId").GetString());
+            Assert.False(value.GetProperty("publicationAuthorized").GetBoolean());
+            Assert.Equal(3, value.EnumerateObject().Count()); // No receipt, prompt, account or provider details.
+        }
+        else if (outcome == "ledger-outage") Assert.Equal(503, Assert.IsType<ObjectResult>(result).StatusCode);
+        else if (outcome == "revoked") Assert.IsType<UnauthorizedResult>(result);
+        else Assert.IsType<NotFoundResult>(result);
+        Assert.Equal(before, remote.HeadPosts); // Read-only even after restart; no retry, refund or allowance reset.
+        if (outcome == "ledger-outage")
+        {
+            var failure = Assert.Single(diagnostic.Events);
+            Assert.Equal("read", failure["Operation"]);
+            Assert.Equal("admission-read", failure["Phase"]);
+            Assert.Equal("io-unavailable", failure["Failure"]);
+            Assert.True(Assert.IsType<long>(failure["ElapsedMilliseconds"]) >= 0);
+        }
+        else if (outcome != "revoked") Assert.Empty(diagnostic.Events);
+        await peer.Completed;
+    }
+
+    [Fact]
+    public async Task Signed_missing_chapter_allows_only_same_registration_and_preserves_a_racing_worker_fence()
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "en",
+            "Synthetic runner", [new("fact", "decision", "Selected a school.")]);
+        string id = OriginChapterSourceIdentity.RequestId(source);
+        var read = new AndroidLinkedOriginChapterReadRequest("android-v2", id);
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/read",
+            JsonSerializer.Serialize(read, ContinuationWebJson)).CreateContext(), http =>
+        {
+            using var chapters = PrimaryChapters(remote);
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var absent = Assert.IsType<NotFoundObjectResult>(controller.ReadChapter(read).Result);
+            var body = JsonSerializer.SerializeToElement(absent.Value, ContinuationWebJson);
+            Assert.Equal("chummer.origin.chapter-missing/v1", body.GetProperty("schema").GetString());
+            Assert.Equal(id, body.GetProperty("requestId").GetString());
+            Assert.True(body.GetProperty("canRegisterSameRequest").GetBoolean());
+            Assert.Equal(3, body.EnumerateObject().Count());
+            Assert.Equal(0, remote.HeadPosts);
+            Assert.Contains("no-store", http.Response.Headers.CacheControl.ToString());
+        });
+        // Another request can commit and dispatch after the missing read. A
+        // cold, same-ID registration must return its existing state, not write
+        // AwaitingAuthoring over the durable execution admission.
+        var request = new AndroidLinkedOriginChapterRequest("android-v2", new(id, source, true));
+        using var worker = PrimaryChapters(remote);
+        var job = worker.Create("subject-v2", request.Authoring, () => true);
+        var work = Assert.Single(worker.PendingForWorker(20));
+        Assert.True(worker.AdmitForWorker(work.WorkId, job.SourceDigest, "execution").MayStartGeneration);
+        int writes = remote.HeadPosts;
+        fixture.Reload();
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/request",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            using var chapters = PrimaryChapters(remote);
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var existing = Assert.IsType<OriginChapterAuthoringJob>(
+                Assert.IsType<OkObjectResult>(controller.RequestChapter(request).Result).Value);
+            Assert.Equal(OriginChapterAuthoringStates.ReconciliationRequired, existing.State);
+        });
+        using var cold = PrimaryChapters(remote);
+        Assert.False(cold.AdmitForWorker(work.WorkId, job.SourceDigest, "execution").MayStartGeneration);
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
+    [Fact]
+    public async Task Signed_v2_primary_chapter_restores_job_prose_and_acceptance_without_replaying_work()
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de",
+            "Synthetic runner", [new("fact", "decision", "Selected a corporate school.")]);
+        string requestId = OriginChapterSourceIdentity.RequestId(source);
+        var request = new AndroidLinkedOriginChapterRequest("android-v2", new(requestId, source, true));
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/request",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext(), http =>
+        {
+            using var chapters = PrimaryChapters(remote);
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var job = Assert.IsType<OriginChapterAuthoringJob>(
+                Assert.IsType<OkObjectResult>(controller.RequestChapter(request).Result).Value);
+            Assert.Equal(OriginChapterAuthoringStates.AwaitingAuthoring, job.State);
+            Assert.Null(job.DraftText);
+        });
+        const string text = "Synthetic stored chapter, not generated by a provider.";
+        string receipt = new string('c', 64);
+        string digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+        string workId, sourceDigest;
+        using (var worker = PrimaryChapters(remote))
+        {
+            var work = Assert.Single(worker.PendingForWorker(20));
+            workId = work.WorkId;
+            sourceDigest = work.Job.SourceDigest;
+            Assert.True(worker.AdmitForWorker(workId, sourceDigest, "execution").MayStartGeneration);
+        }
+        using (var coldWorker = PrimaryChapters(remote))
+        {
+            Assert.False(coldWorker.AdmitForWorker(workId, sourceDigest, "execution").MayStartGeneration);
+            coldWorker.CompleteForWorker(workId, sourceDigest, "execution", text, receipt);
+        }
+        fixture.Reload(); // Reconstruct authentication separately from chapter storage.
+        var read = new AndroidLinkedOriginChapterReadRequest("android-v2", requestId);
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/read",
+            JsonSerializer.Serialize(read, ContinuationWebJson)).CreateContext(), http =>
+        {
+            using var chapters = PrimaryChapters(remote);
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var job = Assert.IsType<OriginChapterAuthoringJob>(
+                Assert.IsType<OkObjectResult>(controller.ReadChapter(read).Result).Value);
+            Assert.Equal(text, job.DraftText);
+            Assert.Null(job.ReaderAcceptedTextDigest);
+        });
+        var accept = new AndroidLinkedOriginChapterAcceptRequest("android-v2", requestId, sourceDigest, receipt, digest, true);
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/accept",
+            JsonSerializer.Serialize(accept, ContinuationWebJson)).CreateContext(), http =>
+        {
+            using var chapters = PrimaryChapters(remote);
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            Assert.Equal(digest, Assert.IsType<OriginChapterAuthoringJob>(
+                Assert.IsType<OkObjectResult>(controller.AcceptChapter(accept).Result).Value).ReaderAcceptedTextDigest);
+        });
+        int writes = remote.HeadPosts;
+        using var cold = PrimaryChapters(remote);
+        Assert.Equal(digest, cold.Get("subject-v2", requestId)!.ReaderAcceptedTextDigest);
+        Assert.Null(cold.Get("other-subject", requestId));
+        Assert.Empty(cold.PendingForWorker(20));
+        Assert.False(cold.AdmitForWorker(workId, sourceDigest, "execution").MayStartGeneration);
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    public async Task Signed_v2_authority_outage_is_unavailable_not_invalid_credentials(int failOnCall, bool throws)
+    {
+        using Fixture fixture = new();
+        var probe = new ChapterReadinessProbe { FailOnCall = failOnCall, ThrowOnFailure = throws };
+        fixture.UseReadinessProbe(probe);
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/read",
+            "{\"installationId\":\"android-v2\",\"requestId\":\"chapter\"}").CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, _ => dispatched = true);
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
+        Assert.Equal(failOnCall, probe.Calls);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body);
+        string response = await reader.ReadToEndAsync();
+        Assert.Contains("temporarily unavailable", response, StringComparison.Ordinal);
+        Assert.DoesNotContain("private-backend-detail", response, StringComparison.Ordinal);
+        Assert.Equal(InstallationGrantStates.Active, fixture.Store.GrantsById[Fixture.GrantId].Status);
+    }
+
+    [Theory]
+    [InlineData("request", false)]
+    [InlineData("read", false)]
+    [InlineData("accept", false)]
+    [InlineData("request", true)]
+    [InlineData("read", true)]
+    [InlineData("accept", true)]
+    public async Task Signed_v2_chapter_authority_outage_does_not_disclose_prose_or_record_acceptance(
+        string action, bool afterChapterRead)
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var chapters = PrimaryChapters(remote);
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de",
+            "Synthetic runner", [new("fact", "decision", "Human")]);
+        var job = chapters.Create("subject-v2", new(OriginChapterSourceIdentity.RequestId(source), source, true), () => true);
+        var work = Assert.Single(chapters.PendingForWorker(20));
+        chapters.AdmitForWorker(work.WorkId, job.SourceDigest, "execution");
+        const string text = "Private synthetic prose; never disclose during authority outage.";
+        string receipt = new string('c', 64), digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+        chapters.CompleteForWorker(work.WorkId, job.SourceDigest, "execution", text, receipt);
+        object body = action switch
+        {
+            "request" => new AndroidLinkedOriginChapterRequest("android-v2", new(job.RequestId, source, true)),
+            "read" => new AndroidLinkedOriginChapterReadRequest("android-v2", job.RequestId),
+            _ => new AndroidLinkedOriginChapterAcceptRequest("android-v2", job.RequestId, job.SourceDigest, receipt, digest, true)
+        };
+        int writes = remote.HeadPosts;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/" + action,
+            JsonSerializer.Serialize(body, ContinuationWebJson)).CreateContext(), http =>
+        {
+            var probe = new ChapterReadinessProbe();
+            fixture.UseReadinessProbe(probe);
+            if (afterChapterRead) remote.BeforeHeadReadResponse = () => probe.FailOnCall = probe.Calls + 1;
+            else probe.FailOnCall = 1;
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var result = action switch
+            {
+                "request" => controller.RequestChapter((AndroidLinkedOriginChapterRequest)body),
+                "read" => controller.ReadChapter((AndroidLinkedOriginChapterReadRequest)body),
+                _ => controller.AcceptChapter((AndroidLinkedOriginChapterAcceptRequest)body)
+            };
+            var unavailable = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, unavailable.StatusCode);
+            Assert.DoesNotContain(text, JsonSerializer.Serialize(unavailable.Value), StringComparison.Ordinal);
+            Assert.Contains("no-store", http.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        });
+        Assert.Equal(writes, remote.HeadPosts);
+        Assert.Null(chapters.Get("subject-v2", job.RequestId)!.ReaderAcceptedTextDigest);
+        Assert.Equal(InstallationGrantStates.Active, fixture.Store.GrantsById[Fixture.GrantId].Status);
+    }
+
+    [Theory]
+    [InlineData("status", false)]
+    [InlineData("list", false)]
+    [InlineData("groups", false)]
+    [InlineData("erase", false)]
+    [InlineData("status", true)]
+    [InlineData("list", true)]
+    [InlineData("groups", true)]
+    [InlineData("erase", true)]
+    public async Task Account_controller_outage_after_signed_admission_preserves_the_link(string action, bool throws)
+    {
+        // Fail both the first controller read and a later recheck after a
+        // successful read. Do not couple outage coverage to redundant probes
+        // inside one synchronous, read-only principal lookup.
+        foreach (bool previouslyRead in new[] { false, true })
+        {
+            using Fixture fixture = new();
+            var signed = fixture.Sign(AccountRoute(action), "{\"installationId\":\"android-v2\"}");
+            var context = signed.CreateContext();
+            bool dispatched = false;
+            await fixture.InvokeAsync(context, http =>
+            {
+                dispatched = true;
+                var probe = new ChapterReadinessProbe { ThrowOnFailure = throws };
+                fixture.UseReadinessProbe(probe);
+                if (previouslyRead)
+                {
+                    var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+                        { ControllerContext = new() { HttpContext = http } };
+                    Assert.IsType<OkObjectResult>(controller.GetGrantStatus(new("android-v2")).Result);
+                    Assert.True(probe.Calls > 0);
+                }
+                probe.FailOnCall = probe.Calls + 1;
+                var result = DeniedAccountAction(fixture, http, action);
+                Assert.Equal(StatusCodes.Status503ServiceUnavailable, result.StatusCode);
+                string response = JsonSerializer.Serialize(result.Value);
+                Assert.Contains("temporarily unavailable", response, StringComparison.Ordinal);
+                Assert.DoesNotContain("private-backend-detail", response, StringComparison.Ordinal);
+                Assert.DoesNotContain("subject-v2", response, StringComparison.Ordinal);
+                Assert.DoesNotContain(Fixture.AccessToken, response, StringComparison.Ordinal);
+                Assert.Contains("no-store", http.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+            });
+            Assert.True(dispatched);
+            Assert.Equal(InstallationGrantStates.Active, fixture.Store.GrantsById[Fixture.GrantId].Status);
+            Assert.Equal(Fixture.AccessToken, fixture.Store.GrantsById[Fixture.GrantId].AccessToken);
+            Assert.Empty(fixture.WorkspaceSnapshots.ListForInstallation(fixture.Store.InstallationsById["android-v2"]));
+
+            // Outage recovery must neither re-link nor make the admitted proof replayable.
+            fixture.UseReadinessProbe(new ChapterReadinessProbe());
+            var replay = signed.CreateContext();
+            await fixture.InvokeAsync(replay, _ => Assert.Fail("An admitted proof must remain consumed."));
+            Assert.Equal(StatusCodes.Status409Conflict, replay.Response.StatusCode);
+            await fixture.InvokeAsync(fixture.Sign(AccountRoute("status"),
+                "{\"installationId\":\"android-v2\"}").CreateContext(), http =>
+            {
+                var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+                    { ControllerContext = new() { HttpContext = http } };
+                var result = Assert.IsType<OkObjectResult>(controller.GetGrantStatus(new("android-v2")).Result);
+                Assert.Equal("subject-v2", Assert.IsType<AndroidLinkedV2GrantStatusResponse>(result.Value).SubjectId);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData("status")]
+    [InlineData("list")]
+    [InlineData("groups")]
+    [InlineData("erase")]
+    public async Task Account_controller_still_rejects_revocation_after_signed_admission(string action)
+    {
+        using Fixture fixture = new();
+        await fixture.InvokeAsync(fixture.Sign(AccountRoute(action),
+            "{\"installationId\":\"android-v2\"}").CreateContext(), http =>
+        {
+            lock (fixture.Store.Gate)
+            {
+                fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                    with { Status = InstallationGrantStates.Revoked };
+                fixture.Store.PersistLocked();
+            }
+            Assert.Equal(StatusCodes.Status401Unauthorized, DeniedAccountAction(fixture, http, action).StatusCode);
+        });
+    }
+
+    private static string AccountRoute(string action) => action switch
+    {
+        "status" => "/api/v2/install-linking/grants/status",
+        "list" => "/api/v2/install-linking/continuation/workspaces/list",
+        "groups" => "/api/v2/android/linked/groups",
+        "erase" => "/api/v2/android/linked/account/erase",
+        _ => throw new ArgumentOutOfRangeException(nameof(action))
+    };
+
+    private static ObjectResult DeniedAccountAction(Fixture fixture, HttpContext http, string action)
+    {
+        var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new() { HttpContext = http } };
+        // Null downstream services are sentinels: no group access or erasure may run on denial.
+        ActionResult? result = action switch
+        {
+            "status" => controller.GetGrantStatus(new("android-v2")).Result,
+            "list" => controller.ListClaimedInstallWorkspaces(new("android-v2")).Result,
+            "groups" => new AndroidLinkedCampaignV2Controller(fixture.Service, null!)
+                { ControllerContext = new() { HttpContext = http } }.ListGroups(new("android-v2")).Result,
+            "erase" => new AndroidLinkedAccountV2Controller(fixture.Service, null!)
+                { ControllerContext = new() { HttpContext = http } }.Erase(new("android-v2", "ERASE"), default)
+                .GetAwaiter().GetResult().Result,
+            _ => throw new ArgumentOutOfRangeException(nameof(action))
+        };
+        return Assert.IsType<ObjectResult>(result);
+    }
+
+    private sealed class ChapterReadinessProbe : IInstallLinkingStoreReadinessProbe
+    {
+        public int Calls { get; private set; }
+        public int FailOnCall { get; set; } = int.MaxValue;
+        public bool ThrowOnFailure { get; init; }
+        public InstallLinkingStoreReadiness Evaluate()
+        {
+            bool ready = ++Calls < FailOnCall;
+            if (!ready && ThrowOnFailure) throw new IOException("private-backend-detail");
+            return new(ready, ready ? "ready" : "unavailable");
+        }
+    }
+
+    [Theory]
+    [InlineData("request", false)]
+    [InlineData("read", false)]
+    [InlineData("accept", false)]
+    [InlineData("request", true)]
+    [InlineData("read", true)]
+    [InlineData("accept", true)]
+    public async Task Signed_v2_primary_chapter_storage_failure_returns_private_unavailable_not_missing_or_success(
+        string action, bool deadline)
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var chapters = PrimaryChapters(remote);
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de",
+            "Synthetic runner", [new("fact", "decision", "Elf")]);
+        var job = chapters.Create("subject-v2", new(OriginChapterSourceIdentity.RequestId(source), source, true), () => true);
+        string receipt = new string('c', 64), digest = new string('d', 64);
+        object body = action switch
+        {
+            "request" => new AndroidLinkedOriginChapterRequest("android-v2", new(job.RequestId, source, true)),
+            "read" => new AndroidLinkedOriginChapterReadRequest("android-v2", job.RequestId),
+            _ => new AndroidLinkedOriginChapterAcceptRequest("android-v2", job.RequestId, job.SourceDigest, receipt, digest, true)
+        };
+        int writes = remote.HeadPosts;
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/" + action,
+            JsonSerializer.Serialize(body, ContinuationWebJson)).CreateContext();
+        await fixture.InvokeAsync(context, http =>
+        {
+            if (deadline) remote.BeforeHeadReadResponse = () => throw new TaskCanceledException("private backend deadline");
+            else remote.FailReads = true;
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var response = action switch
+            {
+                "request" => controller.RequestChapter((AndroidLinkedOriginChapterRequest)body),
+                "read" => controller.ReadChapter((AndroidLinkedOriginChapterReadRequest)body),
+                _ => controller.AcceptChapter((AndroidLinkedOriginChapterAcceptRequest)body)
+            };
+            var unavailable = Assert.IsType<ObjectResult>(response.Result);
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, unavailable.StatusCode);
+            Assert.Equal("Private authoring storage is unavailable. Check the same request before retrying.", unavailable.Value);
+        });
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        Assert.Equal(writes, remote.HeadPosts);
+        remote.FailReads = false;
+        using var cold = PrimaryChapters(remote);
+        Assert.Equal(OriginChapterAuthoringStates.AwaitingAuthoring, cold.Get("subject-v2", job.RequestId)!.State);
+        Assert.Equal(writes, remote.HeadPosts);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_primary_chapter_rechecks_revocation_after_remote_read_before_disclosure_or_acceptance(bool accept)
+    {
+        using Fixture fixture = new();
+        using var remote = new TeableRevisionStoreTests.Remote();
+        using var chapters = PrimaryChapters(remote);
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de",
+            "Synthetic runner", [new("fact", "decision", "Elf")]);
+        var job = chapters.Create("subject-v2", new(OriginChapterSourceIdentity.RequestId(source), source, true), () => true);
+        var work = Assert.Single(chapters.PendingForWorker(20));
+        chapters.AdmitForWorker(work.WorkId, job.SourceDigest, "execution");
+        const string text = "Private synthetic prose.";
+        string receipt = new string('c', 64), digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+        chapters.CompleteForWorker(work.WorkId, job.SourceDigest, "execution", text, receipt);
+        object body = accept
+            ? new AndroidLinkedOriginChapterAcceptRequest("android-v2", job.RequestId, job.SourceDigest, receipt, digest, true)
+            : new AndroidLinkedOriginChapterReadRequest("android-v2", job.RequestId);
+        int writes = remote.HeadPosts;
+        await fixture.InvokeAsync(fixture.Sign("/api/v2/android/linked/origin/chapters/" + (accept ? "accept" : "read"),
+            JsonSerializer.Serialize(body, ContinuationWebJson)).CreateContext(), http =>
+        {
+            remote.BeforeHeadReadResponse = () =>
+            {
+                lock (fixture.Store.Gate)
+                {
+                    fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                        with { Status = InstallationGrantStates.Revoked };
+                    fixture.Store.PersistLocked();
+                }
+            };
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, chapters)
+                { ControllerContext = new() { HttpContext = http } };
+            var response = accept ? controller.AcceptChapter((AndroidLinkedOriginChapterAcceptRequest)body)
+                : controller.ReadChapter((AndroidLinkedOriginChapterReadRequest)body);
+            Assert.IsType<UnauthorizedResult>(response.Result);
+        });
+        Assert.Equal(writes, remote.HeadPosts);
+        using var cold = PrimaryChapters(remote);
+        Assert.Null(cold.Get("subject-v2", job.RequestId)!.ReaderAcceptedTextDigest);
+        fixture.Reload();
+        Assert.Equal(InstallationGrantStates.Revoked, fixture.Store.GrantsById[Fixture.GrantId].Status);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_origin_chapter_acceptance_requires_current_install_owner(bool revoke)
+    {
+        using Fixture fixture = new();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de",
+            "Synthetic runner", [new("fact", "decision", "Elf")]);
+        var service = fixture.CreateChapterAuthoring();
+        var job = service.Create("subject-v2", new(OriginChapterSourceIdentity.RequestId(source), source, true), () => true);
+        Assert.True(service.TryFenceDispatch("subject-v2", job.RequestId, job.SourceDigest));
+        string text = "Private proposed chapter", receipt = new string('b', 64);
+        string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+        service.Complete("subject-v2", job.RequestId, job.SourceDigest, text, receipt);
+        var request = new AndroidLinkedOriginChapterAcceptRequest("android-v2", job.RequestId, job.SourceDigest, receipt, digest, true);
+        var unsigned = new AndroidLinkedOriginChaptersController(fixture.Service, service)
+            { ControllerContext = new() { HttpContext = new DefaultHttpContext() } };
+        Assert.IsType<UnauthorizedResult>(unsigned.AcceptChapter(request).Result);
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/accept",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext();
+        bool reached = false;
+        await fixture.InvokeAsync(context, http =>
+        {
+            reached = true;
+            if (revoke)
+            {
+                lock (fixture.Store.Gate)
+                {
+                    var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                    fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+                }
+            }
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, service)
+                { ControllerContext = new() { HttpContext = http } };
+            if (revoke) Assert.IsType<UnauthorizedResult>(controller.AcceptChapter(request).Result);
+            else Assert.Equal(digest, Assert.IsType<OriginChapterAuthoringJob>(
+                Assert.IsType<OkObjectResult>(controller.AcceptChapter(request).Result).Value).ReaderAcceptedTextDigest);
+        });
+        Assert.True(reached);
+        Assert.Equal(revoke ? null : digest, fixture.CreateChapterAuthoring().Get("subject-v2", job.RequestId)!.ReaderAcceptedTextDigest);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_origin_chapter_requires_consent_and_reopens_only_the_same_private_request(bool consent)
+    {
+        using Fixture fixture = new();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "de-AT",
+            "Synthetic runner", [new("fact", "decision", "Elf")]);
+        string requestId = OriginChapterSourceIdentity.RequestId(source);
+        var request = new AndroidLinkedOriginChapterRequest("android-v2", new(requestId, source, consent));
+        string body = JsonSerializer.Serialize(request, ContinuationWebJson);
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/request", body).CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, http =>
+        {
+            dispatched = true;
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
+                { ControllerContext = new() { HttpContext = http } };
+            var response = Assert.IsAssignableFrom<ObjectResult>(controller.RequestChapter(request).Result);
+            Assert.Equal(consent ? 200 : 400, response.StatusCode);
+            if (consent)
+            {
+                var job = Assert.IsType<OriginChapterAuthoringJob>(response.Value);
+                Assert.Equal(requestId, job.RequestId);
+                Assert.Equal(OriginChapterSourceIdentity.Digest(source), job.SourceDigest);
+                Assert.Equal(OriginChapterAuthoringStates.AwaitingAuthoring, job.State);
+                Assert.Null(job.DraftText);
+            }
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        var read = new AndroidLinkedOriginChapterReadRequest("android-v2", requestId);
+        var readContext = fixture.Sign("/api/v2/android/linked/origin/chapters/read",
+            JsonSerializer.Serialize(read, ContinuationWebJson)).CreateContext();
+        await fixture.InvokeAsync(readContext, http =>
+        {
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
+                { ControllerContext = new() { HttpContext = http } };
+            if (consent) Assert.IsType<OkObjectResult>(controller.ReadChapter(read).Result);
+            else
+            {
+                var missing = Assert.IsType<NotFoundObjectResult>(controller.ReadChapter(read).Result);
+                Assert.Equal(404, missing.StatusCode);
+                var absent = JsonSerializer.SerializeToElement(missing.Value, ContinuationWebJson);
+                Assert.Equal("chummer.origin.chapter-missing/v1", absent.GetProperty("schema").GetString());
+                Assert.Equal(requestId, absent.GetProperty("requestId").GetString());
+                // An absence response is not consent and does not create work.
+                Assert.Null(fixture.CreateChapterAuthoring().Get("subject-v2", requestId));
+            }
+        });
+        Assert.Null(fixture.CreateChapterAuthoring().Get("another-subject", requestId));
+    }
+
+    [Fact]
+    public async Task Signed_v2_origin_chapter_rechecks_revocation_before_storing()
+    {
+        using Fixture fixture = new();
+        var source = new OriginChapterSource("runner", "chapter", new string('a', 64), "decision", "en",
+            "Synthetic runner", [new("fact", "decision", "Elf")]);
+        var request = new AndroidLinkedOriginChapterRequest("android-v2",
+            new(OriginChapterSourceIdentity.RequestId(source), source, true));
+        var unsigned = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
+            { ControllerContext = new() { HttpContext = new DefaultHttpContext() } };
+        Assert.IsType<UnauthorizedResult>(unsigned.RequestChapter(request).Result);
+        var context = fixture.Sign("/api/v2/android/linked/origin/chapters/request",
+            JsonSerializer.Serialize(request, ContinuationWebJson)).CreateContext();
+        await fixture.InvokeAsync(context, http =>
+        {
+            lock (fixture.Store.Gate)
+            {
+                var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                fixture.Store.GrantsById[Fixture.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+            }
+            var controller = new AndroidLinkedOriginChaptersController(fixture.Service, fixture.CreateChapterAuthoring())
+                { ControllerContext = new() { HttpContext = http } };
+            Assert.IsType<UnauthorizedResult>(controller.RequestChapter(request).Result);
+        });
+        Assert.Null(fixture.CreateChapterAuthoring().Get("subject-v2", request.Authoring.RequestId));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_route_preserves_full_workspace_or_rejects_bad_digest(bool corrupt)
+    {
+        using Fixture fixture = new();
+        var core = InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot();
+        var transfer = InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(core);
+        var request = new AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
+            "android-v2", transfer.WorkspaceId, transfer.RulesetId, transfer.Format, transfer.SchemaVersion,
+            transfer.PayloadKind, transfer.Payload, transfer.UpdatedAtUtc, "android-v2", "Runner", "Runner",
+            "Human", "Priority", "5", "6", 0, 0, false, ExpectedRemoteRevision: 0,
+            WorkspaceSnapshot: transfer.WorkspaceSnapshot,
+            WorkspaceSnapshotDigest: corrupt ? new string('f', 64) : transfer.WorkspaceSnapshotDigest);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        string body = JsonSerializer.Serialize(request, options);
+        var context = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body).CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var result = Assert.IsAssignableFrom<ObjectResult>(controller.UpsertClaimedInstallWorkspace(
+                JsonSerializer.Deserialize<AndroidLinkedV2WorkspaceSnapshotUpsertRequest>(body, options)).Result);
+            Assert.Equal(corrupt ? StatusCodes.Status400BadRequest : StatusCodes.Status200OK, result.StatusCode);
+            if (!corrupt)
+            {
+                var wire = JsonSerializer.Deserialize<InstallLinkedWorkspaceSnapshotUpsertResponse>(
+                    JsonSerializer.Serialize(result.Value, options), options)!.Snapshot;
+                Assert.Equal(transfer.WorkspaceSnapshotDigest, wire.WorkspaceSnapshotDigest);
+                Assert.Equal(core.Document.AuxiliaryStateDigest,
+                    InstallLinkedWorkspaceSnapshotTransfer.Decode(wire.WorkspaceSnapshot!.Value).Document.AuxiliaryStateDigest);
+                Assert.Equal(1, wire.RemoteRevision);
+            }
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        var visible = fixture.WorkspaceSnapshots.ListForInstallation(fixture.Store.InstallationsById["android-v2"]);
+        if (corrupt) Assert.Empty(visible);
+        else Assert.Equal(transfer.WorkspaceSnapshotDigest, Assert.Single(visible).WorkspaceSnapshotDigest);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signed_v2_full_continuation_survives_upsert_and_authenticated_cold_list(bool includeProjection)
+    {
+        using Fixture fixture = new();
+        // These are complete transport claims, not proof of mechanically valid
+        // creation/GM history or permission to restore them into a Core store.
+        var full = InstallLinkedWorkspaceSnapshotTransferTests.SampleContinuation("subject-v2");
+        Assert.Equal("install-account-v1:" + Convert.ToHexStringLower(SHA256.HashData(
+            new UTF8Encoding(false, true).GetBytes("chummer-install-account-owner-v1\0subject-v2"))), full.OwnerId);
+        Assert.Equal(2, full.DelegatedGmCharacterEdits.Count);
+        Assert.Equal(new[] { 1 }, full.DelegatedGmHistorySegmentStarts);
+        Assert.NotNull(full.Workspace.Document.AuxiliaryState.CharacterCreationFinalizationArchive);
+        var request = ContinuationRequest(full, includeProjection);
+
+        var stored = (await SendContinuationUpsertAsync(fixture, request, StatusCodes.Status200OK))!;
+        Assert.Equal(1, stored.RemoteRevision);
+        Assert.Matches("^[0-9a-f]{64}$", stored.ServerToken!);
+        Assert.Equal(includeProjection, stored.WorkspaceSnapshot is not null);
+        AssertFullContinuation(full, stored);
+
+        string body = JsonSerializer.Serialize(new AndroidLinkedV2GrantRequest("android-v2"), ContinuationWebJson);
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/list", body);
+        var context = signed.CreateContext();
+        bool dispatched = false;
+        InstallLinkedWorkspaceSnapshotDto? listed = null;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            // A fresh workspace store forces the controller projection through
+            // the actual durable full-envelope decode, not an in-memory echo.
+            var controller = new InstallLinkingV2Controller(fixture.Service,
+                fixture.CreateColdWorkspaceSnapshots(), fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var action = controller.ListClaimedInstallWorkspaces(
+                JsonSerializer.Deserialize<AndroidLinkedV2GrantRequest>(signed.Body, ContinuationWebJson));
+            var response = Assert.IsType<OkObjectResult>(action.Result);
+            string json = JsonSerializer.Serialize(response.Value, ContinuationWebJson);
+            AssertNoProofMaterial(json, signed);
+            var wire = JsonSerializer.Deserialize<InstallLinkedWorkspaceSnapshotListResponse>(json, ContinuationWebJson)!;
+            listed = Assert.Single(wire.Snapshots);
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        Assert.NotNull(listed);
+        Assert.Equal(stored.RemoteRevision, listed.RemoteRevision);
+        Assert.Equal(stored.ServerToken, listed.ServerToken);
+        AssertFullContinuation(full, listed);
+        Assert.True(JsonElement.DeepEquals(request.WorkspaceContinuation!.Value, listed.WorkspaceContinuation!.Value));
+    }
+
+    [Theory]
+    [InlineData("foreign-subject")]
+    [InlineData("subject-case")]
+    [InlineData("outer-digest")]
+    [InlineData("envelope-digest")]
+    public async Task Signed_v2_full_continuation_rejects_wrong_owner_or_digest_without_storing(string corruption)
+    {
+        using Fixture fixture = new();
+        var full = InstallLinkedWorkspaceSnapshotTransferTests.SampleContinuation(corruption switch
+        {
+            "foreign-subject" => "foreign-subject",
+            "subject-case" => "Subject-v2",
+            _ => "subject-v2"
+        });
+        var request = ContinuationRequest(full);
+        if (corruption == "outer-digest") request = request with { WorkspaceContinuationDigest = new string('f', 64) };
+        if (corruption == "envelope-digest")
+        {
+            JsonNode envelope = JsonNode.Parse(request.WorkspaceContinuation!.Value.GetRawText())!;
+            envelope["SnapshotDigest"] = new string('f', 64);
+            request = request with { WorkspaceContinuation = JsonSerializer.SerializeToElement(envelope) };
+        }
+
+        Assert.Null(await SendContinuationUpsertAsync(fixture, request, StatusCodes.Status400BadRequest));
+
+        var installation = fixture.Store.InstallationsById["android-v2"];
+        Assert.Empty(fixture.WorkspaceSnapshots.ListForInstallation(installation));
+        Assert.Empty(fixture.CreateColdWorkspaceSnapshots().ListForInstallation(installation));
+    }
+
+    [Fact]
+    public async Task V2_proof_rejects_a_resealed_full_continuation_body_with_the_original_signature()
+    {
+        using Fixture fixture = new();
+        var original = InstallLinkedWorkspaceSnapshotTransferTests.SampleContinuation("subject-v2");
+        string body = JsonSerializer.Serialize(ContinuationRequest(original), ContinuationWebJson);
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body);
+        var changed = original with { Workspace = original.Workspace with
+        {
+            LastUpdatedUtc = original.Workspace.LastUpdatedUtc.AddSeconds(1)
+        } };
+        var changedRequest = ContinuationRequest(changed);
+        string changedBody = JsonSerializer.Serialize(changedRequest, ContinuationWebJson);
+        Assert.NotEqual(body, changedBody);
+        // The tampered envelope has a correct NEW Core digest and matching
+        // metadata. Only the old device signature is invalid for these bytes.
+        var context = (signed with { Body = Encoding.UTF8.GetBytes(changedBody) }).CreateContext();
+        bool dispatched = false;
+
+        await fixture.InvokeAsync(context, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        AssertNoProofMaterial(await ReadResponseAsync(context), signed);
+        AssertNoProofMaterial(changedBody, signed);
+        Assert.Empty(fixture.CreateColdWorkspaceSnapshots().ListForInstallation(
+            fixture.Store.InstallationsById["android-v2"]));
+        // A fresh valid proof admits the otherwise unchanged replacement body.
+        var accepted = (await SendContinuationUpsertAsync(fixture, changedRequest, StatusCodes.Status200OK))!;
+        AssertFullContinuation(changed, accepted);
+    }
+
+    private static AndroidLinkedV2WorkspaceSnapshotUpsertRequest ContinuationRequest(
+        WorkspaceContinuationSnapshot full, bool includeProjection = false)
+    {
+        var transfer = InstallLinkedWorkspaceSnapshotTransferTests.ToContinuationRecord(full, includeProjection);
+        return new("android-v2", transfer.WorkspaceId, transfer.RulesetId, transfer.Format, transfer.SchemaVersion,
+            transfer.PayloadKind, transfer.Payload, transfer.UpdatedAtUtc, "android-v2", transfer.Name, transfer.Alias,
+            transfer.Metatype, transfer.BuildMethod, transfer.CreatedVersion, transfer.AppVersion,
+            transfer.Karma, transfer.Nuyen, transfer.Created, ExpectedRemoteRevision: 0,
+            WorkspaceSnapshot: transfer.WorkspaceSnapshot, WorkspaceSnapshotDigest: transfer.WorkspaceSnapshotDigest,
+            WorkspaceContinuation: transfer.WorkspaceContinuation, WorkspaceContinuationDigest: transfer.WorkspaceContinuationDigest);
+    }
+
+    private static async Task<InstallLinkedWorkspaceSnapshotDto?> SendContinuationUpsertAsync(
+        Fixture fixture, AndroidLinkedV2WorkspaceSnapshotUpsertRequest request, int expectedStatus)
+    {
+        string body = JsonSerializer.Serialize(request, ContinuationWebJson);
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body);
+        AssertNoProofMaterial(body, signed);
+        var context = signed.CreateContext();
+        bool dispatched = false;
+        InstallLinkedWorkspaceSnapshotDto? stored = null;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var action = controller.UpsertClaimedInstallWorkspace(
+                JsonSerializer.Deserialize<AndroidLinkedV2WorkspaceSnapshotUpsertRequest>(signed.Body, ContinuationWebJson));
+            var result = Assert.IsAssignableFrom<ObjectResult>(action.Result);
+            Assert.Equal(expectedStatus, result.StatusCode);
+            string json = JsonSerializer.Serialize(result.Value, ContinuationWebJson);
+            AssertNoProofMaterial(json, signed);
+            if (expectedStatus == StatusCodes.Status200OK)
+                stored = JsonSerializer.Deserialize<InstallLinkedWorkspaceSnapshotUpsertResponse>(json, ContinuationWebJson)!.Snapshot;
+        });
+        Assert.True(dispatched);
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        return stored;
+    }
+
+    private static void AssertFullContinuation(WorkspaceContinuationSnapshot expected, InstallLinkedWorkspaceSnapshotDto wire)
+    {
+        Assert.NotNull(wire.WorkspaceContinuation);
+        Assert.Equal(WorkspaceContinuationSnapshotDigest.Compute(expected), wire.WorkspaceContinuationDigest);
+        Assert.True(WorkspaceContinuationCodec.TryDecodeCandidate(
+            Encoding.UTF8.GetBytes(wire.WorkspaceContinuation!.Value.GetRawText()),
+            InstallLinkedWorkspaceSnapshotTransfer.MaxSnapshotBytes, out var decoded));
+        Assert.Equal(wire.WorkspaceContinuationDigest, decoded!.SnapshotDigest);
+        Assert.Equal(expected.OwnerId, decoded.Snapshot.OwnerId);
+        Assert.Equal(expected.Workspace.ContentRevision, decoded.Snapshot.Workspace.ContentRevision);
+        Assert.Equal(expected.Workspace.SavedRevision, decoded.Snapshot.Workspace.SavedRevision);
+        Assert.Equal(expected.DelegatedGmHistorySegmentStarts, decoded.Snapshot.DelegatedGmHistorySegmentStarts);
+        Assert.Equal(JsonSerializer.Serialize(expected.DelegatedGmCharacterEdits),
+            JsonSerializer.Serialize(decoded.Snapshot.DelegatedGmCharacterEdits));
+        Assert.Equal(expected.Workspace.Document.AuxiliaryStateDigest, decoded.Snapshot.Workspace.Document.AuxiliaryStateDigest);
+        // Compare the complete typed content, not dictionary insertion order:
+        // the Core wire codec canonicalizes object properties before transport.
+        Assert.True(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(expected),
+            JsonSerializer.SerializeToElement(decoded.Snapshot)));
+    }
+
+    private static void AssertNoProofMaterial(string json, SignedRequest signed)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        Visit(document.RootElement);
+        void Visit(JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                foreach (JsonProperty property in element.EnumerateObject())
+                {
+                    Assert.False(property.Name.Equals("accessToken", StringComparison.OrdinalIgnoreCase)
+                        || property.Name.Equals("authorization", StringComparison.OrdinalIgnoreCase)
+                        || property.Name.Equals("signature", StringComparison.OrdinalIgnoreCase)
+                        || property.Name.Equals("packetKey", StringComparison.OrdinalIgnoreCase));
+                    Visit(property.Value);
+                }
+            }
+            else if (element.ValueKind == JsonValueKind.Array)
+                foreach (JsonElement value in element.EnumerateArray()) Visit(value);
+            else if (element.ValueKind == JsonValueKind.String)
+            {
+                string value = element.GetString()!;
+                Assert.DoesNotContain(signed.AccessToken, value, StringComparison.Ordinal);
+                Assert.DoesNotContain(signed.Signature, value, StringComparison.Ordinal);
+                Assert.DoesNotContain(signed.PacketKey, value, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("stale")]
+    [InlineData("wrong-token")]
+    public async Task Authenticated_workspace_updates_require_exact_remote_authority(string conflict)
+    {
+        using Fixture fixture = new();
+        var request = new AndroidLinkedV2WorkspaceSnapshotUpsertRequest(
+            "android-v2", "ws-http-cas", "sr5", "NativeXml", 1, "workspace", "<character/>",
+            fixture.TimeProvider.GetUtcNow(), "android-v2", "Runner", "Runner", "Human", "Priority",
+            "5", "6", 0, 0, false, ExpectedRemoteRevision: 0);
+        async Task<InstallLinkedWorkspaceSnapshotDto?> Send(AndroidLinkedV2WorkspaceSnapshotUpsertRequest value, int status)
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            string body = JsonSerializer.Serialize(value, options);
+            var signed = fixture.Sign("/api/v2/install-linking/continuation/workspaces/upsert", body, Guid.NewGuid().ToString("N"));
+            var context = signed.CreateContext();
+            InstallLinkedWorkspaceSnapshotDto? snapshot = null;
+            bool dispatched = false;
+            await fixture.InvokeAsync(context, httpContext =>
+            {
+                dispatched = true;
+                var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+                { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+                var action = controller.UpsertClaimedInstallWorkspace(
+                    JsonSerializer.Deserialize<AndroidLinkedV2WorkspaceSnapshotUpsertRequest>(body, options));
+                var response = Assert.IsAssignableFrom<ObjectResult>(action.Result);
+                Assert.Equal(status, response.StatusCode);
+                if (status == StatusCodes.Status200OK)
+                    snapshot = Assert.IsType<InstallLinkedWorkspaceSnapshotUpsertResponse>(response.Value).Snapshot;
+            });
+            Assert.True(dispatched);
+            Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+            return snapshot;
+        }
+        var first = (await Send(request, StatusCodes.Status200OK))!;
+        Assert.Equal(1, first.RemoteRevision);
+        Assert.Matches("^[0-9a-f]{64}$", first.ServerToken!);
+        request = request with { Payload = "<character><name>reviewed</name></character>",
+            ExpectedRemoteRevision = first.RemoteRevision, ExpectedServerToken = first.ServerToken };
+        var second = (await Send(request, StatusCodes.Status200OK))!;
+        Assert.Equal(2, second.RemoteRevision);
+        Assert.NotEqual(first.ServerToken, second.ServerToken);
+        var denied = request with { Payload = "<character><name>not reviewed</name></character>",
+            UpdatedAtUtc = request.UpdatedAtUtc.AddDays(1) };
+        if (conflict == "missing") denied = denied with { ExpectedRemoteRevision = null, ExpectedServerToken = null };
+        if (conflict == "wrong-token") denied = denied with
+            { ExpectedRemoteRevision = second.RemoteRevision, ExpectedServerToken = new string('0', 64) };
+        await Send(denied, conflict == "missing" ? StatusCodes.Status428PreconditionRequired : StatusCodes.Status409Conflict);
+        Assert.Equal(second.Payload, Assert.Single(fixture.WorkspaceSnapshots.ListForInstallation(
+            fixture.Store.InstallationsById["android-v2"])).Payload);
+    }
+
+    [Theory]
+    [InlineData("subject", false)]
+    [InlineData("user", false)]
+    [InlineData("subject", true)]
+    [InlineData("user", true)]
+    [InlineData("both-subject", true)]
+    [InlineData("both-user", true)]
+    public async Task Grant_cannot_authorize_a_reassigned_installation_owner(string field, bool afterProof)
+    {
+        using Fixture fixture = new();
+        void Reassign()
+        {
+            lock (fixture.Store.Gate)
+            {
+                var original = fixture.Store.InstallationsById["android-v2"];
+                fixture.Store.InstallationsById["android-v2"] = field.EndsWith("subject", StringComparison.Ordinal)
+                    ? original with { SubjectId = "other-subject" }
+                    : original with { UserId = "other-user" };
+                if (field.StartsWith("both-", StringComparison.Ordinal))
+                {
+                    var grant = fixture.Store.GrantsById[Fixture.GrantId];
+                    fixture.Store.GrantsById[Fixture.GrantId] = field == "both-subject"
+                        ? grant with { SubjectId = "other-subject" }
+                        : grant with { UserId = "other-user" };
+                }
+                fixture.Store.PersistLocked();
+            }
+        }
+        var signed = fixture.Sign("/api/v2/install-linking/grants/status", "{\"installationId\":\"android-v2\"}");
+        DefaultHttpContext context = signed.CreateContext();
+        if (!afterProof) Reassign();
+        bool dispatched = false;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            dispatched = true;
+            if (afterProof) Reassign();
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var result = controller.GetGrantStatus(new AndroidLinkedV2GrantRequest("android-v2"));
+            Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsAssignableFrom<ObjectResult>(result.Result).StatusCode);
+        });
+        Assert.Equal(afterProof, dispatched);
+        if (!afterProof) Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Grant_status_exposes_subject_only_for_the_revalidated_exact_principal(bool revokeBeforeController)
+    {
+        using Fixture fixture = new();
+        var signed = fixture.Sign("/api/v2/install-linking/grants/status", "{\"installationId\":\"android-v2\"}");
+        DefaultHttpContext context = signed.CreateContext();
+        AndroidLinkedV2GrantStatusResponse? response = null;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            if (revokeBeforeController)
+            {
+                lock (fixture.Store.Gate)
+                {
+                    fixture.Store.GrantsById[Fixture.GrantId] = fixture.Store.GrantsById[Fixture.GrantId]
+                        with { Status = InstallationGrantStates.Revoked };
+                    fixture.Store.PersistLocked();
+                }
+            }
+            var controller = new InstallLinkingV2Controller(fixture.Service, fixture.WorkspaceSnapshots, fixture.TimeProvider)
+            { ControllerContext = new ControllerContext { HttpContext = httpContext } };
+            var result = controller.GetGrantStatus(new AndroidLinkedV2GrantRequest("android-v2"));
+            if (revokeBeforeController)
+                Assert.Equal(StatusCodes.Status401Unauthorized, Assert.IsAssignableFrom<ObjectResult>(result.Result).StatusCode);
+            else
+                response = Assert.IsType<AndroidLinkedV2GrantStatusResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        });
+        Assert.Contains("no-store", context.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        if (revokeBeforeController) Assert.Null(response);
+        else
+        {
+            Assert.Equal("subject-v2", response!.SubjectId);
+            Assert.Equal("android-v2", response.InstallationId);
+            Assert.Equal(Fixture.GrantId, response.GrantId);
+            Assert.Equal(fixture.TimeProvider.GetUtcNow(), response.ObservedAtUtc);
+            Assert.DoesNotContain(Fixture.AccessToken, JsonSerializer.Serialize(response), StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("Basic token-android-v2")]
+    [InlineData("Bearer")]
+    [InlineData("Bearer token-android-v2 extra")]
+    public async Task V2_rejects_absent_or_malformed_bearer(string? authorization)
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/android/linked/groups",
+            "{\"installationId\":\"android-v2\"}");
+        DefaultHttpContext context = signed.CreateContext();
+        if (authorization is null)
+        {
+            context.Request.Headers.Remove("Authorization");
+        }
+        else
+        {
+            context.Request.Headers["Authorization"] = authorization;
+        }
+        bool dispatched = false;
+
+        await fixture.InvokeAsync(context, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        Assert.DoesNotContain(Fixture.AccessToken, await ReadResponseAsync(context), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task V2_rejects_access_token_anywhere_in_body_and_redacts_logs_and_response()
+    {
+        using Fixture fixture = new();
+        const string leakedSecret = "body-secret-that-must-never-be-logged";
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/android/linked/groups",
+            $"{{\"installationId\":\"android-v2\",\"nested\":{{\"accessToken\":\"{leakedSecret}\"}}}}");
+        DefaultHttpContext context = signed.CreateContext();
+        bool dispatched = false;
+
+        await fixture.InvokeAsync(context, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        string observed = string.Join('\n', fixture.Logger.Messages.Append(await ReadResponseAsync(context)));
+        Assert.DoesNotContain(leakedSecret, observed, StringComparison.Ordinal);
+        Assert.DoesNotContain(Fixture.AccessToken, observed, StringComparison.Ordinal);
+        Assert.DoesNotContain(signed.Signature, observed, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("{\"installationId\":\"android-v2\",\"installationId\":\"android-v2\"}")]
+    [InlineData("{\"InstallationId\":\"android-v2\"}")]
+    [InlineData("{\"installationId\":\"android-v2\",\"INSTALLATIONID\":\"android-v2\"}")]
+    public async Task V2_rejects_duplicate_or_case_variant_installation_identity(string body)
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign("/api/v2/android/linked/groups", body);
+        DefaultHttpContext context = signed.CreateContext();
+        bool dispatched = false;
+
+        await fixture.InvokeAsync(context, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task V2_proof_rejects_endpoint_and_grant_substitution_and_replay_after_store_restart()
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/android/linked/groups",
+            "{\"installationId\":\"android-v2\"}");
+        int dispatches = 0;
+
+        DefaultHttpContext accepted = signed.CreateContext();
+        await fixture.InvokeAsync(accepted, _ => dispatches++);
+        Assert.Equal(StatusCodes.Status204NoContent, accepted.Response.StatusCode);
+
+        fixture.Reload();
+        DefaultHttpContext replay = signed.CreateContext();
+        await fixture.InvokeAsync(replay, _ => dispatches++);
+        Assert.Equal(StatusCodes.Status409Conflict, replay.Response.StatusCode);
+
+        DefaultHttpContext endpointSubstitution = signed.CreateContext();
+        endpointSubstitution.Request.Path = "/api/v2/android/linked/groups/create";
+        await fixture.InvokeAsync(endpointSubstitution, _ => dispatches++);
+        Assert.Equal(StatusCodes.Status401Unauthorized, endpointSubstitution.Response.StatusCode);
+
+        SignedRequest fresh = fixture.Sign(
+            "/api/v2/android/linked/groups",
+            "{\"installationId\":\"android-v2\"}");
+        DefaultHttpContext grantSubstitution = fresh.CreateContext();
+        grantSubstitution.Request.Headers[AndroidLinkedV2RequestProof.GrantHeader] = "grant-another-install";
+        await fixture.InvokeAsync(grantSubstitution, _ => dispatches++);
+        Assert.Equal(StatusCodes.Status401Unauthorized, grantSubstitution.Response.StatusCode);
+
+        Assert.Equal(1, dispatches);
+    }
+
+    [Fact]
+    public async Task V2_proof_binds_exact_body_and_rejects_query_substitution()
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/android/linked/groups",
+            "{\"installationId\":\"android-v2\"}");
+
+        DefaultHttpContext bodySubstitution = signed.CreateContext();
+        bodySubstitution.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(
+            "{\"installationId\":\"android-v2\",\"extra\":true}"));
+        await fixture.InvokeAsync(bodySubstitution, _ => throw new InvalidOperationException("dispatch must not occur"));
+        Assert.Equal(StatusCodes.Status401Unauthorized, bodySubstitution.Response.StatusCode);
+
+        SignedRequest fresh = fixture.Sign(
+            "/api/v2/android/linked/groups",
+            "{\"installationId\":\"android-v2\"}");
+        DefaultHttpContext querySubstitution = fresh.CreateContext();
+        querySubstitution.Request.QueryString = new QueryString("?grant=another");
+        await fixture.InvokeAsync(querySubstitution, _ => throw new InvalidOperationException("dispatch must not occur"));
+        Assert.Equal(StatusCodes.Status400BadRequest, querySubstitution.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task V1_is_bypassed_but_v1_proof_cannot_authorize_v2()
+    {
+        using Fixture fixture = new();
+        DefaultHttpContext legacy = new();
+        legacy.Request.Method = HttpMethods.Post;
+        legacy.Request.Path = "/api/v1/android/linked/groups";
+        legacy.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(
+            $"{{\"installationId\":\"android-v2\",\"accessToken\":\"{Fixture.AccessToken}\"}}"));
+        legacy.Response.Body = new MemoryStream();
+        bool legacyDispatched = false;
+
+        await fixture.InvokeAsync(legacy, _ => legacyDispatched = true);
+
+        Assert.True(legacyDispatched);
+        Assert.Equal(StatusCodes.Status204NoContent, legacy.Response.StatusCode);
+
+        SignedRequest v2 = fixture.Sign(
+            "/api/v2/android/linked/groups",
+            "{\"installationId\":\"android-v2\"}");
+        DefaultHttpContext confused = v2.CreateContext();
+        confused.Request.Headers[AndroidLinkedV2RequestProof.SchemeHeader] = "chummer.android.packet.v1";
+        bool v2Dispatched = false;
+
+        await fixture.InvokeAsync(confused, _ => v2Dispatched = true);
+
+        Assert.False(v2Dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, confused.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_rotates_bearer_in_authorization_header_without_serializing_it()
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\",\"headId\":\"android\",\"applicationVersion\":\"0.1.0-preview.11\",\"channelId\":\"internal\",\"platform\":\"android\",\"architecture\":\"arm64\"}";
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/grants/refresh", body);
+        DefaultHttpContext context = signed.CreateContext();
+        AndroidLinkedV2GrantRefreshResponse? response = null;
+
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            var controller = new InstallLinkingV2Controller(
+                fixture.Service,
+                fixture.WorkspaceSnapshots,
+                fixture.TimeProvider)
+            {
+                ControllerContext = new ControllerContext { HttpContext = httpContext }
+            };
+            ActionResult<AndroidLinkedV2GrantRefreshResponse> action = controller.RefreshGrant(
+                new AndroidLinkedV2GrantRefreshRequest(
+                    "android-v2",
+                    "android",
+                    "0.1.0-preview.11",
+                    "internal",
+                    "android",
+                    "arm64",
+                    OperationId: Fixture.OperationId));
+            response = Assert.IsType<AndroidLinkedV2GrantRefreshResponse>(
+                Assert.IsType<OkObjectResult>(action.Result).Value);
+        });
+
+        string rotatedAuthorization = context.Response.Headers["Authorization"].ToString();
+        Assert.StartsWith("Bearer ", rotatedAuthorization, StringComparison.Ordinal);
+        string rotatedToken = rotatedAuthorization["Bearer ".Length..];
+        Assert.NotEqual(Fixture.AccessToken, rotatedToken);
+        Assert.Equal(response!.Grant.GrantId, context.Response.Headers[AndroidLinkedV2RequestProof.GrantHeader]);
+        string responseJson = JsonSerializer.Serialize(response, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.DoesNotContain(Fixture.AccessToken, responseJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(rotatedToken, responseJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("accessToken", responseJson, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(fixture.Service.ResolveAndroidLinkedV2Grant("android-v2", Fixture.GrantId, Fixture.AccessToken));
+        Assert.Null(fixture.Service.ResolveInstallationForGrant("android-v2", Fixture.AccessToken));
+        Assert.NotNull(fixture.Service.ResolveAndroidLinkedV2Grant("android-v2", response.Grant.GrantId, rotatedToken));
+    }
+
+    [Fact]
+    public async Task Refresh_revokes_old_bearer_for_legacy_v1_resolver()
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\"}";
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/grants/refresh", body);
+        DefaultHttpContext context = signed.CreateContext();
+
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            var controller = new InstallLinkingV2Controller(
+                fixture.Service,
+                fixture.WorkspaceSnapshots,
+                fixture.TimeProvider)
+            {
+                ControllerContext = new ControllerContext { HttpContext = httpContext }
+            };
+            Assert.IsType<OkObjectResult>(controller.RefreshGrant(
+                new AndroidLinkedV2GrantRefreshRequest(
+                    "android-v2",
+                    OperationId: Fixture.OperationId)).Result);
+        });
+
+        Assert.Null(fixture.Service.ResolveInstallationForGrant(
+            "android-v2",
+            Fixture.AccessToken));
+    }
+
+    [Fact]
+    public async Task Device_v2_unlink_still_requires_and_accepts_signed_grant_proof()
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/revoke",
+            "{\"installationId\":\"android-v2\"}");
+        AndroidLinkedV2GrantRevokeResponse? response = null;
+
+        await fixture.InvokeAsync(signed.CreateContext(), httpContext =>
+        {
+            var controller = new InstallLinkingV2Controller(
+                fixture.Service,
+                fixture.WorkspaceSnapshots,
+                fixture.TimeProvider)
+            {
+                ControllerContext = new ControllerContext { HttpContext = httpContext }
+            };
+            ActionResult<AndroidLinkedV2GrantRevokeResponse> action = controller.RevokeGrant(
+                new AndroidLinkedV2GrantRequest("android-v2"));
+            response = Assert.IsType<AndroidLinkedV2GrantRevokeResponse>(
+                Assert.IsType<OkObjectResult>(action.Result).Value);
+        });
+
+        Assert.Equal(ClaimedInstallationStates.Revoked, response!.Installation.Status);
+        Assert.Contains(response.Grants, item => item.GrantId == Fixture.GrantId);
+        Assert.Null(fixture.Service.ResolveAndroidLinkedV2Grant(
+            "android-v2",
+            Fixture.GrantId,
+            Fixture.AccessToken));
+    }
+
+    [Fact]
+    public async Task Refresh_response_loss_fresh_proof_recovers_exact_replacement_after_restart()
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\",\"applicationVersion\":\"0.1.0-preview.12\"}";
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/grants/refresh", body);
+
+        (DefaultHttpContext firstContext, AndroidLinkedV2GrantRefreshResponse first) =
+            await InvokeRefreshAsync(fixture, signed);
+        string firstAuthorization = firstContext.Response.Headers.Authorization.ToString();
+        fixture.Reload();
+        SignedRequest freshRetry = fixture.Sign(
+            signed.Path,
+            Encoding.UTF8.GetString(signed.Body),
+            issuedAtUnixSeconds: signed.IssuedAtUnixSeconds + 1);
+
+        (DefaultHttpContext retryContext, AndroidLinkedV2GrantRefreshResponse retry) =
+            await InvokeRefreshAsync(fixture, freshRetry);
+
+        Assert.Equal(first, retry);
+        Assert.Equal(firstAuthorization, retryContext.Response.Headers.Authorization.ToString());
+        Assert.Equal(first.Grant.GrantId, retryContext.Response.Headers[AndroidLinkedV2RequestProof.GrantHeader]);
+        Assert.Equal(Fixture.OperationId, retry.OperationId);
+        Assert.Equal(InstallLinkingService.AndroidLinkedV2GrantTransport, retry.GrantTransport);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+        Assert.Single(fixture.Store.GrantsById.Values, item =>
+            item.InstallationId == "android-v2"
+            && item.Status == InstallationGrantStates.Active);
+        string replacementToken = retryContext.Response.Headers.Authorization.ToString()["Bearer ".Length..];
+        Assert.Null(fixture.Service.ResolveInstallationForGrant("android-v2", replacementToken));
+        Assert.NotNull(fixture.Service.ResolveAndroidLinkedV2Grant(
+            "android-v2",
+            retry.Grant.GrantId,
+            replacementToken));
+    }
+
+    [Fact]
+    public async Task Refresh_response_loss_rejects_reused_proof_envelope_without_minting_again()
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/refresh",
+            "{\"installationId\":\"android-v2\"}");
+        await InvokeRefreshAsync(fixture, signed);
+
+        DefaultHttpContext replay = signed.CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(replay, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status409Conflict, replay.Response.StatusCode);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+    }
+
+    [Fact]
+    public async Task Refresh_response_loss_at_full_grant_capacity_pins_source_and_replacement()
+    {
+        using Fixture fixture = new();
+        lock (fixture.Store.Gate)
+        {
+            DateTimeOffset now = fixture.TimeProvider.GetUtcNow();
+            for (int index = 0; index < InstallLinkingStore.MaxGrants - 1; index++)
+            {
+                string grantId = $"capacity-grant-{index:D4}";
+                fixture.Store.GrantsById[grantId] = new InstallationGrantDto(
+                    grantId,
+                    "capacity-install",
+                    InstallationGrantStates.Revoked,
+                    $"capacity-token-{index:D4}",
+                    now.AddSeconds(index),
+                    now.AddDays(20),
+                    "capacity-user",
+                    "capacity-subject");
+                fixture.Store.GrantTransportAuthoritiesByGrantId[grantId] =
+                    new InstallationGrantTransportAuthority(
+                        grantId,
+                        InstallationGrantTransports.AndroidLinkedV2);
+            }
+            fixture.Store.PersistLocked();
+        }
+
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/refresh",
+            "{\"installationId\":\"android-v2\"}");
+        (DefaultHttpContext firstContext, AndroidLinkedV2GrantRefreshResponse first) =
+            await InvokeRefreshAsync(fixture, signed);
+        string firstAuthorization = firstContext.Response.Headers.Authorization.ToString();
+        fixture.Reload();
+
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+        Assert.True(fixture.Store.GrantsById.ContainsKey(Fixture.GrantId));
+        Assert.True(fixture.Store.GrantsById.ContainsKey(first.Grant.GrantId));
+        Assert.True(fixture.Store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.ContainsKey(Fixture.GrantId));
+
+        SignedRequest fresh = fixture.Sign(signed.Path, Encoding.UTF8.GetString(signed.Body));
+        (DefaultHttpContext retryContext, AndroidLinkedV2GrantRefreshResponse retry) =
+            await InvokeRefreshAsync(fixture, fresh);
+
+        Assert.Equal(first, retry);
+        Assert.Equal(firstAuthorization, retryContext.Response.Headers.Authorization.ToString());
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+    }
+
+    [Theory]
+    [InlineData("body")]
+    [InlineData("key")]
+    [InlineData("bearer")]
+    [InlineData("replacement-bearer")]
+    [InlineData("operation")]
+    [InlineData("installation")]
+    [InlineData("owner")]
+    public async Task Refresh_response_loss_rejects_changed_authority_or_request(string hostileChange)
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\",\"hostLabel\":\"Pixel\"}";
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/grants/refresh", body);
+        (DefaultHttpContext firstContext, _) = await InvokeRefreshAsync(fixture, signed);
+
+        SignedRequest fresh = fixture.Sign(signed.Path, Encoding.UTF8.GetString(signed.Body));
+        DefaultHttpContext retry;
+        if (hostileChange == "body")
+        {
+            fresh = fixture.Sign(
+                signed.Path,
+                "{\"installationId\":\"android-v2\",\"hostLabel\":\"Other\"}");
+            retry = fresh.CreateContext();
+        }
+        else if (hostileChange == "key")
+        {
+            using RSA otherKey = RSA.Create(2048);
+            fresh = fixture.SignWithKey(
+                otherKey,
+                signed.Path,
+                Encoding.UTF8.GetString(signed.Body));
+            retry = fresh.CreateContext();
+        }
+        else if (hostileChange == "bearer")
+        {
+            retry = fresh.CreateContext();
+            retry.Request.Headers.Authorization = "Bearer changed-source-token";
+        }
+        else if (hostileChange == "replacement-bearer")
+        {
+            retry = fresh.CreateContext(firstContext.Response.Headers.Authorization.ToString());
+        }
+        else if (hostileChange == "operation")
+        {
+            const string changedOperationId = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+            string changedBody = Encoding.UTF8.GetString(signed.Body)
+                .Replace(Fixture.OperationId, changedOperationId, StringComparison.Ordinal);
+            fresh = fixture.Sign(signed.Path, changedBody, changedOperationId);
+            retry = fresh.CreateContext();
+        }
+        else if (hostileChange == "installation")
+        {
+            retry = fresh.CreateContext();
+            retry.Request.Headers[AndroidLinkedV2RequestProof.InstallationHeader] = "other-installation";
+        }
+        else
+        {
+            retry = fresh.CreateContext();
+            lock (fixture.Store.Gate)
+            {
+                ClaimedInstallationDto installation = fixture.Store.InstallationsById["android-v2"];
+                fixture.Store.InstallationsById["android-v2"] = installation with { UserId = "other-owner" };
+            }
+        }
+
+        bool dispatched = false;
+        await fixture.InvokeAsync(retry, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, retry.Response.StatusCode);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+    }
+
+    [Fact]
+    public async Task Refresh_response_loss_rejects_case_mutated_source_grant_identity()
+    {
+        using Fixture fixture = new();
+        const string body = "{\"installationId\":\"android-v2\"}";
+        SignedRequest signed = fixture.Sign("/api/v2/install-linking/grants/refresh", body);
+        await InvokeRefreshAsync(fixture, signed);
+        SignedRequest caseMutated = fixture.SignForGrantId(
+            signed.Path,
+            Encoding.UTF8.GetString(signed.Body),
+            Fixture.GrantId.ToUpperInvariant());
+        DefaultHttpContext retry = caseMutated.CreateContext();
+        bool dispatched = false;
+
+        await fixture.InvokeAsync(retry, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, retry.Response.StatusCode);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+    }
+
+    [Fact]
+    public async Task Refresh_response_loss_rejects_expired_operation_receipt()
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/refresh",
+            "{\"installationId\":\"android-v2\"}");
+        await InvokeRefreshAsync(fixture, signed);
+        lock (fixture.Store.Gate)
+        {
+            AndroidLinkedV2GrantRefreshReceipt receipt =
+                fixture.Store.AndroidLinkedV2RefreshReceiptsBySourceGrantId[Fixture.GrantId];
+            fixture.Store.AndroidLinkedV2RefreshReceiptsBySourceGrantId[Fixture.GrantId] = receipt with
+            {
+                RetryExpiresAtUtc = fixture.TimeProvider.GetUtcNow().AddSeconds(-1)
+            };
+        }
+
+        SignedRequest fresh = fixture.Sign(signed.Path, Encoding.UTF8.GetString(signed.Body));
+        DefaultHttpContext retry = fresh.CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(retry, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, retry.Response.StatusCode);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+    }
+
+    [Theory]
+    [InlineData(InstallationGrantStates.Expired)]
+    [InlineData(InstallationGrantStates.Revoked)]
+    public async Task Refresh_response_loss_rejects_non_active_replacement(string replacementStatus)
+    {
+        using Fixture fixture = new();
+        SignedRequest signed = fixture.Sign(
+            "/api/v2/install-linking/grants/refresh",
+            "{\"installationId\":\"android-v2\"}");
+        (_, AndroidLinkedV2GrantRefreshResponse first) = await InvokeRefreshAsync(fixture, signed);
+        lock (fixture.Store.Gate)
+        {
+            InstallationGrantDto grant = fixture.Store.GrantsById[first.Grant.GrantId];
+            fixture.Store.GrantsById[first.Grant.GrantId] = grant with
+            {
+                Status = replacementStatus,
+                ExpiresAtUtc = replacementStatus == InstallationGrantStates.Expired
+                    ? DateTimeOffset.UtcNow.AddMinutes(-1)
+                    : grant.ExpiresAtUtc
+            };
+        }
+
+        SignedRequest fresh = fixture.Sign(signed.Path, Encoding.UTF8.GetString(signed.Body));
+        DefaultHttpContext retry = fresh.CreateContext();
+        bool dispatched = false;
+        await fixture.InvokeAsync(retry, _ => dispatched = true);
+
+        Assert.False(dispatched);
+        Assert.Equal(StatusCodes.Status401Unauthorized, retry.Response.StatusCode);
+        Assert.Equal(2, fixture.Store.GrantsById.Values.Count(item => item.InstallationId == "android-v2"));
+    }
+
+    [Fact]
+    public void Grant_transport_authority_blocks_cross_route_downgrade_and_preserves_legacy_grants()
+    {
+        using Fixture fixture = new();
+
+        Assert.Null(fixture.Service.ResolveInstallationForGrant("android-v2", Fixture.AccessToken));
+        InstallLinkingOperationException downgrade = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.RefreshGrant(new RefreshInstallationGrantRequestDto(
+                "android-v2",
+                Fixture.AccessToken)));
+        Assert.Equal(StatusCodes.Status401Unauthorized, downgrade.StatusCode);
+
+        InstallationGrantDto legacy = fixture.SeedLegacyGrant("preview10-install");
+        Assert.NotNull(fixture.Service.ResolveInstallationForGrant(
+            legacy.InstallationId,
+            legacy.AccessToken));
+        Assert.Null(fixture.Service.ResolveAndroidLinkedV2Grant(
+            legacy.InstallationId,
+            legacy.GrantId,
+            legacy.AccessToken));
+    }
+
+    [Fact]
+    public void V2_request_DTOs_have_no_access_token_member()
+    {
+        Type[] requestTypes =
+        [
+            typeof(AndroidLinkedV2GrantRequest),
+            typeof(AndroidLinkedV2GroupCreateRequest),
+            typeof(AndroidLinkedV2GroupUpdateRequest),
+            typeof(AndroidLinkedV2ChronicleDraftRequest),
+            typeof(AndroidLinkedV2ChronicleActionRequest),
+            typeof(AndroidLinkedV2AccountErasureRequest),
+            typeof(AndroidLinkedV2GrantRefreshRequest),
+            typeof(AndroidLinkedV2WorkspaceSnapshotUpsertRequest)
+        ];
+
+        Assert.All(requestTypes, static type => Assert.DoesNotContain(
+            type.GetProperties(),
+            static property => property.Name.Contains("AccessToken", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public void Canonical_payload_is_version_endpoint_grant_and_body_bound_without_a_secret()
+    {
+        byte[] body = Encoding.UTF8.GetBytes("{\"installationId\":\"android-v2\"}");
+        string packetKey = ToBase64Url(Enumerable.Repeat((byte)0x5a, 32).ToArray());
+        byte[] canonical = AndroidLinkedV2RequestProof.CreateCanonicalPayload(
+            "post",
+            "/api/v2/android/linked/groups/Group-A/chronicles",
+            "android-v2",
+            "grant-android-v2",
+            1_788_544_000,
+            packetKey,
+            body);
+        string expectedBodyDigest = Convert.ToHexString(SHA256.HashData(body)).ToLowerInvariant();
+
+        Assert.Equal(
+            string.Join('\n',
+                "chummer.android.packet.v2",
+                "POST",
+                "/api/v2/android/linked/groups/Group-A/chronicles",
+                "android-v2",
+                "grant-android-v2",
+                "1788544000",
+                packetKey,
+                $"sha256:{expectedBodyDigest}"),
+            Encoding.UTF8.GetString(canonical));
+        Assert.DoesNotContain("grant-secret", Encoding.UTF8.GetString(canonical), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void V2_bootstrap_returns_secret_only_in_response_headers()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-v2",
+            useLegacyCanonical: false);
+        DefaultHttpContext context = CreateControllerContext(AndroidInstallLinkV2BootstrapProof.Path);
+        var controller = new InstallLinkingV2Controller(
+            fixture.Service,
+            fixture.WorkspaceSnapshots,
+            fixture.TimeProvider)
+        {
+            ControllerContext = new ControllerContext { HttpContext = context }
+        };
+
+        ActionResult<AndroidInstallLinkV2ExchangeResponse> action = controller.PollBrowserCallback(request);
+
+        AndroidInstallLinkV2ExchangeResponse response = Assert.IsType<AndroidInstallLinkV2ExchangeResponse>(
+            Assert.IsType<OkObjectResult>(action.Result).Value);
+        Assert.Single(context.Response.Headers.Authorization);
+        string authorization = context.Response.Headers.Authorization.ToString();
+        Assert.StartsWith("Bearer ", authorization, StringComparison.Ordinal);
+        string issuedToken = authorization["Bearer ".Length..];
+        Assert.NotEmpty(issuedToken);
+        Assert.Equal(response.Grant.GrantId, Assert.Single(context.Response.Headers[AndroidLinkedV2RequestProof.GrantHeader]));
+        string json = JsonSerializer.Serialize(response, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.DoesNotContain(issuedToken, json, StringComparison.Ordinal);
+        Assert.DoesNotContain("accessToken", json, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(fixture.Service.ResolveAndroidLinkedV2Grant(
+            response.Installation.InstallationId,
+            response.Grant.GrantId,
+            issuedToken));
+        Assert.Equal(Fixture.OperationId, response.OperationId);
+        Assert.Equal(InstallLinkingService.AndroidLinkedV2GrantTransport, response.GrantTransport);
+    }
+
+    [Fact]
+    public void V2_bootstrap_response_loss_fresh_proof_recovers_original_grant_after_restart()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-retry",
+            useLegacyCanonical: false);
+
+        (DefaultHttpContext firstContext, AndroidInstallLinkV2ExchangeResponse first) =
+            PollBootstrap(fixture, request);
+        string firstAuthorization = firstContext.Response.Headers.Authorization.ToString();
+        fixture.Reload();
+        InstallLinkingService sharedService = fixture.CreateSharedService();
+        AndroidInstallLinkProofPollV2Request freshRetry = fixture.SignBootstrap(request with
+        {
+            IssuedAtUnixSeconds = request.IssuedAtUnixSeconds + 1,
+            Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+            Signature = string.Empty
+        });
+
+        (DefaultHttpContext retryContext, AndroidInstallLinkV2ExchangeResponse retry) =
+            PollBootstrap(fixture, freshRetry, sharedService);
+
+        Assert.False(first.AlreadyClaimed);
+        Assert.True(retry.AlreadyClaimed);
+        Assert.Equal(first.Installation, retry.Installation);
+        Assert.Equal(first.Grant, retry.Grant);
+        Assert.Equal(first.OperationId, retry.OperationId);
+        Assert.Equal(firstAuthorization, retryContext.Response.Headers.Authorization.ToString());
+        Assert.Equal(first.Grant.GrantId, retryContext.Response.Headers[AndroidLinkedV2RequestProof.GrantHeader]);
+        Assert.Single(fixture.Store.GrantsById.Values, item =>
+            item.InstallationId == request.InstallationId);
+    }
+
+    [Fact]
+    public void V2_bootstrap_recovery_grant_is_pinned_against_newer_grant_eviction()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-eviction-window",
+            useLegacyCanonical: false);
+        (DefaultHttpContext firstContext, AndroidInstallLinkV2ExchangeResponse first) =
+            PollBootstrap(fixture, request);
+        string firstAuthorization = firstContext.Response.Headers.Authorization.ToString();
+
+        lock (fixture.Store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            for (int index = 0; index < InstallLinkingStore.MaxGrants; index++)
+            {
+                string grantId = $"newer-grant-{index:D4}";
+                fixture.Store.GrantsById[grantId] = new InstallationGrantDto(
+                    grantId,
+                    "newer-install",
+                    InstallationGrantStates.Revoked,
+                    string.Empty,
+                    now.AddSeconds(index + 1),
+                    now.AddDays(30),
+                    "newer-user",
+                    "newer-subject");
+                fixture.Store.GrantTransportAuthoritiesByGrantId[grantId] =
+                    new InstallationGrantTransportAuthority(
+                        grantId,
+                        InstallationGrantTransports.AndroidLinkedV2);
+            }
+            fixture.Store.PersistLocked();
+        }
+
+        fixture.Reload();
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+        Assert.Contains(first.Grant.GrantId, fixture.Store.GrantsById.Keys);
+        Assert.Contains(
+            fixture.Store.BrowserCallbackRedemptionReceiptsByCallbackId.Values,
+            item => item.GrantId == first.Grant.GrantId);
+        AndroidInstallLinkProofPollV2Request freshRetry = fixture.SignBootstrap(request with
+        {
+            IssuedAtUnixSeconds = request.IssuedAtUnixSeconds + 1,
+            Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+            Signature = string.Empty
+        });
+
+        (DefaultHttpContext retryContext, AndroidInstallLinkV2ExchangeResponse retry) =
+            PollBootstrap(fixture, freshRetry);
+
+        Assert.Equal(first.Grant, retry.Grant);
+        Assert.Equal(firstAuthorization, retryContext.Response.Headers.Authorization.ToString());
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+    }
+
+    [Fact]
+    public void V2_bootstrap_full_recovery_capacity_fails_before_consuming_callback_across_restart()
+    {
+        using Fixture fixture = new();
+        fixture.SeedFullyPinnedGrantCapacity();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-capacity",
+            useLegacyCanonical: false);
+
+        ObjectResult firstDenied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, request).Result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, firstDenied.StatusCode);
+        InstallBrowserCallbackDto callback = Assert.Single(
+            fixture.Store.BrowserCallbacksById.Values,
+            item => item.InstallationId == request.InstallationId);
+        Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
+        Assert.Null(callback.GrantId);
+        Assert.DoesNotContain(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+
+        fixture.Reload();
+        AndroidInstallLinkProofPollV2Request freshRetry = fixture.SignBootstrap(request with
+        {
+            IssuedAtUnixSeconds = request.IssuedAtUnixSeconds + 1,
+            Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+            Signature = string.Empty
+        });
+        ObjectResult retryDenied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, freshRetry).Result);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, retryDenied.StatusCode);
+        callback = Assert.Single(
+            fixture.Store.BrowserCallbacksById.Values,
+            item => item.InstallationId == request.InstallationId);
+        Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
+        Assert.Null(callback.GrantId);
+        Assert.Equal(InstallLinkingStore.MaxGrants, fixture.Store.GrantsById.Count);
+    }
+
+    [Fact]
+    public void V2_bootstrap_retry_rejects_reused_proof_envelope()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-replay",
+            useLegacyCanonical: false);
+        PollBootstrap(fixture, request);
+
+        ObjectResult denied = Assert.IsType<ObjectResult>(PollBootstrapAction(fixture, request).Result);
+
+        Assert.Equal(StatusCodes.Status409Conflict, denied.StatusCode);
+        Assert.Single(fixture.Store.GrantsById.Values, item =>
+            item.InstallationId == request.InstallationId);
+    }
+
+    [Fact]
+    public void V2_bootstrap_retry_rejects_changed_identity_key_and_signed_body()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-hostile",
+            useLegacyCanonical: false);
+        PollBootstrap(fixture, request);
+
+        AndroidInstallLinkProofPollV2Request changedBody = fixture.SignBootstrap(
+            request with
+            {
+                HostLabel = "Different device",
+                IssuedAtUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+                Signature = string.Empty
+            });
+        ObjectResult bodyDenied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, changedBody).Result);
+        Assert.Equal(StatusCodes.Status409Conflict, bodyDenied.StatusCode);
+
+        const string changedOperationId = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+        AndroidInstallLinkProofPollV2Request changedOperation = fixture.SignBootstrap(request with
+        {
+            OperationId = changedOperationId,
+            IssuedAtUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            Nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24)),
+            Signature = string.Empty
+        });
+        ObjectResult operationDenied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, changedOperation).Result);
+        Assert.Equal(StatusCodes.Status409Conflict, operationDenied.StatusCode);
+
+        using RSA otherKey = RSA.Create(2048);
+        AndroidInstallLinkProofPollV2Request changedKey = request with
+        {
+            PublicKey = Convert.ToBase64String(otherKey.ExportSubjectPublicKeyInfo())
+        };
+        ObjectResult keyDenied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, changedKey).Result);
+        Assert.Equal(StatusCodes.Status409Conflict, keyDenied.StatusCode);
+
+        ActionResult<AndroidInstallLinkV2ExchangeResponse> identityResult = PollBootstrapAction(
+            fixture,
+            request with { InstallationId = "other-installation" });
+        Assert.IsType<AcceptedResult>(identityResult.Result);
+        Assert.Single(fixture.Store.GrantsById.Values, item =>
+            item.InstallationId == request.InstallationId);
+    }
+
+    [Fact]
+    public void V2_bootstrap_rejects_resigned_transport_substitution()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-transport-substitution",
+            useLegacyCanonical: false);
+        AndroidInstallLinkProofPollV2Request substituted = fixture.SignBootstrap(request with
+        {
+            InstallLinkTransport = InstallLinkingService.LegacyProofPollTransport,
+            Signature = string.Empty
+        });
+
+        ObjectResult denied = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, substituted).Result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, denied.StatusCode);
+        Assert.DoesNotContain(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+    }
+
+    [Theory]
+    [InlineData("owner")]
+    [InlineData("grant-expired")]
+    [InlineData("grant-revoked")]
+    [InlineData("callback-expired")]
+    [InlineData("callback-revoked")]
+    public void V2_bootstrap_retry_rejects_changed_owner_or_terminal_authority(string hostileChange)
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-terminal",
+            useLegacyCanonical: false);
+        (_, AndroidInstallLinkV2ExchangeResponse first) = PollBootstrap(fixture, request);
+
+        lock (fixture.Store.Gate)
+        {
+            InstallBrowserCallbackDto callback = Assert.Single(
+                fixture.Store.BrowserCallbacksById.Values,
+                item => item.InstallationId == request.InstallationId);
+            InstallationGrantDto grant = fixture.Store.GrantsById[first.Grant.GrantId];
+            ClaimedInstallationDto installation = fixture.Store.InstallationsById[request.InstallationId];
+            if (hostileChange == "owner")
+            {
+                fixture.Store.InstallationsById[request.InstallationId] = installation with
+                {
+                    SubjectId = "other-subject"
+                };
+            }
+            else if (hostileChange == "grant-expired")
+            {
+                fixture.Store.GrantsById[grant.GrantId] = grant with
+                {
+                    IssuedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2),
+                    ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1)
+                };
+            }
+            else if (hostileChange == "grant-revoked")
+            {
+                fixture.Store.GrantsById[grant.GrantId] = grant with { Status = InstallationGrantStates.Revoked };
+            }
+            else if (hostileChange == "callback-expired")
+            {
+                fixture.Store.BrowserCallbacksById[callback.CallbackId] = callback with
+                {
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2),
+                    ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1)
+                };
+            }
+            else
+            {
+                fixture.Store.BrowserCallbacksById[callback.CallbackId] = callback with
+                {
+                    Status = InstallBrowserCallbackStates.Revoked
+                };
+            }
+        }
+
+        ObjectResult denied = Assert.IsType<ObjectResult>(PollBootstrapAction(fixture, request).Result);
+        Assert.True(denied.StatusCode is StatusCodes.Status409Conflict or StatusCodes.Status410Gone);
+        Assert.Single(fixture.Store.GrantsById.Values, item => item.InstallationId == request.InstallationId);
+    }
+
+    [Fact]
+    public void V2_callback_intent_survives_restart_and_rejects_legacy_poll_before_redemption()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-v2-intent",
+            useLegacyCanonical: false);
+        InstallBrowserCallbackDto callback = Assert.Single(
+            fixture.Store.BrowserCallbacksById.Values,
+            item => item.InstallationId == request.InstallationId);
+
+        fixture.Reload();
+
+        Assert.Equal(
+            InstallLinkingService.AndroidLinkedV2ProofPollTransport,
+            fixture.Store.BrowserCallbackTransportIntentsByCallbackId[callback.CallbackId].Transport);
+        InstallLinkingOperationException downgrade = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Service.PollBrowserCallback(fixture.SignLegacyBootstrap(request)));
+        Assert.Equal(StatusCodes.Status409Conflict, downgrade.StatusCode);
+        Assert.DoesNotContain(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+
+        (_, AndroidInstallLinkV2ExchangeResponse response) = PollBootstrap(fixture, request);
+        Assert.Equal(
+            InstallationGrantTransports.AndroidLinkedV2,
+            fixture.Store.GrantTransportAuthoritiesByGrantId[response.Grant.GrantId].Transport);
+    }
+
+    [Fact]
+    public void Legacy_callback_intent_rejects_v2_poll_and_still_allows_preview10_poll()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-legacy-intent",
+            useLegacyCanonical: false,
+            approvedTransport: InstallLinkingService.LegacyProofPollTransport);
+
+        ObjectResult downgrade = Assert.IsType<ObjectResult>(
+            PollBootstrapAction(fixture, request).Result);
+        Assert.Equal(StatusCodes.Status409Conflict, downgrade.StatusCode);
+        Assert.DoesNotContain(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+
+        PollInstallBrowserCallbackResult legacy = fixture.Service.PollBrowserCallback(
+            fixture.SignLegacyBootstrap(request));
+        ExchangeInstallBrowserCallbackResponseDto exchange = Assert.IsType<ExchangeInstallBrowserCallbackResponseDto>(
+            legacy.Exchange);
+        Assert.Equal(
+            InstallationGrantTransports.LegacyV1,
+            fixture.Store.GrantTransportAuthoritiesByGrantId[exchange.Grant.GrantId].Transport);
+    }
+
+    [Fact]
+    public async Task V2_callback_intent_closes_cross_route_redemption_race()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-v2-race",
+            useLegacyCanonical: false);
+        AndroidInstallLinkProofPollRequest legacyRequest = fixture.SignLegacyBootstrap(request);
+        using var start = new ManualResetEventSlim(false);
+
+        Task<ActionResult<AndroidInstallLinkV2ExchangeResponse>> v2 = Task.Run(() =>
+        {
+            start.Wait();
+            return PollBootstrapAction(fixture, request);
+        });
+        Task<InstallLinkingOperationException> v1 = Task.Run(() =>
+        {
+            start.Wait();
+            return Assert.Throws<InstallLinkingOperationException>(() =>
+                fixture.Service.PollBrowserCallback(legacyRequest));
+        });
+        start.Set();
+        ActionResult<AndroidInstallLinkV2ExchangeResponse> v2Result = await v2;
+        InstallLinkingOperationException v1Error = await v1;
+
+        Assert.Equal(StatusCodes.Status409Conflict, v1Error.StatusCode);
+        AndroidInstallLinkV2ExchangeResponse exchange = Assert.IsType<AndroidInstallLinkV2ExchangeResponse>(
+            Assert.IsType<OkObjectResult>(v2Result.Result).Value);
+        Assert.Single(
+            fixture.Store.GrantsById.Values,
+            item => item.InstallationId == request.InstallationId);
+        Assert.Equal(
+            InstallationGrantTransports.AndroidLinkedV2,
+            fixture.Store.GrantTransportAuthoritiesByGrantId[exchange.Grant.GrantId].Transport);
+    }
+
+    [Fact]
+    public void Legacy_bootstrap_signature_cannot_authorize_v2_callback_poll()
+    {
+        using Fixture fixture = new();
+        AndroidInstallLinkProofPollV2Request request = fixture.IssueBootstrapRequest(
+            "android-bootstrap-confusion",
+            useLegacyCanonical: true);
+        DefaultHttpContext context = CreateControllerContext(AndroidInstallLinkV2BootstrapProof.Path);
+        var controller = new InstallLinkingV2Controller(
+            fixture.Service,
+            fixture.WorkspaceSnapshots,
+            fixture.TimeProvider)
+        {
+            ControllerContext = new ControllerContext { HttpContext = context }
+        };
+
+        ActionResult<AndroidInstallLinkV2ExchangeResponse> action = controller.PollBrowserCallback(request);
+
+        ObjectResult denied = Assert.IsType<ObjectResult>(action.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, denied.StatusCode);
+        Assert.False(context.Response.Headers.ContainsKey("Authorization"));
+        Assert.False(context.Response.Headers.ContainsKey(AndroidLinkedV2RequestProof.GrantHeader));
+        Assert.DoesNotContain(request.Signature, JsonSerializer.Serialize(denied.Value), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Bootstrap_canonical_payload_is_version_and_endpoint_bound()
+    {
+        var request = new AndroidInstallLinkProofPollV2Request(
+            "android-bootstrap-v2",
+            "android",
+            "0.1.0-preview.11",
+            "internal",
+            "android",
+            "arm64",
+            "spki",
+            1_788_544_000,
+            "0123456789abcdef0123456789abcdef",
+            "signature",
+            "Pixel",
+            Fixture.OperationId,
+            InstallLinkingService.AndroidLinkedV2ProofPollTransport);
+
+        Assert.Equal(
+            string.Join('\n',
+                "chummer.install-link.remote-callback.v2",
+                "POST",
+                "/api/v2/install-linking/callbacks/poll",
+                InstallLinkingService.AndroidLinkedV2ProofPollTransport,
+                Fixture.OperationId,
+                "android-bootstrap-v2",
+                "android",
+                "0.1.0-preview.11",
+                "internal",
+                "android",
+                "arm64",
+                "1788544000",
+                "0123456789abcdef0123456789abcdef",
+                "Pixel"),
+            Encoding.UTF8.GetString(AndroidInstallLinkV2BootstrapProof.CreateCanonicalPayload(request)));
+    }
+
+    private static async Task<(DefaultHttpContext Context, AndroidLinkedV2GrantRefreshResponse Response)>
+        InvokeRefreshAsync(Fixture fixture, SignedRequest signed)
+    {
+        DefaultHttpContext context = signed.CreateContext();
+        AndroidLinkedV2GrantRefreshResponse? response = null;
+        await fixture.InvokeAsync(context, httpContext =>
+        {
+            var controller = new InstallLinkingV2Controller(
+                fixture.Service,
+                fixture.WorkspaceSnapshots,
+                fixture.TimeProvider)
+            {
+                ControllerContext = new ControllerContext { HttpContext = httpContext }
+            };
+            AndroidLinkedV2GrantRefreshRequest request = JsonSerializer.Deserialize<AndroidLinkedV2GrantRefreshRequest>(
+                signed.Body,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            ActionResult<AndroidLinkedV2GrantRefreshResponse> action = controller.RefreshGrant(request);
+            response = Assert.IsType<AndroidLinkedV2GrantRefreshResponse>(
+                Assert.IsType<OkObjectResult>(action.Result).Value);
+        });
+        return (context, Assert.IsType<AndroidLinkedV2GrantRefreshResponse>(response));
+    }
+
+    private static (
+        DefaultHttpContext Context,
+        AndroidInstallLinkV2ExchangeResponse Response) PollBootstrap(
+        Fixture fixture,
+        AndroidInstallLinkProofPollV2Request request,
+        InstallLinkingService? service = null)
+    {
+        DefaultHttpContext context = CreateControllerContext(AndroidInstallLinkV2BootstrapProof.Path);
+        ActionResult<AndroidInstallLinkV2ExchangeResponse> action = PollBootstrapAction(
+            fixture,
+            request,
+            service,
+            context);
+        AndroidInstallLinkV2ExchangeResponse response = Assert.IsType<AndroidInstallLinkV2ExchangeResponse>(
+            Assert.IsType<OkObjectResult>(action.Result).Value);
+        return (context, response);
+    }
+
+    private static ActionResult<AndroidInstallLinkV2ExchangeResponse> PollBootstrapAction(
+        Fixture fixture,
+        AndroidInstallLinkProofPollV2Request request,
+        InstallLinkingService? service = null,
+        DefaultHttpContext? context = null)
+    {
+        var controller = new InstallLinkingV2Controller(
+            service ?? fixture.Service,
+            fixture.WorkspaceSnapshots,
+            fixture.TimeProvider)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = context ?? CreateControllerContext(AndroidInstallLinkV2BootstrapProof.Path)
+            }
+        };
+        return controller.PollBrowserCallback(request);
+    }
+
+    private static DefaultHttpContext CreateControllerContext(string path)
+    {
+        DefaultHttpContext context = new();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = path;
+        context.Response.Body = new MemoryStream();
+        return context;
+    }
+
+    private static async Task<string> ReadResponseAsync(DefaultHttpContext context)
+    {
+        context.Response.Body.Position = 0;
+        using StreamReader reader = new(context.Response.Body, Encoding.UTF8, leaveOpen: true);
+        string content = await reader.ReadToEndAsync();
+        context.Response.Body.Position = 0;
+        return content;
+    }
+
+    private static string ToBase64Url(byte[] bytes)
+        => Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+    private sealed class Fixture : IDisposable
+    {
+        private readonly string _root;
+        private readonly RSA _key = RSA.Create(2048);
+        private readonly IConfiguration _configuration;
+        private readonly IDataProtectionProvider _protection;
+        private InstallLinkingStore _store;
+
+        public Fixture()
+        {
+            _root = Path.Combine(
+                Path.GetTempPath(),
+                "chummer-android-linked-v2-tests",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(_root);
+            _configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking-store.json"),
+                    ["CHUMMER_RUNTIME_STATE_ROOT"] = _root,
+                    ["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"] = Path.Combine(_root, "workspace-store.json")
+                })
+                .Build();
+            _protection = DataProtectionProvider.Create(Path.Combine(_root, "keys"));
+            _store = CreateStore();
+            Service = new InstallLinkingService(_store, _configuration);
+            WorkspaceSnapshots = new InstallLinkedWorkspaceSnapshotService(
+                new InstallLinkedWorkspaceSnapshotStore(_configuration));
+            TimeProvider = new FixedTimeProvider(DateTimeOffset.UtcNow);
+
+            lock (_store.Gate)
+            {
+                InstallationGrantDto grant = new(
+                    GrantId,
+                    "android-v2",
+                    InstallationGrantStates.Active,
+                    AccessToken,
+                    TimeProvider.GetUtcNow().AddMinutes(-1),
+                    TimeProvider.GetUtcNow().AddDays(30),
+                    "user-v2",
+                    "subject-v2");
+                _store.InstallationsById["android-v2"] = new ClaimedInstallationDto(
+                    InstallationId: "android-v2",
+                    ArtifactId: "android-play-app",
+                    Channel: "internal",
+                    Version: "0.1.0-preview.11",
+                    InstallAccessClass: InstallAccessClasses.AccountRequired,
+                    Status: ClaimedInstallationStates.Active,
+                    CreatedAtUtc: TimeProvider.GetUtcNow().AddDays(-1),
+                    UpdatedAtUtc: TimeProvider.GetUtcNow(),
+                    UserId: "user-v2",
+                    SubjectId: "subject-v2",
+                    PublicKey: Convert.ToBase64String(_key.ExportSubjectPublicKeyInfo()),
+                    ClaimTicketId: "ticket-android-v2",
+                    HeadId: "android",
+                    Platform: "android",
+                    Arch: "arm64",
+                    HostLabel: "Android test",
+                    GrantId: GrantId);
+                _store.GrantsById[GrantId] = grant;
+                _store.GrantTransportAuthoritiesByGrantId[GrantId] =
+                    new InstallationGrantTransportAuthority(
+                        GrantId,
+                        InstallationGrantTransports.AndroidLinkedV2);
+                _store.PersistLocked();
+            }
+        }
+
+        public const string GrantId = "grant-android-v2";
+        public const string AccessToken = "token-android-v2";
+        public const string OperationId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        public InstallLinkingStore Store => _store;
+        public InstallLinkingService Service { get; private set; }
+        public InstallLinkedWorkspaceSnapshotService WorkspaceSnapshots { get; }
+        public TimeProvider TimeProvider { get; }
+        public CapturingLogger Logger { get; } = new();
+        public OriginChapterAuthoringService CreateChapterAuthoring() => new(_configuration);
+
+        public void Reload()
+        {
+            _store.Dispose();
+            _store = CreateStore();
+            Service = new InstallLinkingService(_store, _configuration);
+        }
+
+        public InstallLinkingService CreateSharedService()
+            => new(_store, _configuration);
+
+        public void UseReadinessProbe(IInstallLinkingStoreReadinessProbe probe)
+            => Service = new(_store, _configuration, probe);
+
+        public InstallLinkedWorkspaceSnapshotService CreateColdWorkspaceSnapshots()
+            => new(new InstallLinkedWorkspaceSnapshotStore(_configuration));
+
+        public SignedRequest Sign(
+            string path,
+            string body,
+            string operationId = OperationId,
+            long? issuedAtUnixSeconds = null)
+            => SignWithKey(_key, path, body, operationId, issuedAtUnixSeconds);
+
+        public SignedRequest SignForGrantId(
+            string path,
+            string body,
+            string grantId,
+            string operationId = OperationId,
+            long? issuedAtUnixSeconds = null)
+            => SignWithKey(
+                _key,
+                path,
+                body,
+                operationId,
+                issuedAtUnixSeconds,
+                grantId);
+
+        public SignedRequest SignWithKey(
+            RSA signingKey,
+            string path,
+            string body,
+            string operationId = OperationId,
+            long? issuedAtUnixSeconds = null,
+            string grantId = GrantId)
+        {
+            if (string.Equals(
+                    path,
+                    "/api/v2/install-linking/grants/refresh",
+                    StringComparison.OrdinalIgnoreCase)
+                && !body.Contains("\"operationId\"", StringComparison.Ordinal))
+            {
+                body = body.Insert(1, $"\"operationId\":\"{operationId}\",");
+            }
+            string packetKey = ToBase64Url(RandomNumberGenerator.GetBytes(
+                AndroidLinkedV2RequestProof.PacketKeyBytes));
+            long issued = issuedAtUnixSeconds ?? TimeProvider.GetUtcNow().ToUnixTimeSeconds();
+            byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
+            byte[] canonical = AndroidLinkedV2RequestProof.CreateCanonicalPayload(
+                HttpMethods.Post,
+                path,
+                "android-v2",
+                grantId,
+                issued,
+                packetKey,
+                bodyBytes);
+            byte[] signature = signingKey.SignData(
+                canonical,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            try
+            {
+                return new SignedRequest(
+                    path,
+                    bodyBytes,
+                    grantId,
+                    AccessToken,
+                    packetKey,
+                    issued,
+                    Convert.ToBase64String(signature));
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(canonical);
+                CryptographicOperations.ZeroMemory(signature);
+            }
+        }
+
+        public AndroidInstallLinkProofPollV2Request IssueBootstrapRequest(
+            string installationId,
+            bool useLegacyCanonical,
+            string approvedTransport = InstallLinkingService.AndroidLinkedV2ProofPollTransport)
+        {
+            const string headId = "android";
+            const string applicationVersion = "0.1.0-preview.11";
+            const string channelId = "internal";
+            const string platform = "android";
+            const string architecture = "arm64";
+            const string hostLabel = "Android test";
+            string publicKey = Convert.ToBase64String(_key.ExportSubjectPublicKeyInfo());
+            Service.IssueBrowserCallback(
+                new IssueInstallBrowserCallbackRequestDto(
+                    installationId,
+                    "android-play-app",
+                    applicationVersion,
+                    channelId,
+                    headId,
+                    platform,
+                    architecture,
+                    "chummer://install-link",
+                    publicKey,
+                    HostLabel: null,
+                    InstallAccessClass: InstallAccessClasses.AccountRequired),
+                "user-v2",
+                "subject-v2",
+                approvedTransport);
+
+            long issued = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            string nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24));
+            var unsigned = new AndroidInstallLinkProofPollV2Request(
+                installationId,
+                headId,
+                applicationVersion,
+                channelId,
+                platform,
+                architecture,
+                publicKey,
+                issued,
+                nonce,
+                Signature: string.Empty,
+                hostLabel,
+                OperationId,
+                InstallLinkingService.AndroidLinkedV2ProofPollTransport);
+            if (!useLegacyCanonical)
+            {
+                return SignBootstrap(unsigned);
+            }
+
+            byte[] canonical = Encoding.UTF8.GetBytes(string.Join(
+                    '\n',
+                    "chummer.install-link.remote-callback.v1",
+                    installationId,
+                    headId,
+                    applicationVersion,
+                    channelId,
+                    platform,
+                    architecture,
+                    issued.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    nonce));
+            byte[] signature = _key.SignData(
+                canonical,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            try
+            {
+                return unsigned with { Signature = Convert.ToBase64String(signature) };
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(canonical);
+                CryptographicOperations.ZeroMemory(signature);
+            }
+        }
+
+        public AndroidInstallLinkProofPollV2Request SignBootstrap(
+            AndroidInstallLinkProofPollV2Request unsigned)
+        {
+            byte[] canonical = AndroidInstallLinkV2BootstrapProof.CreateCanonicalPayload(unsigned);
+            byte[] signature = _key.SignData(
+                canonical,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            try
+            {
+                return unsigned with { Signature = Convert.ToBase64String(signature) };
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(canonical);
+                CryptographicOperations.ZeroMemory(signature);
+            }
+        }
+
+        public AndroidInstallLinkProofPollRequest SignLegacyBootstrap(
+            AndroidInstallLinkProofPollV2Request source)
+        {
+            string nonce = ToBase64Url(RandomNumberGenerator.GetBytes(24));
+            long issued = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            byte[] canonical = Encoding.UTF8.GetBytes(string.Join(
+                '\n',
+                "chummer.install-link.remote-callback.v1",
+                source.InstallationId,
+                source.HeadId,
+                source.ApplicationVersion,
+                source.ChannelId,
+                source.Platform,
+                source.Architecture,
+                issued.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                nonce));
+            byte[] signature = _key.SignData(
+                canonical,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            try
+            {
+                return new AndroidInstallLinkProofPollRequest(
+                    source.InstallationId,
+                    source.HeadId,
+                    source.ApplicationVersion,
+                    source.ChannelId,
+                    source.Platform,
+                    source.Architecture,
+                    source.PublicKey,
+                    issued,
+                    nonce,
+                    Convert.ToBase64String(signature),
+                    source.HostLabel);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(canonical);
+                CryptographicOperations.ZeroMemory(signature);
+            }
+        }
+
+        public InstallationGrantDto SeedLegacyGrant(string installationId)
+        {
+            lock (_store.Gate)
+            {
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                InstallationGrantDto grant = new(
+                    $"legacy-{installationId}",
+                    installationId,
+                    InstallationGrantStates.Active,
+                    $"legacy-token-{installationId}",
+                    now.AddMinutes(-1),
+                    now.AddDays(30),
+                    "legacy-user",
+                    "legacy-subject");
+                _store.InstallationsById[installationId] = new ClaimedInstallationDto(
+                    installationId,
+                    "preview10-artifact",
+                    "preview",
+                    "0.1.0-preview.10",
+                    InstallAccessClasses.AccountRequired,
+                    ClaimedInstallationStates.Active,
+                    now.AddDays(-1),
+                    now,
+                    "legacy-user",
+                    "legacy-subject",
+                    Convert.ToBase64String(_key.ExportSubjectPublicKeyInfo()),
+                    "legacy-ticket",
+                    "android",
+                    "android",
+                    "arm64",
+                    "Legacy device",
+                    grant.GrantId);
+                _store.GrantsById[grant.GrantId] = grant;
+                // Deliberately unmarked: pre-authority Preview10 grants migrate as legacy-v1.
+                _store.PersistLocked();
+                return grant;
+            }
+        }
+
+        public void SeedFullyPinnedGrantCapacity()
+        {
+            lock (_store.Gate)
+            {
+                _store.GrantsById.Clear();
+                _store.GrantTransportAuthoritiesByGrantId.Clear();
+                _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId.Clear();
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                for (int index = 0; index < InstallLinkingStore.MaxGrants; index++)
+                {
+                    string grantId = $"pinned-grant-{index:D4}";
+                    _store.GrantsById[grantId] = new InstallationGrantDto(
+                        grantId,
+                        "pinned-install",
+                        InstallationGrantStates.Revoked,
+                        string.Empty,
+                        now.AddMinutes(-10).AddMilliseconds(index),
+                        now.AddDays(30),
+                        "pinned-user",
+                        "pinned-subject");
+                    _store.GrantTransportAuthoritiesByGrantId[grantId] =
+                        new InstallationGrantTransportAuthority(
+                            grantId,
+                            InstallationGrantTransports.AndroidLinkedV2);
+                }
+
+                for (int index = 0; index < InstallLinkingStore.MaxGrants / 2; index++)
+                {
+                    string sourceGrantId = $"pinned-grant-{index * 2:D4}";
+                    string replacementGrantId = $"pinned-grant-{index * 2 + 1:D4}";
+                    _store.AndroidLinkedV2RefreshReceiptsBySourceGrantId[sourceGrantId] =
+                        new AndroidLinkedV2GrantRefreshReceipt(
+                            sourceGrantId,
+                            replacementGrantId,
+                            "pinned-install",
+                            new string('a', 64),
+                            new string('b', 64),
+                            now.AddMinutes(5),
+                            "pinned-user",
+                            "pinned-subject");
+                }
+                _store.PersistLocked();
+            }
+        }
+
+        public async Task InvokeAsync(DefaultHttpContext context, Action<HttpContext> onDispatch)
+        {
+            var middleware = new AndroidLinkedV2RequestProofMiddleware(
+                dispatched =>
+                {
+                    onDispatch(dispatched);
+                    dispatched.Response.StatusCode = StatusCodes.Status204NoContent;
+                    return Task.CompletedTask;
+                },
+                Logger);
+            await middleware.InvokeAsync(
+                context,
+                Service,
+                new AndroidLinkedV2RequestProofVerifier(),
+                TimeProvider);
+        }
+
+        private InstallLinkingStore CreateStore()
+            => new(
+                _configuration,
+                _protection,
+                NullLogger<InstallLinkingStore>.Instance);
+
+        public void Dispose()
+        {
+            _key.Dispose();
+            _store.Dispose();
+            (_protection as IDisposable)?.Dispose();
+            if (Directory.Exists(_root))
+            {
+                Directory.Delete(_root, recursive: true);
+            }
+        }
+    }
+
+    private sealed record SignedRequest(
+        string Path,
+        byte[] Body,
+        string GrantId,
+        string AccessToken,
+        string PacketKey,
+        long IssuedAtUnixSeconds,
+        string Signature)
+    {
+        public DefaultHttpContext CreateContext(string? authorization = null)
+        {
+            DefaultHttpContext context = new();
+            context.Request.Method = HttpMethods.Post;
+            context.Request.Path = Path;
+            context.Request.ContentType = "application/json; charset=utf-8";
+            context.Request.ContentLength = Body.Length;
+            context.Request.Body = new MemoryStream(Body, writable: false);
+            context.Request.Headers["Authorization"] = authorization ?? $"Bearer {AccessToken}";
+            context.Request.Headers[AndroidLinkedV2RequestProof.SchemeHeader] = AndroidLinkedV2RequestProof.Scheme;
+            context.Request.Headers[AndroidLinkedV2RequestProof.InstallationHeader] = "android-v2";
+            context.Request.Headers[AndroidLinkedV2RequestProof.GrantHeader] = GrantId;
+            context.Request.Headers[AndroidLinkedV2RequestProof.PacketKeyHeader] = PacketKey;
+            context.Request.Headers[AndroidLinkedV2RequestProof.IssuedHeader] =
+                IssuedAtUnixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            context.Request.Headers[AndroidLinkedV2RequestProof.SignatureHeader] = Signature;
+            context.Response.Body = new MemoryStream();
+            return context;
+        }
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    public sealed class CapturingLogger : ILogger<AndroidLinkedV2RequestProofMiddleware>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Messages.Add(formatter(state, exception));
+    }
+}

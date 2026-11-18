@@ -54,9 +54,9 @@ trust_pages:
   - id: privacy
     eyebrow: "Privacy"
     heading: "Your data, and how to leave"
-    intro: "Local files stay local unless you choose a connected feature. Chummer owns its retention and deletion policy; service providers do not. Hosted Build deletion claims stay review-gated until restore and whole-account erasure proof passes."
+    intro: "Local runner files stay local unless you choose a connected feature. Android Internal test builds with technical diagnostics enabled also send limited problem reports as described below. Chummer owns its retention and deletion policy; service providers do not. Hosted Build deletion claims stay review-gated until restore and whole-account erasure proof passes."
     effective_date: "2026-03-25"
-    updated_date: "2026-08-12"
+    updated_date: "2026-10-09"
     summary_points:
       - "Local runner files stay on your device until you choose a connected action"
       - "Chummer, not a provider, owns account and deletion truth"
@@ -72,6 +72,16 @@ trust_pages:
         href: "/contact"
         tone: ghost
     sections:
+      - id: android-internal-diagnostics
+        eyebrow: "Android Internal testing"
+        heading: "Technical problem reports, without your story"
+        body: "Internal builds that include automatic diagnostics enable sending by default, unless you have already switched it off. Reports help maintainers investigate failed actions, rejected UI updates and slow operations. They are not a record of everything you do, and a slow-operation report does not prove a crash."
+        bullets:
+          - "Each report contains the app version, observation time, app area, operation and outcome categories, duration, a general error category, and a random report ID for duplicate prevention. It contains no account or device identifier, runner or book text, credentials, screenshot, raw exception message or stack trace."
+          - "Reports go over HTTPS to chummer.run. Like any web request, the connection exposes network metadata such as an IP address to hosting and network infrastructure; that metadata is not copied into the diagnostic report store."
+          - "Individual reports expire after two days. The private receiver cleans them at startup and every 15 minutes while running. This short-lived store is separate from account history, support cases, Teable and backups. Maintainer alerts may contain technical categories and counts, not individual report IDs or user content."
+          - "You can turn diagnostic sending off in the app settings at any time. This stops new sends, cancels pending delivery and clears unsent reports. Reports already accepted by the server remain subject to the two-day expiry. Your off setting survives app updates and restarts."
+          - "Development and public builds do not enable this Internal-test default. An Internal build must not be promoted unchanged to a public track."
       - id: hosted-account
         eyebrow: "Account record"
         heading: "Your account keeps sign-in, preferences, and help together"

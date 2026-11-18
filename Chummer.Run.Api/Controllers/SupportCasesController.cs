@@ -23,7 +23,6 @@ public sealed class SupportCasesController : ControllerBase
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly SupportConciergePacketService _supportConciergePackets;
     private readonly IChummerAssistantAdapter _assistant;
-    private readonly SupportAttachmentStorageService _attachments;
     private readonly IConfiguration _configuration;
     private readonly InstallLinkingService _installLinking;
 
@@ -46,7 +45,7 @@ public sealed class SupportCasesController : ControllerBase
         _supportPresentation = supportPresentation;
         _supportConciergePackets = supportConciergePackets;
         _assistant = assistant;
-        _attachments = attachments;
+        ArgumentNullException.ThrowIfNull(attachments);
         _installLinking = installLinking;
         _configuration = configuration;
     }
@@ -162,13 +161,7 @@ public sealed class SupportCasesController : ControllerBase
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            SupportCaseProjection? item = _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
-            if (item?.Attachments?.Any(candidate => string.Equals(candidate.AttachmentId, attachmentId, StringComparison.OrdinalIgnoreCase)) != true)
-            {
-                return NotFound();
-            }
-
-            var stored = _attachments.TryOpenAttachment(caseId, attachmentId);
+            var stored = _supportCases.OpenAttachmentForReporter(caseId, attachmentId, user.UserId, subject.SubjectId);
             return stored is null
                 ? NotFound()
                 : File(stored.Value.Stream, stored.Value.ContentType, stored.Value.FileName);

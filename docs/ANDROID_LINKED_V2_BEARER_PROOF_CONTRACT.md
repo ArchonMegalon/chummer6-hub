@@ -1,0 +1,342 @@
+# Android linked-account v2 bearer and request-proof contract
+
+Status: implemented, private API contract; release authority still depends on the
+Android and Hub package/release gates.
+
+The v2 contract removes the installation grant secret from ordinary JSON and
+from the signed proof payload. The existing `api/v1/android/linked` contract is
+retained only for deployed Preview 10 compatibility and returns `Deprecation:
+true` plus a `successor-version` link. New Android clients must use v2 after
+their initial install-link credential exchange.
+
+## Protected routes
+
+Every route below is `POST`, rejects query strings, and requires the same v2
+bearer and device-proof headers:
+
+```text
+/api/v2/install-linking/grants/status
+/api/v2/install-linking/grants/refresh
+/api/v2/install-linking/grants/revoke
+/api/v2/install-linking/continuation/workspaces/list
+/api/v2/install-linking/continuation/workspaces/upsert
+/api/v2/android/linked/account/erase
+/api/v2/android/linked/groups
+/api/v2/android/linked/groups/create
+/api/v2/android/linked/groups/{groupId}/update
+/api/v2/android/linked/groups/{groupId}/invites
+/api/v2/android/linked/groups/{groupId}/chronicles
+/api/v2/android/linked/groups/{groupId}/chronicles/create
+/api/v2/android/linked/groups/{groupId}/chronicles/{chronicleProjectId}/draft
+/api/v2/android/linked/groups/{groupId}/chronicles/{chronicleProjectId}/actions
+/api/v2/android/linked/groups/{groupId}/chronicles/{chronicleProjectId}/packet
+/api/v2/android/linked/groups/{groupId}/chronicles/{chronicleProjectId}/handoff
+```
+
+The body is UTF-8 JSON and contains exactly one top-level, camel-cased
+`installationId` plus only the endpoint's domain fields. Duplicate or
+case-variant installation identity properties fail closed. An `accessToken`
+property at any nesting level is rejected.
+
+## V2 install-link bootstrap
+
+Before a bearer exists, new Android clients poll the separately authenticated
+bootstrap route:
+
+```text
+POST /api/v2/install-linking/callbacks/poll
+```
+
+The browser approval URL requires the exact query intent
+`installLinkTransport=proof_poll_v2`; the token-free poll JSON requires
+`installLinkTransport: "proof_poll_v2"`. The JSON body also contains
+`operationId`, `installationId`, `headId`, `applicationVersion`, `channelId`,
+`platform`, `architecture`, `publicKey`, `issuedAtUnixSeconds`, `nonce`,
+`signature`, and optional `hostLabel`. The signature is RSA PKCS#1/SHA-256 over
+these UTF-8 LF-only lines with no trailing LF:
+
+```text
+chummer.install-link.remote-callback.v2
+POST
+/api/v2/install-linking/callbacks/poll
+proof_poll_v2
+<operationId>
+<installationId>
+<headId>
+<applicationVersion>
+<channelId>
+<platform>
+<architecture>
+<issued Unix seconds as invariant decimal>
+<nonce>
+<hostLabel or empty string>
+```
+
+The submitted base64 DER SubjectPublicKeyInfo is cryptographically bound by
+being the key that must verify the signature and by exact equality with the
+account-approved callback key and install identity. The optional `hostLabel` is
+signed device-supplied display metadata; it is not browser-approved identity.
+Query strings are rejected.
+The Hub persists the browser-approved transport intent in the same protected
+snapshot as the callback. The v2 route can redeem only `proof_poll_v2`; the v1
+poll can redeem only `proof_poll`, and direct callback exchange can redeem only
+`grant_callback`. This check precedes redemption, so a cross-route race cannot
+mint a downgrade grant. `operationId` is required and is the canonical unpadded
+base64url encoding of exactly 24 random bytes (32 characters). It is included
+in the signed bootstrap payload after the transport intent. On success, JSON
+contains only `{installation, grant, alreadyClaimed, operationId, grantTransport}` where
+`grant` is safe metadata, the exact `operationId` is echoed, and
+`grantTransport` is the stable value `android-linked-v2`. The issued secret and
+grant ID use the same mandatory single response headers as refresh:
+
+```text
+Authorization: Bearer <issued installation access token>
+X-Chummer-Grant: <issued grantId>
+```
+
+If that successful response is lost, the client retries the same stable
+operation during the callback lifetime using the same `operationId` and
+immutable install fields but a fresh timestamp, nonce, and signature. Every
+retry proof is verified and its nonce is admitted through the durable replay
+authority; reusing a proof envelope is rejected. The Hub returns the original
+installation, grant metadata, grant ID, and bearer and does not mint a second
+grant. Recovery is bound to the durable callback, original grant, transport,
+owner, canonical device key, operation ID, and stable-operation digest. A
+changed operation, body, key, installation, owner, expired/revoked callback, or
+expired/revoked/replaced grant fails closed. Recovery receipts survive restart
+and share the same PostgreSQL compare-and-swap snapshot as the grant.
+Unexpired callback recovery receipts pin their original grant before the
+general 4,096-grant retention pass. If all recovery capacity is already pinned,
+the Hub returns `503` before minting a grant or consuming the callback.
+
+## Required headers
+
+```text
+Authorization: Bearer <installation access token>
+X-Chummer-App-Proof: chummer.android.packet.v2
+X-Chummer-Installation: <installationId>
+X-Chummer-Grant: <grantId>
+X-Chummer-Packet-Key: <32 random bytes, unpadded base64url>
+X-Chummer-Packet-Issued: <Unix seconds>
+X-Chummer-Packet-Signature: <standard base64 RSA signature>
+```
+
+`X-Chummer-Installation` must exactly equal the JSON `installationId`.
+`X-Chummer-Grant` is the non-secret grant identity returned by credential
+exchange or the preceding refresh. The Hub resolves the bearer token, grant,
+installation, active status, expiry, and stored installation public key as one
+atomic authorization decision.
+
+The packet timestamp must be within two minutes of Hub time. A packet key is
+single-use for that grant within the acceptance window. Replay receipts are
+stored as non-secret SHA-256 keys inside the encrypted InstallLinking durable
+snapshot. They therefore survive process restart and participate in the same
+PostgreSQL compare-and-swap authority when that shared authority is active.
+The local-file authority already enforces its existing exclusive writer lease.
+If replay receipt persistence or shared compare-and-swap fails, admission fails
+closed with `503`; the request is never dispatched. Reuse returns `409`;
+missing, malformed, substituted, expired, or incorrectly signed authority
+returns `401` without echoing credentials.
+
+## Canonical request proof
+
+The signature input is UTF-8, consists of exactly eight LF-separated lines,
+and has no trailing LF:
+
+```text
+chummer.android.packet.v2
+<uppercase HTTP method>
+<exact escaped Request.Path.Value, preserving case>
+<installationId>
+<grantId>
+<issued Unix seconds as invariant decimal>
+<packetKey exactly as sent>
+sha256:<lowercase hex SHA-256 of the exact request-body bytes>
+```
+
+The client signs these bytes with the installation RSA key using RSASSA-PKCS1-
+v1_5 and SHA-256. The Hub imports the stored public key as base64-encoded DER
+SubjectPublicKeyInfo and accepts RSA key sizes from 2048 through 4096 bits.
+
+The bearer secret, an access-token digest, and Play Integrity material are not
+members of this proof payload. Grant substitution is prevented by the signed
+grant ID and by resolving that grant ID and bearer token to the same active
+installation. Endpoint substitution is prevented by the signed exact path.
+
+## Refresh response
+
+The refresh request is authenticated with the old bearer/grant and may update
+the install identity fields included in its signed body. A successful refresh
+atomically records the old grant as revoked, issues and persists the replacement,
+and returns safe installation/grant metadata plus the exact echoed `operationId`
+and `grantTransport: "android-linked-v2"` in JSON. The old bearer is invalid for
+both v2 and the retained legacy v1 resolver after commit. The newly issued
+secret is delivered only in the response header:
+
+```text
+Authorization: Bearer <new installation access token>
+X-Chummer-Grant: <new grantId>
+```
+
+Refresh JSON also requires a 32-character canonical `operationId`. If the
+response is lost, the client may retry for 10 minutes with the exact old bearer,
+source grant, operation ID, and byte-identical stored request body, but a fresh
+timestamp, packet key, and signature. The Hub verifies the fresh proof with the
+same device key and admits its packet key through the ordinary durable replay
+authority before returning the same replacement bearer and grant metadata. It
+never rotates a second time. Reusing the original proof envelope is a replay
+conflict. Any bearer, operation, body, installation, key, owner, or source-grant
+case change uses
+the normal denial path, as does an expired receipt or a replacement that is no
+longer the active current v2 grant. The recovery mapping is committed in the
+same durable write/CAS as the rotation, and its source and replacement grants
+are pinned during retention for the entire recovery window.
+
+The response JSON has no access-token member. All v2 responses are private,
+`no-store`, `no-cache`, `no-referrer`, and `nosniff`. Admission logs contain
+only a bounded reason code, numeric status, and a fixed surface label; request
+bodies, bearer values, signatures, installation IDs, and dynamic route values
+are not logged.
+
+The authenticated legacy `GET /api/v1/install-linking/me` account summary and
+the browser account model expose active grant metadata only. Bearer values are
+redacted for both Preview 10 and v2 grants; owner-authorized unlink uses the
+authenticated owner plus installation identity and does not depend on a bearer
+from the page model.
+
+## Workspace snapshot concurrency boundary
+
+Workspace list/upsert responses include `remoteRevision` and `serverToken` on
+each snapshot. The token is an opaque concurrency value, not a grant or access
+credential. Every update to an existing snapshot must send both
+`expectedRemoteRevision` and `expectedServerToken` from the remote baseline that
+the user actually reviewed. A changed baseline returns `409`; a differing
+snapshot without a precondition returns `428`. A newer device timestamp never
+authorizes replacement. The same rule applies to the retained v1 upsert route,
+so a legacy caller cannot bypass v2 conflict protection.
+
+`expectedRemoteRevision: 0` with a null token means create only if missing.
+Existing historical rows are readable with revision zero and a deterministic
+token derived from their complete legacy record; reading does not rewrite them.
+Updating a reviewed legacy row requires that exact non-null token. New commits
+increment the server revision and generate a fresh token, persisted with the
+snapshot. Equal data after intervening updates does not revive an old token.
+An exact unchanged snapshot without a precondition may return the current row
+as a no-op; a supplied stale precondition is rejected even for identical data.
+
+The in-memory row is restored if the file commit fails. This is a bounded
+single-store-instance commit guarantee, not multi-replica, cross-process,
+power-cut or PostgreSQL snapshot-store proof. Grant/proof admission retains its
+own separate existing persistence authority.
+
+**Coordinated client rollout required:** existing clients that write without
+these preconditions must be updated before this server change is deployed.
+They may still read and create missing snapshots, but cannot replace an existing
+one. Clients must not fetch the newest token immediately before writing merely
+to bypass a real conflict. Preserve the reviewed baseline and present explicit
+compare/branch/stay-local choices. A lost write response requires fresh readback,
+not an automatic stale-write retry or an invented success receipt.
+
+## Complete Core snapshot transport (not restore authority)
+
+The snapshot size bound is checked against both incoming JSON and its stable
+Core-encoded representation before persistence. Cold reads apply the same bound
+to the re-encoded representation, not storage-only indentation. Compact Unicode
+or omitted default members cannot expand past the bound after an accepted write;
+pretty-printing on disk cannot make an accepted snapshot unreadable. The HTTP
+request-body cap remains an independent ingress limit.
+
+Both snapshot routes accept and return optional `workspaceSnapshot` and
+`workspaceSnapshotDigest`. They must either both be absent (a historical
+payload-only row) or both be present. The snapshot is Core's existing
+`WorkspaceDocumentSnapshot`: exact workspace ID, `WorkspaceDocument.State`,
+format, update time, content revision and saved revision. State includes the
+complete typed `WorkspaceDocumentAuxiliaryState`, including current Creation
+drafts, receipt ledgers and finalization history. It is never injected into
+character XML or a downloadable character payload.
+
+The wire representation includes primary stored properties only, using
+case-sensitive camel-case JSON and numeric enum values. Computed read-only
+properties are excluded (`IgnoreReadOnlyProperties=true`). The snapshot and
+its document/state require their exact fields; auxiliary state is deserialized
+through the current Core contracts with unknown fields disallowed. Unknown,
+duplicate, lossy or unsupported fields fail closed rather than disappear on a
+round trip. Dictionary keys that differ only by case remain distinct.
+
+Digest semantics are `canonical-core-workspace-snapshot-json-sha256-v1`:
+SHA256 of the UTF-8 JSON object with `contract` set to that semantics string and
+`snapshot` set to the encoded Core snapshot. Object properties within the
+snapshot are ordered ordinally; array order is unchanged; compact JSON uses
+the standard System.Text.Json UTF-8 writer (default encoder, including `+`
+escaped as `\u002B` and uppercase Unicode escape hex). This is a named .NET
+wire encoding, not an RFC8785/JCS or JavaScript `JSON.stringify` claim. The
+digest is lowercase hex, with
+no prefix. `InstallLinkedWorkspaceSnapshotTransfer.Encode/ComputeDigest` is
+the server reference implementation; a separate golden vector and every
+current auxiliary member are exercised in transport tests.
+
+The full snapshot must agree with the outer workspace ID, ruleset, schema,
+payload kind, format, payload and timestamp. Content revision must be positive
+and saved revision must be between zero and content revision. Snapshots are
+bounded at512KiB UTF-8, depth32, within the existing768KiB request limit; oversized
+state is rejected, never truncated. These are capacity limits, not a claim of
+unlimited history. Broader large-workspace transfer needs an explicit bounded
+protocol/capacity update and matching client response handling.
+
+Auxiliary-only changes are real CAS writes. Once a row carries a complete
+snapshot, a payload-only update is rejected with409 even with the correct
+precondition: an older client must not discard wizard state. Exact retries use
+the full snapshot digest, not JsonElement reference identity. A corrupt stored
+snapshot returns503, not a successful payload-only projection. Failed writes
+retain the prior full snapshot and concurrency token in memory and on disk.
+
+Opaque owner IDs and workspace IDs use ordinal equality and collision-free
+framed internal keys. Reload preserves the original components; duplicate
+persisted identities fail closed. Snapshot erasure uses the same exact owner
+comparison so differently cased accounts are not conflated. This changes only
+the snapshot owner boundary, not every other account-keyed store in Hub.
+
+**Still required:** Core-owned semantic validation and atomic restore, Android
+reviewed-baseline roaming, normal account-switch composition and appropriate
+bounded list/fetch handling. Hub validates transport integrity, not the rule
+legality or provenance of receipt claims. A digest is not authentication or
+permission to mutate local Core state. Transport fixtures are not mechanically
+validated characters. Core's private delegated-GM idempotency/audit ledger is
+outside `WorkspaceDocumentSnapshot`; it also needs an explicit preservation or
+conflict policy before a full roaming restore can be claimed. No generic
+auxiliary-state write, Android readiness, package publication or production
+deployment is authorized here.
+
+## Version boundary
+
+Every newly issued grant has durable transport authority: `legacy-v1` or
+`android-linked-v2`. V1 proof values and grants cannot authorize v2, and v2
+grants are rejected by the legacy JSON-token resolvers, including legacy grant
+refresh/revoke. Refresh preserves the source transport. The v2 middleware does
+not reinterpret a v1 body token as bearer authority, and it does not intercept
+the legacy v1 routes. The v2 bootstrap has its own scheme and endpoint binding,
+so a legacy proof cannot authorize it.
+
+Snapshots created before transport authority existed have no marker. Those
+unmarked grants migrate only as `legacy-v1`, preserving deployed Preview 10
+clients without guessing v2 authority from mutable installation fields. The old
+record shape cannot distinguish a legacy grant from a v2 grant. Consequently,
+this compatibility migration is safe only when transport authority ships before
+v2 grant issuance; if an earlier v2 build issued grants, those ambiguous grants
+must be invalidated at rollout and the affected devices must relink. Every grant
+issued after this change is explicitly classified, and an explicitly classified
+v2 grant cannot be downgraded through v1. The v1 callback and linked-account
+routes remain available only for Preview 10 compatibility.
+
+The operation-ID proof format and the matching Android client must roll out as
+one compatibility boundary. An older Hub does not include `operationId` in the
+bootstrap signature, while this Hub requires it for bootstrap and refresh. The
+same coordinated rollout adds `proof_poll_v2` to the browser query, poll JSON,
+and canonical proof immediately after the path. Older unmarked callbacks remain
+bounded by their existing callback expiry and may use only the legacy
+`proof_poll` or direct callback paths; they are never inferred as v2.
+Receipts written by the immediately preceding exact-proof retry implementation
+remain readable but cannot be upgraded into a stable operation: an Android
+device that lost such an in-flight response must start a fresh link. Existing
+successfully received grants retain their transport authority and continue to
+work; only bootstrap/refresh requests need the new operation field.

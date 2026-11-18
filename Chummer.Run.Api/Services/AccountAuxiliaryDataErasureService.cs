@@ -11,6 +11,7 @@ public sealed record AccountAuxiliaryDataErasureResult(
 
 public interface IAccountAuxiliaryDataErasureService
 {
+    void EnsureAccountErasureSupported();
     AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId);
 }
 
@@ -34,6 +35,9 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
     private readonly PromptFoundryStore _promptFoundry;
     private readonly KarmaForgeStore _karmaForge;
     private readonly OriginDossierPublicationService _originDossiers;
+    private readonly OriginChapterAuthoringService? _originChapters;
+    private readonly OriginDossierFirstPartyDocumentService? _originDocuments;
+    private readonly IOriginSceneAccountErasure? _originScenes;
 
     public AccountAuxiliaryDataErasureService(
         BrilliantDirectoriesBillingStore brilliantDirectories,
@@ -48,7 +52,10 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         GmSessionVideoFoundryStore videoFoundry,
         PromptFoundryStore promptFoundry,
         KarmaForgeStore karmaForge,
-        OriginDossierPublicationService originDossiers)
+        OriginDossierPublicationService originDossiers,
+        OriginChapterAuthoringService? originChapters = null,
+        OriginDossierFirstPartyDocumentService? originDocuments = null,
+        IOriginSceneAccountErasure? originScenes = null)
     {
         _brilliantDirectories = brilliantDirectories;
         _myFirstBookUsage = myFirstBookUsage;
@@ -63,6 +70,24 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
         _promptFoundry = promptFoundry;
         _karmaForge = karmaForge;
         _originDossiers = originDossiers;
+        _originChapters = originChapters;
+        _originDocuments = originDocuments;
+        _originScenes = originScenes;
+    }
+
+    public void EnsureAccountErasureSupported()
+    {
+        _originScenes?.EnsureAccountErasureSupported();
+        _originDossiers.EnsureAccountErasureSupported();
+        _originDocuments?.EnsureAccountErasureSupported();
+        _originChapters?.EnsureAccountErasureSupported();
+        _installSnapshots.EnsureAccountErasureSupported();
+        _myFirstBookUsage.EnsureAccountErasureSupported();
+        _originReservations.EnsureAccountErasureSupported();
+        _brilliantDirectories.EnsureAccountErasureSupported();
+        _horizonUsage.EnsureAccountErasureSupported();
+        _artifactRequests.EnsureAccountErasureSupported();
+        _installLinking.GetRequired().EnsureAccountErasureSupported();
     }
 
     public AccountAuxiliaryDataErasureResult Erase(string? userId, string subjectId)
@@ -71,8 +96,12 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             ? throw new ArgumentException("subjectId is required.", nameof(subjectId))
             : subjectId.Trim();
         string? normalizedUser = string.IsNullOrWhiteSpace(userId) ? null : userId.Trim();
+        EnsureAccountErasureSupported();
         var removed = new Dictionary<string, int>(StringComparer.Ordinal)
         {
+            // Media commits its deletion fence before other auxiliary stores are
+            // erased. An in-flight render cannot recreate that owner's images.
+            ["origin_scene_media"] = _originScenes?.EraseForSubject(normalizedSubject) ?? 0,
             ["brilliant_directories_projection"] = EraseSingleList(
                 _brilliantDirectories.Gate,
                 _brilliantDirectories.Members,
@@ -107,7 +136,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             ["gm_session_video_foundry"] = EraseVideoFoundry(normalizedUser),
             ["prompt_foundry"] = ErasePromptFoundry(normalizedUser),
             ["karma_forge"] = EraseKarmaForge(normalizedSubject),
-            ["origin_dossier_publications"] = _originDossiers.EraseForAccount(normalizedUser, normalizedSubject)
+            ["origin_dossier_publications"] = _originDossiers.EraseForAccount(normalizedUser, normalizedSubject),
+            ["origin_chapter_jobs"] = _originChapters?.EraseForSubject(normalizedSubject) ?? 0
         };
 
         return new AccountAuxiliaryDataErasureResult(removed.Values.Sum(), removed);
@@ -162,8 +192,8 @@ public sealed class AccountAuxiliaryDataErasureService : IAccountAuxiliaryDataEr
             {
                 int removed = RemoveDictionaryWhere(
                     _installSnapshots.SnapshotsByKey,
-                    pair => IdEquals(pair.Value.OwnerKey, subjectOwner)
-                            || IdEquals(pair.Value.OwnerKey, userOwner));
+                    pair => string.Equals(pair.Value.OwnerKey, subjectOwner, StringComparison.Ordinal)
+                            || (userOwner is not null && string.Equals(pair.Value.OwnerKey, userOwner, StringComparison.Ordinal)));
                 PersistIfChanged(removed, _installSnapshots.PersistLocked);
                 return removed;
             }

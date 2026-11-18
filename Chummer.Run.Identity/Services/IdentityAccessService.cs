@@ -6,6 +6,7 @@ using Chummer.Run.Contracts.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Chummer.Storage.Teable;
 
 namespace Chummer.Run.Identity.Services;
 
@@ -60,7 +61,8 @@ public sealed class IdentityAccessService : IIdentityAccessService
     private sealed record IdentitySnapshot(
         IReadOnlyList<IdentitySubjectSnapshot> Subjects,
         IReadOnlyList<IdentitySessionSnapshot> Sessions,
-        IReadOnlyList<IdentityEmailTicketSnapshot> EmailTickets);
+        IReadOnlyList<IdentityEmailTicketSnapshot> EmailTickets,
+        IReadOnlyList<EmailStartAttemptState>? RecentEmailStartAttempts = null);
 
     private sealed record IdentitySubjectSnapshot(
         string SubjectId,
@@ -99,10 +101,16 @@ public sealed class IdentityAccessService : IIdentityAccessService
     private readonly string _emailStartPauseFlagPath;
     private readonly ILogger<IdentityAccessService> _logger;
     private readonly IIdentityEmailDeliveryService _emailDelivery;
+    private readonly TeableRevisionStore? _primaryStore;
+    private TeableRevisionStore.Head? _primaryHead;
+    private bool _primaryWriteUncertain;
+    private const string PrimaryStream = "identity";
+    private const int MaximumPrimarySnapshotBytes = 16 * 1024 * 1024;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        MaxDepth = 8
     };
 
     public IdentityAccessService()
@@ -118,11 +126,16 @@ public sealed class IdentityAccessService : IIdentityAccessService
     {
     }
 
-    public IdentityAccessService(IConfiguration configuration, ILogger<IdentityAccessService> logger, IIdentityEmailDeliveryService emailDelivery)
+    public IdentityAccessService(IConfiguration configuration, ILogger<IdentityAccessService> logger,
+        IIdentityEmailDeliveryService emailDelivery, TeableRevisionStore? primaryStore = null)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? NullLogger<IdentityAccessService>.Instance;
         _emailDelivery = emailDelivery;
+        string storageProvider = configuration["CHUMMER_IDENTITY_STORAGE_PROVIDER"]?.Trim() ?? "local";
+        if (storageProvider is not ("local" or "teable") || (storageProvider == "teable") != (primaryStore is not null))
+            throw new InvalidOperationException("Identity storage provider and registration do not match.");
+        _primaryStore = primaryStore;
         _storagePath = ResolveStoragePath(configuration);
         _emailStartPauseFlagPath = ResolveEmailStartPauseFlagPath(configuration, _storagePath);
         LoadSnapshot();
@@ -137,8 +150,18 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             PurgeExpiredTicketsLocked();
             return IssueSessionLocked(request);
+        }
+    }
+
+    public bool IsStorageReady()
+    {
+        lock (_mutate)
+        {
+            try { RefreshPrimaryLocked(); return !_primaryWriteUncertain; }
+            catch { return false; }
         }
     }
 
@@ -157,6 +180,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             PurgeExpiredTicketsLocked();
             PurgeExpiredEmailStartAttemptsLocked(now);
             if (TryGetEmailStartPauseReason(out var pausePreviewNote))
@@ -197,7 +221,8 @@ public sealed class IdentityAccessService : IIdentityAccessService
             }
 
             _recentEmailStartAttempts.Add(new EmailStartAttemptState(email, now));
-            EnsureSubjectLocked(subjectId, displayName, email, new[] { "player" }, now);
+            // Unverified input belongs only to the ticket. Create a new subject
+            // after verification without mutating an existing subject at start.
             var ticketId = $"eml_{Guid.NewGuid():N}";
             var ticket = new EmailTicketState
             {
@@ -242,10 +267,11 @@ public sealed class IdentityAccessService : IIdentityAccessService
         var ticketHash = HashSecret(ticketId);
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             PurgeExpiredTicketsLocked();
             if (!_emailTicketsByHash.TryGetValue(ticketHash, out var ticket))
             {
-                throw new KeyNotFoundException($"Unknown or expired email entry ticket '{ticketId}'.");
+                throw new KeyNotFoundException("Unknown or expired email entry ticket.");
             }
 
             _emailTicketsByHash.Remove(ticketHash);
@@ -253,8 +279,9 @@ public sealed class IdentityAccessService : IIdentityAccessService
                 SubjectId: ticket.SubjectId,
                 DisplayName: ticket.DisplayName,
                 Email: ticket.Email,
-                RequestedRoles: new[] { "player" }));
-            PersistLocked();
+                RequestedRoles: new[] { "player" }), preserveExistingSubject: true);
+            // IssueSessionLocked committed ticket consumption and session issue
+            // together. A second commit could fail after the first was durable.
             return session;
         }
     }
@@ -270,6 +297,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
         var accessTokenHash = HashSecret(accessToken);
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             if (!_sessionsByAccessTokenHash.TryGetValue(accessTokenHash, out var session))
             {
                 return new IdentitySessionRevokeResponse(false, null, null, DateTimeOffset.UtcNow);
@@ -287,6 +315,9 @@ public sealed class IdentityAccessService : IIdentityAccessService
         DateTimeOffset erasedAtUtc = DateTimeOffset.UtcNow;
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
+            if (_primaryStore is not null)
+                throw new InvalidOperationException("Remote account erasure is not enabled until historical private payload cleanup is implemented.");
             string[] sessionKeys = _sessionsByAccessTokenHash
                 .Where(pair => string.Equals(
                     pair.Value.SubjectId,
@@ -333,6 +364,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
         var now = DateTimeOffset.UtcNow;
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             var normalizedSubjectId = NormalizeRequired(subjectId);
             var subject = _subjects.TryGetValue(normalizedSubjectId, out var existing)
                 ? existing
@@ -365,6 +397,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
     {
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             return _subjects.TryGetValue(subjectId, out var subject)
                 ? ToSubjectResponse(subject)
                 : null;
@@ -380,6 +413,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
         lock (_mutate)
         {
+            RefreshPrimaryLocked();
             var accessTokenHash = HashSecret(request.AccessToken);
             if (!_sessionsByAccessTokenHash.TryGetValue(accessTokenHash, out var session))
             {
@@ -405,7 +439,7 @@ public sealed class IdentityAccessService : IIdentityAccessService
         }
     }
 
-    private IdentitySessionIssueResponse IssueSessionLocked(IdentitySessionIssueRequest request)
+    private IdentitySessionIssueResponse IssueSessionLocked(IdentitySessionIssueRequest request, bool preserveExistingSubject = false)
     {
         var now = DateTimeOffset.UtcNow;
         var requestedRoles = request.RequestedRoles ?? Array.Empty<string>();
@@ -414,12 +448,16 @@ public sealed class IdentityAccessService : IIdentityAccessService
             : TimeSpan.FromHours(8);
 
         var subjectId = NormalizeRequired(request.SubjectId);
-        var subject = EnsureSubjectLocked(
-            subjectId,
-            NormalizeOptional(request.DisplayName) ?? subjectId,
-            NormalizeOptional(request.Email),
-            requestedRoles,
-            now);
+        // Email possession authorizes a session, not edits to an existing profile.
+        // Explicit privileged session issuance retains its existing update path.
+        var subject = preserveExistingSubject && _subjects.TryGetValue(subjectId, out var existing)
+            ? existing
+            : EnsureSubjectLocked(
+                subjectId,
+                NormalizeOptional(request.DisplayName) ?? subjectId,
+                NormalizeOptional(request.Email),
+                requestedRoles,
+                now);
 
         var accessToken = BuildToken(subject.SubjectId, "access");
         var refreshToken = BuildToken(subject.SubjectId, "refresh");
@@ -490,6 +528,13 @@ public sealed class IdentityAccessService : IIdentityAccessService
     {
         lock (_mutate)
         {
+            if (_primaryStore is not null)
+            {
+                // No local import or fallback. Empty remote state is a new store,
+                // never permission to resurrect a stale local account file.
+                RefreshPrimaryLocked();
+                return;
+            }
             Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
             if (!File.Exists(_storagePath))
             {
@@ -509,86 +554,89 @@ public sealed class IdentityAccessService : IIdentityAccessService
                 return;
             }
 
-            _subjects.Clear();
-            _sessionsByAccessTokenHash.Clear();
-            _emailTicketsByHash.Clear();
-
-            foreach (var subject in snapshot.Subjects)
-            {
-                var state = new SubjectState
-                {
-                    SubjectId = subject.SubjectId,
-                    DisplayName = subject.DisplayName,
-                    Email = subject.Email,
-                    UpdatedAtUtc = subject.UpdatedAtUtc
-                };
-                foreach (var role in subject.Roles.Where(static role => !string.IsNullOrWhiteSpace(role)))
-                {
-                    state.Roles.Add(role);
-                }
-
-                _subjects[state.SubjectId] = state;
-            }
-
-            foreach (var session in snapshot.Sessions)
-            {
-                var accessTokenHash = NormalizeStoredSecretHash(session.AccessTokenHash, session.AccessToken);
-                var refreshTokenHash = NormalizeStoredSecretHash(session.RefreshTokenHash, session.RefreshToken);
-                if (string.IsNullOrWhiteSpace(session.SessionId)
-                    || string.IsNullOrWhiteSpace(session.SubjectId)
-                    || accessTokenHash is null
-                    || refreshTokenHash is null)
-                {
-                    continue;
-                }
-
-                _sessionsByAccessTokenHash[accessTokenHash] = new SessionState
-                {
-                    SessionId = session.SessionId,
-                    SubjectId = session.SubjectId,
-                    AccessTokenHash = accessTokenHash,
-                    RefreshTokenHash = refreshTokenHash,
-                    IssuedAtUtc = session.IssuedAtUtc,
-                    ExpiresAtUtc = session.ExpiresAtUtc
-                };
-            }
-
-            foreach (var ticket in snapshot.EmailTickets)
-            {
-                var ticketHash = NormalizeStoredSecretHash(ticket.TicketHash, ticket.TicketId);
-                if (ticketHash is null
-                    || string.IsNullOrWhiteSpace(ticket.SubjectId)
-                    || string.IsNullOrWhiteSpace(ticket.Email)
-                    || string.IsNullOrWhiteSpace(ticket.DisplayName))
-                {
-                    continue;
-                }
-
-                _emailTicketsByHash[ticketHash] = new EmailTicketState
-                {
-                    TicketHash = ticketHash,
-                    SubjectId = ticket.SubjectId,
-                    Email = ticket.Email,
-                    DisplayName = ticket.DisplayName,
-                    NextPath = ticket.NextPath,
-                    CreatedAtUtc = ticket.CreatedAtUtc,
-                    ExpiresAtUtc = ticket.ExpiresAtUtc
-                };
-            }
-
+            ApplySnapshotLocked(snapshot);
             PurgeExpiredTicketsLocked();
             _logger.LogInformation(
                 "IdentityAccessService loaded {SubjectCount} subjects, {SessionCount} sessions, and {EmailTicketCount} email tickets from {StoragePath}.",
-                _subjects.Count,
-                _sessionsByAccessTokenHash.Count,
-                _emailTicketsByHash.Count,
-                _storagePath);
+                _subjects.Count, _sessionsByAccessTokenHash.Count, _emailTicketsByHash.Count, _storagePath);
         }
+    }
+
+    private void ApplySnapshotLocked(IdentitySnapshot snapshot)
+    {
+        _subjects.Clear();
+        _sessionsByAccessTokenHash.Clear();
+        _emailTicketsByHash.Clear();
+
+        foreach (var subject in snapshot.Subjects)
+        {
+            var state = new SubjectState
+            {
+                SubjectId = subject.SubjectId,
+                DisplayName = subject.DisplayName,
+                Email = subject.Email,
+                UpdatedAtUtc = subject.UpdatedAtUtc
+            };
+            foreach (var role in subject.Roles.Where(static role => !string.IsNullOrWhiteSpace(role)))
+            {
+                state.Roles.Add(role);
+            }
+
+            _subjects[state.SubjectId] = state;
+        }
+
+        foreach (var session in snapshot.Sessions)
+        {
+            var accessTokenHash = NormalizeStoredSecretHash(session.AccessTokenHash, session.AccessToken);
+            var refreshTokenHash = NormalizeStoredSecretHash(session.RefreshTokenHash, session.RefreshToken);
+            if (string.IsNullOrWhiteSpace(session.SessionId)
+                || string.IsNullOrWhiteSpace(session.SubjectId)
+                || accessTokenHash is null
+                || refreshTokenHash is null)
+            {
+                continue;
+            }
+
+            _sessionsByAccessTokenHash[accessTokenHash] = new SessionState
+            {
+                SessionId = session.SessionId,
+                SubjectId = session.SubjectId,
+                AccessTokenHash = accessTokenHash,
+                RefreshTokenHash = refreshTokenHash,
+                IssuedAtUtc = session.IssuedAtUtc,
+                ExpiresAtUtc = session.ExpiresAtUtc
+            };
+        }
+
+        foreach (var ticket in snapshot.EmailTickets)
+        {
+            var ticketHash = NormalizeStoredSecretHash(ticket.TicketHash, ticket.TicketId);
+            if (ticketHash is null
+                || string.IsNullOrWhiteSpace(ticket.SubjectId)
+                || string.IsNullOrWhiteSpace(ticket.Email)
+                || string.IsNullOrWhiteSpace(ticket.DisplayName))
+            {
+                continue;
+            }
+
+            _emailTicketsByHash[ticketHash] = new EmailTicketState
+            {
+                TicketHash = ticketHash,
+                SubjectId = ticket.SubjectId,
+                Email = ticket.Email,
+                DisplayName = ticket.DisplayName,
+                NextPath = ticket.NextPath,
+                CreatedAtUtc = ticket.CreatedAtUtc,
+                ExpiresAtUtc = ticket.ExpiresAtUtc
+            };
+        }
+
+        _recentEmailStartAttempts.Clear();
+        _recentEmailStartAttempts.AddRange(snapshot.RecentEmailStartAttempts ?? []);
     }
 
     private void PersistLocked()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var snapshot = new IdentitySnapshot(
             Subjects: _subjects.Values
                 .OrderBy(static item => item.SubjectId, StringComparer.OrdinalIgnoreCase)
@@ -620,12 +668,106 @@ public sealed class IdentityAccessService : IIdentityAccessService
                     NextPath: item.NextPath,
                     CreatedAtUtc: item.CreatedAtUtc,
                     ExpiresAtUtc: item.ExpiresAtUtc))
-                .ToArray());
+                .ToArray(),
+            RecentEmailStartAttempts: _recentEmailStartAttempts.ToArray());
 
+        if (_primaryStore is not null)
+        {
+            if (_primaryWriteUncertain) throw new InvalidOperationException("Identity storage requires reconciliation before continuing.");
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(snapshot, _jsonOptions);
+            TeableRevisionStore.Head? committed = null;
+            try
+            {
+                if (bytes.Length > MaximumPrimarySnapshotBytes) throw new InvalidDataException("Identity snapshot is oversized.");
+                ValidatePrimarySnapshot(snapshot);
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                committed = _primaryStore.CompareExchangeAsync(PrimaryStream, _primaryHead, Guid.NewGuid(), bytes, deadline.Token)
+                    .GetAwaiter().GetResult();
+                _primaryHead = committed with { Bytes = [] };
+                return;
+            }
+            catch
+            {
+                // Memory may contain a mutation which was not acknowledged (or
+                // whose response was lost). Never serve that cache as authority.
+                _primaryWriteUncertain = true;
+                throw;
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(bytes);
+                if (committed is not null) CryptographicOperations.ZeroMemory(committed.Bytes);
+            }
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var tempPath = $"{_storagePath}.tmp";
         File.WriteAllText(tempPath, JsonSerializer.Serialize(snapshot, _jsonOptions));
         File.Move(tempPath, _storagePath, true);
     }
+
+    private void RefreshPrimaryLocked()
+    {
+        if (_primaryStore is null) return;
+        if (_primaryWriteUncertain) throw new InvalidOperationException("Identity storage requires reconciliation before continuing.");
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var head = _primaryStore.ReadAsync(PrimaryStream, deadline.Token).GetAwaiter().GetResult();
+        try
+        {
+            if (head is null)
+            {
+                if (_primaryHead is not null) throw new InvalidDataException("Identity primary state regressed.");
+                ApplySnapshotLocked(new([], [], []));
+                return;
+            }
+            if (_primaryHead is not null && (head.Revision < _primaryHead.Revision
+                || head.Revision == _primaryHead.Revision && (head.Commit != _primaryHead.Commit || head.Sha256 != _primaryHead.Sha256)))
+                throw new InvalidDataException("Identity primary state regressed.");
+            if (head.Bytes.Length > MaximumPrimarySnapshotBytes) throw new InvalidDataException("Identity snapshot is oversized.");
+            var snapshot = JsonSerializer.Deserialize<IdentitySnapshot>(head.Bytes, _jsonOptions)
+                ?? throw new InvalidDataException("Identity primary snapshot is invalid.");
+            ValidatePrimarySnapshot(snapshot);
+            ApplySnapshotLocked(snapshot);
+            _primaryHead = head with { Bytes = [] };
+        }
+        finally { if (head is not null) CryptographicOperations.ZeroMemory(head.Bytes); }
+    }
+
+    private static void ValidatePrimarySnapshot(IdentitySnapshot snapshot)
+    {
+        if (snapshot.Subjects is null || snapshot.Sessions is null || snapshot.EmailTickets is null)
+            throw new InvalidDataException("Incomplete identity primary snapshot.");
+        var subjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var subject in snapshot.Subjects)
+            if (subject is null || string.IsNullOrWhiteSpace(subject.SubjectId) || string.IsNullOrWhiteSpace(subject.DisplayName)
+                || subject.Roles is null || subject.Roles.Any(string.IsNullOrWhiteSpace) || !subjects.Add(subject.SubjectId))
+                throw new InvalidDataException("Invalid identity primary subject.");
+        var sessions = new HashSet<string>(StringComparer.Ordinal);
+        var sessionIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var session in snapshot.Sessions)
+            if (session is null || !subjects.Contains(session.SubjectId) || string.IsNullOrWhiteSpace(session.SessionId)
+                || !CanonicalHash(session.AccessTokenHash) || !CanonicalHash(session.RefreshTokenHash)
+                || session.AccessToken is not null || session.RefreshToken is not null
+                || !sessions.Add(session.AccessTokenHash!) || !sessionIds.Add(session.SessionId)
+                || session.ExpiresAtUtc <= session.IssuedAtUtc)
+                throw new InvalidDataException("Invalid identity primary session.");
+        var tickets = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var ticket in snapshot.EmailTickets)
+            if (ticket is null || string.IsNullOrWhiteSpace(ticket.SubjectId) || !CanonicalHash(ticket.TicketHash)
+                || ticket.TicketId is not null || !tickets.Add(ticket.TicketHash!)
+                || string.IsNullOrWhiteSpace(ticket.Email) || string.IsNullOrWhiteSpace(ticket.DisplayName)
+                // New accounts remain pending until verified. Orphan tickets
+                // must still bind to the exact subject derived from their email.
+                || (!subjects.Contains(ticket.SubjectId)
+                    && !string.Equals(ticket.SubjectId, IdentitySubjectDerivation.FromEmail(ticket.Email), StringComparison.Ordinal))
+                || ticket.ExpiresAtUtc <= ticket.CreatedAtUtc)
+                throw new InvalidDataException("Invalid identity primary ticket.");
+        if (snapshot.RecentEmailStartAttempts?.Any(attempt => attempt is null || string.IsNullOrWhiteSpace(attempt.Email)) == true)
+            throw new InvalidDataException("Invalid identity primary throttle state.");
+    }
+
+    private static bool CanonicalHash(string? value)
+        => value is not null && TryNormalizeSha256Hash(value, out string canonical) && canonical == value;
 
     private void PurgeExpiredTicketsLocked()
     {

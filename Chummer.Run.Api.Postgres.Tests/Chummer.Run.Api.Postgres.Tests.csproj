@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <!-- Testcontainers' transitive minimum2025.1.0 is affected by
+         GHSA-q939-rpr3-3284. Pin the vendor's fixed release for this test host. -->
+    <PackageReference Include="SSH.NET" Version="2026.0.0" PrivateAssets="all" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Chummer.Run.Api/Chummer.Run.Api.csproj" />
+  </ItemGroup>
+
+  <!-- Run the original PostgreSQL suite against the actual API assembly. This
+       project does not replace database execution with an in-memory authority. -->
+  <ItemGroup>
+    <Compile Include="../Chummer.Tests/InstallLinkingPostgresAuthorityIntegrationTests.cs"
+             Link="InstallLinkingPostgresAuthorityIntegrationTests.cs" />
+    <Compile Include="../Chummer.Tests/InstallLinkingPostgresCoordinatorStoreTests.cs"
+             Link="InstallLinkingPostgresCoordinatorStoreTests.cs" />
+  </ItemGroup>
+</Project>

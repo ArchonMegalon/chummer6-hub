@@ -4,15 +4,15 @@
     "net10.0": {
       "Chummer.Engine.Contracts": {
         "type": "Direct",
-        "requested": "[0.0.0-packageplane.candidate.sha8a736655c5d8, )",
-        "resolved": "0.0.0-packageplane.candidate.sha8a736655c5d8",
-        "contentHash": "ZQuZ0vik3If44xTFJYW39nVQLqrZiRFN42+jdxrKrX6ZdG2W6CvcaXEoIOo6+/Hbcz4463BLfWfJQIWcikkOVw=="
+        "requested": "[0.0.0-packageplane.candidate.sh5160e78a60bce, )",
+        "resolved": "0.0.0-packageplane.candidate.sh5160e78a60bce",
+        "contentHash": "9OeKSP0Fqn/niuRhPKEAlB+ZceoRnFOuMEW8FzvGgUkSjsWVQz7vNwplJ3GPNyiEtmKnrnGW3GK9lVoMmqlAUA=="
       },
       "Chummer.Hub.Registry.Contracts": {
         "type": "Direct",
-        "requested": "[0.1.0-preview, )",
-        "resolved": "0.1.0-preview",
-        "contentHash": "ti+zD2zVexuQXcO+/ahEVVzqcfJSND9X2MLcSG/gf3n90Uiux+xKVMC64nRzZaDT3t1rWFcFfULfBk401sRd9g=="
+        "requested": "[0.1.1-packageplane.20260927.1, )",
+        "resolved": "0.1.1-packageplane.20260927.1",
+        "contentHash": "iJAN7pcnsubw2z7ZOe0eFLv4tJHaJzDp5hrVI5z0HUN6ZzYwo25/76NtiYykvg/4cCRvbXtQkp81MIRrZ88RTg=="
       },
       "chummer.play.contracts": {
         "type": "Project"

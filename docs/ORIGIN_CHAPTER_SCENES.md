@@ -1,0 +1,126 @@
+# Origin chapter scene bridge
+
+`OriginChapterSceneRequestBridge` is a compose-only adapter to the existing
+`origin-dossier-media` governed request lane. It reads the chapter under the
+authenticated subject and requires explicit image-processing consent, the exact
+reader-accepted prose digest and an excerpt that occurs in those exact bytes.
+It rechecks authorization after reading and before returning the request.
+
+It does not mutate the chapter, accept reading for a user, consume quota, choose
+a provider, execute a render, persist image bytes or grant publication. The media
+payload binds opaque owner, workspace, chapter, canonical chapter digest and
+selected prose. Alt text is bounded and must be escaped by clients.
+
+## Growing-character continuity
+
+Automatic illustrated-book requests use `chummer.origin.chapter-scene/v3`
+with insertion policy `automatic-private-book/v1`; the manual route retains v2.
+Hub follows the exact,
+reader-accepted predecessor chain in the same owner/workspace to its opening
+chapter and binds that opening's scene as `referenceSceneId`. `protagonistId`
+is SHA-256 of the NUL-delimited subject digest, workspace ID and
+`origin-protagonist/v1`. Every later chapter retains these bindings, including
+after restart. Missing or changed predecessors cannot invent a replacement.
+
+The prompt preserves the opening character/metatype brief and uses the current
+accepted decision's facts and exact prose excerpt for age and setting. It is
+UTF-8 bounded without splitting characters; unchosen future opportunities are
+not illustrated as history. Media Factory must validate and provide the actual
+retained reference PNG to a reference-capable renderer, not merely reuse this
+prompt. Deploy that compatible Media version before this Hub bridge.
+
+This establishes reference provenance, not a biometric or exact-age guarantee.
+On 28 September, the actual compiled bridge/client and deployed Media worker
+generated child and youth PNGs from one retained reference and cold-read their
+exact bytes. Visual continuity was observed, with fine-detail and lettering
+limitations documented in Media Factory's
+`docs/evidence/origin-continuity-canary-20260928.md`. Both real images passed the
+Android managed reader/EPUB check using explicitly synthetic prose. The complete
+live illustrated FirstBook workflow and physical Play installation remain open;
+neither follows from this bounded provider check or Preview 50 Internal
+availability. Existing v1/v2 scenes are not relabelled
+and existing paid requests must not be replayed to change their contract.
+
+For the explicitly consented illustrated-book route, Hub selects an excerpt of
+the exact accepted chapter itself. No local picture upload, scene picker or
+per-image approval is needed. Requests use `RequiresApproval=false` and
+`PersistOnApproval=false`, not a fabricated human approval. Old FirstBook-only
+consent cannot enter this path. Media retains the immutable original reference
+and may automatically persist only a validated v3 private-book image.
+
+## Private delivery boundary
+
+`AndroidLinkedOriginScenesController` now implements signed-install POST routes
+under `/api/v2/android/linked/origin/scenes`: `request`, `read`, and `decide`.
+The existing Android v2 proof middleware binds the exact route, body and install.
+The request resolves a real Hub user for allowance accounting, composes from
+accepted prose, checks the private worker, admits one exact governed request,
+then dispatches it. Reconnection reuses that same charged receipt; a concurrent
+Teable writer is reread, never blindly charged again. A changed scene request
+cannot replace an admitted one, including after a weekly allowance reset.
+Read/review identity is derived from the authenticated owner's accepted chapter,
+not a phone-supplied asset ID. Authorization is rechecked after I/O.
+
+A disconnected phone cancels before admission. Once the exact quota/order commit
+has completed, Hub awaits one handoff with the existing Media-client deadline,
+independent of that connection's cancellation token. It still checks current
+install authorization before and after the handoff. This is not a detached job,
+a longer timeout or an automatic retry. Media's durable no-replay fence remains
+the execution authority.
+
+If Media returns not-found, `read` checks the charged ledger for the same Hub
+user, subject and scene identity. A retained admission returns the existing
+`uncertain` wire state with only the asset ID and publication=false. It does not
+claim the renderer has started or succeeded. This prevents older Android clients
+from treating the paid order as absent and creating again. A ledger outage stays
+unavailable; no admission anywhere remains not-found. Reads never consume quota,
+dispatch, refund, reset or change an order, even after the admission window ends.
+A host failure before handoff still needs explicit reconciliation of that exact
+order; this change is not a background queue or proof of end-to-end latency.
+
+`OriginSceneMediaClient` uses a private Unix-domain socket, no public TCP route,
+no redirects/proxy/cookies, a dedicated file-mounted bearer token and bounded
+streamed JSON. Media Factory owns provider execution, image retention and the
+no-replay fence. The client never receives provider credentials or download URLs.
+Hub does not start a second renderer or store image blobs in its application tree.
+
+Local Docker configuration requires absolute `CHUMMER_ORIGIN_SCENE_MEDIA_SOCKET`
+and `CHUMMER_ORIGIN_SCENE_MEDIA_TOKEN_FILE` paths in a private shared mount. The
+token must be a separate owner-only file, 32–256 printable ASCII bytes, not an
+account credential. Set `CHUMMER_ORIGIN_SCENE_MEDIA_REQUIRED=true` once enabled
+and retain it even during outages: account erasure then fails closed if the media
+worker is unavailable. Never-enabled installations may omit all three settings.
+Partial configuration is not a silent erasure bypass. Account deletion removes
+media before other auxiliary stores and retains an owner tombstone against
+in-flight completion. Existing primary-store erasure restrictions still apply.
+
+The capability remains disabled by default. In the local scene overlay,
+`CHUMMER_ORIGIN_SCENE_ENABLED=true` explicitly enables admission; a healthy socket
+alone does not enable it. This source change does not configure
+or deploy the service. Android must obtain explicit illustrated-book consent,
+call these routes, and validate/download bytes into its existing immutable scene
+store for offline reading and EPUB embedding. The legacy manual path keeps its
+review requirement. No live provider or Play delivery claim follows from server
+tests.
+
+An operator may sponsor a bounded private test without inventing billing
+membership. The optional `CHUMMER_ORIGIN_SCENE_SPONSOR_` settings are
+`USER_SHA256` (SHA-256 of the trimmed, uppercase invariant Hub user ID), `LIMIT`
+(1–8), `WEEK_START_UTC` (Monday midnight), and `EXPIRES_AT_UTC` (no later than the
+end of that week). Both timestamps must use `yyyy-MM-ddTHH:mm:ssZ`. All four must
+be valid and current. Missing, expired or mismatched settings leave normal limits
+unchanged. This only raises that owner's existing weekly limit for explicitly
+consented private Origin chapter scenes, never the global free tier, other
+capabilities or a receiptless quota consumption. Existing usage is not reset.
+Receipts identify `sponsored_test`, `operator_approved_private_scene_trial` and
+`private_origin_scene`; `SupporterActive` still reflects actual billing.
+Expiry stops new admissions, not fulfillment/readback of an already charged,
+exact immutable order. Media's independent attempt ceiling and no-replay fence
+still apply. This is not an assertion of provider credits or publication rights.
+
+Focused local verification: affected API build; Origin chapter, Horizon allowance,
+scene signed-install and account-erasure tests. These cover accepted/unaccepted
+text, literal excerpt, consent, owner/revocation, cold/concurrent admission,
+bounded private transport and recovery-only dispatch refusal. No paid provider
+calls are used by these tests. Reuse the unchanged Android EPUB checks; device
+and complete actual narrative/illustration delivery remain separate work.

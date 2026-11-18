@@ -1410,6 +1410,8 @@ def prepare_immutable_build_contexts(
         "Directory.Build.props",
         "eng/NuGet.Container.Config",
         "eng/package-plane.lock.json",
+        "eng/core-main-runtime-artifact-authority.json",
+        "eng/core-runtime-bundle",
         "global.json",
         "scripts/ai/bootstrap-hub-package-feed.py",
         "scripts/generate_public_play_worker_projection.py",

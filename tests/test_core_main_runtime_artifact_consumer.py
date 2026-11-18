@@ -22,15 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = ROOT / "eng/core-main-runtime-artifact-authority.json"
 WORKFLOW_PATH = ROOT / ".github/workflows/core-main-runtime-artifact-consumer.yml"
 SCRIPT_PATH = ROOT / "scripts/ai/consume-core-main-runtime-artifact.py"
-AUTHORITY_SHA256 = "1f1514e274ddc1dc59d87dcd42874d1d8eb0914b2bd9f3258f15e2f813a0e947"
-
-
-class NonSeekableBytesIO(io.BytesIO):
-    def seekable(self) -> bool:
-        return False
-
-    def seek(self, *_args: Any, **_kwargs: Any) -> int:
-        raise io.UnsupportedOperation("synthetic GitHub artifact stream is non-seekable")
+AUTHORITY_SHA256 = "ac350b351476b434bc09edcc7a0246df6b3c3179a79fd26a79892a0950065d5e"
 
 
 def load_module():
@@ -53,46 +45,132 @@ def write_json(path: Path, payload: Any, mode: int = 0o600) -> None:
     path.chmod(mode)
 
 
-def api_metadata(authority: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def open_descriptor_count() -> int:
+    return len(os.listdir("/proc/self/fd"))
+
+
+def public_metadata(
+    authority: dict[str, Any], receipt: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     producer = authority["producer"]
-    run = {
-        "id": producer["run_id"],
-        "run_attempt": producer["run_attempt"],
-        "event": producer["event"],
-        "status": "completed",
-        "conclusion": "success",
-        "head_branch": producer["branch"],
-        "head_sha": producer["head_commit"],
-        "name": producer["workflow_name"],
-        "path": producer["workflow_path"],
-        "workflow_id": producer["workflow_id"],
-        "repository": {"full_name": producer["repository"]},
-        "head_repository": {"full_name": producer["repository"]},
-        "pull_requests": [],
-        "head_commit": {
-            "id": producer["head_commit"],
-            "tree_id": producer["recipe_tree"],
+    public_release = authority["public_release"]
+    bot = {
+        "login": "github-actions[bot]",
+        "id": 41898282,
+        "type": "Bot",
+        "site_admin": False,
+    }
+    assets = []
+    for key in ("receipt_asset", "bundle_asset"):
+        asset = public_release[key]
+        assets.append(
+            {
+                "id": asset["id"],
+                "name": asset["name"],
+                "label": asset["label"],
+                "content_type": asset["content_type"],
+                "state": asset["state"],
+                "size": asset["size_bytes"],
+                "digest": f"sha256:{asset['sha256']}",
+                "created_at": asset["created_at_utc"],
+                "updated_at": asset["updated_at_utc"],
+                "url": asset["api_url"],
+                "browser_download_url": asset["download_url"],
+                "download_count": 99,
+                "uploader": bot,
+            }
+        )
+    release = {
+        "id": public_release["release_id"],
+        "tag_name": public_release["tag_name"],
+        "target_commitish": public_release["target_commit"],
+        "name": public_release["name"],
+        "body": public_release["body"],
+        "draft": public_release["draft"],
+        "prerelease": public_release["prerelease"],
+        "immutable": public_release["immutable"],
+        "created_at": public_release["created_at_utc"],
+        "published_at": public_release["published_at_utc"],
+        "updated_at": public_release["updated_at_utc"],
+        "url": public_release["release_api_url"],
+        "html_url": public_release["release_html_url"],
+        "author": bot,
+        "assets": assets,
+    }
+    tag = {
+        "ref": f"refs/tags/{public_release['tag_name']}",
+        "url": public_release["tag_api_url"].replace("/ref/tags/", "/refs/tags/"),
+        "object": {
+            "type": "commit",
+            "sha": producer["head_commit"],
+            "url": (
+                f"https://api.github.com/repos/{producer['repository']}/git/commits/"
+                f"{producer['head_commit']}"
+            ),
         },
     }
-    artifact = {
-        "id": producer["artifact_id"],
-        "name": producer["artifact_name"],
-        "size_in_bytes": producer["artifact_size_bytes"],
-        "digest": f"sha256:{producer['artifact_sha256']}",
-        "expired": False,
-        "archive_download_url": (
-            f"https://api.github.com/repos/{producer['repository']}/actions/"
-            f"artifacts/{producer['artifact_id']}/zip"
-        ),
-        "workflow_run": {
-            "id": producer["run_id"],
-            "head_branch": producer["branch"],
-            "head_sha": producer["head_commit"],
-            "repository_id": producer["repository_id"],
-            "head_repository_id": producer["repository_id"],
+    return release, tag, receipt
+
+
+def public_receipt(authority: dict[str, Any]) -> dict[str, Any]:
+    producer = authority["producer"]
+    release = authority["public_release"]
+    return {
+        "contract": "chummer-core.runtime-package-public-handoff/v2",
+        "repository": producer["repository"],
+        "ref": "refs/heads/main",
+        "commit": producer["head_commit"],
+        "release_tag": release["tag_name"],
+        "receipt_asset_name": release["receipt_asset"]["name"],
+        "source_actions_artifact": {
+            "id": producer["artifact_id"],
+            "name": producer["artifact_name"],
+            "sha256": producer["artifact_sha256"],
+            "size_bytes": producer["artifact_size_bytes"],
+            "workflow_run": {
+                "id": producer["run_id"],
+                "attempt": producer["run_attempt"],
+                "event": producer["event"],
+                "head_branch": producer["branch"],
+                "head_sha": producer["head_commit"],
+                "head_tree": producer["recipe_tree"],
+                "repository": producer["repository"],
+                "workflow_id": producer["workflow_id"],
+                "workflow_ref": (
+                    f"{producer['repository']}/{producer['workflow_path']}@refs/heads/"
+                    f"{producer['branch']}"
+                ),
+                "workflow_sha": producer["head_commit"],
+                "attempt_api_url": (
+                    f"https://api.github.com/repos/{producer['repository']}/actions/runs/"
+                    f"{producer['run_id']}/attempts/{producer['run_attempt']}"
+                ),
+            },
+            "authenticated_metadata": {
+                "api_url": (
+                    f"https://api.github.com/repos/{producer['repository']}/actions/"
+                    f"artifacts/{producer['artifact_id']}"
+                ),
+                "archive_download_url": (
+                    f"https://api.github.com/repos/{producer['repository']}/actions/"
+                    f"artifacts/{producer['artifact_id']}/zip"
+                ),
+                "created_at_utc": "2026-08-27T10:14:54Z",
+                "expires_at_utc": "2026-09-01T10:14:53Z",
+                "repository_id": producer["repository_id"],
+                "head_repository_id": producer["repository_id"],
+            },
+        },
+        "bundle": {
+            "contract": "chummer-core.runtime-package-public-handoff-zip/v1",
+            "asset_name": release["bundle_asset"]["name"],
+            "sha256": release["bundle_asset"]["sha256"],
+            "size_bytes": release["bundle_asset"]["size_bytes"],
+            "member_count": authority["archive"]["member_count"],
+            "uncompressed_size_bytes": authority["archive"]["uncompressed_size_bytes"],
+            "members": authority["archive"]["members"],
         },
     }
-    return run, artifact
 
 
 def build_synthetic_lane(
@@ -127,15 +205,15 @@ def build_synthetic_lane(
     runner_temp.mkdir(mode=0o700)
     workspace = runner_temp / "core-main-runtime.synthetic"
     workspace.mkdir(mode=0o700)
-    archive_path = workspace / "artifact.zip"
+    archive_path = workspace / "bundle.zip"
     infos: list[tuple[zipfile.ZipInfo, bytes]] = []
     for index, row in enumerate(authority["archive"]["members"]):
         name = "../escape" if mutation == "zip_slip" and index == 0 else row["path"]
         info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
         info.create_system = 3
-        info.create_version = 45
+        info.create_version = 20
         info.extract_version = 20
-        info.flag_bits = 8
+        info.flag_bits = 0
         mode = stat.S_IFLNK | 0o777 if mutation == "symlink" and index == 0 else stat.S_IFREG | 0o644
         info.external_attr = mode << 16
         info.compress_type = zipfile.ZIP_STORED
@@ -145,45 +223,52 @@ def build_synthetic_lane(
     if mutation == "extra":
         extra = zipfile.ZipInfo("foreign.txt", date_time=(1980, 1, 1, 0, 0, 0))
         extra.create_system = 3
-        extra.create_version = 45
+        extra.create_version = 20
         extra.extract_version = 20
-        extra.flag_bits = 8
+        extra.flag_bits = 0
         extra.external_attr = (stat.S_IFREG | 0o644) << 16
         extra.compress_type = zipfile.ZIP_STORED
         infos.append((extra, b"foreign\n"))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        archive_buffer = NonSeekableBytesIO()
+        archive_buffer = io.BytesIO()
         with zipfile.ZipFile(archive_buffer, "w") as archive:
             for info, payload in infos:
                 archive.writestr(info, payload)
         archive_path.write_bytes(archive_buffer.getvalue())
     archive_path.chmod(0o600)
     archive_bytes = archive_path.read_bytes()
-    authority["producer"]["artifact_size_bytes"] = len(archive_bytes)
-    authority["producer"]["artifact_sha256"] = hashlib.sha256(archive_bytes).hexdigest()
-    validator["artifact_selector"]["sha256"] = authority["producer"][
-        "artifact_sha256"
-    ]
+    authority["public_release"]["bundle_asset"]["size_bytes"] = len(archive_bytes)
+    authority["public_release"]["bundle_asset"]["sha256"] = hashlib.sha256(
+        archive_bytes
+    ).hexdigest()
+    receipt = public_receipt(authority)
+    receipt_path = workspace / "receipt.json"
+    write_json(receipt_path, receipt)
+    receipt_bytes = receipt_path.read_bytes()
+    authority["public_release"]["receipt_asset"]["size_bytes"] = len(receipt_bytes)
+    authority["public_release"]["receipt_asset"]["sha256"] = hashlib.sha256(
+        receipt_bytes
+    ).hexdigest()
     authority_path = tmp_path / "authority.json"
     write_json(authority_path, authority)
-    run, artifact = api_metadata(authority)
-    run_path = workspace / "run.json"
-    artifact_path = workspace / "artifact.json"
-    write_json(run_path, run)
-    write_json(artifact_path, artifact)
+    release, tag, _receipt = public_metadata(authority, receipt)
+    release_path = workspace / "release.json"
+    tag_path = workspace / "tag.json"
+    write_json(release_path, release)
+    write_json(tag_path, tag)
     return (
         module,
         authority,
         authority_path,
         runner_temp,
         workspace,
-        run_path,
-        artifact_path,
+        release_path,
+        tag_path,
     )
 
 
-def test_committed_authority_is_the_exact_verified_main_snapshot() -> None:
+def test_committed_authority_is_the_exact_public_main_snapshot() -> None:
     module = load_module()
     raw = AUTHORITY_PATH.read_bytes()
     authority = module.load_authority(AUTHORITY_PATH)
@@ -196,24 +281,36 @@ def test_committed_authority_is_the_exact_verified_main_snapshot() -> None:
         "workflow_id": 315904519,
         "workflow_name": "Core package-plane",
         "workflow_path": ".github/workflows/package-plane.yml",
-        "run_id": 32748122851,
+        "run_id": 34951015819,
         "run_attempt": 1,
         "event": "push",
         "branch": "main",
-        "head_commit": "a8e191ea49f2cac8a3f695c56812254d34cbd669",
-        "recipe_tree": "87369e1fa54f36b00d6527ff2efb89e048db4165",
-        "artifact_id": 9528212865,
+        "head_commit": "fe642d59a2899e1f1298271a0ffb80e91355aaf6",
+        "recipe_tree": "51353f120ae10884bef6f6998278c96fab894eba",
+        "artifact_id": 10391071118,
         "artifact_name": (
             "chummer-core-runtime-package-plane-"
-            "a8e191ea49f2cac8a3f695c56812254d34cbd669"
+            "fe642d59a2899e1f1298271a0ffb80e91355aaf6"
         ),
         "artifact_sha256": (
-            "048f5bbd927ba15f0b2e6ea0695e35ef9fceeef51b30afc6ad09c9ac60267d28"
+            "307924e649c9a7bae01ff3aa85b352617bb67667982feb4a2948d8f99f43fac8"
         ),
-        "artifact_size_bytes": 1546656,
+        "artifact_size_bytes": 3360991,
     }
+    release = authority["public_release"]
+    assert release["release_id"] == 389027043
+    assert release["target_commit"] == producer["head_commit"]
+    assert release["immutable"] is False
+    assert (release["receipt_asset"]["id"], release["receipt_asset"]["sha256"]) == (
+        565399781,
+        "876e4f20e8949ea4c4806d80eeb814ecd34fe1db3e9a546b3af001b4fbf8d5c0",
+    )
+    assert (release["bundle_asset"]["id"], release["bundle_asset"]["sha256"]) == (
+        565399778,
+        "d45350886940a3323ed72a9f7b72ad539e0383e13a55063dcf10c90d491dac1b",
+    )
     assert authority["archive"]["member_count"] == 11
-    assert authority["archive"]["uncompressed_size_bytes"] == 1544098
+    assert authority["archive"]["uncompressed_size_bytes"] == 3358433
     assert len(authority["archive"]["members"]) == 11
     assert len(
         [
@@ -222,6 +319,14 @@ def test_committed_authority_is_the_exact_verified_main_snapshot() -> None:
             if row["path"].startswith("packages/")
         ]
     ) == 8
+    validator = authority["validator_authority"]
+    assert validator["runtime_source_commit"] == (
+        "54398fa0dfe60b4f00aac40d333882b7f7cc2886"
+    )
+    assert validator["runtime_package_version"] == (
+        "0.0.0-packageplane.candidate.sh54398fa0dfe60"
+    )
+    assert validator["package_recipe_commit"] == producer["head_commit"]
 
 
 def test_committed_owner_authority_rows_are_exact() -> None:
@@ -259,12 +364,20 @@ def test_committed_owner_authority_rows_are_exact() -> None:
     ]
 
 
-def test_workflow_is_pinned_minimal_and_has_one_shot_consumption() -> None:
+def test_workflow_is_anonymous_pinned_bounded_and_one_shot() -> None:
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     trigger = workflow.get("on", workflow.get(True))
     assert workflow["permissions"] == {"contents": "read"}
-    assert set(trigger) == {"workflow_dispatch", "push"}
+    assert set(trigger) == {"workflow_dispatch", "pull_request", "push"}
     assert trigger["push"]["branches"] == ["main"]
+    expected_paths = [
+        ".github/workflows/core-main-runtime-artifact-consumer.yml",
+        "eng/core-main-runtime-artifact-authority.json",
+        "scripts/ai/consume-core-main-runtime-artifact.py",
+        "scripts/ai/validate-core-package-artifact.py",
+    ]
+    assert trigger["pull_request"]["paths"] == expected_paths
+    assert trigger["push"]["paths"] == expected_paths
     steps = workflow["jobs"]["consume"]["steps"]
     uses = [step["uses"] for step in steps if "uses" in step]
     assert uses == [
@@ -274,22 +387,40 @@ def test_workflow_is_pinned_minimal_and_has_one_shot_consumption() -> None:
     assert all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", value) for value in uses)
     assert not any("download-artifact" in value for value in uses)
     lifecycle = steps[1]
-    assert lifecycle["env"]["CORE_ARTIFACT_READ_TOKEN"] == (
-        "${{ secrets.CHUMMER_CORE_ARTIFACT_READ_TOKEN }}"
-    )
+    assert lifecycle["env"] == {"PYTHONDONTWRITEBYTECODE": "1"}
     script = lifecycle["run"]
     for value in (
-        "actions/runs/32748122851",
-        "actions/artifacts/9528212865",
-        "actions/artifacts/9528212865/zip",
+        "releases/389027043",
+        "git/ref/tags/${tag}",
+        "core-runtime-package-plane-fe642d59a2899e1f1298271a0ffb80e91355aaf6",
+        "--max-filesize 65536",
         "--max-filesize 16777216",
         "ulimit -f 32768",
         'trap cleanup_snapshot EXIT',
+        '--release-metadata "${snapshot_dir}/release.json"',
+        '--tag-metadata "${snapshot_dir}/tag.json"',
+        '--receipt "${snapshot_dir}/receipt.json"',
+        '--bundle "${snapshot_dir}/bundle.zip"',
         '--artifact-root "${export_root}"',
         '"${consumer}" finalize',
         'test ! -e "${snapshot_dir}"',
     ):
         assert value in script
+    assert "secrets." not in script
+    assert "Authorization:" not in script
+    assert "/latest" not in script
+    assert "/actions/artifacts/" not in script
+    assert "--retry 0" in script
+    assert script.count("--write-out ") == 4
+    for label in ("release", "tag", "receipt", "bundle"):
+        assert (
+            "--write-out 'core-public-input " + label
+            + " http=%{http_code} bytes=%{size_download}\\n'"
+        ) in script
+    # Error diagnostics identify the request, not headers, signed redirect
+    # URLs, or response bodies. One-shot fail-closed download policy remains.
+    for forbidden in ("%{url", "%{header", "%{json}", "--verbose", "--trace"):
+        assert forbidden not in script
     after_finalize = script.split('"${consumer}" finalize', 1)[1]
     assert "export_root" not in after_finalize
     assert steps[2]["with"]["path"] == (
@@ -297,21 +428,31 @@ def test_workflow_is_pinned_minimal_and_has_one_shot_consumption() -> None:
     )
 
 
-def test_api_metadata_requires_real_main_push_tree_and_exact_artifact() -> None:
+def test_public_metadata_requires_exact_release_tag_assets_and_v2_receipt() -> None:
     module = load_module()
     authority = module.load_authority(AUTHORITY_PATH)
-    run, artifact = api_metadata(authority)
-    module.validate_api_metadata(authority, run, artifact)
+    receipt = public_receipt(authority)
+    release, tag, receipt = public_metadata(authority, receipt)
+    module.validate_public_release_metadata(authority, release, tag, receipt)
 
-    hostile_run = copy.deepcopy(run)
-    hostile_run["event"] = "pull_request"
-    with pytest.raises(module.ConsumerError, match="workflow run metadata"):
-        module.validate_api_metadata(authority, hostile_run, artifact)
+    hostile_tag = copy.deepcopy(tag)
+    hostile_tag["object"]["sha"] = "f" * 40
+    with pytest.raises(module.ConsumerError, match="direct release tag"):
+        module.validate_public_release_metadata(authority, release, hostile_tag, receipt)
 
-    hostile_artifact = copy.deepcopy(artifact)
-    hostile_artifact["workflow_run"]["head_sha"] = "f" * 40
-    with pytest.raises(module.ConsumerError, match="artifact API metadata"):
-        module.validate_api_metadata(authority, run, hostile_artifact)
+    hostile_receipt = copy.deepcopy(receipt)
+    hostile_receipt["source_actions_artifact"]["workflow_run"]["head_tree"] = "f" * 40
+    with pytest.raises(module.ConsumerError, match="workflow provenance"):
+        module.validate_public_release_metadata(
+            authority, release, tag, hostile_receipt
+        )
+
+    hostile_release = copy.deepcopy(release)
+    hostile_release["assets"][1]["digest"] = "sha256:" + "f" * 64
+    with pytest.raises(module.ConsumerError, match="bundle_asset .*metadata"):
+        module.validate_public_release_metadata(
+            authority, hostile_release, tag, receipt
+        )
 
 
 def test_prepare_extracts_only_exact_regular_members_with_exact_modes(
@@ -332,7 +473,8 @@ def test_prepare_extracts_only_exact_regular_members_with_exact_modes(
         authority_path,
         run_path,
         artifact_path,
-        workspace / "artifact.zip",
+        workspace / "receipt.json",
+        workspace / "bundle.zip",
         runner_temp,
         workspace,
         export_root,
@@ -367,7 +509,43 @@ def test_prepare_rejects_hostile_zip_layouts(
             authority_path,
             run_path,
             artifact_path,
-            workspace / "artifact.zip",
+            workspace / "receipt.json",
+            workspace / "bundle.zip",
+            runner_temp,
+            workspace,
+            workspace / "artifact-root",
+            workspace / "validator-authority.json",
+        )
+    module.cleanup(authority_path, runner_temp, workspace)
+    assert not workspace.exists()
+
+
+def test_prepare_rejects_same_size_public_receipt_byte_substitution(
+    tmp_path: Path,
+) -> None:
+    (
+        module,
+        _authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        release_path,
+        tag_path,
+    ) = build_synthetic_lane(tmp_path)
+    receipt_path = workspace / "receipt.json"
+    payload = bytearray(receipt_path.read_bytes())
+    assert payload[-1:] == b"\n"
+    payload[-1] = ord(" ")
+    receipt_path.write_bytes(payload)
+    receipt_path.chmod(0o600)
+
+    with pytest.raises(module.ConsumerError, match="receipt SHA-256"):
+        module.prepare(
+            authority_path,
+            release_path,
+            tag_path,
+            receipt_path,
+            workspace / "bundle.zip",
             runner_temp,
             workspace,
             workspace / "artifact-root",
@@ -417,21 +595,23 @@ def validator_result(authority: dict[str, Any], contract: str) -> dict[str, Any]
     return result
 
 
-def test_verdict_is_current_v2_compatible_and_v3_snapshot_strict() -> None:
+def test_verdict_rejects_v2_and_requires_v3_snapshot() -> None:
     module = load_module()
     authority = module.load_authority(AUTHORITY_PATH)
-    v2 = module.validation_summary(authority, validator_result(authority, module.VALIDATION_V2))
-    assert v2["post_validation_consumption_authority"] == {
-        "contract": "github-actions.immutable-artifact-selector/v1",
-        "artifact_id": 9528212865,
-        "sha256": "048f5bbd927ba15f0b2e6ea0695e35ef9fceeef51b30afc6ad09c9ac60267d28",
-    }
+    with pytest.raises(module.ConsumerError, match="immutable-snapshot v3"):
+        module.validation_summary(
+            authority,
+            validator_result(
+                authority,
+                "chummer-hub.core-runtime-package-artifact-validation/v2",
+            ),
+        )
 
     v3_result = validator_result(authority, module.VALIDATION_V3)
     v3 = module.validation_summary(authority, v3_result)
     assert v3["artifact_byte_snapshot"] == {
         "contract": "chummer-hub.core-runtime-package-byte-snapshot/v1",
-        "sha256": "b5875da488e804b5f6eff33b81d0f1080b1b2b6c4dcf45676dbe451693e2a68a",
+        "sha256": "85c162bdd2ef868be3a41efff8a94e0da3ead53c5248f0529b86f24440b62aca",
         "member_count": 11,
         "source_path_posture": "not_attested_after_snapshot_capture",
     }
@@ -457,7 +637,8 @@ def test_finalize_deletes_artifact_root_before_recording_only_verdict(
         authority_path,
         run_path,
         artifact_path,
-        workspace / "artifact.zip",
+        workspace / "receipt.json",
+        workspace / "bundle.zip",
         runner_temp,
         workspace,
         export_root,
@@ -481,3 +662,253 @@ def test_finalize_deletes_artifact_root_before_recording_only_verdict(
     rendered = verdict_path.read_text(encoding="utf-8")
     assert "artifact-root" not in rendered
     assert "not_attested_after_snapshot_capture" in rendered
+
+
+def test_archive_leaf_swap_is_rejected_without_descriptor_leaks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        module,
+        _authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        run_path,
+        artifact_path,
+    ) = build_synthetic_lane(tmp_path)
+    archive_path = workspace / "bundle.zip"
+    original_archive = tmp_path / "original-artifact.zip"
+    hostile_archive = tmp_path / "hostile-artifact.zip"
+    hostile_archive.write_bytes(b"hostile replacement\n")
+    hostile_archive.chmod(0o600)
+    real_open = module.os.open
+    swapped = False
+
+    def swap_before_archive_open(
+        path: Any, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        nonlocal swapped
+        if path == "bundle.zip" and dir_fd is not None and not swapped:
+            swapped = True
+            os.rename(archive_path, original_archive)
+            os.rename(hostile_archive, archive_path)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    before = open_descriptor_count()
+    with monkeypatch.context() as patcher:
+        patcher.setattr(module.os, "open", swap_before_archive_open)
+        with pytest.raises(module.ConsumerError, match="downloaded public bundle"):
+            module.prepare(
+                authority_path,
+                run_path,
+                artifact_path,
+                workspace / "receipt.json",
+                archive_path,
+                runner_temp,
+                workspace,
+                workspace / "artifact-root",
+                workspace / "validator-authority.json",
+            )
+    assert swapped
+    assert open_descriptor_count() == before
+    archive_path.unlink()
+    original_archive.rename(archive_path)
+    module.cleanup(authority_path, runner_temp, workspace)
+    assert not workspace.exists()
+
+
+def test_extraction_directory_swap_never_writes_through_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        module,
+        _authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        run_path,
+        artifact_path,
+    ) = build_synthetic_lane(tmp_path)
+    export_root = workspace / "artifact-root"
+    packages_path = export_root / "packages"
+    held_packages_path = export_root / "packages-held"
+    outside = tmp_path / "outside-packages"
+    outside.mkdir()
+    sentinel = outside / "sentinel"
+    sentinel.write_text("do not touch\n", encoding="utf-8")
+    real_open = module.os.open
+    swapped = False
+
+    def swap_packages_before_member_create(
+        path: Any, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        nonlocal swapped
+        if (
+            isinstance(path, str)
+            and path.endswith(".nupkg")
+            and flags & os.O_CREAT
+            and dir_fd is not None
+            and not swapped
+        ):
+            swapped = True
+            os.rename(packages_path, held_packages_path)
+            os.symlink(outside, packages_path, target_is_directory=True)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    before = open_descriptor_count()
+    with monkeypatch.context() as patcher:
+        patcher.setattr(module.os, "open", swap_packages_before_member_create)
+        with pytest.raises(module.ConsumerError, match="packages directory path"):
+            module.prepare(
+                authority_path,
+                run_path,
+                artifact_path,
+                workspace / "receipt.json",
+                workspace / "bundle.zip",
+                runner_temp,
+                workspace,
+                export_root,
+                workspace / "validator-authority.json",
+            )
+    assert swapped
+    assert list(outside.iterdir()) == [sentinel]
+    assert open_descriptor_count() == before
+    packages_path.unlink()
+    held_packages_path.rename(packages_path)
+    module.cleanup(authority_path, runner_temp, workspace)
+    assert not workspace.exists()
+
+
+def test_finalize_cleanup_uses_held_root_and_fails_closed_on_root_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        module,
+        authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        run_path,
+        artifact_path,
+    ) = build_synthetic_lane(tmp_path)
+    export_root = workspace / "artifact-root"
+    held_export_root = workspace / "artifact-root-held"
+    outside = tmp_path / "outside-cleanup"
+    outside.mkdir()
+    sentinel = outside / "sentinel"
+    sentinel.write_text("do not touch\n", encoding="utf-8")
+    module.prepare(
+        authority_path,
+        run_path,
+        artifact_path,
+        workspace / "receipt.json",
+        workspace / "bundle.zip",
+        runner_temp,
+        workspace,
+        export_root,
+        workspace / "validator-authority.json",
+    )
+    write_json(
+        workspace / "validation.json",
+        validator_result(authority, module.VALIDATION_V3),
+    )
+    verdict_path = runner_temp / "core-main-runtime-artifact-verdict.json"
+    real_unlink = module.os.unlink
+    swapped = False
+
+    def swap_root_during_package_cleanup(
+        path: Any, *, dir_fd: int | None = None
+    ) -> None:
+        nonlocal swapped
+        if (
+            isinstance(path, str)
+            and path.endswith(".nupkg")
+            and dir_fd is not None
+            and not swapped
+        ):
+            swapped = True
+            os.rename(export_root, held_export_root)
+            os.symlink(outside, export_root, target_is_directory=True)
+        real_unlink(path, dir_fd=dir_fd)
+
+    before = open_descriptor_count()
+    with monkeypatch.context() as patcher:
+        patcher.setattr(module.os, "unlink", swap_root_during_package_cleanup)
+        with pytest.raises(module.ConsumerError, match="extraction root path"):
+            module.finalize(
+                authority_path,
+                workspace / "validation.json",
+                runner_temp,
+                workspace,
+                verdict_path,
+            )
+    assert swapped
+    assert not verdict_path.exists()
+    assert list(outside.iterdir()) == [sentinel]
+    assert open_descriptor_count() == before
+    export_root.unlink()
+    held_export_root.rename(export_root)
+    module.cleanup(authority_path, runner_temp, workspace)
+    assert not workspace.exists()
+
+
+def test_verdict_write_uses_held_runner_and_removes_output_after_runner_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        module,
+        authority,
+        authority_path,
+        runner_temp,
+        workspace,
+        run_path,
+        artifact_path,
+    ) = build_synthetic_lane(tmp_path)
+    module.prepare(
+        authority_path,
+        run_path,
+        artifact_path,
+        workspace / "receipt.json",
+        workspace / "bundle.zip",
+        runner_temp,
+        workspace,
+        workspace / "artifact-root",
+        workspace / "validator-authority.json",
+    )
+    write_json(
+        workspace / "validation.json",
+        validator_result(authority, module.VALIDATION_V3),
+    )
+    verdict_path = runner_temp / "core-main-runtime-artifact-verdict.json"
+    held_runner = runner_temp.with_name(f"{runner_temp.name}-held")
+    real_open = module.os.open
+    swapped = False
+
+    def swap_runner_before_verdict_create(
+        path: Any, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+    ) -> int:
+        nonlocal swapped
+        if path == verdict_path.name and flags & os.O_CREAT and not swapped:
+            swapped = True
+            os.rename(runner_temp, held_runner)
+            os.mkdir(runner_temp, mode=0o700)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    before = open_descriptor_count()
+    with monkeypatch.context() as patcher:
+        patcher.setattr(module.os, "open", swap_runner_before_verdict_create)
+        with pytest.raises(module.ConsumerError, match="runner temp path"):
+            module.finalize(
+                authority_path,
+                workspace / "validation.json",
+                runner_temp,
+                workspace,
+                verdict_path,
+            )
+    assert swapped
+    assert open_descriptor_count() == before
+    assert not (held_runner / verdict_path.name).exists()
+    assert not verdict_path.exists()
+    runner_temp.rmdir()
+    held_runner.rename(runner_temp)
+    assert not workspace.exists()

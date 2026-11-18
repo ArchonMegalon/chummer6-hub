@@ -22,6 +22,7 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class AccountsController : Controller
 {
     private const int MaxRequestBodyBytes = 16 * 1024;
+    private const string OriginLibraryPath = "/account/work/origin-dossiers";
 
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
@@ -170,16 +171,33 @@ public sealed class AccountsController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            var links = _links.GetSummary(subject.SubjectId);
-            HubUserExperienceDto experience = _experience.GetOrCreate(subject.SubjectId);
+
+            // Keep identity admission first, but do not make a small account page
+            // wait for unrelated remote stores or create unused projections.
+            if (ShouldShowMinimalAccountSection(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId, prepQuery, Request.Query))
+            {
+                return View(
+                    "~/Views/Accounts/Section.cshtml",
+                    BuildAccountSectionModel(selectedSection, user, subject.SubjectId, accessNotice));
+            }
+
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
+            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            if (showHub)
+            {
+                return View(
+                    "~/Views/Accounts/Hub.cshtml",
+                    BuildAccountHubModel(user, installLinking, supportCases, campaignSpine));
+            }
+
+            var links = _links.GetSummary(subject.SubjectId);
+            HubUserExperienceDto experience = _experience.GetOrCreate(subject.SubjectId);
             var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
             var selectedSupportCase = string.IsNullOrWhiteSpace(caseId)
                 ? null
                 : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
             var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase, installLinking);
-            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
             var originDossierPublications = _originDossierPublications.ListForAccount(user.UserId, subject.SubjectId);
             EntitlementSyncReceiptProjection entitlementSyncReceipts = _workspaceServerPlane.GetEntitlementSyncReceiptProjection(user, installLinking);
             var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
@@ -212,28 +230,6 @@ public sealed class AccountsController : Controller
             IReadOnlyList<ContributionReceiptDto> participationReceipts = participationSession is null
                 ? Array.Empty<ContributionReceiptDto>()
                 : _sessions.ListReceipts(participationSession.SponsorSessionId);
-            if (showHub)
-            {
-                return View(
-                    "~/Views/Accounts/Hub.cshtml",
-                    BuildAccountHubModel(user, installLinking, supportCases, campaignSpine));
-            }
-
-            if (ShouldShowMinimalAccountSection(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId, prepQuery, Request.Query))
-            {
-                return View(
-                    "~/Views/Accounts/Section.cshtml",
-                    BuildAccountSectionModel(
-                        selectedSection,
-                        user,
-                        installLinking,
-                        campaignSpine,
-                        _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email),
-                        _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 8),
-                        _participationNotifications.ListReceiptsForUser(user.UserId, 6),
-                        accessNotice));
-            }
-
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
                 CurrentSection: selectedSection,
@@ -373,9 +369,10 @@ public sealed class AccountsController : Controller
                 return Redirect($"{returnPath}?accessNotice=unlink_refresh");
             }
 
-            _installLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(
-                InstallationId: installation.InstallationId,
-                AccessToken: activeGrant.AccessToken));
+            _installLinking.RevokeGrantForOwner(
+                installation.InstallationId,
+                user.UserId,
+                subject.SubjectId);
             return Redirect($"{returnPath}?accessNotice=unlinked");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -408,10 +405,10 @@ public sealed class AccountsController : Controller
 
         string membershipLabel = allowance?.AllowanceTier switch
             {
+                null => "Membership unavailable",
                 "supporter" => "Supporter",
                 _ => "Free"
-            }
-            ?? "Free";
+            };
         string membershipSummary = allowance is not null
             ? allowance.SupporterActive
                 ? "2 books each month. Same app."
@@ -434,7 +431,8 @@ public sealed class AccountsController : Controller
             : $"{supportCases.Count} support case{(supportCases.Count == 1 ? string.Empty : "s")}.";
         string campaignSummary = $"{campaignSpine.Dossiers.Count} runner{(campaignSpine.Dossiers.Count == 1 ? string.Empty : "s")}, {campaignSpine.Campaigns.Count} campaign{(campaignSpine.Campaigns.Count == 1 ? string.Empty : "s")}.";
         bool supporterActive = allowance?.SupporterActive ?? false;
-        string supporterPrimaryLabel = supporterActive ? "Manage supporter" : "Become supporter";
+        string supporterPrimaryLabel = allowance is null ? "Check membership"
+            : supporterActive ? "Manage supporter" : "Become supporter";
         string supporterPrimaryHref = "/account/billing";
         string supporterSecondaryLabel = "Details";
         string supporterSecondaryHref = "/account/billing";
@@ -503,19 +501,26 @@ public sealed class AccountsController : Controller
     private AccountSectionPageViewModel BuildAccountSectionModel(
         string section,
         HubUserDto user,
-        InstallLinkingSummaryDto installLinking,
-        AccountCampaignSummary campaignSpine,
-        HorizonArtifactAllowanceViewModel? allowance,
-        IReadOnlyList<PublicPackageReceipt> participationPackageReceipts,
-        IReadOnlyList<ParticipationOperatorNotificationReceipt> participationActivityReceipts,
+        string subjectId,
         string? accessNotice)
-        => section switch
+    {
+        if (section == "participation")
+        {
+            return BuildAccountParticipationSectionModel(
+                user,
+                _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email),
+                _packageCatalog.ListReceiptsForSubject(subjectId, 8),
+                _participationNotifications.ListReceiptsForUser(user.UserId, 6));
+        }
+
+        var installLinking = _installLinking.GetSummary(user.UserId, subjectId);
+        return section switch
         {
             "access" => BuildAccountAccessSectionModel(user, installLinking, accessNotice),
-            "work" => BuildAccountWorkSectionModel(user, installLinking, campaignSpine),
-            "participation" => BuildAccountParticipationSectionModel(user, allowance, participationPackageReceipts, participationActivityReceipts),
+            "work" => BuildAccountWorkSectionModel(user, installLinking, _campaignSpine.GetAccountSummary(user, installLinking)),
             _ => throw new InvalidOperationException($"Unsupported account section '{section}'.")
         };
+    }
 
     private AccountSectionPageViewModel BuildAccountAccessSectionModel(
         HubUserDto user,
@@ -687,7 +692,13 @@ public sealed class AccountsController : Controller
             [
                 runnerCard,
                 campaignCard,
-                browserCard
+                browserCard,
+                new AccountHubCardViewModel(
+                    "Origin",
+                    "My books",
+                    "Open your private Origin library.",
+                    "Open library",
+                    OriginLibraryPath)
             ],
             BackLabel: "Back to account",
             BackHref: "/account");
@@ -702,8 +713,8 @@ public sealed class AccountsController : Controller
         int followAndVoteCount = participationPackageReceipts.Count(item =>
             string.Equals(item.ActionKind, "follow", StringComparison.OrdinalIgnoreCase)
             || string.Equals(item.ActionKind, "vote", StringComparison.OrdinalIgnoreCase));
-        string supporterSummary = allowance?.SupporterActive ?? false
-            ? "2 books each month. Same app."
+        string supporterSummary = allowance is null ? "Membership details unavailable right now."
+            : allowance.SupporterActive ? "2 books each month. Same app."
             : "1 book each month. Same app.";
         bool supporterActive = allowance?.SupporterActive ?? false;
         string participateSummary = followAndVoteCount > 0
@@ -741,7 +752,7 @@ public sealed class AccountsController : Controller
                     "Membership",
                     "Membership",
                     supporterSummary,
-                    supporterActive ? "Manage supporter" : "Become supporter",
+                    allowance is null ? "Check membership" : supporterActive ? "Manage supporter" : "Become supporter",
                     "/account/billing",
                     "Details",
                     "/account/billing"),
@@ -899,8 +910,68 @@ public sealed class AccountsController : Controller
                 ? "week"
                 : "window";
 
+    [HttpGet(OriginLibraryPath)]
+    [Produces("text/html")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> OriginDossierLibraryPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var publications = _originDossierPublications.ListForAccount(user.UserId, subject.SubjectId);
+            var cards = publications.Select(publication =>
+            {
+                string detailPath = $"{OriginLibraryPath}/{Uri.EscapeDataString(publication.ProjectId)}";
+                bool canRead = publication.FullStoryVerified && publication.EbookHandoffReady
+                    && !string.IsNullOrWhiteSpace(publication.AudiobookshelfDossierShareUrl);
+                return new AccountHubCardViewModel(
+                    "Origin",
+                    publication.Title,
+                    canRead ? "Your full ebook is ready to read."
+                        : publication.FullStoryVerified ? "Full chapters verified. The ebook is not available yet."
+                        : "The full story is not available yet. Open the book status for details.",
+                    canRead ? "Read the ebook" : "View book status",
+                    canRead ? $"{detailPath}/read" : detailPath,
+                    canRead ? "Book details" : null,
+                    canRead ? detailPath : null);
+            }).ToArray();
+            return View("~/Views/Accounts/Section.cshtml", new AccountSectionPageViewModel(
+                Chrome: _chrome.BuildAuthenticatedChrome("My books", "Your private Origin library.",
+                    OriginLibraryPath, user.DisplayName, user.Email),
+                Eyebrow: "Origin library",
+                Heading: "My books",
+                Summary: "Read your growing Life Modules chapters or open a finished Origin ebook.",
+                Highlights: cards.Length == 0 ? ["No finished ebooks are available here yet. Your growing story may already have readable chapters."] : [],
+                Cards: [new AccountHubCardViewModel("Life Modules", "Your growing stories",
+                    "Full chapters already written for your runners, including books still in progress.",
+                    "Open my chapters", OriginChapterReaderController.LibraryPath, null, null), .. cards],
+                BackLabel: "Back to runners",
+                BackHref: "/account/roster"));
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(OriginLibraryPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Origin library could not confirm the signed-in identity.");
+            Response.StatusCode = ex.StatusCode;
+            return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
+                Chrome: _chrome.BuildPublicChrome("Library unavailable", "Your library could not be opened right now.", OriginLibraryPath),
+                Heading: "Your library is unavailable right now",
+                SupportLine: "Chummer could not confirm your account. Your books and account were not changed.",
+                Notice: null,
+                PrimaryLabel: "Try again",
+                PrimaryHref: OriginLibraryPath,
+                SecondaryLabel: "Return to account",
+                SecondaryHref: "/account"));
+        }
+    }
+
     [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}")]
     [Produces("text/html")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> OriginDossierDetailPage(
         [FromRoute] string originDossierProjectId,
         CancellationToken cancellationToken)
@@ -928,7 +999,7 @@ public sealed class AccountsController : Controller
                     SupportLine: "This account does not have a verified Origin Dossier publication for that project.",
                     Notice: "Open your library to see the dossiers that belong to this account.",
                     PrimaryLabel: "Open Origin Dossier library",
-                    PrimaryHref: "/account/roster#origin-dossier-library",
+                    PrimaryHref: OriginLibraryPath,
                     SecondaryLabel: "Return to account",
                     SecondaryHref: "/account"));
             }
@@ -942,7 +1013,7 @@ public sealed class AccountsController : Controller
                     user.Email),
                 Publication: publication,
                 AccountHref: "/account",
-                LibraryHref: "/account/roster#origin-dossier-library");
+                LibraryHref: OriginLibraryPath);
             return View("~/Views/Accounts/OriginDossier.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -958,7 +1029,7 @@ public sealed class AccountsController : Controller
                 SupportLine: "Chummer could not open this private Origin Dossier right now. The dossier and account were not changed.",
                 Notice: null,
                 PrimaryLabel: "Try account again",
-                PrimaryHref: "/account/roster#origin-dossier-library",
+                PrimaryHref: OriginLibraryPath,
                 SecondaryLabel: "Return home",
                 SecondaryHref: "/home"));
         }
@@ -1330,7 +1401,9 @@ public sealed class AccountsController : Controller
                 resolvedArtifactKind);
             return artifact is null
                 ? NotFound()
-                : PhysicalFile(artifact.Path, artifact.ContentType, enableRangeProcessing: true);
+                : artifact.Content is not null
+                    ? File(artifact.Content, artifact.ContentType, enableRangeProcessing: true)
+                    : PhysicalFile(artifact.Path, artifact.ContentType, enableRangeProcessing: true);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {

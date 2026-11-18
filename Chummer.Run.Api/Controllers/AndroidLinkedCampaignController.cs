@@ -477,6 +477,8 @@ public sealed class AndroidLinkedCampaignController : ControllerBase
         Response.Headers.Pragma = "no-cache";
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         Response.Headers["Referrer-Policy"] = "no-referrer";
+        Response.Headers["Deprecation"] = "true";
+        Response.Headers["Link"] = "</api/v2/android/linked>; rel=\"successor-version\"";
     }
 }
 

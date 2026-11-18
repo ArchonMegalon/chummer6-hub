@@ -10,6 +10,12 @@ REQUIRED_COMPONENT_KEYS: tuple[str, ...] = (
     "whatsapp",
     "whatsapp_pairing",
     "teable_recovery",
+)
+
+# These probes remain visible operator diagnostics, but absence or provider
+# outage cannot make the mixed EA readiness gate fail structurally.  Their
+# Chummer release classification is owned by ea_release_component_matrix.v1.
+NON_RELEASE_CRITICAL_COMPONENT_KEYS: tuple[str, ...] = (
     "mymedia_alexa",
 )
 

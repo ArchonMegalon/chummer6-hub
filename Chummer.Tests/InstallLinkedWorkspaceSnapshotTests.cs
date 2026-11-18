@@ -20,6 +20,47 @@ namespace Chummer.Tests;
 public sealed class InstallLinkedWorkspaceSnapshotTests
 {
     [Fact]
+    public void Legacy_route_carries_complete_snapshot_and_cannot_downgrade_it()
+    {
+        using Fixture fixture = new();
+        var grant = fixture.SeedClaimedInstall("ins-a", "user", "subject");
+        var transfer = InstallLinkedWorkspaceSnapshotTransferTests.ToRecord(
+            InstallLinkedWorkspaceSnapshotTransferTests.SampleSnapshot());
+        var request = new InstallLinkedWorkspaceSnapshotUpsertRequest("ins-a", grant.AccessToken,
+            transfer.WorkspaceId, transfer.RulesetId, transfer.Format, transfer.SchemaVersion,
+            transfer.PayloadKind, transfer.Payload, transfer.UpdatedAtUtc, "ins-a", "Runner", "Runner",
+            "Human", "Priority", "5", "6", 0, 0, false, ExpectedRemoteRevision: 0,
+            WorkspaceSnapshot: transfer.WorkspaceSnapshot, WorkspaceSnapshotDigest: transfer.WorkspaceSnapshotDigest);
+        var response = Assert.IsType<InstallLinkedWorkspaceSnapshotUpsertResponse>(
+            Assert.IsType<OkObjectResult>(fixture.Controller.UpsertClaimedInstallWorkspace(request).Result).Value).Snapshot;
+        Assert.Equal(transfer.WorkspaceSnapshotDigest, response.WorkspaceSnapshotDigest);
+        var list = Assert.IsType<InstallLinkedWorkspaceSnapshotListResponse>(Assert.IsType<OkObjectResult>(
+            fixture.Controller.ListClaimedInstallWorkspaces(new("ins-a", grant.AccessToken)).Result).Value);
+        Assert.Equal(transfer.WorkspaceSnapshotDigest, Assert.Single(list.Snapshots).WorkspaceSnapshotDigest);
+        var downgraded = request with { WorkspaceSnapshot = null, WorkspaceSnapshotDigest = null,
+            ExpectedRemoteRevision = response.RemoteRevision, ExpectedServerToken = response.ServerToken };
+        Assert.Equal(StatusCodes.Status409Conflict,
+            Assert.IsType<ObjectResult>(fixture.Controller.UpsertClaimedInstallWorkspace(downgraded).Result).StatusCode);
+    }
+
+    [Fact]
+    public void Later_device_clock_cannot_overwrite_an_unreviewed_remote_snapshot()
+    {
+        using Fixture fixture = new();
+        fixture.SeedClaimedInstall("ins-a", "user-archon", "subject-archon");
+        ClaimedInstallationDto installation = fixture.RequireInstallation("ins-a");
+        var original = new InstallLinkedWorkspaceSnapshotRecord(
+            string.Empty, "ws-cas", "sr5", "NativeXml", 1, "workspace", "<character><name>A</name></character>",
+            DateTimeOffset.UtcNow, "ins-a", "A", "A", "Human", "Priority", "5", "6", 0, 0, false);
+        fixture.Workspaces.UpsertForInstallation(installation, original);
+        var exception = Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Workspaces.UpsertForInstallation(installation,
+                original with { Payload = "<character><name>B</name></character>", UpdatedAtUtc = original.UpdatedAtUtc.AddDays(1) }));
+        Assert.Equal(StatusCodes.Status428PreconditionRequired, exception.StatusCode);
+        Assert.Equal(original.Payload, Assert.Single(fixture.Workspaces.ListForInstallation(installation)).Payload);
+    }
+
+    [Fact]
     public void Snapshot_upsert_and_list_roundtrip_across_two_installations_for_same_subject()
     {
         using Fixture fixture = new();
@@ -221,7 +262,7 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
     }
 
     [Fact]
-    public void Upsert_keeps_newer_existing_snapshot_when_older_payload_arrives()
+    public void Upsert_rejects_unreviewed_older_snapshot_instead_of_silently_acknowledging_it()
     {
         using Fixture fixture = new();
         fixture.SeedClaimedInstall("ins-a", "user-archon", "subject-archon");
@@ -249,19 +290,170 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
                 Nuyen: 9000,
                 Created: true));
 
-        InstallLinkedWorkspaceSnapshotRecord result = fixture.Workspaces.UpsertForInstallation(
+        InstallLinkingOperationException error = Assert.Throws<InstallLinkingOperationException>(() => fixture.Workspaces.UpsertForInstallation(
             installation,
             newer with
             {
                 Payload = "<character><name>Older</name></character>",
                 UpdatedAtUtc = new DateTimeOffset(2026, 06, 03, 14, 0, 0, TimeSpan.Zero),
                 Name = "Older"
-            });
+            }));
 
+        Assert.Equal(StatusCodes.Status428PreconditionRequired, error.StatusCode);
+        InstallLinkedWorkspaceSnapshotRecord result = Assert.Single(fixture.Workspaces.ListForInstallation(installation));
         Assert.Equal(newer.UpdatedAtUtc, result.UpdatedAtUtc);
         Assert.Equal("Fresh", result.Name);
         Assert.Contains("Fresh", result.Payload, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Exact_remote_precondition_wins_even_with_an_older_device_clock_and_survives_reload()
+    {
+        using Fixture fixture = new();
+        fixture.SeedClaimedInstall("ins-a", "user", "subject");
+        var installation = fixture.RequireInstallation("ins-a");
+        var first = fixture.Workspaces.UpsertForInstallation(installation, CasSnapshot("first"), 0);
+        Assert.Equal(1, first.RemoteRevision);
+        Assert.Matches("^[0-9a-f]{64}$", first.ServerToken!);
+        var second = fixture.Workspaces.UpsertForInstallation(installation,
+            first with { Payload = "second", UpdatedAtUtc = first.UpdatedAtUtc.AddDays(-1) },
+            first.RemoteRevision, first.ServerToken);
+        Assert.Equal(2, second.RemoteRevision);
+        Assert.NotEqual(first.ServerToken, second.ServerToken);
+        var reloaded = new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(fixture.Configuration));
+        Assert.Equal(second, Assert.Single(reloaded.ListForInstallation(installation)));
+        Assert.Equal(second, reloaded.UpsertForInstallation(installation, second, second.RemoteRevision, second.ServerToken));
+        Assert.Equal(StatusCodes.Status409Conflict, Assert.Throws<InstallLinkingOperationException>(() =>
+            reloaded.UpsertForInstallation(installation, second, first.RemoteRevision, first.ServerToken)).StatusCode);
+    }
+
+    [Theory]
+    [InlineData(-1L, null)]
+    [InlineData(1L, null)]
+    [InlineData(0L, "short")]
+    [InlineData(1L, "short")]
+    [InlineData(null, "short")]
+    public void Malformed_preconditions_never_create_a_snapshot(long? revision, string? token)
+    {
+        using Fixture fixture = new();
+        fixture.SeedClaimedInstall("ins-a", "user", "subject");
+        var installation = fixture.RequireInstallation("ins-a");
+        Assert.Equal(StatusCodes.Status400BadRequest, Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Workspaces.UpsertForInstallation(installation, CasSnapshot("not stored"), revision, token)).StatusCode);
+        Assert.Empty(fixture.Workspaces.ListForInstallation(installation));
+    }
+
+    [Fact]
+    public async Task Two_devices_cannot_both_replace_the_same_reviewed_remote_revision()
+    {
+        using Fixture fixture = new();
+        fixture.SeedClaimedInstall("ins-a", "user", "subject");
+        fixture.SeedClaimedInstall("ins-b", "user", "subject");
+        var a = fixture.RequireInstallation("ins-a");
+        var b = fixture.RequireInstallation("ins-b");
+        var first = fixture.Workspaces.UpsertForInstallation(a, CasSnapshot("first"), 0);
+        using var start = new ManualResetEventSlim();
+        Task<bool> Write(ClaimedInstallationDto installation, string payload) => Task.Run(() =>
+        {
+            start.Wait();
+            try
+            {
+                fixture.Workspaces.UpsertForInstallation(installation, first with { Payload = payload },
+                    first.RemoteRevision, first.ServerToken);
+                return true;
+            }
+            catch (InstallLinkingOperationException ex) when (ex.StatusCode == StatusCodes.Status409Conflict) { return false; }
+        });
+        Task<bool> one = Write(a, "A wins");
+        Task<bool> two = Write(b, "B wins");
+        start.Set();
+        Assert.Single(await Task.WhenAll(one, two), static success => success);
+        var current = Assert.Single(fixture.Workspaces.ListForInstallation(a));
+        Assert.Equal(2, current.RemoteRevision);
+        Assert.Contains(current.Payload, new[] { "A wins", "B wins" });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Failed_disk_commit_restores_exact_in_memory_authority(bool existing)
+    {
+        using Fixture fixture = new();
+        fixture.SeedClaimedInstall("ins-a", "user", "subject");
+        var installation = fixture.RequireInstallation("ins-a");
+        var before = existing ? fixture.Workspaces.UpsertForInstallation(installation, CasSnapshot("first"), 0) : null;
+        string blockedTemp = fixture.Configuration["CHUMMER_INSTALL_LINKED_WORKSPACE_SNAPSHOT_STORE_PATH"]! + ".tmp";
+        Directory.CreateDirectory(blockedTemp);
+        try
+        {
+            Exception? failure = Record.Exception(() => fixture.Workspaces.UpsertForInstallation(installation, CasSnapshot("not committed"),
+                before?.RemoteRevision ?? 0, before?.ServerToken));
+            Assert.True(failure is IOException or UnauthorizedAccessException, $"Expected disk failure, got {failure?.GetType().Name}.");
+            var visible = fixture.Workspaces.ListForInstallation(installation);
+            if (before is null) Assert.Empty(visible);
+            else Assert.Equal(before, Assert.Single(visible));
+        }
+        finally { Directory.Delete(blockedTemp); }
+        var retry = fixture.Workspaces.UpsertForInstallation(installation, CasSnapshot("committed"),
+            before?.RemoteRevision ?? 0, before?.ServerToken);
+        Assert.Equal((before?.RemoteRevision ?? 0) + 1, retry.RemoteRevision);
+    }
+
+    [Fact]
+    public void Legacy_rows_require_their_exact_read_token_not_a_missing_only_create()
+    {
+        using Fixture fixture = new();
+        fixture.SeedClaimedInstall("ins-a", "user", "subject");
+        var installation = fixture.RequireInstallation("ins-a");
+        var store = new InstallLinkedWorkspaceSnapshotStore(fixture.Configuration);
+        var legacy = CasSnapshot("legacy private runner") with { OwnerKey = "subject:subject" };
+        lock (store.Gate)
+        {
+            store.SnapshotsByKey.Add(InstallLinkedWorkspaceSnapshotStore.ComposeKey(legacy.OwnerKey, legacy.WorkspaceId), legacy);
+            store.PersistLocked();
+        }
+        var service = new InstallLinkedWorkspaceSnapshotService(store);
+        var observed = Assert.Single(service.ListForInstallation(installation));
+        Assert.Equal(0, observed.RemoteRevision);
+        Assert.Matches("^[0-9a-f]{64}$", observed.ServerToken!);
+        var reloaded = new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(fixture.Configuration));
+        Assert.Equal(observed, Assert.Single(reloaded.ListForInstallation(installation)));
+        Assert.Equal(StatusCodes.Status409Conflict, Assert.Throws<InstallLinkingOperationException>(() =>
+            reloaded.UpsertForInstallation(installation, CasSnapshot("unseen replacement"), 0)).StatusCode);
+        var updated = reloaded.UpsertForInstallation(installation, observed with { Payload = "reviewed replacement" },
+            observed.RemoteRevision, observed.ServerToken);
+        Assert.Equal(1, updated.RemoteRevision);
+        Assert.NotEqual(observed.ServerToken, updated.ServerToken);
+    }
+
+    [Fact]
+    public void Tokens_do_not_cross_owner_partitions_or_revive_an_identical_older_snapshot()
+    {
+        using Fixture fixture = new();
+        fixture.SeedClaimedInstall("ins-a", "user-a", "subject-a");
+        fixture.SeedClaimedInstall("ins-b", "user-b", "subject-b");
+        var a = fixture.RequireInstallation("ins-a");
+        var b = fixture.RequireInstallation("ins-b");
+        var first = fixture.Workspaces.UpsertForInstallation(a, CasSnapshot("A"), 0);
+        var other = fixture.Workspaces.UpsertForInstallation(b, CasSnapshot("B"), 0);
+        Assert.Equal(StatusCodes.Status409Conflict, Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Workspaces.UpsertForInstallation(b, other with { Payload = "not reviewed" },
+                first.RemoteRevision, first.ServerToken)).StatusCode);
+        var middle = fixture.Workspaces.UpsertForInstallation(a, first with { Payload = "intermediate" },
+            first.RemoteRevision, first.ServerToken);
+        var restored = fixture.Workspaces.UpsertForInstallation(a, first, middle.RemoteRevision, middle.ServerToken);
+        Assert.Equal(first.Payload, restored.Payload);
+        Assert.Equal(3, restored.RemoteRevision);
+        Assert.Equal(StatusCodes.Status409Conflict, Assert.Throws<InstallLinkingOperationException>(() =>
+            fixture.Workspaces.UpsertForInstallation(a, first, first.RemoteRevision, first.ServerToken)).StatusCode);
+        Assert.Equal(restored, fixture.Workspaces.UpsertForInstallation(a, restored));
+        Assert.Equal(other, Assert.Single(fixture.Workspaces.ListForInstallation(b)));
+    }
+
+    private static InstallLinkedWorkspaceSnapshotRecord CasSnapshot(string payload)
+        => new(string.Empty, "ws-cas", "sr5", "NativeXml", 1, "workspace", payload,
+            new DateTimeOffset(2026, 9, 9, 12, 0, 0, TimeSpan.Zero), "ins-a", "Runner", "Runner",
+            "Human", "Priority", "5", "6", 0, 0, false);
 
     [Fact]
     public void Snapshot_store_persists_and_reloads_records()

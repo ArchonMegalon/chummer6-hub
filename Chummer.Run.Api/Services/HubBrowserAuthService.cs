@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Chummer.Run.Contracts.Identity;
+using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -125,7 +126,9 @@ public sealed class HubBrowserAuthService
             },
             operation: "issue-session",
             publicMessage: "Sign-in could not be completed right now. Try again later.",
-            cancellationToken);
+            cancellationToken,
+            // Identity creates a new session per POST, even if an earlier response was lost.
+            maxAttempts: 1);
     }
 
     public async Task RevokeCookieSessionAsync(HttpRequest request, CancellationToken cancellationToken)
@@ -201,7 +204,16 @@ public sealed class HubBrowserAuthService
             QueryHelpers.ParseQuery(queryIndex < 0 ? string.Empty : candidate[queryIndex..]);
         string? callbackUri = SingleQueryValue(query, "installLinkCallbackUri");
         string? transport = SingleQueryValue(query, "installLinkTransport");
-        bool proofPoll = string.Equals(transport, "proof_poll", StringComparison.Ordinal);
+        string? operationId = SingleQueryValue(query, "installLinkOperationId");
+        if (query.ContainsKey("installLinkOperationId")
+            && (!string.Equals(transport, InstallBrowserCallbackTransports.LegacyProofPoll, StringComparison.Ordinal)
+                || operationId is null
+                || !AndroidLinkedV2RequestProof.IsValidOperationId(operationId)))
+        {
+            return safeFallback;
+        }
+        bool proofPoll = transport is not null
+            && InstallBrowserCallbackTransports.IsProofPoll(transport);
         if (!proofPoll && !string.IsNullOrWhiteSpace(transport))
         {
             return safeFallback;
@@ -230,8 +242,9 @@ public sealed class HubBrowserAuthService
             SingleQueryValue(query, "platform"),
             SingleQueryValue(query, "arch"),
             sanitizedCallback,
-            proofPoll ? "proof_poll" : null,
-            publicKey);
+            proofPoll ? transport : null,
+            publicKey,
+            operationId);
     }
 
     public static string BuildInstallLinkingNextPath(
@@ -243,9 +256,17 @@ public sealed class HubBrowserAuthService
         string? arch,
         string installLinkCallbackUri,
         string? installLinkTransport = null,
-        string? publicKey = null)
+        string? publicKey = null,
+        string? installLinkOperationId = null)
     {
-        bool proofPoll = string.Equals(installLinkTransport, "proof_poll", StringComparison.Ordinal);
+        if (installLinkOperationId is not null
+            && (!string.Equals(installLinkTransport, InstallBrowserCallbackTransports.LegacyProofPoll, StringComparison.Ordinal)
+                || !AndroidLinkedV2RequestProof.IsValidOperationId(installLinkOperationId)))
+        {
+            throw new ArgumentException("Install-link operation id is invalid.", nameof(installLinkOperationId));
+        }
+        bool proofPoll = installLinkTransport is not null
+            && InstallBrowserCallbackTransports.IsProofPoll(installLinkTransport);
         if (!proofPoll && !string.IsNullOrWhiteSpace(installLinkTransport))
         {
             throw new ArgumentException("Install-link transport is invalid.", nameof(installLinkTransport));
@@ -270,8 +291,9 @@ public sealed class HubBrowserAuthService
             ["platform"] = SanitizeInstallLinkValue(platform),
             ["arch"] = SanitizeInstallLinkValue(arch),
             ["installLinkCallbackUri"] = callback,
-            ["installLinkTransport"] = proofPoll ? "proof_poll" : null,
-            ["publicKey"] = canonicalPublicKey
+            ["installLinkTransport"] = proofPoll ? installLinkTransport : null,
+            ["publicKey"] = canonicalPublicKey,
+            ["installLinkOperationId"] = installLinkOperationId
         };
         return QueryHelpers.AddQueryString(
             InstallLinkPath,
@@ -283,18 +305,56 @@ public sealed class HubBrowserAuthService
     {
         if (string.IsNullOrWhiteSpace(callbackUri)
             || callbackUri.Length > MaxNextPathLength
-            || HasControlOrBackslash(callbackUri)
-            || !Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed)
+            || HasControlOrBackslash(callbackUri))
+        {
+            return null;
+        }
+
+        // Android proof-poll approvals return to the hosted page; desktop proof-poll
+        // approvals return to the requesting app (custom scheme or loopback listener).
+        // Neither accepts userinfo or fragments. The hosted Android callback requires
+        // state; current desktop clients also send callbacks without state.
+        if (!Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed)
             || !string.IsNullOrEmpty(parsed.UserInfo)
-            || !string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(parsed.Host, "chummer.run", StringComparison.OrdinalIgnoreCase)
-            || !parsed.IsDefaultPort
-            || !string.Equals(parsed.AbsolutePath, AndroidInstallLinkCallbackPath, StringComparison.Ordinal)
             || !string.IsNullOrEmpty(parsed.Fragment))
         {
             return null;
         }
 
+        if (string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(parsed.Host, "chummer.run", StringComparison.OrdinalIgnoreCase)
+            && parsed.IsDefaultPort
+            && string.Equals(parsed.AbsolutePath, AndroidInstallLinkCallbackPath, StringComparison.Ordinal))
+        {
+            return NormalizeProofPollPageCallback(parsed);
+        }
+
+        if (IsDesktopProofPollCallback(parsed))
+        {
+            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
+                QueryHelpers.ParseQuery(parsed.Query);
+            var preserved = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (string key in CallbackStateKeys)
+            {
+                if (!query.TryGetValue(key, out Microsoft.Extensions.Primitives.StringValues values))
+                {
+                    continue;
+                }
+                if (values.Count != 1 || !IsSafeCallbackStateValue(values[0]))
+                {
+                    return null;
+                }
+                preserved[key] = values[0];
+            }
+
+            return QueryHelpers.AddQueryString(parsed.GetLeftPart(UriPartial.Path), preserved);
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeProofPollPageCallback(Uri parsed)
+    {
         IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
             QueryHelpers.ParseQuery(parsed.Query);
         if (query.Count != 1
@@ -309,6 +369,33 @@ public sealed class HubBrowserAuthService
             $"https://chummer.run{AndroidInstallLinkCallbackPath}",
             "state",
             state[0]!);
+    }
+
+    private static bool IsDesktopProofPollCallback(Uri parsed)
+    {
+        // chummer://install-link — the desktop custom-scheme callback registered by
+        // the installed app.
+        if (string.Equals(parsed.Scheme, "chummer", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(parsed.Host, "install-link", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrEmpty(parsed.AbsolutePath.TrimEnd('/')))
+        {
+            return true;
+        }
+
+        // http(s)://127.0.0.1[:port]/install-link/callback — the app-local loopback
+        // listener callback. Loopback hosts only; the listener picks its own port.
+        if ((string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            && IsLoopbackHost(parsed.Host)
+            && string.Equals(
+                parsed.AbsolutePath.TrimEnd('/'),
+                AppLocalInstallLinkCallbackPath.TrimEnd('/'),
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     public static string? SanitizeInstallLinkPublicKey(string? publicKey)
@@ -564,9 +651,10 @@ public sealed class HubBrowserAuthService
         Func<Task<HttpResponseMessage>> sendAsync,
         string operation,
         string publicMessage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int maxAttempts = TransientRetryAttempts)
     {
-        using var response = await SendAsync(sendAsync, operation, publicMessage, cancellationToken);
+        using var response = await SendAsync(sendAsync, operation, publicMessage, cancellationToken, maxAttempts);
         try
         {
             var payload = await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
@@ -599,7 +687,8 @@ public sealed class HubBrowserAuthService
         Func<Task<HttpResponseMessage>> sendAsync,
         string operation,
         string publicMessage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int maxAttempts = TransientRetryAttempts)
     {
         for (int attempt = 1; ; attempt++)
         {
@@ -612,7 +701,7 @@ public sealed class HubBrowserAuthService
                 }
 
                 var detail = await SafeReadBodyAsync(response, cancellationToken);
-                if (attempt < TransientRetryAttempts && IsTransientStatusCode(response.StatusCode))
+                if (attempt < maxAttempts && IsTransientStatusCode(response.StatusCode))
                 {
                     _logger.LogWarning(
                         "Identity browser auth operation {Operation} returned transient status {StatusCode} on attempt {Attempt}. Retrying. Detail: {Detail}",
@@ -637,12 +726,12 @@ public sealed class HubBrowserAuthService
                     (int)response.StatusCode,
                     detail);
             }
-            catch (HttpRequestException ex) when (attempt < TransientRetryAttempts)
+            catch (HttpRequestException ex) when (attempt < maxAttempts)
             {
                 _logger.LogWarning(ex, "Identity browser auth operation {Operation} failed on attempt {Attempt}. Retrying.", operation, attempt);
                 await DelayBeforeRetryAsync(attempt, cancellationToken);
             }
-            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested && attempt < TransientRetryAttempts)
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested && attempt < maxAttempts)
             {
                 _logger.LogWarning(ex, "Identity browser auth operation {Operation} timed out on attempt {Attempt}. Retrying.", operation, attempt);
                 await DelayBeforeRetryAsync(attempt, cancellationToken);

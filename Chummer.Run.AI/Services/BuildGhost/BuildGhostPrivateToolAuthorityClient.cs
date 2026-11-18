@@ -1,6 +1,7 @@
 using Chummer.Run.Contracts.BuildGhost;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -49,6 +50,7 @@ public sealed class BuildGhostPrivateToolAuthorityClient : IBuildGhostPrivateToo
         "packetAccessKey"
     };
 
+    [ActivatorUtilitiesConstructor]
     public BuildGhostPrivateToolAuthorityClient(
         HttpClient httpClient,
         IConfiguration configuration)
@@ -148,6 +150,35 @@ public sealed class BuildGhostPrivateToolAuthorityClient : IBuildGhostPrivateToo
         }
 
         if (!IsOpaqueKey(request.PacketAccessKey)) reasons.Add("packet-access-key-invalid");
+        if (!IsSha256(request.PacketDigest)) reasons.Add("packet-digest-invalid");
+        if (!ToughTongueBuildGhostScenarioContract.CanonicalLocales.Contains(request.Locale, StringComparer.Ordinal))
+        {
+            reasons.Add("locale-unsupported");
+        }
+        if (!AllowedRequestKinds.Contains(request.RequestKind ?? string.Empty)) reasons.Add("request-kind-unsupported");
+        if (request.Question is { Length: > 2_000 } || request.Question?.Any(char.IsControl) == true)
+        {
+            reasons.Add("question-invalid");
+        }
+        return reasons;
+    }
+
+    public static IReadOnlyList<string> ValidateProviderRequest(
+        BuildGhostPrivateToolProviderRequest? request)
+    {
+        if (request is null)
+        {
+            return ["private-tool-provider-request-required"];
+        }
+        List<string> reasons = [];
+        if (request.Schema != ToughTongueBuildGhostContractVersions.PrivateToolRequestV2)
+        {
+            reasons.Add("private-tool-provider-request-schema-invalid");
+        }
+        if (!IsCanonicalPacketAccessKey(request.PacketAccessKey))
+        {
+            reasons.Add("packet-access-key-invalid");
+        }
         if (!IsSha256(request.PacketDigest)) reasons.Add("packet-digest-invalid");
         if (!ToughTongueBuildGhostScenarioContract.CanonicalLocales.Contains(request.Locale, StringComparer.Ordinal))
         {
@@ -291,6 +322,13 @@ public sealed class BuildGhostPrivateToolAuthorityClient : IBuildGhostPrivateToo
             && !value.Contains('@', StringComparison.Ordinal)
             && !value.Contains("//", StringComparison.Ordinal)
             && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' or ':');
+
+    private static bool IsCanonicalPacketAccessKey(string? value)
+        => value is { Length: 43 }
+            && value.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_')
+            // A 32-byte unpadded base64url value has four data bits in its final
+            // character and therefore two canonical zero padding bits.
+            && "AEIMQUYcgkosw048".Contains(value[^1]);
 
     private static bool IsSha256(string? value)
         => value is { Length: 71 }

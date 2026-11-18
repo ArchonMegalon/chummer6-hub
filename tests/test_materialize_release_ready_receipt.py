@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import time
 import unittest
@@ -517,6 +518,36 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
 
         self.assertTrue(any("RUN_SERVICES_ROOT" in failure for failure in failures))
         self.assertTrue(any("legacy-checkout-bound" in failure for failure in failures))
+
+    def test_authoritative_launcher_missing_checkout_is_actionable(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-controller-missing-root-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            launcher.write_text(
+                module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE,
+                encoding="utf-8",
+            )
+            launcher.chmod(0o700)
+            environment = dict(os.environ)
+            environment.pop("CHUMMER_RUN_SERVICES_ROOT", None)
+
+            completed = subprocess.run(
+                [str(launcher)],
+                cwd=temp_dir,
+                env=environment,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=10,
+            )
+
+        self.assertNotEqual(0, completed.returncode)
+        self.assertIn(
+            "NOT RELEASE READY: CHUMMER_RUN_SERVICES_ROOT is required",
+            completed.stdout,
+        )
+        self.assertNotIn("Traceback", completed.stdout)
 
     def test_shared_launcher_rejects_noncanonical_raw_shebang_bytes(self) -> None:
         module = load_module()
@@ -1528,8 +1559,11 @@ launch()
             check=False,
             text=True,
         )
-        self.assertEqual(0, clean_help.returncode)
-        self.assertIn("Materialize the release-ready receipt", clean_help.stdout)
+        self.assertNotEqual(0, clean_help.returncode)
+        self.assertIn(
+            "NOT RELEASE READY: CHUMMER_RUN_SERVICES_ROOT is required",
+            clean_help.stdout + clean_help.stderr,
+        )
 
     def test_forced_bash_exit_zero_hook_cannot_emit_controller_authority(self) -> None:
         module = load_module()
@@ -2808,7 +2842,10 @@ launch()
             script.splitlines()[1],
         )
         self.assertIn('TRUSTED_PYTHON = "/usr/bin/python3"', script)
-        self.assertIn('TRUSTED_PYTHON,\n            "-I",\n            str(MATERIALIZER)', script)
+        self.assertIn(
+            'TRUSTED_PYTHON,\n            "-I",\n            "-B",\n            str(MATERIALIZER)',
+            script,
+        )
         self.assertIn("if sys.flags.isolated != 1:", script)
         self.assertIn('"--run-authoritative-controller"', script)
         self.assertIn("os.execve(", script)

@@ -7,28 +7,97 @@ namespace Chummer.Run.AI.Services.BuildGhost;
 public interface IBuildGhostPersonaReleaseRegistry
 {
     BuildGhostPersonaReleaseProjection ResolveRook();
+
+    BuildGhostPersonaReleaseProjection ResolveRookVidBoard() => ResolveRook();
+
+    BuildGhostPersonaMediaRelease? ResolveRookVidBoardMedia() => null;
 }
 
 public sealed class BuildGhostPersonaReleaseRegistry : IBuildGhostPersonaReleaseRegistry
 {
     private readonly IReadOnlyList<BuildGhostPersonaMediaRelease> _releases;
+    private readonly BuildGhostToughTongueStockAvatarBindingValidation _avatarBindingValidation;
 
     public BuildGhostPersonaReleaseRegistry(IEnumerable<BuildGhostPersonaMediaRelease> releases)
+        : this(
+            releases,
+            new BuildGhostToughTongueStockAvatarBindingValidation(
+                false,
+                null,
+                ["stock-avatar-provider-id-missing-or-invalid"]))
+    {
+    }
+
+    public BuildGhostPersonaReleaseRegistry(
+        IEnumerable<BuildGhostPersonaMediaRelease> releases,
+        BuildGhostToughTongueStockAvatarBinding avatarBinding)
+        : this(
+            releases,
+            new BuildGhostToughTongueStockAvatarBindingValidation(
+                BuildGhostToughTongueStockAvatarBindingContract.Validate(avatarBinding).Count == 0,
+                avatarBinding,
+                BuildGhostToughTongueStockAvatarBindingContract.Validate(avatarBinding)))
+    {
+    }
+
+    private BuildGhostPersonaReleaseRegistry(
+        IEnumerable<BuildGhostPersonaMediaRelease> releases,
+        BuildGhostToughTongueStockAvatarBindingValidation avatarBindingValidation)
     {
         _releases = releases?.ToArray() ?? throw new ArgumentNullException(nameof(releases));
+        _avatarBindingValidation = avatarBindingValidation
+            ?? throw new ArgumentNullException(nameof(avatarBindingValidation));
     }
 
     public BuildGhostPersonaReleaseRegistry(IConfiguration configuration)
-        : this(LoadConfiguredReleases(configuration))
+        : this(
+            LoadConfiguredReleases(configuration),
+            BuildGhostToughTongueStockAvatarBindingContract.FromConfiguration(configuration))
     {
     }
 
     public BuildGhostPersonaReleaseProjection ResolveRook()
     {
-        BuildGhostPersonaMediaRelease? avatar = Latest(ToughTongueBuildGhostPersonaIds.RookAvatar, "avatar");
+        BuildGhostPersonaMediaRelease? voice = Latest(ToughTongueBuildGhostPersonaIds.RookVoice, "synthetic-voice");
+        List<string> blockers = [.. _avatarBindingValidation.RejectionReasons];
+        bool avatarReady = _avatarBindingValidation.Accepted
+            && _avatarBindingValidation.Binding is not null;
+        bool voiceReady = IsReady(voice, "synthetic-voice", blockers);
+        if (voice is not null
+            && !voice.Provenance.Contains("synthetic", StringComparison.OrdinalIgnoreCase))
+        {
+            voiceReady = false;
+            blockers.Add("voice-provenance-is-not-declared-synthetic");
+        }
+
+        return new BuildGhostPersonaReleaseProjection(
+            ToughTongueBuildGhostPersonaIds.Rook,
+            _avatarBindingValidation.Binding?.AvatarAlias ?? ToughTongueBuildGhostPersonaIds.StockDefaultAvatar,
+            ToughTongueBuildGhostPersonaIds.RookVoice,
+            avatarReady ? "provider-managed-default" : "invalid",
+            voice?.ReleaseState ?? "missing",
+            avatarReady,
+            voiceReady,
+            avatarReady && voiceReady ? "provider-managed-avatar-and-voice" : avatarReady ? "provider-managed-avatar-and-text-only" : "local-text-only",
+            blockers.Distinct(StringComparer.Ordinal).OrderBy(static blocker => blocker, StringComparer.Ordinal).ToArray());
+    }
+
+    public BuildGhostPersonaReleaseProjection ResolveRookVidBoard()
+    {
+        BuildGhostPersonaMediaRelease? video = Latest(
+            ToughTongueBuildGhostPersonaIds.RookVidBoardSupport,
+            "vidboard-support-video");
         BuildGhostPersonaMediaRelease? voice = Latest(ToughTongueBuildGhostPersonaIds.RookVoice, "synthetic-voice");
         List<string> blockers = [];
-        bool avatarReady = IsReady(avatar, "avatar", blockers);
+        bool avatarReady = IsReady(video, "vidboard-support-video", blockers);
+        if (video is not null
+            && (!video.Provenance.Contains("synthetic", StringComparison.OrdinalIgnoreCase)
+                || !video.Provenance.Contains("vidboard", StringComparison.OrdinalIgnoreCase)))
+        {
+            avatarReady = false;
+            blockers.Add("vidboard-support-video-provenance-invalid");
+        }
+
         bool voiceReady = IsReady(voice, "synthetic-voice", blockers);
         if (voice is not null
             && !voice.Provenance.Contains("synthetic", StringComparison.OrdinalIgnoreCase))
@@ -41,13 +110,20 @@ public sealed class BuildGhostPersonaReleaseRegistry : IBuildGhostPersonaRelease
             ToughTongueBuildGhostPersonaIds.Rook,
             ToughTongueBuildGhostPersonaIds.RookAvatar,
             ToughTongueBuildGhostPersonaIds.RookVoice,
-            avatar?.ReleaseState ?? "missing",
+            video?.ReleaseState ?? "missing",
             voice?.ReleaseState ?? "missing",
             avatarReady,
             voiceReady,
-            avatarReady && voiceReady ? "governed-avatar-and-voice" : avatarReady ? "governed-avatar-and-text-only" : "local-text-only",
+            avatarReady && voiceReady
+                ? "rook-vidboard-and-synthetic-voice"
+                : avatarReady
+                    ? "rook-vidboard-pre-rendered-only"
+                    : "local-text-only",
             blockers.Distinct(StringComparer.Ordinal).OrderBy(static blocker => blocker, StringComparer.Ordinal).ToArray());
     }
+
+    public BuildGhostPersonaMediaRelease? ResolveRookVidBoardMedia()
+        => Latest(ToughTongueBuildGhostPersonaIds.RookVidBoardSupport, "vidboard-support-video");
 
     private BuildGhostPersonaMediaRelease? Latest(string assetId, string assetKind)
         => _releases

@@ -69,6 +69,37 @@ public sealed class InstallLinkingStoreSecurityTests
     }
 
     [Fact]
+    public void Store_rejects_unsupported_callback_transport_intent()
+    {
+        using StoreFixture fixture = new();
+        using InstallLinkingStore store = fixture.CreateStore(fixture.CreateProvider("callback-intent-keys"));
+        var service = new InstallLinkingService(store, fixture.Configuration);
+        IssueInstallBrowserCallbackResponseDto issued = service.IssueBrowserCallback(
+            new IssueInstallBrowserCallbackRequestDto(
+                "callback-intent-install",
+                "callback-intent-artifact",
+                "0.1.0-preview.11",
+                "preview",
+                "desktop",
+                "windows",
+                "x64",
+                "chummer://install-link",
+                PublicKey: null),
+            "callback-intent-user",
+            "callback-intent-subject");
+
+        lock (store.Gate)
+        {
+            store.BrowserCallbackTransportIntentsByCallbackId[issued.Callback.CallbackId] =
+                new InstallBrowserCallbackTransportIntent(
+                    issued.Callback.CallbackId,
+                    "proof_poll_v3");
+
+            Assert.Throws<InvalidDataException>(() => store.PersistLocked());
+        }
+    }
+
+    [Fact]
     public void Legacy_plaintext_is_restricted_loaded_and_immediately_migrated()
     {
         using StoreFixture fixture = new();

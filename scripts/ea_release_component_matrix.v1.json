@@ -1,0 +1,73 @@
+{
+  "contract_name": "chummer.ea_release_component_matrix.v1",
+  "schema_version": 1,
+  "product": "chummer6",
+  "decision_scope": "chummer_release",
+  "unknown_component_policy": "fail_closed",
+  "blocker_selection_policy": "explicit_allowlist",
+  "release_critical_component_ids": [
+    "release_approval_ledger",
+    "publication_authorization",
+    "operator_revocation_transport"
+  ],
+  "components": [
+    {
+      "component_id": "release_approval_ledger",
+      "release_critical": true,
+      "may_block_chummer_release": true,
+      "failure_policy": "fail_closed"
+    },
+    {
+      "component_id": "publication_authorization",
+      "release_critical": true,
+      "may_block_chummer_release": true,
+      "failure_policy": "fail_closed"
+    },
+    {
+      "component_id": "operator_revocation_transport",
+      "release_critical": true,
+      "may_block_chummer_release": true,
+      "failure_policy": "fail_closed"
+    },
+    {
+      "component_id": "audiobook_providers",
+      "release_critical": false,
+      "may_block_chummer_release": false,
+      "failure_policy": "record_only"
+    },
+    {
+      "component_id": "memorial_memory_bridge",
+      "release_critical": false,
+      "may_block_chummer_release": false,
+      "failure_policy": "record_only"
+    },
+    {
+      "component_id": "black_ledger_automation",
+      "release_critical": false,
+      "may_block_chummer_release": false,
+      "failure_policy": "record_only"
+    },
+    {
+      "component_id": "travel_ooda",
+      "release_critical": false,
+      "may_block_chummer_release": false,
+      "failure_policy": "record_only"
+    },
+    {
+      "component_id": "outbound_growth",
+      "release_critical": false,
+      "may_block_chummer_release": false,
+      "failure_policy": "record_only"
+    }
+  ],
+  "gate_bindings": [
+    {
+      "gate_id": "verify_ea_operator_readiness",
+      "component_ids": [
+        "release_approval_ledger",
+        "publication_authorization",
+        "operator_revocation_transport"
+      ]
+    }
+  ]
+}

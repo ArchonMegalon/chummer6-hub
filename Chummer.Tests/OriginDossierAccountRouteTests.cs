@@ -21,6 +21,181 @@ namespace Chummer.Tests;
 
 public sealed class OriginDossierAccountRouteTests
 {
+    private static OriginChapterAuthoringRequest ChapterRequest(string requestId = "private-request")
+        => new(requestId, new("workspace-one", "chapter-one", new string('a', 64), "decision-one",
+            "de-AT", "Synthetic Runner", [new("fact-one", "decision-one", "A source fact is not a chapter.")]), true);
+
+    [Fact]
+    public async Task GrowingChapterReaderShowsFullOwnedProseWithoutPublicationOrAcceptance()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var service = fixture.Chapters;
+        var job = service.Create(fixture.SubjectId, ChapterRequest(), () => true);
+        service.Create("another-subject", ChapterRequest("other-request"), () => true);
+        string text = "A night in Vienna\n\n" + string.Concat(Enumerable.Repeat("A complete paragraph, not a summary.\n\n", 350))
+            + "The chapter ends here. <script>not markup</script>";
+        var work = service.PendingForWorker(20).Single(item => item.Job.RequestId == job.RequestId);
+        service.AdmitForWorker(work.WorkId, job.SourceDigest, "private-admission");
+        service.CompleteForWorker(work.WorkId, job.SourceDigest, "private-admission", text, new string('b', 64));
+        string before = JsonSerializer.Serialize(service.Get(fixture.SubjectId, job.RequestId));
+        var controller = fixture.CreateChapterController();
+        var library = Assert.IsType<AccountSectionPageViewModel>(Assert.IsType<ViewResult>(
+            await controller.Library(CancellationToken.None)).Model);
+        var card = Assert.Single(library.Cards);
+        Assert.Equal("Read full chapter", card.PrimaryLabel);
+        Assert.Equal("A night in Vienna", card.Summary);
+        string reference = card.PrimaryHref.Split('/').Last();
+        var model = Assert.IsType<OriginChapterReadingPageViewModel>(Assert.IsType<ViewResult>(
+            await controller.Read(reference, CancellationToken.None)).Model);
+        Assert.Equal(text, model.Text);
+        Assert.Equal("de-AT", model.Locale);
+        string projection = JsonSerializer.Serialize(model);
+        Assert.DoesNotContain("private-admission", projection, StringComparison.Ordinal);
+        Assert.DoesNotContain("first_book_ai", projection, StringComparison.Ordinal);
+        Assert.DoesNotContain(job.SourceDigest, projection, StringComparison.Ordinal);
+        Assert.Contains("no-store", controller.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        Assert.Equal("no-referrer", controller.Response.Headers["Referrer-Policy"]);
+        Assert.Equal(before, JsonSerializer.Serialize(service.Get(fixture.SubjectId, job.RequestId)));
+        Assert.Null(service.Get(fixture.SubjectId, job.RequestId)!.ReaderAcceptedTextDigest);
+        Assert.False(service.AdmitForWorker(work.WorkId, job.SourceDigest, "private-admission").MayStartGeneration);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GrowingReaderDoesNotInventProseOrRestartPendingWork(bool admitted)
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var job = fixture.Chapters.Create(fixture.SubjectId, ChapterRequest(), () => true);
+        var work = Assert.Single(fixture.Chapters.PendingForWorker(20));
+        if (admitted) fixture.Chapters.AdmitForWorker(work.WorkId, job.SourceDigest, "private-admission");
+        var entry = Assert.Single(fixture.Chapters.ListForReader(fixture.SubjectId));
+        string before = JsonSerializer.Serialize(fixture.Chapters.Get(fixture.SubjectId, job.RequestId));
+        var model = Assert.IsType<OriginChapterReadingPageViewModel>(Assert.IsType<ViewResult>(
+            await fixture.CreateChapterController().Read(entry.Reference, CancellationToken.None)).Model);
+        Assert.Null(model.Text);
+        Assert.Contains("reliable completion time is not available", model.Status, StringComparison.Ordinal);
+        Assert.Equal(before, JsonSerializer.Serialize(fixture.Chapters.Get(fixture.SubjectId, job.RequestId)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GrowingReaderRequiresAuthenticationForLibraryAndProse(bool detail)
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var controller = fixture.CreateChapterController(authenticated: false);
+        var result = detail ? await controller.Read(new string('b', 64), CancellationToken.None)
+            : await controller.Library(CancellationToken.None);
+        Assert.StartsWith("/login?next=", Assert.IsType<RedirectResult>(result).Url, StringComparison.Ordinal);
+        Assert.Contains("no-store", controller.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("foreign")]
+    [InlineData("../private")]
+    [InlineData("unknown")]
+    public async Task GrowingReaderCannotReadAnotherOwnersChapterOrAnInvalidReference(string input)
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.Chapters.Create("another-subject", ChapterRequest(), () => true);
+        string reference = input == "foreign" ? Assert.Single(fixture.Chapters.ListForReader("another-subject")).Reference
+            : input == "unknown" ? new string('0', 64) : input;
+        var controller = fixture.CreateChapterController();
+        Assert.IsType<AuthMessagePageViewModel>(Assert.IsType<ViewResult>(
+            await controller.Read(reference, CancellationToken.None)).Model);
+        Assert.Equal(StatusCodes.Status404NotFound, controller.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GrowingReaderStorageFailureIsNotAnEmptySuccessfulLibrary()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.Chapters.Create(fixture.SubjectId, ChapterRequest(), () => true);
+        string file = Assert.Single(Directory.GetFiles(Path.Combine(fixture.Root, "origin-chapter-jobs"), "*.json"));
+        File.WriteAllText(file, "invalid private data");
+        var controller = fixture.CreateChapterController();
+        var model = Assert.IsType<AuthMessagePageViewModel>(Assert.IsType<ViewResult>(
+            await controller.Library(CancellationToken.None)).Model);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, controller.Response.StatusCode);
+        Assert.DoesNotContain("invalid private data", JsonSerializer.Serialize(model), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OriginLibraryShowsOnlyOwnedBooksWithVerifiedReadingLinks()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("mine", fixture.SubjectId);
+        fixture.ImportGoldPublication("someone-elses-book", "subject.other-owner");
+        var view = Assert.IsType<ViewResult>(await fixture.CreateController().OriginDossierLibraryPage(CancellationToken.None));
+
+        Assert.Equal("~/Views/Accounts/Section.cshtml", view.ViewName);
+        var model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        var card = Assert.Single(model.Cards, card => card.Eyebrow == "Origin");
+        Assert.Equal("My books", model.Heading);
+        Assert.Equal("Read the ebook", card.PrimaryLabel);
+        Assert.Equal("/account/work/origin-dossiers/mine/read", card.PrimaryHref);
+        Assert.Equal("/account/work/origin-dossiers/mine", card.SecondaryHref);
+        Assert.Equal("/account/roster", model.BackHref);
+    }
+
+    [Fact]
+    public async Task OriginLibraryDoesNotOfferReadingWhenTheManuscriptIsNotVerified()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var artifacts = fixture.ImportGoldPublication("incomplete", fixture.SubjectId);
+        File.WriteAllText(artifacts.ProviderManuscriptPath, "A summary is not a full chapter.");
+
+        var view = Assert.IsType<ViewResult>(await fixture.CreateController().OriginDossierLibraryPage(CancellationToken.None));
+        var model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        var card = Assert.Single(model.Cards, card => card.Eyebrow == "Origin");
+        Assert.Equal("View book status", card.PrimaryLabel);
+        Assert.Equal("/account/work/origin-dossiers/incomplete", card.PrimaryHref);
+        Assert.Null(card.SecondaryHref);
+        Assert.Contains("not available yet", card.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OriginLibraryHasAnHonestEmptyState()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var view = Assert.IsType<ViewResult>(await fixture.CreateController().OriginDossierLibraryPage(CancellationToken.None));
+        var model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        var growing = Assert.Single(model.Cards);
+        Assert.Equal(OriginChapterReaderController.LibraryPath, growing.PrimaryHref);
+        Assert.Contains("No finished ebooks", Assert.Single(model.Highlights), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OriginLibraryRequiresSignInAndReturnsToTheLibrary()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        var result = await fixture.CreateController(authenticated: false).OriginDossierLibraryPage(CancellationToken.None);
+        Assert.Equal("/login?next=%2Faccount%2Fwork%2Forigin-dossiers", Assert.IsType<RedirectResult>(result).Url);
+    }
+
+    [Fact]
+    public async Task UnavailableOriginDetailReturnsToARealOwnerLibrary()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("private", "subject.other-owner");
+        var controller = fixture.CreateController();
+        var view = Assert.IsType<ViewResult>(await controller.OriginDossierDetailPage("private", CancellationToken.None));
+        Assert.Equal(StatusCodes.Status404NotFound, controller.Response.StatusCode);
+        Assert.Equal("/account/work/origin-dossiers", Assert.IsType<AuthMessagePageViewModel>(view.Model).PrimaryHref);
+    }
+
+    [Theory]
+    [InlineData(nameof(AccountsController.OriginDossierLibraryPage))]
+    [InlineData(nameof(AccountsController.OriginDossierDetailPage))]
+    public void PrivateOriginPagesCannotBeResponseCached(string method)
+    {
+        var attribute = Assert.Single(typeof(AccountsController).GetMethod(method)!
+            .GetCustomAttributes(typeof(ResponseCacheAttribute), inherit: true).Cast<ResponseCacheAttribute>());
+        Assert.True(attribute.NoStore);
+        Assert.Equal(ResponseCacheLocation.None, attribute.Location);
+    }
+
     [Fact]
     public async Task OriginDossierDetailPageShowsOnlyTheSignedInOwnersGoldEdition()
     {
@@ -34,6 +209,7 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal("~/Views/Accounts/OriginDossier.cshtml", view.ViewName);
         OriginDossierPublicationDetailPageViewModel model = Assert.IsType<OriginDossierPublicationDetailPageViewModel>(view.Model);
         Assert.Equal("origin-route", model.Publication.ProjectId);
+        Assert.Equal("/account/work/origin-dossiers", model.LibraryHref);
         Assert.True(model.Publication.GoldReady, string.Join(", ", model.Publication.MissingGoldRequirements));
         Assert.Equal("origin.chummer.run/Varga/Mira/Route-Runner", model.Publication.OriginEditionNamespace);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/read", model.Publication.AudiobookshelfDossierShareUrl);
@@ -246,6 +422,9 @@ public sealed class OriginDossierAccountRouteTests
         public OriginDossierPublicationService OriginDossiers
             => _provider.GetRequiredService<OriginDossierPublicationService>();
 
+        public OriginChapterAuthoringService Chapters
+            => _provider.GetRequiredService<OriginChapterAuthoringService>();
+
         public static OriginDossierRouteFixture Create()
         {
             string root = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-route-tests", Guid.NewGuid().ToString("N"));
@@ -254,6 +433,7 @@ public sealed class OriginDossierAccountRouteTests
             IConfiguration configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
+                    ["CHUMMER_RUNTIME_STATE_ROOT"] = root,
                     ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(root, "install-linking.json"),
                     ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(root, "support.json"),
@@ -289,8 +469,14 @@ public sealed class OriginDossierAccountRouteTests
         }
 
         public AccountsController CreateController(bool authenticated = true)
+            => CreateController<AccountsController>(authenticated);
+
+        public OriginChapterReaderController CreateChapterController(bool authenticated = true)
+            => CreateController<OriginChapterReaderController>(authenticated);
+
+        private T CreateController<T>(bool authenticated) where T : Controller
         {
-            AccountsController controller = ActivatorUtilities.CreateInstance<AccountsController>(_provider);
+            T controller = ActivatorUtilities.CreateInstance<T>(_provider);
             DefaultHttpContext httpContext = new()
             {
                 RequestServices = _provider

@@ -327,6 +327,25 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     )
     deploy_under_test = tmp_path / "deploy_public_edge_portal.sh"
     deploy_script = DEPLOY.read_text(encoding="utf-8")
+    # Tests selecting ROOT must not depend on runtime inputs next to the real
+    # checkout. Explicit fake-source tests retain their own sibling inputs.
+    for variable, directory in (
+        (
+            "CORE_RUNTIME_BUNDLE_SOURCE_INPUT",
+            "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input",
+        ),
+        ("HUB_PACKAGE_FEED_SOURCE_INPUT", "hub-package-feed-0.1.1-packageplane.20260910.1-input"),
+    ):
+        input_root = tmp_path / "default-authority-inputs" / directory
+        input_root.mkdir(parents=True)
+        assignment = f'{variable}="$("$TRUSTED_DIRNAME" -- "$SOURCE_ROOT")/{directory}"'
+        assert deploy_script.count(assignment) == 1
+        deploy_script = deploy_script.replace(
+            assignment,
+            assignment
+            + f'\nif [[ "$SOURCE_ROOT" == "{ROOT}" ]]; then\n'
+            + f'  {variable}="{input_root}"\nfi',
+        )
     deploy_script = deploy_script.replace(
         'readonly TRUSTED_PYTHON="/usr/bin/python3"',
         f'readonly TRUSTED_PYTHON="{trusted_python}"',
@@ -846,6 +865,11 @@ def make_fake_authority_source(
     inject_postdeploy_nested_secret_value: str | None = None,
 ) -> Path:
     source = tmp_path / "source"
+    (
+        tmp_path
+        / "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input"
+    ).mkdir()
+    (tmp_path / "hub-package-feed-0.1.1-packageplane.20260910.1-input").mkdir()
     (source / "scripts").mkdir(parents=True)
     (source / "Chummer.Run.Api").mkdir()
     (source / "docker-compose.public-edge.yml").write_text(
@@ -1275,6 +1299,47 @@ def test_fake_daemon_rejects_restart_policy_for_auto_remove_candidate(
     assert create.stdout.strip() == CANDIDATE_PORTAL_CONTAINER_ID
     assert Path(env["FAKE_AUTO_REMOVE_STATE"]).read_text(encoding="utf-8") == "true\n"
     assert promote.returncode == 64
+
+
+@pytest.mark.parametrize(
+    ("directory", "message"),
+    (
+        (
+            "core-runtime-package-plane-b8cb7dcba5a704948a6eb994c99bb3525b935845-input",
+            "sealed Core runtime bundle input is missing or path-aliased",
+        ),
+        (
+            "hub-package-feed-0.1.1-packageplane.20260910.1-input",
+            "sealed Hub package feed input is missing or path-aliased",
+        ),
+    ),
+)
+@pytest.mark.parametrize("invalid_kind", ("missing", "symlink"))
+def test_default_authority_inputs_fail_closed_before_docker(
+    tmp_path: Path,
+    directory: str,
+    message: str,
+    invalid_kind: str,
+) -> None:
+    input_root = tmp_path / "default-authority-inputs" / directory
+    if invalid_kind == "missing":
+        input_root.rmdir()
+    else:
+        target = input_root.with_name(directory + "-target")
+        input_root.rename(target)
+        input_root.symlink_to(target, target_is_directory=True)
+    env = os.environ.copy()
+    env["CHUMMER_RUN_SERVICES_SOURCE"] = str(ROOT)
+    env["FAKE_DOCKER_LOG"] = str(tmp_path / "docker.log")
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)], cwd=ROOT, env=env, text=True, capture_output=True
+    )
+
+    assert result.returncode == 2
+    assert message in result.stderr
+    assert not (tmp_path / "docker.log").exists()
+    assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
 
 
 def test_source_replay_preflight_failure_stops_before_quiesce(

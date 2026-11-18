@@ -100,11 +100,12 @@ builder.Services.AddSingleton<IBuildGhostClock, SystemBuildGhostClock>();
 builder.Services.AddHttpClient<IToughTongueBuildGhostTransport, ToughTongueBuildGhostHttpTransport>(client =>
 {
     string configured = builder.Configuration["CHUMMER_BUILD_GHOST_TOUGH_TONGUE_BASE_URL"]
-        ?? "https://app.toughtongueai.com/api/public/";
+        ?? "https://api.toughtongueai.com/api/public/";
     if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? baseAddress)
-        || !string.Equals(baseAddress.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        || !ToughTongueBuildGhostScenarioClient.IsOfficialApiBaseAddress(baseAddress))
     {
-        throw new InvalidOperationException("Tough Tongue base URL must be an absolute HTTPS URL.");
+        throw new InvalidOperationException(
+            "Tough Tongue base URL must be the exact official HTTPS public API boundary.");
     }
 
     client.BaseAddress = baseAddress;
@@ -112,11 +113,45 @@ builder.Services.AddHttpClient<IToughTongueBuildGhostTransport, ToughTongueBuild
 });
 builder.Services.AddHttpClient<IToughTongueBuildGhostScenarioClient, ToughTongueBuildGhostScenarioClient>(client =>
 {
-    client.BaseAddress = new Uri("https://app.toughtongueai.com/api/public/", UriKind.Absolute);
+    client.BaseAddress = new Uri("https://api.toughtongueai.com/api/public/", UriKind.Absolute);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddHttpClient<BuildGhostCartesiaVoiceDeletionClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.cartesia.ai/", UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddSingleton<ToughTongueBuildGhostCanaryHarness>();
 builder.Services.AddSingleton<IToughTongueBuildGhostAdapter, ToughTongueBuildGhostAdapter>();
+builder.Services.AddHttpClient<IBuildGhostMeetingLinkBroker, ChummerMeetingLinkBrokerClient>(client =>
+{
+    string configured = builder.Configuration[ChummerMeetingLinkBrokerClient.BaseUrlConfigurationKey] ?? string.Empty;
+    if (Uri.TryCreate(configured.Trim(), UriKind.Absolute, out Uri? baseAddress)
+        && ChummerMeetingLinkBrokerClient.IsAllowedBrokerBaseAddress(baseAddress))
+    {
+        client.BaseAddress = baseAddress.AbsoluteUri.EndsWith("/", StringComparison.Ordinal)
+            ? baseAddress
+            : new Uri(baseAddress.AbsoluteUri + "/", UriKind.Absolute);
+    }
+    client.Timeout = TimeSpan.FromSeconds(20);
+}).ConfigurePrimaryHttpMessageHandler(static () => new HttpClientHandler
+{
+    AllowAutoRedirect = false,
+    AutomaticDecompression = System.Net.DecompressionMethods.None,
+    UseCookies = false
+});
+builder.Services.AddSingleton<IBuildGhostLiveSupportSessionStore, EncryptedFileBuildGhostLiveSupportSessionStore>();
+builder.Services.AddHttpClient<IToughTongueLiveSupportMeetingClient, ToughTongueLiveSupportMeetingClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.toughtongueai.com/api/public/", UriKind.Absolute);
+    client.Timeout = TimeSpan.FromSeconds(20);
+}).ConfigurePrimaryHttpMessageHandler(static () => new HttpClientHandler
+{
+    AllowAutoRedirect = false,
+    AutomaticDecompression = System.Net.DecompressionMethods.None,
+    UseCookies = false
+});
+builder.Services.AddSingleton<IBuildGhostLiveSupportService, BuildGhostLiveSupportService>();
 builder.Services.AddHttpClient<IBuildGhostPrivateToolAuthorityClient, BuildGhostPrivateToolAuthorityClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(BuildGhostPrivateToolAuthorityClient.TimeoutSeconds);

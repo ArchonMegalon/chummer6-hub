@@ -37,6 +37,36 @@ public sealed class PlayAuthorizationEndpointIntegrationTests
     private const string DeviceThumbprint = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
     private static readonly DateTimeOffset BaselineUtc = new(2026, 7, 14, 10, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Primary_storage_cannot_activate_under_a_local_writer_lease(bool enabled)
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"chummer-play-primary-lease-{Guid.NewGuid():N}");
+        var configuration = new ConfigurationBuilder()
+            .AddConfiguration(Configuration(enabled, Path.Combine(root, "community.json")))
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["CHUMMER_COMMUNITY_STORAGE_PROVIDER"] = "teable" })
+            .Build();
+        var environment = new TestEnvironment(PlayAuthorizationApiPolicy.TestEnvironmentName);
+        try
+        {
+            Assert.False(new PlayAuthorizationApiPolicy(configuration, environment).Enabled);
+            if (enabled)
+            {
+                Assert.Throws<InvalidOperationException>(() => PlayAuthorizationApiPolicy.ValidateStartup(configuration, environment));
+                Assert.Throws<InvalidOperationException>(() => new PlayAuthorizationProcessLease(configuration));
+            }
+            else
+            {
+                PlayAuthorizationApiPolicy.ValidateStartup(configuration, environment);
+                using var lease = new PlayAuthorizationProcessLease(configuration);
+                await lease.StartAsync(CancellationToken.None);
+            }
+            Assert.False(Directory.Exists(root));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+    }
+
     [Fact]
     public void ActivationIsTestOnlyRequiresStrongConfigurationAndHoldsOneProcessLease()
     {
