@@ -790,6 +790,8 @@ def test_windows_visual_proof_verifier_skips_disabled_artifact_ids(tmp_path: Pat
 
 
 def test_publish_download_bundle_fails_before_promotion_when_windows_visual_proof_is_missing(tmp_path: Path) -> None:
+    from test_windows_installer_payload_gate import _windows_installer_stub_with_payload_metadata
+
     bundle_dir = tmp_path / "bundle"
     files_dir = bundle_dir / "files"
     files_dir.mkdir(parents=True)
@@ -829,6 +831,7 @@ def test_publish_download_bundle_fails_before_promotion_when_windows_visual_proo
         env={
             **os.environ,
             "CHUMMER_WINDOWS_INSTALLER_VISUAL_PROOF_PATH": str(tmp_path / "WINDOWS_INSTALLER_VISUAL_PROOF.generated.json"),
+            "CHUMMER_WINDOWS_VISUAL_AUDIT_PUBLISHED_PATH": str(tmp_path / "missing-visual-audit.json"),
         },
         text=True,
         capture_output=True,
@@ -836,8 +839,10 @@ def test_publish_download_bundle_fails_before_promotion_when_windows_visual_proo
     )
 
     assert result.returncode != 0
+    assert "windows_installer_payload_gate:ok checked=1" in result.stdout
     assert "windows_installer_visual_proof_gate:fail" in result.stderr
     assert "Windows installer visual proof is missing" in result.stderr
+    assert not (deploy_dir / "files").exists()
 
 
 def test_materialize_public_downloads_bundle_fails_before_generation_when_windows_visual_proof_is_missing(tmp_path: Path) -> None:

@@ -842,7 +842,9 @@ is_public_artifact() {
     return 1
   fi
   if [[ "$artifact_name" == chummer-*-win-*-payload.zip ]]; then
-    return 0
+    # Bootstrap payloads are installer-owned sidecars, not public artifact rows.
+    # Keep them in DOWNLOADS_DIR for manifest-bound promotion, out of discovery.
+    return 1
   fi
   case "$artifact_name" in
     chummer-*-win-*.zip|chummer-*-win-*.tar.gz|chummer-*-win-*.exe)
@@ -962,6 +964,10 @@ fi
 
 if [[ -n "$UI_LOCALIZATION_RELEASE_GATE_PATH" && -f "$UI_LOCALIZATION_RELEASE_GATE_PATH" ]]; then
   materialize_args+=(--ui-localization-release-gate "$UI_LOCALIZATION_RELEASE_GATE_PATH")
+fi
+
+if [[ -n "${CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH:-}" ]]; then
+  materialize_args+=(--flagship-readiness "$CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH")
 fi
 
 materializer_help="$(python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" --help 2>&1 || true)"
