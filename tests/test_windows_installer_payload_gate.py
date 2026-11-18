@@ -2175,6 +2175,8 @@ def test_http_publisher_requires_manifest_bound_embedded_bootstrap_metadata() ->
 
 
 def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_path: Path) -> None:
+    from test_windows_installer_visual_proof_gate import _write_visual_audit
+
     bundle_dir = tmp_path / "bundle"
     files_dir = bundle_dir / "files"
     files_dir.mkdir(parents=True)
@@ -2211,6 +2213,16 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
     )
     _write_startup_smoke_receipt(bundle_dir / "startup-smoke", installer_path)
 
+    # Synthetic fixture evidence exercises the gate; it is not native Windows proof.
+    audit_path = tmp_path / "visual-audit" / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"
+    audit = _write_visual_audit(audit_path, installer_path=installer_path)
+    startup_receipt = audit["startupReceipt"]
+    assert isinstance(startup_receipt, dict)
+    startup_receipt["path"] = str(
+        bundle_dir / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json"
+    )
+    audit_path.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
+
     deploy_dir = tmp_path / "deploy"
     result = subprocess.run(
         ["bash", str(PUBLISH_SCRIPT), str(bundle_dir), str(deploy_dir)],
@@ -2220,6 +2232,8 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
             "CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS": "windows",
             "CHUMMER_PUBLIC_EDGE_DOWNLOADS_MIRROR_AUTO": "false",
             "CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER": "true",
+            "CHUMMER_WINDOWS_INSTALLER_VISUAL_PROOF_PATH": str(tmp_path / "missing-legacy-proof.json"),
+            "CHUMMER_WINDOWS_VISUAL_AUDIT_PUBLISHED_PATH": str(audit_path),
             "PORTAL_MANIFEST_PATH": str(deploy_dir / "releases.json"),
             "PORTAL_DOWNLOADS_DIR": str(deploy_dir),
         },
@@ -2229,6 +2243,7 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "windows_installer_visual_proof_gate:ok checked=1 legacy=0 visual_audit=1" in result.stdout
     assert (deploy_dir / "files" / installer_path.name).is_file()
     assert (deploy_dir / "files" / payload_path.name).is_file()
     deployed_sidecar = deploy_dir / "files" / f"{payload_path.name}.json"
