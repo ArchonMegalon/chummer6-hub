@@ -13,6 +13,27 @@ PORTAL_DOWNLOADS_DIR="${PORTAL_DOWNLOADS_DIR:-$REPO_ROOT/Chummer.Portal/download
 STARTUP_SMOKE_DIR="${STARTUP_SMOKE_DIR:-$(dirname "$DOWNLOADS_DIR")/startup-smoke}"
 STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-}"
 PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-}"
+PUBLICATION_PROFILE="${CHUMMER_PUBLIC_PUBLICATION_PROFILE:-}"
+case "$PUBLICATION_PROFILE" in
+  "") ;;
+  windows_unsigned_preview_v1)
+    case "${PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}" in
+      false|0|no|off) PUBLIC_SKIP_STARTUP_SMOKE_FILTER=false ;;
+      *) echo "Windows preview requires native startup evidence; skip flags are forbidden." >&2; exit 1 ;;
+    esac
+    for preview_guard_flag in CHUMMER_VERIFY_SKIP_STARTUP_SMOKE_FILTER CHUMMER_VERIFY_ALLOW_SKIPPED_STARTUP_SMOKE CHUMMER_ALLOW_SKIPPED_STARTUP_SMOKE; do
+      case "${!preview_guard_flag:-false}" in
+        false|0|no|off) ;;
+        *) echo "Windows preview requires native startup evidence; skip flags are forbidden: $preview_guard_flag" >&2; exit 1 ;;
+      esac
+    done
+    if [[ -n "${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-}${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}" ]]; then
+      echo "Windows preview cannot disable installer payload or visual evidence gates." >&2
+      exit 1
+    fi
+    ;;
+  *) echo "Unknown publication profile: $PUBLICATION_PROFILE" >&2; exit 1 ;;
+esac
 RELEASE_VERSION="${RELEASE_VERSION:-unpublished}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL:-stable}"
 RELEASE_PUBLISHED_AT="${RELEASE_PUBLISHED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
@@ -67,7 +88,11 @@ if [[ -z "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" ]]; then
   fi
 fi
 
-UI_LOCALIZATION_RELEASE_GATE_PATH="$(resolve_ui_localization_release_gate_path)"
+if [[ "$PUBLICATION_PROFILE" == "windows_unsigned_preview_v1" ]]; then
+  UI_LOCALIZATION_RELEASE_GATE_PATH=""
+else
+  UI_LOCALIZATION_RELEASE_GATE_PATH="$(resolve_ui_localization_release_gate_path)"
+fi
 
 if [[ ! -f "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" ]]; then
   echo "Missing registry materializer: $REGISTRY_ROOT/scripts/materialize_public_release_channel.py" >&2
@@ -76,6 +101,15 @@ fi
 
 resolve_registry_commit() {
   local registry_commit
+  if [[ "$PUBLICATION_PROFILE" == "windows_unsigned_preview_v1" && -z "$EXPECTED_REGISTRY_COMMIT" ]]; then
+    echo "Windows preview requires CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT from the reviewed Registry source." >&2
+    return 1
+  fi
+  if [[ "$PUBLICATION_PROFILE" == "windows_unsigned_preview_v1" ]] &&
+     [[ "$(git -C "$REGISTRY_ROOT" rev-parse --show-toplevel)" != "$(realpath "$REGISTRY_ROOT")" ]]; then
+    echo "Windows preview Registry authority must be an independent Git checkout." >&2
+    return 1
+  fi
   if ! registry_commit="$(git -C "$REGISTRY_ROOT" rev-parse --verify 'HEAD^{commit}' 2>/dev/null)"; then
     echo "Registry authority must be an exact Git checkout: $REGISTRY_ROOT" >&2
     return 1
@@ -322,6 +356,7 @@ normalize_preview_install_access_classes() {
   local manifest_path="$1"
   local release_channel="$2"
   : "$release_channel"
+  [[ "$PUBLICATION_PROFILE" != "windows_unsigned_preview_v1" ]] || return 0
 
   python3 - "$manifest_path" "$release_channel" "$PREVIEW_INSTALL_ACCESS_CLASS" "${CHUMMER_PREVIEW_WINDOWS_INSTALL_ACCESS_CLASS:-open_public}" "${CHUMMER_PREVIEW_LINUX_INSTALL_ACCESS_CLASS:-open_public}" "${CHUMMER_PREVIEW_MACOS_INSTALL_ACCESS_CLASS:-account_required}" "$FORCE_ACCOUNT_REQUIRED_DOWNLOADS" <<'PY'
 from __future__ import annotations
@@ -913,6 +948,9 @@ materialize_args=(
   --compat-output "$MANIFEST_PATH"
   --registry-commit "$REGISTRY_COMMIT"
 )
+if [[ -n "$PUBLICATION_PROFILE" ]]; then
+  materialize_args+=(--publication-profile "$PUBLICATION_PROFILE")
+fi
 
 if [[ -n "$SOURCE_MANIFEST_PATH" && -f "$SOURCE_MANIFEST_PATH" ]]; then
   materialize_args+=(--manifest "$SOURCE_MANIFEST_PATH")
@@ -936,7 +974,9 @@ fi
 if to_bool "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" && [[ "$materializer_help" == *"--skip-startup-smoke-filter"* ]]; then
   materialize_args+=(--skip-startup-smoke-filter)
 fi
-if [[ "$materializer_help" == *"--required-desktop-platforms"* ]]; then
+if [[ "$PUBLICATION_PROFILE" == "windows_unsigned_preview_v1" ]]; then
+  materialize_args+=(--required-desktop-platforms "${CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS:-windows}")
+elif [[ "$materializer_help" == *"--required-desktop-platforms"* ]]; then
   materialize_args+=(--required-desktop-platforms "${CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS:-linux,windows,macos}")
 fi
 

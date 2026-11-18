@@ -18,6 +18,27 @@ FILES_SOURCE="$BUNDLE_DIR/files"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
 STARTUP_SMOKE_SOURCE="${STARTUP_SMOKE_SOURCE:-$BUNDLE_DIR/startup-smoke}"
 PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-}"
+PUBLICATION_PROFILE="${CHUMMER_PUBLIC_PUBLICATION_PROFILE:-}"
+case "$PUBLICATION_PROFILE" in
+  "") ;;
+  windows_unsigned_preview_v1)
+    case "${PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}" in
+      false|0|no|off) PUBLIC_SKIP_STARTUP_SMOKE_FILTER=false ;;
+      *) echo "Windows preview requires native startup evidence; skip flags are forbidden." >&2; exit 1 ;;
+    esac
+    for preview_guard_flag in CHUMMER_VERIFY_SKIP_STARTUP_SMOKE_FILTER CHUMMER_VERIFY_ALLOW_SKIPPED_STARTUP_SMOKE CHUMMER_ALLOW_SKIPPED_STARTUP_SMOKE; do
+      case "${!preview_guard_flag:-false}" in
+        false|0|no|off) ;;
+        *) echo "Windows preview requires native startup evidence; skip flags are forbidden: $preview_guard_flag" >&2; exit 1 ;;
+      esac
+    done
+    if [[ -n "${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-}${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}" ]]; then
+      echo "Windows preview cannot disable installer payload or visual evidence gates." >&2
+      exit 1
+    fi
+    ;;
+  *) echo "Unknown publication profile: $PUBLICATION_PROFILE" >&2; exit 1 ;;
+esac
 CHUMMER_MACOS_PUBLIC_SHELF_ENABLED="${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}"
 RELEASE_SHELF_HELPER="$SCRIPT_DIR/release_shelf_generation.py"
 SHELF_LAYOUT_MARKER=".release-shelf-layout-v1"
@@ -282,6 +303,10 @@ if to_bool "$SHELF_LAYOUT_V1_ENABLED"; then
   layout_mode_args+=(--initialize-layout)
 fi
 PUBLICATION_MODE="$(python3 "$RELEASE_SHELF_HELPER" "${layout_mode_args[@]}")"
+if [[ "$PUBLICATION_PROFILE" == "windows_unsigned_preview_v1" && "$PUBLICATION_MODE" != "generation" ]]; then
+  echo "Windows preview requires immutable generation publication; enable CHUMMER_RELEASE_SHELF_LAYOUT_V1_ENABLED for an unmarked shelf." >&2
+  exit 1
+fi
 if [[ "$PUBLICATION_MODE" == "generation" ]]; then
   mkdir -p "$AUTHORITATIVE_DEPLOY_DIR"
   if [[ -f "$AUTHORITATIVE_DEPLOY_DIR/$SHELF_LAYOUT_MARKER" ]]; then
@@ -856,6 +881,9 @@ import shutil
 import sys
 from pathlib import Path
 
+import os
+
+windows_preview = os.environ.get("CHUMMER_PUBLIC_PUBLICATION_PROFILE") == "windows_unsigned_preview_v1"
 stage_root = Path(sys.argv[1])
 final_root = Path(sys.argv[2])
 files_root = Path(sys.argv[3])
@@ -920,6 +948,11 @@ def rewrite_install_verification(stage_verification_path: Path, source_root: Pat
 for receipt_path in receipt_paths:
     source_root = receipt_path.parent
     payload = json.loads(receipt_path.read_text(encoding="utf-8-sig"))
+
+    if windows_preview:
+        # Preserve reviewed public-safe evidence exactly; never rewrite its identity or publish companions.
+        shutil.copy2(receipt_path, stage_root / receipt_path.name)
+        continue
 
     if release_channel:
         payload["channelId"] = release_channel

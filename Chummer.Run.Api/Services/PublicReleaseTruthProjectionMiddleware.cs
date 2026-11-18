@@ -28,6 +28,14 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         ReleaseShelfGenerationStore shelfStore,
         ILogger<PublicReleaseTruthProjectionMiddleware> logger)
     {
+        // Reject unsafe download paths before authority lookup can mask the denial.
+        if (PublicReleaseEvidenceDownloadPolicy.RejectRequest(context.Request))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            global::Chummer.Run.Api.PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+            return;
+        }
+
         if (!IsReleaseFacingRoute(context.Request.Path))
         {
             await _next(context);

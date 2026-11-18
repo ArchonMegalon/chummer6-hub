@@ -8,7 +8,14 @@
         <section class="minimal-section minimal-section--tight" data-release-truth-banner="@Model.ReleaseDecisionStatus" role="status">
             <div class="minimal-status-pill">
                 <strong>Release review required</strong>
-                <span>Decision: @Model.ReleaseDecisionStatus. Release routes remain inspectable, but installer handoffs and availability or stable-release claims are withheld until immutable release authority is ready.</span>
+                @if (Model.ReviewRequiredPublicByteHandoffsAllowed)
+                {
+                    <span>Decision: @Model.ReleaseDecisionStatus. The listed preview downloads are authorized for this release scope. This handoff does not establish signing, compatibility, wider availability, stable-release readiness, or complete manual Windows/SR6 qualification.</span>
+                }
+                else
+                {
+                    <span>Decision: @Model.ReleaseDecisionStatus. Release routes remain inspectable, but installer handoffs and availability or stable-release claims are withheld until immutable release authority is ready.</span>
+                }
             </div>
         </section>
     }

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Xunit;
 
@@ -17,6 +18,8 @@ public sealed class PayloadSidecarContractValidatorTests
         "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip";
     private const string ProjectedPayloadUrl =
         "/downloads/g/g-20260724T111416Z-48dd860a787641a0/install/avalonia-win-x64-installer/payload";
+    private const string ProjectedFilePayloadUrl =
+        "/downloads/g/g-20260724T111416Z-48dd860a787641a0/files/chummer-avalonia-win-x64-payload.zip";
     private const string PayloadSha256 =
         "22464a462bf72e0b24efd686ddb2a66114bccde0f98b82273e15f7335a35582e";
     private const long PayloadSizeBytes = 51231862;
@@ -35,6 +38,205 @@ public sealed class PayloadSidecarContractValidatorTests
           "sizeBytes": 51231862
         }
         """;
+    private const string EmbeddedPayloadSha256 =
+        "286ea7260365d7f0aac169e518669bdb7aaf4db6e99fb9bb8b56e222aed858f4";
+    private const long EmbeddedPayloadSizeBytes = 61297391;
+    private const string EmbeddedReleaseVersion = "1.0.0-preview.20261110.6940";
+    private const string EmbeddedSidecarSha256 =
+        "072c3467436807458aac35373391472142d2832a48454984cc30ed4e7bbd868f";
+    private const string EmbeddedSidecarJson = """
+        {
+          "contractName": "chummer6-ui.windows_bootstrap_payload",
+          "fileName": "chummer-avalonia-win-x64-payload.zip",
+          "downloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip",
+          "sha256": "286ea7260365d7f0aac169e518669bdb7aaf4db6e99fb9bb8b56e222aed858f4",
+          "sizeBytes": 61297391,
+          "payloadAcquisitionMode": "embedded",
+          "installerFileName": "chummer-avalonia-win-x64-installer.exe",
+          "releaseVersion": "1.0.0-preview.20261110.6940"
+        }
+        """;
+
+    [Theory]
+    [InlineData(false, ProjectedPayloadUrl)]
+    [InlineData(true, ProjectedPayloadUrl)]
+    [InlineData(false, ProjectedFilePayloadUrl)]
+    [InlineData(true, ProjectedFilePayloadUrl)]
+    public void ExactEmbeddedPreviewSidecarMatchesSealedOpenPublicManifestWithoutMutation(
+        bool requirePayloadAcquisitionMode,
+        string manifestUrl)
+    {
+        byte[] sidecar = EmbeddedSidecar();
+        byte[] original = sidecar.ToArray();
+        Assert.Equal(470, sidecar.Length);
+        Assert.Equal(EmbeddedSidecarSha256, Convert.ToHexStringLower(SHA256.HashData(sidecar)));
+
+        bool valid = ValidateEmbedded(sidecar, out string? failure,
+            manifestUrl: manifestUrl,
+            requirePayloadAcquisitionMode: requirePayloadAcquisitionMode);
+
+        Assert.True(valid, failure);
+        Assert.Equal(original, sidecar);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EmbeddedModeCannotUseMutableIncomingUrlValidation(bool requirePayloadAcquisitionMode)
+    {
+        bool valid = PayloadSidecarContractValidator.TryValidate(
+            EmbeddedSidecar(), InstallerFileName, PayloadFileName, StablePayloadUrl,
+            EmbeddedPayloadSha256, EmbeddedPayloadSizeBytes, EmbeddedReleaseVersion,
+            allowMutableIncomingUrl: true, requirePayloadAcquisitionMode, out string? failure,
+            installAccessClass: "open_public", artifactId: ArtifactId);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar identity does not match its manifests", failure);
+    }
+
+    [Theory]
+    [InlineData("contractName", "other.contract")]
+    [InlineData("fileName", "other-payload.zip")]
+    [InlineData("installerFileName", "other-installer.exe")]
+    [InlineData("sha256", "086ea7260365d7f0aac169e518669bdb7aaf4db6e99fb9bb8b56e222aed858f4")]
+    [InlineData("sizeBytes", 61297392L)]
+    [InlineData("releaseVersion", "1.0.0-preview.20261110.6941")]
+    public void EmbeddedSidecarRejectsIdentityDrift(string property, object value)
+    {
+        JsonObject sidecar = JsonNode.Parse(EmbeddedSidecar())!.AsObject();
+        sidecar[property] = JsonSerializer.SerializeToNode(value);
+
+        foreach (string manifestUrl in new[] { ProjectedPayloadUrl, ProjectedFilePayloadUrl })
+        {
+            bool valid = ValidateEmbedded(JsonSerializer.SerializeToUtf8Bytes(sidecar), out string? failure,
+                manifestUrl: manifestUrl);
+
+            Assert.False(valid);
+            Assert.Equal("payload sidecar identity does not match its manifests", failure);
+        }
+    }
+
+    [Theory]
+    [InlineData("account_required")]
+    [InlineData("account_recommended")]
+    [InlineData("Open_Public")]
+    [InlineData(" open_public ")]
+    [InlineData(null)]
+    public void EmbeddedStableUrlRequiresExactEffectiveOpenPublicAccess(string? accessClass)
+    {
+        foreach (string manifestUrl in new[] { ProjectedPayloadUrl, ProjectedFilePayloadUrl })
+        {
+            bool valid = ValidateEmbedded(EmbeddedSidecar(), out string? failure,
+                manifestUrl: manifestUrl, installAccessClass: accessClass);
+
+            Assert.False(valid);
+            Assert.Equal("payload sidecar URL does not match its governed payload route", failure);
+        }
+    }
+
+    [Theory]
+    [InlineData("/downloads/files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("/downloads/g/generation/files/other-payload.zip")]
+    [InlineData("/downloads/g//files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("/downloads/g/../files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("/downloads/g/g%2Dgeneration/files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("/downloads/g/generation//files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("/downloads/g/generation/files/chummer-avalonia-win-x64-payload.zip/")]
+    [InlineData("/downloads/g/generation/files/chummer-avalonia-win-x64-payload.zip?download=1")]
+    [InlineData("/downloads/g/generation/files/chummer-avalonia-win-x64-payload.zip#payload")]
+    [InlineData("/downloads/g/generation/files/chummer-avalonia-win-x64-payload%2Ezip")]
+    [InlineData("https://chummer.run/downloads/g/generation/files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("https://evil.example/downloads/g/generation/files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("/downloads/g/generation/install/other-artifact/payload")]
+    [InlineData("/downloads/g//install/avalonia-win-x64-installer/payload")]
+    [InlineData("/downloads/g/../install/avalonia-win-x64-installer/payload")]
+    [InlineData("/downloads/g/generation/install/avalonia-win-x64-installer/payload?download=1")]
+    [InlineData("https://chummer.run/downloads/g/generation/install/avalonia-win-x64-installer/payload")]
+    public void EmbeddedStableUrlRequiresExactProjectedArtifactRoute(string manifestUrl)
+    {
+        bool valid = ValidateEmbedded(EmbeddedSidecar(), out string? failure, manifestUrl: manifestUrl);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar URL does not match its governed payload route", failure);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("other-artifact")]
+    [InlineData(" avalonia-win-x64-installer")]
+    public void EmbeddedStableUrlRequiresSelectedArtifactIdentity(string? artifactId)
+    {
+        bool valid = ValidateEmbedded(EmbeddedSidecar(), out string? failure, artifactId: artifactId);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar URL does not match its governed payload route", failure);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" avalonia-win-x64-installer")]
+    [InlineData("..")]
+    public void EmbeddedStableFileUrlRequiresSelectedArtifactContext(string? artifactId)
+    {
+        bool valid = ValidateEmbedded(EmbeddedSidecar(), out string? failure,
+            manifestUrl: ProjectedFilePayloadUrl, artifactId: artifactId);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar URL does not match its governed payload route", failure);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StableFileUrlAliasDoesNotChangeDownloadModeBehavior(bool hasDownloadMode)
+    {
+        bool valid = ValidateSealed(hasDownloadMode ? ProductionSidecar() : Sidecar(),
+            ProjectedFilePayloadUrl, "open_public", ArtifactId, out string? failure);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar URL does not match its governed payload route", failure);
+    }
+
+    [Theory]
+    [InlineData("https://evil.example/downloads/files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("http://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("https://attacker@chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("https://chummer.run:443/downloads/files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload%2Ezip")]
+    [InlineData("https://chummer.run/downloads/files/../files/chummer-avalonia-win-x64-payload.zip")]
+    [InlineData("https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip?download=1")]
+    [InlineData("https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip#payload")]
+    [InlineData(" https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip")]
+    public void EmbeddedModeDoesNotBypassCanonicalUrlBinding(string downloadUrl)
+    {
+        JsonObject sidecar = JsonNode.Parse(EmbeddedSidecar())!.AsObject();
+        sidecar["downloadUrl"] = downloadUrl;
+
+        foreach (string manifestUrl in new[] { ProjectedPayloadUrl, ProjectedFilePayloadUrl })
+        {
+            bool valid = ValidateEmbedded(JsonSerializer.SerializeToUtf8Bytes(sidecar), out string? failure,
+                manifestUrl: manifestUrl);
+
+            Assert.False(valid);
+            Assert.Equal("payload sidecar URL does not match its governed payload route", failure);
+        }
+    }
+
+    [Theory]
+    [InlineData("open_public")]
+    [InlineData("account_recommended")]
+    [InlineData("account_required")]
+    public void EmbeddedExactGovernedRoutePreservesAccessClasses(string accessClass)
+    {
+        JsonObject sidecar = JsonNode.Parse(EmbeddedSidecar())!.AsObject();
+        sidecar["downloadUrl"] = ProjectedPayloadUrl;
+
+        bool valid = ValidateEmbedded(JsonSerializer.SerializeToUtf8Bytes(sidecar), out string? failure,
+            installAccessClass: accessClass);
+
+        Assert.True(valid, failure);
+    }
 
     [Fact]
     public void ExactFailedProductionSidecarMatchesProjectedOpenPublicManifest()
@@ -96,7 +298,10 @@ public sealed class PayloadSidecarContractValidatorTests
     [InlineData(" download")]
     [InlineData("download ")]
     [InlineData(" download ")]
-    public void PresentAcquisitionModeRequiresExactDownloadString(
+    [InlineData("Embedded")]
+    [InlineData(" embedded")]
+    [InlineData("embedded ")]
+    public void PresentAcquisitionModeRequiresExactSupportedString(
         string acquisitionMode)
     {
         foreach (bool required in new[] { false, true })
@@ -130,11 +335,13 @@ public sealed class PayloadSidecarContractValidatorTests
             failure);
     }
 
-    [Fact]
-    public void AcquisitionModeDoesNotPermitUnknownProperties()
+    [Theory]
+    [InlineData("download")]
+    [InlineData("embedded")]
+    public void AcquisitionModeDoesNotPermitUnknownProperties(string acquisitionMode)
     {
         bool valid = ValidateModeRequirement(
-            SidecarWithAcquisitionMode("download", includeUnknown: true),
+            SidecarWithAcquisitionMode(acquisitionMode, includeUnknown: true),
             requirePayloadAcquisitionMode: false,
             out string? failure);
 
@@ -142,11 +349,13 @@ public sealed class PayloadSidecarContractValidatorTests
         Assert.Equal("payload sidecar property set is noncanonical", failure);
     }
 
-    [Fact]
-    public void DuplicateAcquisitionModePropertyFailsClosed()
+    [Theory]
+    [InlineData("download")]
+    [InlineData("embedded")]
+    public void DuplicateAcquisitionModePropertyFailsClosed(string acquisitionMode)
     {
         byte[] duplicate = Encoding.UTF8.GetBytes(
-            """{"payloadAcquisitionMode":"download","payloadAcquisitionMode":"download"}""");
+            $$"""{"payloadAcquisitionMode":"{{acquisitionMode}}","payloadAcquisitionMode":"{{acquisitionMode}}"}""");
 
         bool valid = ValidateModeRequirement(
             duplicate,
@@ -426,6 +635,22 @@ public sealed class PayloadSidecarContractValidatorTests
 
     private static byte[] ProductionSidecar()
         => Encoding.UTF8.GetBytes(ProductionSidecarJson + "\n");
+
+    private static byte[] EmbeddedSidecar()
+        => Encoding.UTF8.GetBytes(EmbeddedSidecarJson + "\n");
+
+    private static bool ValidateEmbedded(
+        byte[] sidecar,
+        out string? failure,
+        string manifestUrl = ProjectedPayloadUrl,
+        string? installAccessClass = "open_public",
+        string? artifactId = ArtifactId,
+        bool requirePayloadAcquisitionMode = false)
+        => PayloadSidecarContractValidator.TryValidate(
+            sidecar, InstallerFileName, PayloadFileName, manifestUrl,
+            EmbeddedPayloadSha256, EmbeddedPayloadSizeBytes, EmbeddedReleaseVersion,
+            allowMutableIncomingUrl: false, requirePayloadAcquisitionMode, out failure,
+            installAccessClass, artifactId);
 
     private static byte[] SidecarWithAcquisitionMode(
         object? acquisitionMode,

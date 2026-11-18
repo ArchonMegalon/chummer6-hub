@@ -1783,6 +1783,201 @@ def test_windows_installer_verifier_rejects_bulk_bootstrap_installer(tmp_path: P
     assert "is not smaller than payloadSizeBytes" in result.stderr
 
 
+def _write_embedded_bootstrap_case(
+    tmp_path: Path, *, bulk: bool = False, compressed: bool = False,
+) -> tuple[Path, Path]:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    _write_bootstrap_payload(payload_path)
+    if bulk:
+        with zipfile.ZipFile(payload_path, "a") as archive:
+            archive.writestr("runtime/bulk.pack", b"0" * (16 * 1024 * 1024))
+    payload_bytes = payload_path.read_bytes()
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    payload_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    # A metadata-gate fixture, not a runnable NSIS installer. NSIS compression
+    # may make a real embedded installer smaller than the uncompressed ZIP.
+    body = b"compressed-nsis-fixture" if compressed else payload_bytes
+    installer_bytes = WINDOWS_INSTALLER_STUB + body + (
+        "\nCHUMMER6_BOOTSTRAP_METADATA\n"
+        f"payloadFileName={payload_path.name}\n"
+        f"payloadDownloadUrl={payload_url}\n"
+        f"payloadSha256={payload_sha256}\n"
+        f"payloadSizeBytes={len(payload_bytes)}\n"
+        "payloadAcquisitionMode=embedded\n"
+    ).encode("utf-8")
+    installer_path.write_bytes(installer_bytes)
+    sidecar_path = files_dir / f"{payload_path.name}.json"
+    _write_payload_sidecar(
+        sidecar_path, installer_name=installer_path.name,
+        payload_name=payload_path.name, payload_bytes=payload_bytes,
+    )
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    sidecar["payloadAcquisitionMode"] = "embedded"
+    sidecar_path.write_text(json.dumps(sidecar), encoding="utf-8")
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path, installer_name=installer_path.name,
+        installer_sha256=hashlib.sha256(installer_bytes).hexdigest(),
+        installer_size_bytes=len(installer_bytes), payload_name=payload_path.name,
+        payload_sha256=payload_sha256, payload_size_bytes=len(payload_bytes),
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["downloads"][0]["payloadAcquisitionMode"] = "embedded"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return files_dir, manifest_path
+
+
+def _run_embedded_bootstrap_case(
+    files_dir: Path, manifest_path: Path, *, require_metadata: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["python3", "-B", str(VERIFY_SCRIPT), "--files-dir", str(files_dir),
+         "--manifest", str(manifest_path), "--require-manifest-row"]
+        + (["--require-embedded-bootstrap-metadata"] if require_metadata else []),
+        text=True, capture_output=True, check=False,
+    )
+
+
+def _refresh_embedded_installer_identity(files_dir: Path, manifest_path: Path) -> None:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    row = manifest["downloads"][0]
+    installer_bytes = (files_dir / row["fileName"]).read_bytes()
+    row.update(sha256=hashlib.sha256(installer_bytes).hexdigest(), sizeBytes=len(installer_bytes))
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+@pytest.mark.parametrize("require_metadata", [False, True])
+@pytest.mark.parametrize("compressed", [False, True])
+def test_windows_installer_verifier_accepts_validated_embedded_bootstrap(
+    tmp_path: Path, require_metadata: bool, compressed: bool,
+) -> None:
+    files_dir, manifest_path = _write_embedded_bootstrap_case(tmp_path, bulk=True, compressed=compressed)
+    result = _run_embedded_bootstrap_case(files_dir, manifest_path, require_metadata=require_metadata)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "windows_installer_payload_gate:ok checked=1" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        (b"payloadAcquisitionMode=embedded\n", b"payloadAcquisitionMode=download\n"),
+        (b"payloadAcquisitionMode=embedded\n", b""),
+        (b"payloadAcquisitionMode=embedded\n", b"payloadAcquisitionMode=embedded\n" * 2),
+        (b"payloadAcquisitionMode=embedded\n", b"XpayloadAcquisitionMode=embedded\n"),
+        (b"payloadAcquisitionMode=embedded\n", b"payloadAcquisitionMode=embedded"),
+        (b"payloadFileName=chummer-avalonia", b"payloadFileName=forged-avalonia"),
+        (b"payloadDownloadUrl=https://example.invalid", b"payloadDownloadUrl=https://attacker.invalid"),
+        (b"payloadSha256=", b"payloadSha256=0"),
+        (b"payloadSizeBytes=", b"payloadSizeBytes=1"),
+        (b"\nCHUMMER6_BOOTSTRAP_METADATA\n", b"\n"),
+        (b"\nCHUMMER6_BOOTSTRAP_METADATA\n", b"\nCHUMMER6_BOOTSTRAP_METADATA\n" * 2),
+    ],
+)
+def test_windows_installer_verifier_rejects_forged_embedded_bootstrap_metadata(
+    tmp_path: Path, old: bytes, new: bytes,
+) -> None:
+    files_dir, manifest_path = _write_embedded_bootstrap_case(tmp_path)
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    original = installer_path.read_bytes()
+    assert old in original
+    installer_path.write_bytes(original.replace(old, new))
+    _refresh_embedded_installer_identity(files_dir, manifest_path)
+    # Embedded mode must verify the trailer even without the optional CLI flag.
+    result = _run_embedded_bootstrap_case(files_dir, manifest_path)
+    assert result.returncode != 0
+    if new == b"payloadAcquisitionMode=embedded\n" * 2:
+        assert "exactly one embedded payloadAcquisitionMode metadata occurrence" in result.stderr
+    else:
+        assert "must contain exactly one validated metadata trailer" in result.stderr
+
+
+@pytest.mark.parametrize("target", ["manifest", "sidecar"])
+@pytest.mark.parametrize("mode", [None, "download", "bundled", "unknown"])
+def test_windows_installer_verifier_rejects_inconsistent_embedded_bootstrap_mode(
+    tmp_path: Path, target: str, mode: str | None,
+) -> None:
+    files_dir, manifest_path = _write_embedded_bootstrap_case(tmp_path)
+    path = manifest_path if target == "manifest" else files_dir / "chummer-avalonia-win-x64-payload.zip.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    row = document["downloads"][0] if target == "manifest" else document
+    if mode is None:
+        row.pop("payloadAcquisitionMode")
+    else:
+        row["payloadAcquisitionMode"] = mode
+    path.write_text(json.dumps(document), encoding="utf-8")
+    result = _run_embedded_bootstrap_case(files_dir, manifest_path)
+    assert result.returncode != 0
+    assert "payloadAcquisitionMode" in result.stderr
+
+
+@pytest.mark.parametrize("excess", [0, 1])
+def test_windows_installer_verifier_bounds_embedded_bootstrap_total_bytes(
+    tmp_path: Path, excess: int,
+) -> None:
+    files_dir, manifest_path = _write_embedded_bootstrap_case(tmp_path)
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    installer_bytes = installer_path.read_bytes()
+    maximum = payload_path.stat().st_size + 15 * 1024 * 1024
+    marker = b"\nCHUMMER6_BOOTSTRAP_METADATA\n"
+    installer_path.write_bytes(installer_bytes.replace(
+        marker, b"\0" * (maximum + excess - len(installer_bytes)) + marker,
+    ))
+    _refresh_embedded_installer_identity(files_dir, manifest_path)
+    result = _run_embedded_bootstrap_case(files_dir, manifest_path)
+    if excess:
+        assert result.returncode != 0
+        assert "verified payload size + bootstrap launcher allowance" in result.stderr
+    else:
+        assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("field", ["payloadSizeBytes", "payloadSha256", "sizeBytes", "sha256"])
+def test_windows_installer_verifier_rejects_embedded_bootstrap_identity_mismatch(
+    tmp_path: Path, field: str,
+) -> None:
+    files_dir, manifest_path = _write_embedded_bootstrap_case(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    row = manifest["downloads"][0]
+    row[field] = row[field] + 1 if field.endswith("Bytes") else "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    result = _run_embedded_bootstrap_case(files_dir, manifest_path)
+    assert result.returncode != 0
+    prefix = "manifest" if field.startswith("payload") else "manifest Windows installer row"
+    assert f"{prefix} {field}" in result.stderr
+
+
+@pytest.mark.parametrize("explicit_mode", [False, True])
+def test_windows_installer_verifier_keeps_download_bootstrap_stub_cap(
+    tmp_path: Path, explicit_mode: bool,
+) -> None:
+    files_dir, manifest_path = _write_embedded_bootstrap_case(tmp_path, bulk=True)
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_bytes = installer_path.read_bytes().replace(
+        b"payloadAcquisitionMode=embedded\n", b"payloadAcquisitionMode=download\n",
+    )
+    # Still smaller than the payload: only the original 15 MiB cap rejects it.
+    marker = b"\nCHUMMER6_BOOTSTRAP_METADATA\n"
+    trailer = marker + installer_bytes.split(marker)[1]
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB + b"\0" * (15 * 1024 * 1024) + trailer)
+    _refresh_embedded_installer_identity(files_dir, manifest_path)
+    for path in (manifest_path, files_dir / "chummer-avalonia-win-x64-payload.zip.json"):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        row = document["downloads"][0] if path == manifest_path else document
+        if explicit_mode:
+            row["payloadAcquisitionMode"] = "download"
+        else:
+            row.pop("payloadAcquisitionMode")
+        path.write_text(json.dumps(document), encoding="utf-8")
+    result = _run_embedded_bootstrap_case(files_dir, manifest_path, require_metadata=True)
+    assert result.returncode != 0
+    assert "bootstrap launchers must be <= 15728640 bytes" in result.stderr
+    assert "is not smaller than payloadSizeBytes" not in result.stderr
+
+
 def test_windows_installer_verifier_accepts_cross_manifest_schema_aliases(
     tmp_path: Path,
 ) -> None:

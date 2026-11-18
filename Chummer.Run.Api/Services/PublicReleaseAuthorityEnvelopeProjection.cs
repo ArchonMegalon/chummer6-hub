@@ -449,6 +449,23 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
             releaseDecisionStatus,
             supportOwner);
 
+        // Parsing unknown does not authorize it. Only the fully validated v2
+        // handoff can carry this exact Windows tuple, before authority is bound.
+        foreach (AuthorityArtifact artifact in authorityArtifacts)
+        {
+            if (artifact.CompatibilityState == "unknown"
+                && (releaseDecisionBinding.ArtifactHandoff is null
+                    || artifact.ArtifactId != "avalonia-win-x64-installer"
+                    || artifact.Head != "avalonia"
+                    || artifact.Platform != "windows"
+                    || artifact.Rid != "win-x64"
+                    || artifact.Arch != "x64"
+                    || artifact.InstallAccessClass != "open_public"))
+            {
+                throw Invalid("Unknown compatibility requires the exact scope-approved Windows review byte handoff.");
+            }
+        }
+
         if (artifactCount == 0)
         {
             if (releaseDecisionStatus != "review_required"
@@ -1768,7 +1785,12 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
                 "Registry SNAPSHOT.json artifact");
             string sha256 = RequireSha256(artifact, "sha256", "Registry SNAPSHOT.json artifact");
             long sizeBytes = RequirePositiveLong(artifact, "sizeBytes", "Registry SNAPSHOT.json artifact");
-            RequireExactArtifactState(artifact, "compatibilityState", "compatible");
+            string compatibilityState = RequireCanonicalToken(
+                artifact, "compatibilityState", "Registry SNAPSHOT.json artifact");
+            if (compatibilityState is not ("compatible" or "unknown"))
+            {
+                throw Invalid("Registry SNAPSHOT.json artifact compatibilityState must be compatible or gated unknown.");
+            }
             RequireExactArtifactState(artifact, "promotionState", "promoted");
             RequireExactArtifactState(artifact, "publicationScope", "signed-in-and-public");
             RequireExactArtifactState(artifact, "revokeState", "not_revoked");
@@ -1803,6 +1825,7 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
                 downloadUrl,
                 sha256,
                 sizeBytes,
+                compatibilityState,
                 publicInstallRoute,
                 accessClass));
         }
@@ -2085,8 +2108,8 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
                 || !string.Equals(authority.Sha256, hubSha256, StringComparison.Ordinal)
                 || hub.SizeBytes != authority.SizeBytes
                 || !string.Equals(
-                    "compatible",
-                    NormalizeExactToken(hub.CompatibilityState),
+                    authority.CompatibilityState,
+                    (hub.CompatibilityState ?? string.Empty).Trim().ToLowerInvariant(),
                     StringComparison.Ordinal)
                 || !string.Equals(authority.InstallAccessClass, NormalizeExactToken(hub.InstallAccessClass), StringComparison.Ordinal))
             {
@@ -2173,6 +2196,7 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
         string DownloadUrl,
         string Sha256,
         long SizeBytes,
+        string CompatibilityState,
         string PublicInstallRoute,
         string InstallAccessClass);
 
