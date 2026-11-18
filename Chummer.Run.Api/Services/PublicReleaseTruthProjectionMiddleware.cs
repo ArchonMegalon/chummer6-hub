@@ -12,6 +12,7 @@ public sealed class PublicReleaseTruthProjectionMiddleware
     public const string StagedProbeHeaderName = "X-Chummer-Staged-Release-Probe";
     public static readonly object HttpContextItemKey = new();
     private static readonly object AuthoritySnapshotSha256ItemKey = new();
+    private static readonly object EnvelopeFreeEvidenceSnapshotItemKey = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly RequestDelegate _next;
@@ -111,6 +112,7 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         PublicReleaseTruthProjectionDto projection = capture.Projection;
         context.Items[HttpContextItemKey] = projection;
         context.Items[AuthoritySnapshotSha256ItemKey] = capture.AuthoritySnapshotSha256;
+        context.Items[EnvelopeFreeEvidenceSnapshotItemKey] = capture.EnvelopeFreeEvidenceSnapshot;
         byte[] json = JsonSerializer.SerializeToUtf8Bytes(projection, JsonOptions);
         context.Response.Headers[ProjectionHeaderName] = ToBase64Url(json);
         context.Response.Headers[DecisionStatusHeaderName] = projection.ReleaseDecisionStatus;
@@ -162,6 +164,11 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         => context?.Items.TryGetValue(AuthoritySnapshotSha256ItemKey, out object? value) == true
             ? value as string
             : null;
+
+    internal static bool HasEnvelopeFreeEvidenceSnapshot(HttpContext context, ReleaseShelfSnapshot snapshot)
+        => context.Items.TryGetValue(EnvelopeFreeEvidenceSnapshotItemKey, out object? captured)
+            && ReferenceEquals(captured, snapshot)
+            && TryGetAuthoritySnapshotSha256(context) == PublicReleaseTruthProjectionDto.Missing;
 
     public static bool IsReleaseFacingRoute(PathString path)
     {

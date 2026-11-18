@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -1227,6 +1228,519 @@ public sealed class ReleaseShelfGenerationStoreTests
         Assert.Equal("artifact-b", second.RootElement.GetProperty("artifactBytes").GetString());
     }
 
+
+    private const string PreviewReceiptPath = "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json";
+    // Exact public projection reviewed by the controller; no private native fields.
+    private const string ReviewedPreviewReceipt = """
+        {
+          "status": "pass",
+          "headId": "avalonia",
+          "version": "1.0.0-preview.20261118.b95573f9",
+          "releaseVersion": "1.0.0-preview.20261118.b95573f9",
+          "channelId": "preview",
+          "platform": "windows",
+          "arch": "x64",
+          "rid": "win-x64",
+          "readyCheckpoint": "pre_ui_event_loop",
+          "hostClass": "local-win-x64",
+          "artifactDigest": "sha256:497a7b170ec8d89eb58f90e6156ca08337090a188f320a83545cb21560ec9444",
+          "operatingSystem": "Microsoft Windows 10.0.26200",
+          "recordedAtUtc": "2026-11-18T16:09:22.3299307+00:00",
+          "executionEnvironment": "native_windows",
+          "verificationScope": "native_windows_startup",
+          "nativeHostEvidence": {
+            "contractName": "chummer6-ui.native_windows_host_evidence",
+            "status": "verified",
+            "isNativeWindows": true,
+            "hostPlatform": "windows",
+            "hostKernel": "MINGW64_NT-10.0-26200",
+            "runner": "native-msys-direct",
+            "evidenceSource": "host_kernel_and_native_direct_selection"
+          },
+          "artifactSha256": "497a7b170ec8d89eb58f90e6156ca08337090a188f320a83545cb21560ec9444",
+          "artifactId": "avalonia-win-x64-installer",
+          "artifactFileName": "chummer-avalonia-win-x64-installer.exe",
+          "fileName": "chummer-avalonia-win-x64-installer.exe",
+          "artifactRelativePath": "files/chummer-avalonia-win-x64-installer.exe"
+        }
+        """ + "\n";
+
+    [Fact]
+    public void ReviewedStartupOnlyReceiptKeepsExactPublicBytesAndIdentity()
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(ReviewedPreviewReceipt);
+        Assert.Equal("9e8ea237c90dce39104e4a94ad9c42f867bd841d07ea8f0244802afb3af7bff1",
+            Convert.ToHexStringLower(SHA256.HashData(bytes)));
+        using JsonDocument manifest = ReviewedReceiptManifest();
+        Assert.True(PublicReleaseEvidenceDownloadPolicy.IsSafeStartupOnlyWindowsReceipt(bytes, manifest.RootElement));
+    }
+
+    [Theory]
+    [InlineData("artifactSha256", "wrong")]
+    [InlineData("artifactDigest", "wrong")]
+    [InlineData("artifactId", "other-installer")]
+    [InlineData("artifactFileName", "other.exe")]
+    [InlineData("fileName", "other.exe")]
+    [InlineData("artifactRelativePath", "files/other.exe")]
+    [InlineData("version", "other-version")]
+    [InlineData("releaseVersion", "other-version")]
+    [InlineData("channelId", "stable")]
+    [InlineData("headId", "other")]
+    [InlineData("platform", "linux")]
+    [InlineData("arch", "arm64")]
+    [InlineData("rid", "win-arm64")]
+    [InlineData("readyCheckpoint", "ui_ready")]
+    [InlineData("executionEnvironment", "wine")]
+    [InlineData("verificationScope", "full_windows")]
+    [InlineData("recordedAtUtc", "2026-11-18T16:09:22")]
+    [InlineData("hostClass", "local-linux-x64")]
+    [InlineData("operatingSystem", "Wine Windows")]
+    public void StartupOnlyReceiptRejectsIdentityAndNativeClaimDrift(string field, string value)
+    {
+        JsonObject receipt = JsonNode.Parse(ReviewedPreviewReceipt)!.AsObject();
+        receipt[field] = value;
+        using JsonDocument manifest = ReviewedReceiptManifest();
+        Assert.False(PublicReleaseEvidenceDownloadPolicy.IsSafeStartupOnlyWindowsReceipt(
+            JsonSerializer.SerializeToUtf8Bytes(receipt), manifest.RootElement));
+    }
+
+    [Theory]
+    [InlineData("artifactInstallMode", "null")]
+    [InlineData("bootstrapPayloadSha256", "\"\"")]
+    [InlineData("bootstrapPayloadSizeBytes", "false")]
+    [InlineData("startedAtUtc", "null")]
+    [InlineData("completedAtUtc", "null")]
+    [InlineData("installLinkingInstallationId", "\"private\"")]
+    [InlineData("installLinkingLaunchCount", "299")]
+    [InlineData("unexpected", "null")]
+    public void StartupOnlyReceiptRejectsEveryAdditionalFieldEvenWhenEmpty(string field, string json)
+    {
+        JsonObject receipt = JsonNode.Parse(ReviewedPreviewReceipt)!.AsObject();
+        receipt[field] = JsonNode.Parse(json);
+        using JsonDocument manifest = ReviewedReceiptManifest();
+        Assert.False(PublicReleaseEvidenceDownloadPolicy.IsSafeStartupOnlyWindowsReceipt(
+            JsonSerializer.SerializeToUtf8Bytes(receipt), manifest.RootElement));
+    }
+
+    [Fact]
+    public void StartupOnlyReceiptRejectsDuplicateMissingAndPrivateNestedFields()
+    {
+        using JsonDocument manifest = ReviewedReceiptManifest();
+        byte[] duplicate = Encoding.UTF8.GetBytes(ReviewedPreviewReceipt.Replace(
+            "\"status\": \"pass\",", "\"status\": \"pass\", \"status\": \"pass\",", StringComparison.Ordinal));
+        Assert.False(PublicReleaseEvidenceDownloadPolicy.IsSafeStartupOnlyWindowsReceipt(duplicate, manifest.RootElement));
+        JsonObject receipt = JsonNode.Parse(ReviewedPreviewReceipt)!.AsObject();
+        receipt.Remove("artifactSha256");
+        Assert.False(PublicReleaseEvidenceDownloadPolicy.IsSafeStartupOnlyWindowsReceipt(
+            JsonSerializer.SerializeToUtf8Bytes(receipt), manifest.RootElement));
+        receipt = JsonNode.Parse(ReviewedPreviewReceipt)!.AsObject();
+        receipt["nativeHostEvidence"]!["privatePath"] = "private";
+        Assert.False(PublicReleaseEvidenceDownloadPolicy.IsSafeStartupOnlyWindowsReceipt(
+            JsonSerializer.SerializeToUtf8Bytes(receipt), manifest.RootElement));
+    }
+
+    [Theory]
+    [InlineData("Windows_NT", "native-msys-direct", "host_kernel_and_native_direct_selection", "true", true)]
+    [InlineData("MINGW32_NT-10.0-26200", "native-msys-direct", "host_kernel_and_native_direct_selection", "true", true)]
+    [InlineData("MSYS_NT-10.0-26200", "pwsh", "host_kernel_and_runner_selection", "true", true)]
+    [InlineData("Linux", "native-msys-direct", "host_kernel_and_native_direct_selection", "true", false)]
+    [InlineData("MINGW64_NT-10.0-26200", "pwsh", "host_kernel_and_native_direct_selection", "true", false)]
+    [InlineData("MINGW64_NT-10.0-26200", "native-msys-direct", "host_kernel_and_native_direct_selection", "\"true\"", false)]
+    public void StartupOnlyReceiptRequiresTypedNativeEvidenceAndRunnerPair(
+        string kernel, string runner, string source, string nativeFlag, bool accepted)
+    {
+        JsonObject receipt = JsonNode.Parse(ReviewedPreviewReceipt)!.AsObject();
+        JsonObject native = receipt["nativeHostEvidence"]!.AsObject();
+        native["hostKernel"] = kernel;
+        native["runner"] = runner;
+        native["evidenceSource"] = source;
+        native["isNativeWindows"] = JsonNode.Parse(nativeFlag);
+        using JsonDocument manifest = ReviewedReceiptManifest();
+        Assert.Equal(accepted, PublicReleaseEvidenceDownloadPolicy.IsSafeStartupOnlyWindowsReceipt(
+            JsonSerializer.SerializeToUtf8Bytes(receipt), manifest.RootElement));
+    }
+
+    [Fact]
+    public async Task StartupOnlyPreviewEndpointServesBoundBytesWithoutAuthorityClaims()
+    {
+        await using var fixture = new PreviewReceiptHttpFixture();
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(fixture.ReceiptBytes, await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal("missing", response.Headers.GetValues(
+            PublicReleaseTruthProjectionMiddleware.AuthoritySnapshotSha256HeaderName).Single());
+        Assert.Equal("missing", response.Headers.GetValues(
+            PublicReleaseTruthProjectionMiddleware.DecisionStatusHeaderName).Single());
+        Assert.Equal("non-authoritative-windows-startup-only",
+            response.Headers.GetValues("X-Chummer-Release-Evidence-Scope").Single());
+        Assert.NotNull(fixture.Capture);
+        Assert.False(fixture.Capture!.Projection.AuthorityBound);
+        Assert.False(fixture.Capture.Projection.AvailabilityClaimsAllowed);
+        Assert.False(fixture.Capture.Projection.ReviewRequiredPublicByteHandoffsAllowed);
+        Assert.True(fixture.SnapshotBindingAccepted);
+        Assert.False(fixture.RecapturedSnapshotBindingAccepted);
+        foreach (string path in new[] { "release-evidence/CURRENT.json", "release-evidence/public-promotion.json",
+            "proof/raw.json", "startup-smoke/raw.log" })
+        {
+            using HttpResponseMessage denied = await client.GetAsync("/downloads/g/generation-preview/" + path);
+            Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("publicationProfile", "full_release")]
+    [InlineData("publicationProfile", null)]
+    [InlineData("platformScope", "all_platforms")]
+    [InlineData("supportabilityState", "gold_supported")]
+    [InlineData("rolloutState", "public_preview")]
+    public async Task StartupOnlyPreviewEndpointDoesNotInferScopeFromRequestOrMissingAuthority(
+        string field, string? value)
+    {
+        await using var fixture = new PreviewReceiptHttpFixture(
+            configure: canonical => canonical[field] = value);
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, fixture.ReceiptUrl +
+            "?publicationProfile=windows_unsigned_preview_v1&hasAuthorityEnvelope=false");
+        request.Headers.Add(PublicReleaseTruthProjectionMiddleware.AuthoritySnapshotSha256HeaderName, new string('a', 64));
+        using HttpResponseMessage response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("installerMode", "null")]
+    [InlineData("payloadSha256", "\"\"")]
+    [InlineData("bootstrap_payload_size_bytes", "false")]
+    [InlineData("payloadMetadataFileName", "null")]
+    [InlineData("payload_metadata_file_name", "\"\"")]
+    public async Task StartupOnlyPreviewEndpointRejectsArtifactPackagingAuthority(string field, string value)
+    {
+        await using var fixture = new PreviewReceiptHttpFixture(configure: canonical =>
+        {
+            var artifact = (Dictionary<string, object?>)((object[])canonical["artifacts"]!)[0];
+            artifact[field] = JsonSerializer.Deserialize<JsonElement>(value);
+        });
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("CURRENT.json")]
+    [InlineData("SNAPSHOT.json")]
+    [InlineData("RELEASE_DECISION.json")]
+    [InlineData("current.json")]
+    [InlineData("all-unsupported")]
+    public async Task StartupOnlyPreviewEndpointRejectsPartialOrUnsupportedOptionalEnvelope(string envelope)
+    {
+        var files = new Dictionary<string, string>();
+        foreach (string name in envelope == "all-unsupported"
+            ? new[] { "CURRENT.json", "SNAPSHOT.json", "RELEASE_DECISION.json" } : new[] { envelope })
+            files["release-evidence/" + name] = "{}";
+        await using var fixture = new PreviewReceiptHttpFixture(extraFiles: files);
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StartupOnlyPreviewEndpointCannotReplaceAValidEnvelopeBootstrapContract()
+    {
+        await using var fixture = new PreviewReceiptHttpFixture(includeAuthorityEnvelope: true);
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(64, response.Headers.GetValues(
+            PublicReleaseTruthProjectionMiddleware.AuthoritySnapshotSha256HeaderName).Single().Length);
+        Assert.NotNull(fixture.Capture);
+        Assert.True(fixture.Capture!.Projection.AuthorityBound);
+        Assert.False(fixture.SnapshotBindingAccepted);
+    }
+
+    [Fact]
+    public async Task StartupOnlyPreviewEndpointServesExactScopeApprovedBytesWithUnknownCompatibility()
+    {
+        await using var fixture = new PreviewReceiptHttpFixture(
+            includeAuthorityEnvelope: true, publicByteHandoff: true);
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(fixture.ReceiptBytes, await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal("scope-approved-windows-startup-only",
+            response.Headers.GetValues("X-Chummer-Release-Evidence-Scope").Single());
+        Assert.Equal("review_required", response.Headers.GetValues(
+            PublicReleaseTruthProjectionMiddleware.DecisionStatusHeaderName).Single());
+        Assert.Equal(64, response.Headers.GetValues(
+            PublicReleaseTruthProjectionMiddleware.AuthoritySnapshotSha256HeaderName).Single().Length);
+        Assert.True(fixture.Capture!.Projection.AuthorityBound);
+        Assert.True(fixture.Capture.Projection.ReviewRequiredPublicByteHandoffsAllowed);
+        Assert.False(fixture.Capture.Projection.AvailabilityClaimsAllowed);
+        Assert.False(fixture.Capture.Projection.StableClaimsAllowed);
+        foreach (string path in new[] { "release-evidence/CURRENT.json", "release-evidence/SNAPSHOT.json",
+            "release-evidence/RELEASE_DECISION.json", "proof/raw.json", "startup-smoke/raw.log" })
+        {
+            using HttpResponseMessage denied = await client.GetAsync("/downloads/g/generation-preview/" + path);
+            Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("installerMode", "null")]
+    [InlineData("payloadSha256", "\"\"")]
+    [InlineData("bootstrap_payload_size_bytes", "false")]
+    [InlineData("payloadMetadataFileName", "null")]
+    public async Task ScopeApprovedStartupOnlyReceiptStillRejectsPackagingClaims(string field, string value)
+    {
+        await using var fixture = new PreviewReceiptHttpFixture(includeAuthorityEnvelope: true,
+            publicByteHandoff: true, configure: canonical =>
+            {
+                var artifact = (Dictionary<string, object?>)((object[])canonical["artifacts"]!)[0];
+                artifact[field] = JsonSerializer.Deserialize<JsonElement>(value);
+            });
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(PreviewReceiptPath)]
+    [InlineData("files/chummer-test.bin")]
+    [InlineData(ReleaseShelfGenerationStore.CanonicalManifestFileName)]
+    public async Task ScopeApprovedStartupOnlyReceiptRejectsBytesSwappedAfterTruthCapture(string path)
+    {
+        await using var fixture = new PreviewReceiptHttpFixture(includeAuthorityEnvelope: true, publicByteHandoff: true);
+        fixture.AfterCapture = () =>
+        {
+            string file = Path.Combine(fixture.GenerationRoot, path);
+            byte[] bytes = File.ReadAllBytes(file);
+            bytes[bytes.Length / 2] ^= 1;
+            File.WriteAllBytes(file, bytes);
+        };
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(PreviewReceiptPath)]
+    [InlineData("files/chummer-test.bin")]
+    [InlineData(ReleaseShelfGenerationStore.CanonicalManifestFileName)]
+    public async Task StartupOnlyPreviewEndpointRejectsBytesSwappedAfterTruthCapture(string path)
+    {
+        await using var fixture = new PreviewReceiptHttpFixture();
+        fixture.AfterCapture = () =>
+        {
+            string file = Path.Combine(fixture.GenerationRoot, path);
+            byte[] bytes = File.ReadAllBytes(file);
+            bytes[bytes.Length / 2] ^= 1;
+            File.WriteAllBytes(file, bytes);
+        };
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StartupOnlyPreviewEndpointKeepsCapturedGenerationAcrossActivation()
+    {
+        await using var fixture = new PreviewReceiptHttpFixture();
+        fixture.AfterCapture = fixture.ActivateOtherGeneration;
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(fixture.ReceiptBytes, await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal("generation-preview", response.Headers.GetValues("X-Chummer-Release-Generation").Single());
+    }
+
+    [Fact]
+    public async Task StartupOnlyPreviewEndpointRequiresProjectionMiddleware()
+    {
+        await using var fixture = new PreviewReceiptHttpFixture(includeMiddleware: false);
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StartupOnlyPreviewEndpointRejectsReplacedRequestSnapshot()
+    {
+        await using var fixture = new PreviewReceiptHttpFixture(replacePinnedSnapshot: true);
+        await fixture.StartAsync();
+        using HttpClient client = fixture.CreateClient();
+        using HttpResponseMessage response = await client.GetAsync(fixture.ReceiptUrl);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private static JsonDocument ReviewedReceiptManifest()
+        => JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            releaseVersion = "1.0.0-preview.20261118.b95573f9", channel = "preview",
+            artifacts = new[] { new {
+                artifactId = "avalonia-win-x64-installer", head = "avalonia", platform = "windows",
+                rid = "win-x64", arch = "x64", kind = "installer", installAccessClass = "open_public",
+                fileName = "chummer-avalonia-win-x64-installer.exe",
+                sha256 = "497a7b170ec8d89eb58f90e6156ca08337090a188f320a83545cb21560ec9444"
+            } }
+        }));
+
+    private sealed class PreviewReceiptHttpFixture(
+        Action<Dictionary<string, object?>>? configure = null,
+        IReadOnlyDictionary<string, string>? extraFiles = null,
+        bool includeMiddleware = true,
+        bool replacePinnedSnapshot = false,
+        bool includeAuthorityEnvelope = false,
+        bool publicByteHandoff = false) : IAsyncDisposable
+    {
+        private readonly ReleaseShelfFixture _shelf = new();
+        private WebApplication? _app;
+        public Action? AfterCapture { get; set; }
+        public PublicReleaseTruthCapture? Capture { get; private set; }
+        public bool SnapshotBindingAccepted { get; private set; }
+        public bool RecapturedSnapshotBindingAccepted { get; private set; }
+        public string GenerationRoot => Path.Combine(_shelf.DownloadsRoot, "generations", "generation-preview");
+        public string ReceiptUrl => "/downloads/g/generation-preview/" + PreviewReceiptPath;
+        public byte[] ReceiptBytes { get; private set; } = [];
+
+        public async Task StartAsync()
+        {
+            // Synthetic installer bytes exercise the real shelf/HTTP binding;
+            // the separate exact-projection test above retains the real identity.
+            const string artifactBytes = "synthetic Windows installer, never publish";
+            string digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(artifactBytes)));
+            JsonObject receipt = JsonNode.Parse(ReviewedPreviewReceipt)!.AsObject();
+            receipt["artifactSha256"] = digest;
+            receipt["artifactDigest"] = "sha256:" + digest;
+            receipt["artifactFileName"] = "chummer-test.bin";
+            receipt["fileName"] = "chummer-test.bin";
+            receipt["artifactRelativePath"] = "files/chummer-test.bin";
+            ReceiptBytes = Encoding.UTF8.GetBytes(receipt.ToJsonString());
+            var files = extraFiles?.ToDictionary(row => row.Key, row => row.Value) ?? new Dictionary<string, string>();
+            files[PreviewReceiptPath] = Encoding.UTF8.GetString(ReceiptBytes);
+            files["startup-smoke/raw.log"] = "private raw fixture";
+            files["proof/raw.json"] = "{}";
+            const string version = "1.0.0-preview.20261118.b95573f9";
+            const string knownIssue = "Unsigned Windows-only preview. Native journeys incomplete.";
+            _shelf.WriteGeneration("generation-preview", version, artifactBytes,
+                extraFiles: files,
+                generationBoundFilesFactory: canonicalBytes =>
+                {
+                    if (!includeAuthorityEnvelope)
+                        return new Dictionary<string, byte[]>();
+                    var manifest = new PublicReleaseManifestDto(
+                        Version: version, Channel: "preview",
+                        PublishedAt: DateTimeOffset.Parse(ReleaseShelfFixture.PublishedAt),
+                        Status: "published", RolloutState: "public_release_review_required",
+                        SupportabilityState: "review_required", KnownIssueSummary: knownIssue,
+                        Downloads: [new PublicReleaseArtifactDto(
+                            Id: "avalonia-win-x64-installer", Platform: "windows", PlatformId: "windows",
+                            Head: "avalonia", Rid: "win-x64", Arch: "x64", Kind: "installer",
+                            Url: "/downloads/g/generation-preview/files/chummer-test.bin", Sha256: digest,
+                            SizeBytes: Encoding.UTF8.GetByteCount(artifactBytes),
+                            CompatibilityState: publicByteHandoff ? "unknown" : "compatible",
+                            InstallAccessClass: "open_public")]);
+                    var envelope = PublicReleaseTruthProjectionTests.BuildAuthorityEnvelope(
+                        manifest, "review_required", manifestBytesOverride: canonicalBytes,
+                        publicByteHandoff: publicByteHandoff);
+                    return new Dictionary<string, byte[]>
+                    {
+                        [PublicReleaseAuthorityEnvelopeProjection.CurrentInventoryPath] = envelope.CurrentBytes.ToArray(),
+                        [PublicReleaseAuthorityEnvelopeProjection.SnapshotInventoryPath] = envelope.SnapshotBytes.ToArray(),
+                        ["release-evidence/RELEASE_DECISION.json"] = envelope.DecisionBytes.ToArray()
+                    };
+                }, configureManifests: (canonical, compatibility) =>
+                {
+                    canonical["releaseVersion"] = version;
+                    canonical["channel"] = "preview";
+                    foreach (Dictionary<string, object?> manifest in new[] { canonical, compatibility })
+                    {
+                        manifest["publicationProfile"] = "windows_unsigned_preview_v1";
+                        manifest["platformScope"] = "windows_only";
+                        manifest["supportabilityState"] = "review_required";
+                        manifest["rolloutState"] = "public_release_review_required";
+                        manifest["knownIssueSummary"] = knownIssue;
+                    }
+                    var artifact = (Dictionary<string, object?>)((object[])canonical["artifacts"]!)[0];
+                    artifact["artifactId"] = "avalonia-win-x64-installer";
+                    artifact["platform"] = "windows";
+                    artifact["rid"] = "win-x64";
+                    artifact["compatibilityState"] = publicByteHandoff ? "unknown" : "compatible";
+                    var download = (Dictionary<string, object?>)((object[])compatibility["downloads"]!)[0];
+                    download["id"] = "avalonia-win-x64-installer";
+                    download["platform"] = "windows";
+                    configure?.Invoke(canonical);
+                });
+            _shelf.WriteGeneration("generation-other", "run-other", "other-installer");
+            _shelf.Activate("generation-preview", version);
+            WebApplicationBuilder builder = WebApplication.CreateBuilder();
+            builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
+            builder.Configuration.AddConfiguration(_shelf.Configuration);
+            builder.Services.AddHttpContextAccessor();
+            builder.Services.AddSingleton<ReleaseShelfGenerationStore>();
+            builder.Services.AddSingleton(provider => new PublicReleaseManifestService(
+                provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<ReleaseShelfGenerationStore>()));
+            builder.Services.AddSingleton<PublicCanonFileLoader>();
+            builder.Services.AddSingleton<ReleaseSelectionService>();
+            builder.Services.AddSingleton<ArtifactDeliveryPolicy>();
+            builder.Services.AddSingleton<IReleaseTruthProjection, PublicReleaseTruthProjectionService>();
+            builder.Services.AddSingleton(provider => new ReleaseBundlePromotionService(
+                provider.GetRequiredService<IConfiguration>(), NullLogger<ReleaseBundlePromotionService>.Instance,
+                promotionCheckpoint: null));
+            _app = builder.Build();
+            if (includeMiddleware)
+                _app.UseMiddleware<PublicReleaseTruthProjectionMiddleware>();
+            _app.Use(async (context, next) =>
+            {
+                if (PublicReleaseTruthProjectionMiddleware.TryGet(context) is { } projection)
+                {
+                    Capture = new PublicReleaseTruthCapture(projection,
+                        PublicReleaseTruthProjectionMiddleware.TryGetAuthoritySnapshotSha256(context)!);
+                    var store = context.RequestServices.GetRequiredService<ReleaseShelfGenerationStore>();
+                    SnapshotBindingAccepted = PublicReleaseTruthProjectionMiddleware.HasEnvelopeFreeEvidenceSnapshot(
+                        context, store.CaptureGenerationForCurrentRequest("generation-preview"));
+                    ReleaseShelfSnapshot recaptured = store.CaptureGeneration("generation-preview");
+                    RecapturedSnapshotBindingAccepted = PublicReleaseTruthProjectionMiddleware.HasEnvelopeFreeEvidenceSnapshot(
+                        context, recaptured);
+                    if (replacePinnedSnapshot)
+                        store.PinForCurrentRequest(recaptured);
+                }
+                AfterCapture?.Invoke();
+                await next(context);
+            });
+            _app.MapPublicReleaseEvidenceDownloads();
+            await _app.StartAsync();
+        }
+
+        public void ActivateOtherGeneration() => _shelf.Activate("generation-other", "run-other");
+
+        public HttpClient CreateClient()
+        {
+            IServer server = _app!.Services.GetRequiredService<IServer>();
+            var addresses = server.Features.Get<IServerAddressesFeature>()!;
+            return new HttpClient { BaseAddress = new Uri(addresses.Addresses.Single()) };
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_app is not null)
+            {
+                await _app.StopAsync();
+                await _app.DisposeAsync();
+            }
+            _shelf.Dispose();
+        }
+    }
+
     private sealed class ReleaseShelfHttpFixture : IAsyncDisposable
     {
         private readonly ReleaseShelfFixture _shelf = new();
@@ -1554,7 +2068,8 @@ public sealed class ReleaseShelfGenerationStoreTests
             Func<ReadOnlyMemory<byte>, IReadOnlyDictionary<string, byte[]>>? generationBoundFilesFactory = null,
             bool includeSemanticNavigationRoutes = false,
             string? semanticNavigationLookalikeRoute = null,
-            string? payloadFileName = null)
+            string? payloadFileName = null,
+            Action<Dictionary<string, object?>, Dictionary<string, object?>>? configureManifests = null)
         {
             string generationRoot = Path.Combine(DownloadsRoot, "generations", generationId);
             Directory.CreateDirectory(Path.Combine(generationRoot, "files"));
@@ -1791,6 +2306,7 @@ public sealed class ReleaseShelfGenerationStoreTests
 
             string canonicalPath = Path.Combine(generationRoot, ReleaseShelfGenerationStore.CanonicalManifestFileName);
             string compatibilityPath = Path.Combine(generationRoot, ReleaseShelfGenerationStore.CompatibilityManifestFileName);
+            configureManifests?.Invoke(canonical, compatibility);
             File.WriteAllText(canonicalPath, JsonSerializer.Serialize(canonical));
             File.WriteAllText(compatibilityPath, JsonSerializer.Serialize(compatibility));
             foreach ((string relativePath, byte[] contents) in generationBoundFilesFactory?.Invoke(

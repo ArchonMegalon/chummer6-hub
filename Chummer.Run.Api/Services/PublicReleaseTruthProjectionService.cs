@@ -26,7 +26,13 @@ internal interface IStagedReleaseTruthProjection
 
 public sealed record PublicReleaseTruthCapture(
     PublicReleaseTruthProjectionDto Projection,
-    string AuthoritySnapshotSha256);
+    string AuthoritySnapshotSha256)
+{
+    // Request-local evidence context, never a public authority claim. Only the
+    // server's envelope resolver may establish absence for this captured shelf.
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal ReleaseShelfSnapshot? EnvelopeFreeEvidenceSnapshot { get; init; }
+}
 
 public sealed class PublicReleaseTruthProjectionService
     : IReleaseTruthProjection, IStagedReleaseTruthProjection
@@ -95,7 +101,13 @@ public sealed class PublicReleaseTruthProjectionService
 
         return new(
             Project(manifest, authorityDigest, authorityBytes),
-            PublicReleaseTruthProjectionDto.Missing);
+            PublicReleaseTruthProjectionDto.Missing)
+        {
+            EnvelopeFreeEvidenceSnapshot = !snapshot.IsLegacy
+                && authorityBytes.HasValue && !authorityBytes.Value.IsEmpty
+                && !snapshot.Inventory.Keys.Any(PublicReleaseEvidenceDownloadPolicy.IsPrivateAuthorityPath)
+                    ? snapshot : null
+        };
     }
 
     public PublicReleaseTruthProjectionDto Project(
