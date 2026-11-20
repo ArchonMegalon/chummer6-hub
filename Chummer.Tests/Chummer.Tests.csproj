@@ -154,6 +154,8 @@
     <Compile Include="IdentityEmailWebhookAuthorizationTests.cs" />
     <ProjectReference Include="..\Chummer.Run.Identity\Chummer.Run.Identity.csproj" />
     <Compile Include="InstallLinkingBrowserCallbackTests.cs" />
+    <Compile Include="InstallLinkingInstallationStatusTests.cs" />
+    <Compile Include="InstallLinkingGuardrailTests.cs" />
     <Compile Include="InstallLinkingStoreSecurityTests.cs" />
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />
   </ItemGroup>
