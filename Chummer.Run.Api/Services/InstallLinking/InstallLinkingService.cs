@@ -1613,6 +1613,140 @@ public sealed partial class InstallLinkingService
         }
     }
 
+    public InstallLinkingInstallationStatusDto ResolveInstallationStatus(
+        AndroidInstallLinkProofPollRequest request)
+    {
+        EnsureDurableStoreReady();
+        ArgumentNullException.ThrowIfNull(request);
+
+        string installationId = NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength);
+        string headId = NormalizeRequired(request.HeadId, nameof(request.HeadId), MaxHeadIdLength);
+        string applicationVersion = NormalizeRequired(request.ApplicationVersion, nameof(request.ApplicationVersion), MaxVersionLength);
+        string channelId = NormalizeRequired(request.ChannelId, nameof(request.ChannelId), MaxChannelIdLength);
+        string platform = NormalizeRequired(request.Platform, nameof(request.Platform), MaxPlatformLength);
+        string arch = NormalizeRequired(request.Arch, nameof(request.Arch), MaxArchLength);
+        string publicKey = NormalizeRequired(request.PublicKey, nameof(request.PublicKey), MaxPublicKeyLength);
+        string nonce = NormalizeRequired(request.Nonce, nameof(request.Nonce), MaxProofNonceLength);
+        string signature = NormalizeRequired(request.Signature, nameof(request.Signature), MaxProofSignatureLength);
+        if (nonce.Length < 16 || !nonce.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
+        {
+            throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof nonce is invalid.");
+        }
+
+        byte[] publicKeyBytes = DecodeBase64(publicKey, "public key");
+        byte[] signatureBytes = DecodeBase64(signature, "signature");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        long nowUnixSeconds = now.ToUnixTimeSeconds();
+        long allowedSkewSeconds = (long)RemoteProofClockSkew.TotalSeconds;
+        if (request.IssuedAtUnixSeconds <= 0
+            || request.IssuedAtUnixSeconds < nowUnixSeconds - allowedSkewSeconds
+            || request.IssuedAtUnixSeconds > nowUnixSeconds + allowedSkewSeconds)
+        {
+            CryptographicOperations.ZeroMemory(publicKeyBytes);
+            CryptographicOperations.ZeroMemory(signatureBytes);
+            throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof timestamp is outside the allowed window.");
+        }
+
+        try
+        {
+            using RSA rsa = RSA.Create();
+            try
+            {
+                rsa.ImportSubjectPublicKeyInfo(publicKeyBytes, out int bytesRead);
+                if (bytesRead != publicKeyBytes.Length || rsa.KeySize is < 2048 or > 4096)
+                {
+                    throw new CryptographicException("unsupported key size");
+                }
+            }
+            catch (CryptographicException)
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof public key is invalid.");
+            }
+
+            string canonicalPublicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+            // Authenticate the install's identity before revealing any state.
+            byte[] proof = Encoding.UTF8.GetBytes(string.Join(
+                '\n',
+                "chummer.install-link.install-status.v1",
+                installationId,
+                headId,
+                applicationVersion,
+                channelId,
+                platform,
+                arch,
+                request.IssuedAtUnixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                nonce));
+            bool signatureValid;
+            try
+            {
+                signatureValid = rsa.VerifyData(
+                    proof,
+                    signatureBytes,
+                    HashAlgorithmName.SHA256,
+                    RSASignaturePadding.Pkcs1);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(proof);
+            }
+            if (!signatureValid)
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "remote proof signature is invalid.");
+            }
+
+            lock (_store.Gate)
+            {
+                ExpireTicketsLocked(now);
+                ExpireGrantsLocked(now);
+
+                _store.InstallationsById.TryGetValue(installationId, out ClaimedInstallationDto? installation);
+                if (installation is null
+                    || !string.Equals(installation.PublicKey, canonicalPublicKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Unclaimed (or bound to a different key): reveal only the
+                    // neutral "not linked" outcome - no per-user detail leaks.
+                    return new InstallLinkingInstallationStatusDto(
+                        Linked: false,
+                        Installation: null,
+                        Grant: null);
+                }
+
+                if (!string.Equals(installation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(installation.UserId))
+                {
+                    // Revoked/expired or owner-less: fail closed as not linked.
+                    return new InstallLinkingInstallationStatusDto(
+                        Linked: false,
+                        Installation: null,
+                        Grant: null);
+                }
+
+                // Resolve an ACTIVE grant for this installation so the desktop can
+                // self-adopt it instead of waiting for a browser redirect.
+                InstallationGrantDto? grant = _store.GrantsById.Values
+                    .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
+                    .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
+                    .Where(item => item.ExpiresAtUtc > now)
+                    .OrderByDescending(static item => item.IssuedAtUtc)
+                    .FirstOrDefault();
+
+                // The caller just proved possession of the installation's private
+                // signing key - the same credential the proof-poll exchange trusts -
+                // so returning the active grant (with token) lets the desktop adopt
+                // a link completed on the web without a browser redirect.
+                return new InstallLinkingInstallationStatusDto(
+                    Linked: true,
+                    Installation: installation,
+                    Grant: grant);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(publicKeyBytes);
+            CryptographicOperations.ZeroMemory(signatureBytes);
+        }
+    }
+
     public PollInstallBrowserCallbackResult PollBrowserCallbackV2(
         AndroidInstallLinkProofPollV2Request request)
     {
@@ -3087,6 +3221,11 @@ internal sealed record AndroidLinkedV2GrantRotationResult(
 internal sealed record AndroidLinkedV2GrantRevocationResult(
     ClaimedInstallationDto Installation,
     IReadOnlyList<AndroidLinkedV2GrantMetadata> Grants);
+
+public sealed record InstallLinkingInstallationStatusDto(
+    bool Linked,
+    ClaimedInstallationDto? Installation,
+    InstallationGrantDto? Grant);
 
 public sealed class InstallLinkingOperationException : Exception
 {

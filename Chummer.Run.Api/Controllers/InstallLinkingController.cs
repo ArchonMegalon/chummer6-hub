@@ -397,6 +397,28 @@ public sealed class InstallLinkingController : ControllerBase
         }
     }
 
+    [HttpPost("installations/status")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
+    [ProducesResponseType<InstallLinkingInstallationStatusDto>(StatusCodes.Status200OK)]
+    public ActionResult<InstallLinkingInstallationStatusDto> GetInstallationStatus(
+        [FromBody] AndroidInstallLinkProofPollRequest? request)
+    {
+        ApplySensitiveResponseHeaders();
+        if (request is null)
+        {
+            return BadRequest("remote proof payload is required.");
+        }
+
+        try
+        {
+            return Ok(_installLinking.ResolveInstallationStatus(request));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpPost("callbacks/poll")]
     [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<ExchangeInstallBrowserCallbackResponseDto>(StatusCodes.Status200OK)]
