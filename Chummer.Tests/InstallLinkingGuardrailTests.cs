@@ -56,6 +56,7 @@ public sealed class InstallLinkingGuardrailTests
     [InlineData(nameof(InstallLinkingController.RefreshGrant))]
     [InlineData(nameof(InstallLinkingController.RevokeGrant))]
     [InlineData(nameof(InstallLinkingController.ExchangeBrowserCallback))]
+    [InlineData(nameof(InstallLinkingController.GetInstallationStatus))]
     [InlineData(nameof(InstallLinkingController.ExchangeDesktopLaunch))]
     [InlineData(nameof(InstallLinkingController.ContinueClaimedInstall))]
     [InlineData(nameof(InstallLinkingController.ListClaimedInstallWorkspaces))]

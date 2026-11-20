@@ -122,6 +122,8 @@
     <Compile Include="..\Chummer.Tests\InstallLinkedWorkspaceSnapshotTests.cs" Link="InstallLinkedWorkspaceSnapshotTests.cs" />
     <Compile Include="..\Chummer.Tests\InstallLinkedWorkspaceSnapshotTransferTests.cs" Link="InstallLinkedWorkspaceSnapshotTransferTests.cs" />
     <Compile Include="..\Chummer.Tests\InstallLinkingBrowserCallbackTests.cs" Link="InstallLinkingBrowserCallbackTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingInstallationStatusTests.cs" Link="InstallLinkingInstallationStatusTests.cs" />
+    <Compile Include="..\Chummer.Tests\InstallLinkingGuardrailTests.cs" Link="InstallLinkingGuardrailTests.cs" />
     <Compile Include="..\Chummer.Tests\InstallLinkingStoreSecurityTests.cs" Link="InstallLinkingStoreSecurityTests.cs" />
     <Compile Include="..\Chummer.Tests\RepoPaths.cs" Link="RepoPaths.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerFactionOnboardingTests.cs" Link="BlackLedgerFactionOnboardingTests.cs" />
