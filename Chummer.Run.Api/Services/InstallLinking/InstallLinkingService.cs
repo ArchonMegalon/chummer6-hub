@@ -1633,6 +1633,14 @@ public sealed partial class InstallLinkingService
             throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof nonce is invalid.");
         }
 
+        string operationId = CreateLegacyProofOperationId(nonce);
+        if (request.OperationId is not null
+            && (!AndroidLinkedV2RequestProof.IsValidOperationId(request.OperationId)
+                || !FixedTimeEquals(request.OperationId, operationId)))
+        {
+            throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "remote proof operation id does not match its signed nonce.");
+        }
+
         byte[] publicKeyBytes = DecodeBase64(publicKey, "public key");
         byte[] signatureBytes = DecodeBase64(signature, "signature");
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -1701,7 +1709,12 @@ public sealed partial class InstallLinkingService
 
                 _store.InstallationsById.TryGetValue(installationId, out ClaimedInstallationDto? installation);
                 if (installation is null
-                    || !string.Equals(installation.PublicKey, canonicalPublicKey, StringComparison.OrdinalIgnoreCase))
+                    || !FixedTimeEquals(installation.PublicKey ?? string.Empty, canonicalPublicKey)
+                    || !string.Equals(installation.HeadId, headId, StringComparison.Ordinal)
+                    || !string.Equals(installation.Version, applicationVersion, StringComparison.Ordinal)
+                    || !string.Equals(installation.Channel, channelId, StringComparison.Ordinal)
+                    || !string.Equals(installation.Platform, platform, StringComparison.Ordinal)
+                    || !string.Equals(installation.Arch, arch, StringComparison.Ordinal))
                 {
                     // Unclaimed (or bound to a different key): reveal only the
                     // neutral "not linked" outcome - no per-user detail leaks.
@@ -1712,7 +1725,8 @@ public sealed partial class InstallLinkingService
                 }
 
                 if (!string.Equals(installation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase)
-                    || string.IsNullOrWhiteSpace(installation.UserId))
+                    || string.IsNullOrWhiteSpace(installation.UserId)
+                    || string.IsNullOrWhiteSpace(installation.SubjectId))
                 {
                     // Revoked/expired or owner-less: fail closed as not linked.
                     return new InstallLinkingInstallationStatusDto(
@@ -1721,19 +1735,23 @@ public sealed partial class InstallLinkingService
                         Grant: null);
                 }
 
-                // Resolve an ACTIVE grant for this installation so the desktop can
-                // self-adopt it instead of waiting for a browser redirect.
-                InstallationGrantDto? grant = _store.GrantsById.Values
-                    .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
-                    .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
-                    .Where(item => item.ExpiresAtUtc > now)
-                    .OrderByDescending(static item => item.IssuedAtUtc)
-                    .FirstOrDefault();
+                // Recover only this installation's current, mutually bound legacy
+                // grant. A newer orphan or an Android v2 grant is not authority
+                // for this legacy credential recovery route.
+                if (string.IsNullOrWhiteSpace(installation.GrantId)
+                    || !TryResolveActiveGrantLocked(installationId, installation.GrantId, now, out _, out var grant)
+                    || grant is null
+                    || !GrantHasTransportLocked(grant.GrantId, InstallationGrantTransports.LegacyV1)
+                    || string.IsNullOrWhiteSpace(grant.AccessToken)
+                    || grant.IssuedAtUtc > now
+                    || grant.ExpiresAtUtc <= grant.IssuedAtUtc)
+                {
+                    return new InstallLinkingInstallationStatusDto(
+                        Linked: false,
+                        Installation: null,
+                        Grant: null);
+                }
 
-                // The caller just proved possession of the installation's private
-                // signing key - the same credential the proof-poll exchange trusts -
-                // so returning the active grant (with token) lets the desktop adopt
-                // a link completed on the web without a browser redirect.
                 return new InstallLinkingInstallationStatusDto(
                     Linked: true,
                     Installation: installation,
