@@ -320,6 +320,11 @@ public sealed class InstallLinkingController : ControllerBase
 
             if (proofPoll)
             {
+                if (androidProofPoll)
+                {
+                    return BuildAndroidInstallLinkReturnPage(normalizedCallbackUri, approvalSaved: true);
+                }
+
                 return BuildBrowserInstallLinkStatusPage(
                     statusCode: StatusCodes.Status200OK,
                     heading: "Account linked",
@@ -395,6 +400,68 @@ public sealed class InstallLinkingController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+    }
+
+    [HttpGet("/app/install-link")]
+    public IActionResult AndroidInstallLinkReturn()
+    {
+        ApplySensitiveResponseHeaders();
+        // This public fallback only returns to the requesting app. It never approves,
+        // redeems, or reports a linked account; the app still proves its pending key.
+        string? callbackUri = HubBrowserAuthService.SanitizeProofPollCallbackUri(
+            "https://chummer.run/app/install-link" + Request.QueryString.Value);
+        return callbackUri is null
+            ? Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Open account linking from Chummer to continue.")
+            : BuildAndroidInstallLinkReturnPage(callbackUri, approvalSaved: false);
+    }
+
+    private static ContentResult BuildAndroidInstallLinkReturnPage(string callbackUri, bool approvalSaved)
+    {
+        // An ordinary same-origin HTTPS navigation can remain in the browser.
+        // A package-targeted HTTPS intent, activated by the user's tap, invokes the
+        // existing Android App Link handler with the same state and no credentials.
+        string intentUri = "intent://chummer.run/app/install-link" + new Uri(callbackUri).Query
+            + "#Intent;scheme=https;package=com.myexternalbrain.chummer;S.browser_fallback_url="
+            + Uri.EscapeDataString(callbackUri) + ";end";
+        string heading = approvalSaved ? "Device approved" : "Return to Chummer";
+        string supportLine = approvalSaved
+            ? "Your approval is saved. Open Chummer to finish linking this device."
+            : "Open Chummer to check your account link.";
+        return new ContentResult
+        {
+            StatusCode = StatusCodes.Status200OK,
+            ContentType = "text/html; charset=utf-8",
+            Content = $$"""
+                <!doctype html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+                  <title>{{heading}} · Chummer</title>
+                  <link rel="stylesheet" href="/css/site.css">
+                </head>
+                <body class="surface-auth">
+                  <main class="auth-stage">
+                    <section class="auth-shell auth-shell--message">
+                      <div class="auth-shell__story auth-visual">
+                        <h1 class="hero-brand">CHUMMER</h1>
+                        <h2 class="hero-headline">{{heading}}</h2>
+                        <p class="auth-visual__copy">{{supportLine}}</p>
+                      </div>
+                      <div class="auth-panel auth-panel--message">
+                        <div class="stacked-actions">
+                          <a class="button-like button-like--primary" id="install-link-open" href="{{WebUtility.HtmlEncode(intentUri)}}">Return to Chummer</a>
+                          <a class="button-like button-like--secondary" href="{{WebUtility.HtmlEncode(callbackUri)}}">Try the app link</a>
+                        </div>
+                        <p class="muted-copy">If your browser keeps this page open, switch back to Chummer. The app will check your existing link.</p>
+                      </div>
+                    </section>
+                  </main>
+                </body>
+                </html>
+                """
+        };
     }
 
     [HttpPost("installations/status")]

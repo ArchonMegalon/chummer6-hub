@@ -50,7 +50,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
         ContentResult page = Assert.IsType<ContentResult>(approval);
         Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
-        Assert.Contains("Account linked", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Device approved", page.Content, StringComparison.Ordinal);
         Assert.Contains("Return to Chummer", page.Content, StringComparison.Ordinal);
         Assert.Contains(callbackUri.Replace("&", "&amp;", StringComparison.Ordinal), page.Content, StringComparison.Ordinal);
         InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
@@ -800,11 +800,70 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             installLinkTransport: InstallLinkingService.AndroidLinkedV2ProofPollTransport,
             publicKey: publicKey);
 
-        Assert.Equal(StatusCodes.Status200OK, Assert.IsType<ContentResult>(approval).StatusCode);
+        ContentResult page = Assert.IsType<ContentResult>(approval);
+        Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        AssertAndroidReturnIntent(page.Content!, "android-v2-state");
         InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        Assert.DoesNotContain(callback.CallbackCode, page.Content!, StringComparison.Ordinal);
         Assert.Equal(
             InstallLinkingService.AndroidLinkedV2ProofPollTransport,
             fixture.Store.BrowserCallbackTransportIntentsByCallbackId[callback.CallbackId].Transport);
+    }
+
+    [Fact]
+    public void Android_callback_fallback_returns_to_the_exact_app_without_approving_an_install()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        fixture.Controller.Request.QueryString = new QueryString("?state=phone-State_7.~");
+
+        ContentResult page = Assert.IsType<ContentResult>(fixture.Controller.AndroidInstallLinkReturn());
+
+        Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        AssertAndroidReturnIntent(page.Content!, "phone-State_7.~");
+        Assert.DoesNotContain("Device approved", page.Content!, StringComparison.Ordinal);
+        Assert.DoesNotContain("Account linked", page.Content!, StringComparison.Ordinal);
+        Assert.Contains("switch back to Chummer", page.Content!, StringComparison.Ordinal);
+        Assert.Empty(fixture.Store.BrowserCallbacksById);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("?state=")]
+    [InlineData("?state=one&state=two")]
+    [InlineData("?state=one&code=do-not-reflect")]
+    [InlineData("?state=one&next=https://evil.example")]
+    [InlineData("?state=one%3Bpackage%3Devil.example")]
+    [InlineData("?state=%22%3E%3Cscript%3E")]
+    [InlineData("?state=one%0D%0Aheader")]
+    public void Android_callback_fallback_rejects_invalid_or_credential_bearing_queries(string query)
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        fixture.Controller.Request.QueryString = new QueryString(query);
+
+        ObjectResult result = Assert.IsType<ObjectResult>(fixture.Controller.AndroidInstallLinkReturn());
+
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Empty(fixture.Store.BrowserCallbacksById);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    private static void AssertAndroidReturnIntent(string html, string state)
+    {
+        Assert.True(TryExtractPrimaryHref(html, out string href));
+        string intent = WebUtility.HtmlDecode(href);
+        string callback = "https://chummer.run/app/install-link?state=" + Uri.EscapeDataString(state);
+        Assert.Equal(
+            "intent://chummer.run/app/install-link?state=" + Uri.EscapeDataString(state)
+            + "#Intent;scheme=https;package=com.myexternalbrain.chummer;S.browser_fallback_url="
+            + Uri.EscapeDataString(callback) + ";end",
+            intent);
+        // Keep the action a normal user-gesture link, including the no-JavaScript case.
+        Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("iframe", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Account linked", html, StringComparison.Ordinal);
     }
 
     [Fact]
