@@ -11,7 +11,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerHubRegistryContractsPackageVersion)" />
     <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerRunRegistryPackageVersion)">
       <ExcludeAssets>contentFiles</ExcludeAssets>
@@ -19,6 +19,13 @@
     <ProjectReference Include="../Chummer.Run.Api/Chummer.Run.Api.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
+  <Target Name="CopyRegistryTestAdapter" AfterTargets="Build">
+    <ItemGroup>
+      <RegistryTestAdapter Include="$(Pkgxunit_runner_visualstudio)/build/net6.0/xunit.runner.*.dll" />
+    </ItemGroup>
+    <Error Condition="'@(RegistryTestAdapter)' == ''" Text="The pinned xUnit discovery adapter is missing." />
+    <Copy SourceFiles="@(RegistryTestAdapter)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
   <Target Name="RequireSelectedRegistryPackages" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(ChummerUseLocalCompatibilityTree)' != 'false'"
            Text="Registry package verification requires the package consumer, without sibling source references." />
