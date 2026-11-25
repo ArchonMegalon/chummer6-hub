@@ -111,7 +111,7 @@ def main():
     project = root / PROJECT / f"{PROJECT}.csproj"
     common = ["-m:1", "-p:ChummerUseLocalCompatibilityTree=false", "-p:ChummerPackageFeed=",
               f"-p:RestorePackagesPath={cache}", "-p:UseSharedCompilation=false",
-              "-p:TargetFrameworks=net10.0", f"-p:ChummerRegistrySelectedCommit={args.selected_registry_commit}"]
+              "-p:TargetFramework=net10.0", "-p:TargetFrameworks=net10.0", f"-p:ChummerRegistrySelectedCommit={args.selected_registry_commit}"]
     before_locks = {str(p.relative_to(root)): module._sha256(p) for p in root.glob("*/packages.lock.json")}
     command = [args.dotnet, "restore", str(project), "--configfile", str(config), "--packages", str(cache),
                "--no-cache", "--nologo", *common,
