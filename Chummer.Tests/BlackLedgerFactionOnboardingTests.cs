@@ -397,90 +397,38 @@ public sealed class FactionCharterBuilderTests
     }
 
     [Fact]
-    public void FactionModerationLifecycle_can_approve_and_suppress_public_projection()
+    public async Task FactionModerationLifecycle_can_approve_and_suppress_public_projection()
     {
-        var service = BlackLedgerFactionAllegianceTests.CreateService();
-        var user = new Chummer.Run.Contracts.Community.HubUserDto(
-            "usr_mod2",
-            "subject.mod2",
-            "Moderation Two",
-            "moderation2",
-            "private",
-            "UTC",
-            "",
-            new[] { "subject.mod2" },
-            Array.Empty<string>(),
-            DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow);
-
-        var charter = service.CreateFaction(user, new BlackLedgerCreateFactionRequest(
-            "Projection Gate Board",
-            "major",
-            "creator_press",
-            new[] { "dispatch_desk", "public_trust" },
-            new[] { "overexposed", "thin_resources" },
-            "emerald-core",
-            null,
-            false));
-
-        var approved = service.ApproveFactionForPublicProjection(user, charter.FactionId);
-        Assert.Equal("approved", approved.Outcome);
+        using var fixture = new FactionAccessFixture();
+        var service = fixture.Factions;
+        var user = fixture.Accounts.EnsureUser("founder");
+        var charter = service.CreateFaction(user, FactionAccessFixture.Charter());
+        var permission = await FactionAccessFixture.Permission(fixture.Store);
+        var approved = service.ApproveFactionForPublicProjection(permission, charter.FactionId);
         Assert.True(approved.PublicProjectionAllowed);
         Assert.NotNull(service.GetFactionDetail(charter.FactionId));
-        Assert.Contains(service.ListFactionSummaries(), item => string.Equals(item.FactionId, charter.FactionId, StringComparison.OrdinalIgnoreCase));
-
-        var suppressed = service.SuppressFactionPublicProjection(user, charter.FactionId, "needs another pass");
-        Assert.Equal("suppressed", suppressed.Outcome);
+        Assert.Contains(service.ListFactionSummaries(), item => item.FactionId == charter.FactionId);
+        var suppressed = service.SuppressFactionPublicProjection(permission, charter.FactionId, "Needs revision");
         Assert.False(suppressed.PublicProjectionAllowed);
         Assert.Null(service.GetFactionDetail(charter.FactionId));
-        Assert.DoesNotContain(service.ListFactionSummaries(), item => string.Equals(item.FactionId, charter.FactionId, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(service.ListFactionSummaries(), item => item.FactionId == charter.FactionId);
         Assert.NotNull(service.GetWorkspaceFactionDetail(charter.FactionId));
     }
 
     [Fact]
     public void PrivateLoreOverlay_persists_without_public_projection()
     {
-        var service = BlackLedgerFactionAllegianceTests.CreateService();
-        var user = new Chummer.Run.Contracts.Community.HubUserDto(
-            "usr_overlay",
-            "subject.overlay",
-            "Overlay",
-            "overlay",
-            "private",
-            "UTC",
-            "",
-            new[] { "subject.overlay" },
-            Array.Empty<string>(),
-            DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow);
-
-        var charter = service.CreateFaction(user, new BlackLedgerCreateFactionRequest(
-            "Relay Choir",
-            "major",
-            "creator_press",
-            new[] { "dispatch_desk", "public_trust" },
-            new[] { "overexposed", "thin_resources" },
-            "emerald-core",
-            null,
-            false));
-
-        var overlay = service.UpsertPrivateLoreOverlay(user, "cmp_demo", new PrivateLoreOverlayRequest(
-            "emerald-sprawl-prelude",
-            charter.FactionId,
-            new Dictionary<string, string>
-            {
-                ["safehouse_alpha"] = "Choir Annex",
-                ["district_beta"] = "Glassline"
-            },
-            new[] { "Private lore stays non-projecting." }));
-
+        using var fixture = new FactionAccessFixture();
+        var service = fixture.Factions;
+        var user = fixture.Accounts.EnsureUser("owner");
+        var charter = service.CreateFaction(user, FactionAccessFixture.Charter());
+        FactionAccessFixture.AddCampaign(fixture.Store, user, "cmp_demo");
+        var overlay = service.UpsertPrivateLoreOverlay(user, "cmp_demo", FactionAccessFixture.Lore(charter.FactionId));
         Assert.False(overlay.PublicProjectionAllowed);
         Assert.Equal("cmp_demo", overlay.CampaignId);
-        Assert.Equal("Choir Annex", overlay.LabelMap["safehouse_alpha"]);
-
-        var restored = service.GetPrivateLoreOverlay("cmp_demo", charter.FactionId);
+        var restored = service.GetPrivateLoreOverlay(user, "cmp_demo", charter.FactionId);
         Assert.NotNull(restored);
-        Assert.Equal("Glassline", restored!.LabelMap["district_beta"]);
+        Assert.Equal("Private synthetic label", restored!.LabelMap["district"]);
     }
 
     [Fact]

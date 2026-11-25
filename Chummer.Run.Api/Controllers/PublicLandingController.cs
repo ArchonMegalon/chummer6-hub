@@ -18080,6 +18080,10 @@ echo "Help: ${HELP_URL}"
                 ? NotFound()
                 : View("~/Views/PublicLanding/LedgerFactionWorkspace.cshtml", model);
         }
+        catch (HubRequestAuthException ex) when (ex.StatusCode == StatusCodes.Status404NotFound)
+        {
+            return NotFound();
+        }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
@@ -18094,6 +18098,11 @@ echo "Help: ${HELP_URL}"
         HubUserDto user,
         CancellationToken cancellationToken)
     {
+        if (string.Equals(currentSection, "private-lore", StringComparison.OrdinalIgnoreCase))
+        {
+            campaignId = _blackLedgerFactions.RequirePrivateLoreCampaignOwner(user, campaignId);
+        }
+
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
         var world = _blackLedgerStats.LoadWorldPreview();
@@ -18162,9 +18171,9 @@ echo "Help: ${HELP_URL}"
             : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
         BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = BuildProtectedBlackLedgerWorldTurnBriefing(1);
         RunnerPassportPublicSummary runnerPassportSummary = _communityCreatorHorizons.BuildPassportSummary();
-        BlackLedgerPrivateLoreOverlayDto? overlay = string.IsNullOrWhiteSpace(resolvedCampaignId)
-            ? null
-            : _blackLedgerFactions.GetPrivateLoreOverlay(resolvedCampaignId, faction.Id);
+        BlackLedgerPrivateLoreOverlayDto? overlay = string.Equals(currentSection, "private-lore", StringComparison.OrdinalIgnoreCase)
+            ? _blackLedgerFactions.GetPrivateLoreOverlay(user, campaignId!, faction.Id)
+            : null;
         var privateLabels = overlay?.LabelMap?.Values?.Where(static label => !string.IsNullOrWhiteSpace(label)).Take(6).ToArray()
             ?? [$"{faction.PublicName} campaign alias", $"{faction.PublicName} safehouse codename", $"{faction.PublicName} pressure lane beta"];
         var privateLoreNotes = (overlay?.Notes?.Count > 0

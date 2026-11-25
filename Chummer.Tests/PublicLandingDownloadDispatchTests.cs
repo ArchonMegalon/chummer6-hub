@@ -4515,6 +4515,56 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.IsType<ForbidResult>(result);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("unknown-campaign")]
+    [InlineData("other-campaign")]
+    public async Task PrivateLorePageDeniesMissingOrNonownedCampaignBeforeInitializingWorkspace(string? campaignId)
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        fixture.Controller.Request.Headers.Authorization = "Bearer desktop-access-token";
+        var owner = fixture.Accounts.EnsureUser("other-owner");
+        fixture.BlackLedgerFactions.JoinFaction(owner, "ashline-circle");
+        fixture.BlackLedgerFactions.JoinFaction(fixture.DispatchUser, "ashline-circle");
+        FactionAccessFixture.AddCampaign(fixture.CommunityStore, owner, "other-campaign");
+        fixture.BlackLedgerFactions.UpsertPrivateLoreOverlay(owner, "other-campaign", FactionAccessFixture.Lore("ashline-circle"));
+        string Snapshot() => JsonSerializer.Serialize(new
+        {
+            fixture.CommunityStore.BlackLedgerFactionOnboardingState,
+            fixture.CommunityStore.CampaignSpinesById,
+            fixture.CommunityStore.RestoreByUserId
+        });
+        string before = Snapshot();
+        Assert.IsType<NotFoundResult>(await fixture.Controller.AccountLedgerFactionPrivateLorePage("ashline-circle", campaignId, default));
+        Assert.Equal(before, Snapshot());
+    }
+
+    [Fact]
+    public async Task PrivateLorePageDisplaysOwnersOverlayOnlyInPrivateSection()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        fixture.Controller.Request.Headers.Authorization = "Bearer desktop-access-token";
+        fixture.BlackLedgerFactions.JoinFaction(fixture.DispatchUser, "ashline-circle");
+        FactionAccessFixture.AddCampaign(fixture.CommunityStore, fixture.DispatchUser, "owned-campaign");
+        fixture.BlackLedgerFactions.UpsertPrivateLoreOverlay(fixture.DispatchUser, "owned-campaign", FactionAccessFixture.Lore("ashline-circle"));
+        var page = Assert.IsType<ViewResult>(await fixture.Controller.AccountLedgerFactionPrivateLorePage("ashline-circle", "owned-campaign", default));
+        var model = Assert.IsType<BlackLedgerFactionWorkspacePageViewModel>(page.Model);
+        Assert.Contains("Private synthetic label", model.PrivateLabels);
+        Assert.Contains("Private synthetic note", model.PrivateLoreNotes);
+        var overview = Assert.IsType<ViewResult>(await fixture.Controller.AccountLedgerFactionPage("ashline-circle", "owned-campaign", default));
+        Assert.DoesNotContain("Private synthetic", JsonSerializer.Serialize(overview.Model), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PrivateLorePageRequiresAuthentication()
+    {
+        using Fixture fixture = new(authenticated: false);
+        Assert.IsType<RedirectResult>(await fixture.Controller.AccountLedgerFactionPrivateLorePage("ashline-circle", "owned-campaign", default));
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
@@ -4804,6 +4854,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 Configuration,
                 NullLogger<PublicTrustPulseService>.Instance);
             CommunityStore communityStore = new(Configuration, NullLogger<CommunityStore>.Instance);
+            CommunityStore = communityStore;
             Accounts = new AccountService(communityStore);
             DispatchUser = Accounts.EnsureUser("subject.dispatch", "Dispatch User", "dispatch@example.com");
             WorkspaceLifecyclePolicyService workspaceLifecycle = new(Configuration);
@@ -4951,6 +5002,8 @@ public sealed class PublicLandingDownloadDispatchTests
         public InstallBootstrapTicketService InstallBootstrapTickets { get; }
 
         public PersonalizedInstallScriptService PersonalizedInstallScripts { get; }
+
+        public CommunityStore CommunityStore { get; }
 
         public BlackLedgerFactionOnboardingService BlackLedgerFactions { get; }
 

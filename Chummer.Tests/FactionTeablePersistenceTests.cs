@@ -41,7 +41,7 @@ public sealed class FactionTeablePersistenceTests : IDisposable
         ActionId: "scout", TargetDistrictId: "emerald-core", TargetFactionId: null, Stake: "pressure");
 
     [Fact]
-    public void Charter_allegiance_lore_action_and_moderation_restore_without_local_state()
+    public async Task Charter_allegiance_lore_action_and_moderation_restore_without_local_state()
     {
         using var remote = new Remote();
         using var writer = Store(remote);
@@ -49,10 +49,12 @@ public sealed class FactionTeablePersistenceTests : IDisposable
         var factions = Factions(writer);
         var charter = factions.CreateFaction(user, Charter("Synthetic Signal Cell"));
         var action = factions.ExecuteAction(user, charter.FactionId, Scout);
+        FactionAccessFixture.AddCampaign(writer, user, "campaign-synthetic");
         var lore = factions.UpsertPrivateLoreOverlay(user, "campaign-synthetic", new PrivateLoreOverlayRequest(
             "emerald-sprawl-prelude", charter.FactionId, new Dictionary<string, string> { ["district"] = "Private label" }, ["Private note"]));
         Assert.Null(factions.GetFactionDetail(charter.FactionId));
-        factions.ApproveFactionForPublicProjection(user, charter.FactionId);
+        var permission = await FactionAccessFixture.Permission(writer);
+        factions.ApproveFactionForPublicProjection(permission, charter.FactionId);
 
         using var cold = Store(remote);
         var restored = Factions(cold);
@@ -60,7 +62,7 @@ public sealed class FactionTeablePersistenceTests : IDisposable
         Assert.Equal("public_safe_active", restored.GetCharter(charter.FactionId)!.Status);
         Assert.NotNull(restored.GetFactionDetail(charter.FactionId));
         Assert.Equal(action.ReceiptId, Assert.Single(restored.GetActionReceipts(charter.FactionId)).ReceiptId);
-        var savedLore = restored.GetPrivateLoreOverlay("campaign-synthetic", charter.FactionId)!;
+        var savedLore = restored.GetPrivateLoreOverlay(user, "campaign-synthetic", charter.FactionId)!;
         Assert.Equal(lore.OverlayId, savedLore.OverlayId);
         Assert.Equal("Private label", savedLore.LabelMap["district"]);
         Assert.False(savedLore.PublicProjectionAllowed);
@@ -68,20 +70,21 @@ public sealed class FactionTeablePersistenceTests : IDisposable
     }
 
     [Fact]
-    public void Existing_service_observes_remote_moderation_and_allegiance_changes()
+    public async Task Existing_service_observes_remote_moderation_and_allegiance_changes()
     {
         using var remote = new Remote();
         using var writer = Store(remote);
         var user = new AccountService(writer).EnsureUser("founder");
         var factions = Factions(writer);
         var charter = factions.CreateFaction(user, Charter("Synthetic Quiet Cell"));
-        factions.ApproveFactionForPublicProjection(user, charter.FactionId);
+        var permission = await FactionAccessFixture.Permission(writer);
+        factions.ApproveFactionForPublicProjection(permission, charter.FactionId);
         using var reader = Store(remote);
         var observer = Factions(reader);
         Assert.NotNull(observer.GetFactionDetail(charter.FactionId));
         Assert.True(observer.HasActiveAllegiance(user.UserId));
 
-        factions.SuppressFactionPublicProjection(user, charter.FactionId, "Withdrawn");
+        factions.SuppressFactionPublicProjection(permission, charter.FactionId, "Withdrawn");
         using (writer.Enter())
         {
             writer.BlackLedgerFactionOnboardingState!.Allegiances.Remove(user.UserId);
@@ -92,6 +95,36 @@ public sealed class FactionTeablePersistenceTests : IDisposable
         Assert.Equal("suppressed", observer.GetCharter(charter.FactionId)!.Status);
         Assert.False(observer.HasActiveAllegiance(user.UserId));
         Assert.Throws<InvalidOperationException>(() => observer.ExecuteAction(user, charter.FactionId, Scout));
+    }
+
+    [Fact]
+    public void Lore_access_observes_persisted_owner_transfer_without_writing_on_denial()
+    {
+        using var remote = new Remote();
+        using var writer = Store(remote);
+        var accounts = new AccountService(writer);
+        var owner = accounts.EnsureUser("lore-owner");
+        var successor = accounts.EnsureUser("lore-successor");
+        var factions = Factions(writer);
+        var charter = factions.CreateFaction(owner, Charter("Synthetic Private Cell"));
+        FactionAccessFixture.AddCampaign(writer, owner, "campaign-synthetic");
+        var lore = factions.UpsertPrivateLoreOverlay(owner, "campaign-synthetic", FactionAccessFixture.Lore(charter.FactionId));
+        using var reader = Store(remote);
+        var observer = Factions(reader);
+        Assert.Equal(lore.OverlayId, observer.GetPrivateLoreOverlay(owner, "campaign-synthetic", charter.FactionId)!.OverlayId);
+        using (writer.Enter())
+        {
+            var group = writer.GroupsById["group-campaign-synthetic"];
+            writer.GroupsById[group.GroupId] = group with { OwnerUserId = successor.UserId };
+            writer.PersistLocked();
+        }
+        int writes = remote.HeadPosts;
+        Assert.Equal(404, Assert.Throws<Chummer.Run.Api.Services.HubRequestAuthException>(() =>
+            observer.GetPrivateLoreOverlay(owner, "campaign-synthetic", charter.FactionId)).StatusCode);
+        Assert.Equal(404, Assert.Throws<Chummer.Run.Api.Services.HubRequestAuthException>(() =>
+            observer.UpsertPrivateLoreOverlay(owner, "campaign-synthetic", FactionAccessFixture.Lore(charter.FactionId))).StatusCode);
+        Assert.Equal(writes, remote.HeadPosts);
+        Assert.Equal(lore.OverlayId, observer.GetPrivateLoreOverlay(successor, "campaign-synthetic", charter.FactionId)!.OverlayId);
     }
 
     [Fact]
