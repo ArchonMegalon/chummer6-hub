@@ -26,17 +26,17 @@
       },
       "Chummer.Hub.Registry.Contracts": {
         "type": "Direct",
-        "requested": "[0.1.1-packageplane.20260927.1, )",
-        "resolved": "0.1.1-packageplane.20260927.1",
-        "contentHash": "iJAN7pcnsubw2z7ZOe0eFLv4tJHaJzDp5hrVI5z0HUN6ZzYwo25/76NtiYykvg/4cCRvbXtQkp81MIRrZ88RTg=="
+        "requested": "[0.1.2-packageplane.20261125.sh6b6b1a95, )",
+        "resolved": "0.1.2-packageplane.20261125.sh6b6b1a95",
+        "contentHash": "fMoAgWg/MT5GKOjp9TsXOXYIJqkEPjiav4F8P7vMzVCjZS5GShIu6Thz4Dda0VN8rW0zV8Fbaa14T3ZzT8fuzg=="
       },
       "Chummer.Run.Registry": {
         "type": "Direct",
-        "requested": "[0.1.1-packageplane.20260927.1, )",
-        "resolved": "0.1.1-packageplane.20260927.1",
-        "contentHash": "5TIxRZrBTbMzfL3lDCdJjXR7X7njs+mi4aJ+rVxnJIntoIi3b9+j6u5an4Muyz6YiyMy3et0WW31b0Vv5V1CWg==",
+        "requested": "[0.1.2-packageplane.20261125.sh6b6b1a95, )",
+        "resolved": "0.1.2-packageplane.20261125.sh6b6b1a95",
+        "contentHash": "vvxTSLIaeiYSs52TxDGe3Pp2J05w7ARUNMCaQqHXM81Rb3kyZYQx0H9sDnNnTEJUdpGC5sN3QWGgf6sQRpi85A==",
         "dependencies": {
-          "Chummer.Hub.Registry.Contracts": "0.1.1-packageplane.20260927.1"
+          "Chummer.Hub.Registry.Contracts": "0.1.2-packageplane.20261125.sh6b6b1a95"
         }
       },
       "Npgsql": {
@@ -127,8 +127,8 @@
         "type": "Project",
         "dependencies": {
           "Chummer.Engine.Contracts": "[0.0.0-packageplane.candidate.sh5160e78a60bce, )",
-          "Chummer.Hub.Registry.Contracts": "[0.1.1-packageplane.20260927.1, )",
-          "Chummer.Play.Contracts": "[0.1.1-packageplane.20260927.1, )"
+          "Chummer.Hub.Registry.Contracts": "[0.1.2-packageplane.20261125.sh6b6b1a95, )",
+          "Chummer.Play.Contracts": "[0.1.2-packageplane.20261125.sh6b6b1a95, )"
         }
       },
       "chummer.storage.teable": {
