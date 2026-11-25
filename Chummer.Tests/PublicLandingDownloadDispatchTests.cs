@@ -4975,7 +4975,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 signalProjection: null!,
                 signalOperations: null!,
                 trustPulse: trustPulse,
-                signedInTrustStatus: null!,
+                signedInTrustStatus: new SignedInTrustStatusService(InstallLinking, supportCases, supportPresentation, trustPulse),
                 supportCases: supportCases,
                 supportPresentation: supportPresentation,
                 configuration: Configuration,
