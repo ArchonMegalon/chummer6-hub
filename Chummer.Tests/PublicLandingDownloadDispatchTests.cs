@@ -4815,6 +4815,8 @@ public sealed class PublicLandingDownloadDispatchTests
                 ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(_root, "horizon-artifact-request-receipts.json"),
                 ["BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL"] = "https://billing.example.test/supporter",
                 ["BRILLIANT_DIRECTORIES_SYNC_SECRET"] = "sync-secret",
+                ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(_root, "support-store.json"),
+                ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(_root, "attachments"),
                 ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
                 ["CHUMMER_KARMA_FORGE_STORE_PATH"] = Path.Combine(_root, "karma-forge-store.json"),
                 ["AllowedHosts"] = "chummer.run",
@@ -4922,6 +4924,15 @@ public sealed class PublicLandingDownloadDispatchTests
                 new StaticHttpClientFactory(new HttpClient(new StaticJsonHandler("""{"data":[],"total":0}"""))),
                 webHostEnvironment,
                 NullLogger<PublicParticipateSnapshotService>.Instance);
+            SupportStore supportStore = new(Configuration, NullLogger<SupportStore>.Instance);
+            SupportCasePresentationService supportPresentation = new();
+            SupportCaseService supportCases = new(
+                supportStore,
+                new SupportAttachmentStorageService(Configuration, supportStore),
+                new RewardService(communityStore),
+                new SupportProgressEmailWorkflowService(new HttpClient(new IdentityHandler(false)), Configuration,
+                    NullLogger<SupportProgressEmailWorkflowService>.Instance),
+                NullLogger<SupportCaseService>.Instance);
             Controller = new PublicLandingController(
                 landing: landing,
                 flipLinkDocumentPortal: new FlipLinkDocumentPortalService(Configuration),
@@ -4938,7 +4949,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 runsiteTourQuota: runsiteTourQuota,
                 installLinking: InstallLinking,
                 campaignSpine: campaignSpine,
-                workspaceServerPlane: null!,
+                workspaceServerPlane: new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation),
                 readyForTonight: null!,
                 knowledgeFabric: null!,
                 nexusPan: null!,
@@ -4965,8 +4976,8 @@ public sealed class PublicLandingDownloadDispatchTests
                 signalOperations: null!,
                 trustPulse: trustPulse,
                 signedInTrustStatus: null!,
-                supportCases: null!,
-                supportPresentation: null!,
+                supportCases: supportCases,
+                supportPresentation: supportPresentation,
                 configuration: Configuration,
                 installBootstrapTickets: InstallBootstrapTickets,
                 personalizedInstallScripts: PersonalizedInstallScripts,
