@@ -295,9 +295,10 @@ public sealed class LedgerController : ControllerBase
     {
         try
         {
-            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            return Ok(_blackLedgerFactions.ApproveFactionForPublicProjection(user, factionId));
+            var permission = await BlackLedgerModerationPermission.RequireAsync(_identity, Request, cancellationToken);
+            var subject = permission.Subject;
+            _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerFactions.ApproveFactionForPublicProjection(permission, factionId));
         }
         catch (HubRequestAuthException ex)
         {
@@ -319,9 +320,10 @@ public sealed class LedgerController : ControllerBase
     {
         try
         {
-            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            return Ok(_blackLedgerFactions.SuppressFactionPublicProjection(user, factionId, body?.Reason));
+            var permission = await BlackLedgerModerationPermission.RequireAsync(_identity, Request, cancellationToken);
+            var subject = permission.Subject;
+            _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerFactions.SuppressFactionPublicProjection(permission, factionId, body?.Reason));
         }
         catch (HubRequestAuthException ex)
         {

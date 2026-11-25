@@ -11,7 +11,7 @@
     "msbuild": "cc96c3846ae171984d29ba572ef6f22d273c675cd745c59dc7225fd5cd69610b",
     "nuget_packaging": "980fd0205cf99d02e52664ea82c678dcd32232b59d96e277b774d4743e7496b1"
   },
-  "package_version": "0.1.1-packageplane.20260927.1",
+  "package_version": "0.1.2-packageplane.20261125.sh6b6b1a95",
   "approved_remote_source": "https://api.nuget.org/v3/index.json",
   "build_recipe": {
     "path": "scripts/ai/bootstrap-hub-package-feed.py",
@@ -104,55 +104,55 @@
   "packages": [
     {
       "id": "Chummer.Hub.Registry.Contracts",
-      "version": "0.1.1-packageplane.20260927.1",
+      "version": "0.1.2-packageplane.20261125.sh6b6b1a95",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
-      "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29",
+      "commit": "6b6b1a95f5d077291183582cf73d43f83cd9cf63",
       "checkout_directory": "chummer-hub-registry",
       "project": "Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "354f68b2ef919934b5c809ea6e130dc90f3e761f5705cec2844587ef5844d3ce",
-      "nupkg_size_bytes": 524814
+      "nupkg_sha256": "a8c9ce639bf03d9a17534e21fddb1984f1dedce5a18f74c3298275972857e861",
+      "nupkg_size_bytes": 524832
     },
     {
       "id": "Chummer.Run.Registry",
-      "version": "0.1.1-packageplane.20260927.1",
+      "version": "0.1.2-packageplane.20261125.sh6b6b1a95",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
-      "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29",
+      "commit": "6b6b1a95f5d077291183582cf73d43f83cd9cf63",
       "checkout_directory": "chummer-hub-registry",
       "project": "Chummer.Run.Registry/Chummer.Run.Registry.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "7472fc5cc37257a4a2dac512a5fe6ce682c87e18810641d2094d8098ee0528ea",
-      "nupkg_size_bytes": 345254
+      "nupkg_sha256": "4b99fa643e7c7a8f4e5cf2836d17f282d56139cf1e82f92901a879e901d16d0d",
+      "nupkg_size_bytes": 387265
     },
     {
       "id": "Chummer.Play.Contracts",
-      "version": "0.1.1-packageplane.20260927.1",
+      "version": "0.1.2-packageplane.20261125.sh6b6b1a95",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
-      "commit": "fdd5aaa8dd32922aa3e6d0a14d5b592bc15333a9",
+      "commit": "7066947a74d240db564815858a8122fa5064cb42",
       "checkout_directory": "chummer-run-services",
       "project": "Chummer.Play.Contracts/Chummer.Play.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "f229b3754be13ee7d1ff2b231673ff7021c21d5f4a1d02dc2ae555a2073f19b7",
-      "nupkg_size_bytes": 322516
+      "nupkg_sha256": "cd042946473722f3dfc8f675966dbf7b157ffa77219be22baa5c6d477c6184da",
+      "nupkg_size_bytes": 322534
     },
     {
       "id": "Chummer.Run.Contracts",
-      "version": "0.1.1-packageplane.20260927.1",
+      "version": "0.1.2-packageplane.20261125.sh6b6b1a95",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
-      "commit": "fdd5aaa8dd32922aa3e6d0a14d5b592bc15333a9",
+      "commit": "7066947a74d240db564815858a8122fa5064cb42",
       "checkout_directory": "chummer-run-services",
       "project": "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "002dbe7ccf56cc306d9fecd048d6c3025481547b0bf082b94ceac5bc6d563f30",
-      "nupkg_size_bytes": 1862480
+      "nupkg_sha256": "a85a346b983eec74d00f70e426735cb8b0e96a685835c2da086aebd0576e706a",
+      "nupkg_size_bytes": 1862516
     }
   ]
 }

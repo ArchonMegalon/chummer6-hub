@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+    <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerHubRegistryContractsPackageVersion)" />
+    <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerRunRegistryPackageVersion)">
+      <ExcludeAssets>contentFiles</ExcludeAssets>
+    </PackageReference>
+    <ProjectReference Include="../Chummer.Run.Api/Chummer.Run.Api.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <Target Name="RequireSelectedRegistryPackages" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(ChummerUseLocalCompatibilityTree)' != 'false'"
+           Text="Registry package verification requires the package consumer, without sibling source references." />
+    <Error Condition="'$(ChummerRegistrySelectedCommit)' == ''"
+           Text="Run the package verifier with the controller-selected corrected Registry commit." />
+  </Target>
+</Project>

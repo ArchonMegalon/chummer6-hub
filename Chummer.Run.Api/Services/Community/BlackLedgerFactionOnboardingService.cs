@@ -742,19 +742,22 @@ public sealed class BlackLedgerFactionOnboardingService
         }
     }
 
-    public BlackLedgerFactionModerationReceiptDto ApproveFactionForPublicProjection(HubUserDto user, string factionId)
+    public BlackLedgerFactionModerationReceiptDto ApproveFactionForPublicProjection(BlackLedgerModerationPermission permission, string factionId)
     {
         string normalizedFactionId = NormalizeFactionId(factionId);
         var now = DateTimeOffset.UtcNow;
 
         using (_store.Enter())
         {
-            if (!State.CreatedFactions.ContainsKey(normalizedFactionId) || !State.Charters.TryGetValue(normalizedFactionId, out var charter))
+            HubUserDto user = RequireIndependentModeratorLocked(permission, normalizedFactionId);
+            var state = _store.BlackLedgerFactionOnboardingState;
+            if (state is null || !state.CreatedFactions.ContainsKey(normalizedFactionId)
+                || !state.Charters.TryGetValue(normalizedFactionId, out var charter))
             {
                 throw new InvalidOperationException("Unknown faction.");
             }
 
-            State.Charters[normalizedFactionId] = charter with
+            state.Charters[normalizedFactionId] = charter with
             {
                 Status = "public_safe_active",
                 Summary = "Moderation review approved the faction for bounded public projection on the Black Ledger."
@@ -769,20 +772,23 @@ public sealed class BlackLedgerFactionOnboardingService
                 CreatedAtUtc: now,
                 PublicProjectionAllowed: true);
 
-            State.ModerationReceipts.Add(receipt);
+            state.ModerationReceipts.Add(receipt);
             PersistLocked();
             return receipt;
         }
     }
 
-    public BlackLedgerFactionModerationReceiptDto SuppressFactionPublicProjection(HubUserDto user, string factionId, string? reason = null)
+    public BlackLedgerFactionModerationReceiptDto SuppressFactionPublicProjection(BlackLedgerModerationPermission permission, string factionId, string? reason = null)
     {
         string normalizedFactionId = NormalizeFactionId(factionId);
         var now = DateTimeOffset.UtcNow;
 
         using (_store.Enter())
         {
-            if (!State.CreatedFactions.ContainsKey(normalizedFactionId) || !State.Charters.TryGetValue(normalizedFactionId, out var charter))
+            HubUserDto user = RequireIndependentModeratorLocked(permission, normalizedFactionId);
+            var state = _store.BlackLedgerFactionOnboardingState;
+            if (state is null || !state.CreatedFactions.ContainsKey(normalizedFactionId)
+                || !state.Charters.TryGetValue(normalizedFactionId, out var charter))
             {
                 throw new InvalidOperationException("Unknown faction.");
             }
@@ -791,7 +797,7 @@ public sealed class BlackLedgerFactionOnboardingService
                 ? "Faction remains suppressed from public projection pending further review."
                 : $"Faction remains suppressed from public projection: {reason.Trim()}";
 
-            State.Charters[normalizedFactionId] = charter with
+            state.Charters[normalizedFactionId] = charter with
             {
                 Status = "suppressed",
                 Summary = summary
@@ -806,10 +812,30 @@ public sealed class BlackLedgerFactionOnboardingService
                 CreatedAtUtc: now,
                 PublicProjectionAllowed: false);
 
-            State.ModerationReceipts.Add(receipt);
+            state.ModerationReceipts.Add(receipt);
             PersistLocked();
             return receipt;
         }
+    }
+
+    private HubUserDto RequireIndependentModeratorLocked(BlackLedgerModerationPermission? permission, string factionId)
+    {
+        string subjectId = permission?.RequireSubjectId() ?? throw BlackLedgerModerationPermission.Denied();
+        if (!_store.UserIdBySubjectId.TryGetValue(subjectId, out var userId)
+            || !_store.UsersById.TryGetValue(userId, out var user))
+        {
+            throw BlackLedgerModerationPermission.Denied();
+        }
+
+        // No deliberate self-review policy exists: even an operator/admin must
+        // leave approval and suppression of their own charter to another reviewer.
+        if (_store.BlackLedgerFactionOnboardingState?.Charters.TryGetValue(factionId, out var charter) == true
+            && string.Equals(charter.FounderAccountId, user.UserId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw BlackLedgerModerationPermission.Denied();
+        }
+
+        return user;
     }
 
     public BlackLedgerFactionSlotAvailabilityDto BuildMajorSlotAvailability()
@@ -1009,17 +1035,45 @@ public sealed class BlackLedgerFactionOnboardingService
             ? new("challenger", 65, 2, 12, 4, 3, 3, false, 22, 48, 35, "This faction starts weaker and must challenge larger factions to grow.")
             : new("major", 100, 3, 18, 5, 2, 5, true, 55, 35, 50, null);
 
+    // This check only reads persisted authority. Account-summary/starter helpers
+    // initialize campaigns and must never be used to authorize a supplied ID.
+    public string RequirePrivateLoreCampaignOwner(HubUserDto? user, string? campaignId)
+    {
+        using var scope = _store.Enter();
+        return RequirePrivateLoreCampaignOwnerLocked(user, campaignId);
+    }
+
+    private string RequirePrivateLoreCampaignOwnerLocked(HubUserDto? user, string? campaignId)
+    {
+        if (user is null || string.IsNullOrWhiteSpace(user.UserId) || string.IsNullOrWhiteSpace(user.SubjectId)
+            || string.IsNullOrWhiteSpace(campaignId)
+            || !_store.UsersById.ContainsKey(user.UserId)
+            || !_store.UserIdBySubjectId.TryGetValue(user.SubjectId, out var currentUserId)
+            || !string.Equals(currentUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
+            || !_store.CampaignSpinesById.TryGetValue(campaignId.Trim(), out var campaign)
+            || !_store.GroupsById.TryGetValue(campaign.GroupId, out var group)
+            || string.IsNullOrWhiteSpace(group.OwnerUserId)
+            || !string.Equals(group.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+        {
+            // Identical response for absent, unknown and inaccessible campaigns.
+            throw new HubRequestAuthException(StatusCodes.Status404NotFound, "Private lore is unavailable.");
+        }
+
+        return campaign.CampaignId;
+    }
+
     public BlackLedgerPrivateLoreOverlayDto UpsertPrivateLoreOverlay(HubUserDto user, string campaignId, PrivateLoreOverlayRequest request)
     {
         using var scope = _store.Enter();
+        campaignId = RequirePrivateLoreCampaignOwnerLocked(user, campaignId);
         if (!string.Equals(request.WorldId, WorldId, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("worldId must be emerald-sprawl-prelude.");
         }
 
         string normalizedFactionId = NormalizeFactionId(request.FactionId);
-        var allegiance = GetAllegiance(user) ?? throw new InvalidOperationException("No faction allegiance.");
-        if (!string.Equals(allegiance.ActiveFactionId, normalizedFactionId, StringComparison.OrdinalIgnoreCase))
+        if (_store.BlackLedgerFactionOnboardingState?.Allegiances.TryGetValue(user.UserId, out var allegiance) != true
+            || !string.Equals(allegiance.ActiveFactionId, normalizedFactionId, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("You can only write private lore for your active faction.");
         }
@@ -1034,23 +1088,17 @@ public sealed class BlackLedgerFactionOnboardingService
             PublicProjectionAllowed: false,
             UpdatedAtUtc: DateTimeOffset.UtcNow);
 
-        using (_store.Enter())
-        {
-            State.PrivateLoreOverlays[$"{campaignId}:{normalizedFactionId}"] = overlay;
-            PersistLocked();
-        }
-
+        State.PrivateLoreOverlays[$"{campaignId}:{normalizedFactionId}"] = overlay;
+        PersistLocked();
         return overlay;
     }
 
-    public BlackLedgerPrivateLoreOverlayDto? GetPrivateLoreOverlay(string campaignId, string factionId)
+    public BlackLedgerPrivateLoreOverlayDto? GetPrivateLoreOverlay(HubUserDto user, string campaignId, string factionId)
     {
-        using (_store.Enter())
-        {
-            return State.PrivateLoreOverlays.TryGetValue($"{campaignId}:{NormalizeFactionId(factionId)}", out var overlay)
-                ? overlay
-                : null;
-        }
+        using var scope = _store.Enter();
+        campaignId = RequirePrivateLoreCampaignOwnerLocked(user, campaignId);
+        return _store.BlackLedgerFactionOnboardingState?.PrivateLoreOverlays.TryGetValue(
+            $"{campaignId}:{NormalizeFactionId(factionId)}", out var overlay) == true ? overlay : null;
     }
 
     private RunnerMembershipSnapshot BuildRunnerMembershipSnapshot(HubUserDto user)

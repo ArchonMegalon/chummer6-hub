@@ -127,6 +127,7 @@
     <Compile Include="..\Chummer.Tests\InstallLinkingStoreSecurityTests.cs" Link="InstallLinkingStoreSecurityTests.cs" />
     <Compile Include="..\Chummer.Tests\RepoPaths.cs" Link="RepoPaths.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerFactionOnboardingTests.cs" Link="BlackLedgerFactionOnboardingTests.cs" />
+    <Compile Include="..\Chummer.Tests\BlackLedgerAccessTests.cs" Link="BlackLedgerAccessTests.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerTickNewsTests.cs" Link="BlackLedgerTickNewsTests.cs" />
     <Compile Include="..\Chummer.Tests\CampaignCollaborationServiceTests.cs" Link="CampaignCollaborationServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\CampaignSpineGuardrailTests.cs" Link="CampaignSpineGuardrailTests.cs" />
