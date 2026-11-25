@@ -54,6 +54,7 @@ builder.Services.AddSingleton<IReleaseShelfPublicationReadinessProbe, ReleaseUpl
 builder.Services.AddHostedService<ReleaseShelfPublicationReadinessRefreshService>();
 builder.Services
     .AddControllersWithViews()
+    .AddApplicationPart(typeof(Chummer.Run.Registry.Controllers.HubRegistryController).Assembly)
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = context =>
@@ -418,6 +419,9 @@ app.UseWhen(
 
 app.UseWebSockets();
 app.UseAuthorization();
+// Registry's explicit control policy authenticates even AllowAnonymous actions.
+// Resolve account ownership after it, and only on the public read endpoints.
+app.UseMiddleware<HubRegistryReadIdentityMiddleware>();
 
 app.MapMethods("/api/health", new[] { HttpMethods.Get, HttpMethods.Head }, () => Results.Json(new
 {
